@@ -72,6 +72,7 @@ export async function initializeDatabase() {
       id VARCHAR(255) PRIMARY KEY,
       name VARCHAR(255) NOT NULL,
       email VARCHAR(255) UNIQUE NOT NULL,
+      username VARCHAR(255) UNIQUE,
       password_hash VARCHAR(255) NOT NULL,
       role VARCHAR(50) NOT NULL,
       phone VARCHAR(255),
@@ -83,6 +84,14 @@ export async function initializeDatabase() {
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
   `);
+
+  // Migration for databases created before `username` existed (fresh installs already
+  // get it from the CREATE TABLE above, so this is a no-op there).
+  try {
+    await dbClient.execute(`ALTER TABLE users ADD COLUMN username VARCHAR(255)`);
+  } catch {
+    // column already exists — safe to ignore
+  }
 
   // Tours & Accommodations
   // `extra_data` holds the rich/optional Tour fields (includes, images, itinerary, roomTypes,
@@ -170,6 +179,20 @@ export async function initializeDatabase() {
   console.log('[DB] Schema ready. Indexes created successfully.');
 
   await seedIfEmpty();
+  await backfillMissingUsernames();
+}
+
+// Databases seeded before the `username` column existed have it as NULL on every row
+// (ALTER TABLE can't retroactively populate it). Fill it in from the seed data whenever
+// a row's email matches a known seed user and its username is still empty.
+async function backfillMissingUsernames() {
+  for (const user of seedUsers) {
+    if (!user.username) continue;
+    await dbClient.execute(
+      `UPDATE users SET username = ? WHERE email = ? AND (username IS NULL OR username = '')`,
+      [user.username, user.email]
+    );
+  }
 }
 
 // 3. One-time demo data seed so a fresh Postgres/SQLite database isn't an empty marketplace.
@@ -185,10 +208,10 @@ async function seedIfEmpty() {
   for (const user of seedUsers) {
     const passwordHash = await bcrypt.hash(user.password || 'changeme123', 10);
     await dbClient.execute(
-      `INSERT INTO users (id, name, email, password_hash, role, phone, company_name, balance, avatar, about, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO users (id, name, email, username, password_hash, role, phone, company_name, balance, avatar, about, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        user.id, user.name, user.email, passwordHash, user.role, user.phone || null,
+        user.id, user.name, user.email, user.username || null, passwordHash, user.role, user.phone || null,
         user.companyName || null, Number(user.balance) || 0, user.avatar || null,
         user.about || null, user.createdAt || new Date().toISOString()
       ]

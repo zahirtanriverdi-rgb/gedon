@@ -7,6 +7,7 @@ import VendorPortal from './components/VendorPortal';
 import AdminPortal from './components/AdminPortal';
 import OperatorLogin from './components/OperatorLogin';
 import { SearchDropdown } from './components/SearchDropdown';
+import { getRecentSearches, addRecentSearch } from './utils/recentSearches';
 import { 
   Compass, 
   Layers, 
@@ -179,12 +180,24 @@ export default function App() {
   // Active Role State (Customer, Vendor, Admin) inside the Marketplace simulation
   const [selectedRole, setSelectedRole] = useState<UserRole>('customer');
   const [loggedInVendor, setLoggedInVendor] = useState<User | null>(null);
+  // JWT from /api/auth/operator/login — kept in memory only (not localStorage), matches
+  // the token's own short lifetime and is cleared on logout.
+  const [operatorToken, setOperatorToken] = useState<string | null>(null);
+  const handleOperatorLogin = (user: User, token: string) => {
+    setLoggedInVendor(user);
+    setOperatorToken(token);
+  };
+  const handleOperatorLogout = () => {
+    setLoggedInVendor(null);
+    setOperatorToken(null);
+  };
 
   // Global search and scroll state for sticky header
   const [globalSearchQuery, setGlobalSearchQuery] = useState('');
   const [isGlobalSearchFocused, setIsGlobalSearchFocused] = useState(false);
   const globalSearchRef = React.useRef<HTMLDivElement>(null);
-  const [recentSearches] = useState<string[]>(['Quba', 'Qəbələ']);
+  const [recentSearches, setRecentSearches] = useState<string[]>(() => getRecentSearches());
+  const recordSearch = (term: string) => setRecentSearches(addRecentSearch(term));
   const [isScrolled, setIsScrolled] = useState(false);
   const [displayCurrency, setDisplayCurrency] = useState<'AZN' | 'USD' | 'EUR'>('AZN');
   const [appLanguage, setAppLanguage] = useState<'az' | 'en' | 'ru'>('az');
@@ -544,6 +557,8 @@ export default function App() {
           {/* Logo Brand */}
           <div className="flex items-center gap-2 cursor-pointer order-1" onClick={() => {
             setCurrentSection('marketplace');
+            setGlobalSearchQuery('');
+            setIsGlobalSearchFocused(false);
             window.dispatchEvent(new CustomEvent('nav-home'));
           }}>
             <div className="flex flex-col font-black text-black leading-tight text-xl tracking-tight">
@@ -569,6 +584,7 @@ export default function App() {
                      onFocus={() => setIsGlobalSearchFocused(true)}
                      onKeyDown={(e) => {
                        if (e.key === 'Enter') {
+                         recordSearch(globalSearchQuery);
                          setIsGlobalSearchFocused(false);
                          window.scrollTo({ top: 300, behavior: 'smooth' });
                        }
@@ -576,8 +592,9 @@ export default function App() {
                      className="w-full py-2 bg-transparent text-slate-800 text-sm focus:outline-none placeholder-slate-500 font-medium"
                    />
                 </div>
-                <button 
+                <button
                   onClick={() => {
+                    recordSearch(globalSearchQuery);
                     setIsGlobalSearchFocused(false);
                     window.scrollTo({ top: 300, behavior: 'smooth' });
                   }}
@@ -589,12 +606,13 @@ export default function App() {
 
               {/* Suggestions Dropdown */}
               {isGlobalSearchFocused && (
-                <SearchDropdown 
+                <SearchDropdown
                   query={globalSearchQuery}
                   tours={tours}
                   recentSearches={recentSearches}
                   onSelect={(val) => {
                     setGlobalSearchQuery(val);
+                    recordSearch(val);
                     setIsGlobalSearchFocused(false);
                   }}
                   appLanguage={appLanguage}
@@ -693,7 +711,7 @@ export default function App() {
                 </button>
                 {loggedInVendor && (
                   <button
-                    onClick={() => setLoggedInVendor(null)}
+                    onClick={handleOperatorLogout}
                     className="text-xs font-semibold py-1 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-all ml-4"
                   >
                     Çıxış
@@ -761,15 +779,16 @@ export default function App() {
             )}
 
             {selectedRole === 'vendor' && !loggedInVendor && (
-              <OperatorLogin users={users} onLogin={setLoggedInVendor} />
+              <OperatorLogin onLogin={handleOperatorLogin} />
             )}
 
             {selectedRole === 'vendor' && loggedInVendor && (
-              <VendorPortal 
+              <VendorPortal
                 tours={tours}
                 slots={slots}
                 bookings={bookings}
                 currentUser={activeUser}
+                operatorToken={operatorToken}
                 onAddSlot={handleAddSlot}
                 onAddTour={handleAddTour}
                 onEditTour={handleEditTour}

@@ -32,6 +32,7 @@ interface VendorPortalProps {
   slots: TourSlot[];
   bookings: Booking[];
   currentUser: User;
+  operatorToken?: string | null;
   onAddSlot: (newSlot: TourSlot) => Promise<void>;
   onAddTour: (newTour: Tour) => Promise<void>;
   onEditTour?: (updatedTour: Tour) => Promise<void>;
@@ -108,6 +109,7 @@ export default function VendorPortal({
   slots,
   bookings,
   currentUser,
+  operatorToken,
   onAddSlot,
   onAddTour,
   onEditTour,
@@ -271,33 +273,49 @@ export default function VendorPortal({
     }
   };
 
-  const handleQrScan = (scannedText: string) => {
+  // Scan/check-in now hits the real backend (POST /api/bookings/checkin, JWT-protected)
+  // instead of searching the client-side `bookings` array — the server looks the ticket
+  // up itself and verifies it belongs to this operator's account before marking attendance.
+  const handleQrScan = async (scannedText: string) => {
     setIsQrScannerOpen(false);
-    
-    // Find booking matching the scanned reference ID
-    const foundBooking = bookings.find(b => 
-      b.booking_reference === scannedText || 
-      `TUR-${b.id.slice(0, 5).toUpperCase()}` === scannedText
-    );
 
-    if (foundBooking) {
-      if (foundBooking.attendanceStatus === 'İştirakçı gəldi') {
+    if (!operatorToken) {
+      if (onShowNotification) onShowNotification('Sessiyanız bitib. Yenidən daxil olun.', 'error');
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/bookings/checkin', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${operatorToken}`,
+        },
+        body: JSON.stringify({ reference: scannedText }),
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
         if (onShowNotification) {
-          onShowNotification('Bu bilet artıq check-in edilib! ⚠️', 'warning');
+          onShowNotification(data.error || 'Sistemdə bu bilet məlumatı tapılmadı! Xahiş edirik QR kodu bir daha yoxlayın. ❌', 'error');
         }
-      } else {
-        if (onEditBooking) {
-          const updated: Booking = { ...foundBooking, attendanceStatus: 'İştirakçı gəldi' };
-          onEditBooking(updated);
-          if (onShowNotification) {
-            onShowNotification(`Check-in uğurludur: ${foundBooking.customerName} (${foundBooking.participantsCount} nəfər) ✅`, 'success');
-          }
-        }
+        return;
       }
-    } else {
+
+      if (data.alreadyCheckedIn) {
+        if (onShowNotification) onShowNotification('Bu bilet artıq check-in edilib! ⚠️', 'warning');
+        return;
+      }
+
+      if (onEditBooking) {
+        await onEditBooking(data.booking);
+      }
       if (onShowNotification) {
-        onShowNotification('Sistemdə bu bilet məlumatı tapılmadı! Xahiş edirik QR kodu bir daha yoxlayın. ❌', 'error');
+        onShowNotification(`Check-in uğurludur: ${data.booking.customerName} (${data.booking.participantsCount} nəfər) ✅`, 'success');
       }
+    } catch (err) {
+      console.error('Check-in zamanı xəta baş verdi:', err);
+      if (onShowNotification) onShowNotification('Sistem xətası: Check-in edilə bilmədi.', 'error');
     }
   };
 

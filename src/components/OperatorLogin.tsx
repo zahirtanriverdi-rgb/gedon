@@ -3,37 +3,37 @@ import { User } from '../types';
 import { Lock, User as UserIcon } from 'lucide-react';
 
 interface OperatorLoginProps {
-  users: User[];
-  onLogin: (user: User) => void;
+  onLogin: (user: User, token: string) => void;
 }
 
-export default function OperatorLogin({ users, onLogin }: OperatorLoginProps) {
+export default function OperatorLogin({ onLogin }: OperatorLoginProps) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setTimeout(() => {
-      // Find operator where role is vendor and credentials match
-      const matchedUser = users.find(
-        (u) =>
-          u.role === 'vendor' &&
-          ((u.username && u.username === username) || u.email === username) &&
-          u.password === password
-      );
-
-      if (matchedUser) {
-        onLogin(matchedUser);
-      } else {
-        setError('İstifadəçi adı və ya şifrə yanlışdır.');
-      }
-      setIsLoading(false);
-    }, 500);
-  };
-
   const [isLoading, setIsLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setIsLoading(true);
+    try {
+      const response = await fetch('/api/auth/operator/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ identifier: username, password }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        setError(data.error || 'İstifadəçi adı və ya şifrə yanlışdır.');
+        return;
+      }
+      onLogin(data.user, data.token);
+    } catch (e: any) {
+      setError('Giriş zamanı server ilə əlaqə mümkün olmadı. Backend serverin işlədiyini yoxlayın.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">

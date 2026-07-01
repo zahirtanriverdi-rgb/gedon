@@ -54,6 +54,24 @@ interface BackendUser {
 
 const JWT_SECRET = process.env.JWT_SECRET || "turlar-secure-marketplace-fallback-jwt-hash-key";
 
+// Verifies the `Authorization: Bearer <token>` header issued by /api/auth/operator/login.
+// Tokens are signed on login but were never actually checked anywhere until now — this
+// middleware is what makes that check real. Attaches the decoded { id, email, role } to
+// req.operator for route handlers that need to know which vendor is calling.
+function authenticateOperator(req: any, res: any, next: any) {
+  const authHeader = req.headers.authorization as string | undefined;
+  const token = authHeader && authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+  if (!token) {
+    return res.status(401).json({ error: "Giriş tələb olunur (Authorization token yoxdur)." });
+  }
+  try {
+    req.operator = jwt.verify(token, JWT_SECRET);
+    next();
+  } catch {
+    return res.status(401).json({ error: "Token etibarsızdır və ya vaxtı bitib. Yenidən daxil olun." });
+  }
+}
+
 // Pre-seeded operator and admin accounts
 const backendUsers: BackendUser[] = [
   {
@@ -134,34 +152,46 @@ app.post("/api/auth/admin/login", (req, res) => {
   });
 });
 
-// OPERATOR LOGIN (JWT Sign & Return)
-app.post("/api/auth/operator/login", (req, res) => {
-  const { email, password } = req.body;
-  if (!email || !password) {
-    return res.status(400).json({ error: "Zəhmət olmasa e-poçt və şifrəni daxil edin." });
+// OPERATOR LOGIN (JWT Sign & Return) — checks the real `users` table (Postgres/SQLite via
+// server/db.ts), not a mock in-memory list, so actual seeded/registered vendor accounts work.
+// `identifier` accepts either the vendor's email or username.
+app.post("/api/auth/operator/login", async (req, res) => {
+  const { identifier, password } = req.body;
+  if (!identifier || !password) {
+    return res.status(400).json({ error: "Zəhmət olmasa istifadəçi adı/e-poçt və şifrəni daxil edin." });
   }
 
-  const user = backendUsers.find(u => u.email === email && u.role === "vendor");
-  if (!user || !bcrypt.compareSync(password, user.passwordHash)) {
-    return res.status(401).json({ error: "E-poçt və ya şifrə yanlışdır!" });
-  }
-
-  const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: "24h" });
-  return res.json({
-    success: true,
-    token,
-    user: {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      phone: user.phone,
-      avatar: user.avatar,
-      companyName: user.companyName,
-      balance: user.balance,
-      about: user.about
+  try {
+    const rows = await dbClient.query(
+      `SELECT * FROM users WHERE (email = ? OR username = ?) AND role = 'vendor'`,
+      [identifier, identifier]
+    );
+    const user = rows[0];
+    if (!user || !bcrypt.compareSync(password, user.password_hash)) {
+      return res.status(401).json({ error: "İstifadəçi adı/e-poçt və ya şifrə yanlışdır!" });
     }
-  });
+
+    const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: "24h" });
+    return res.json({
+      success: true,
+      token,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        username: user.username,
+        role: user.role,
+        phone: user.phone,
+        avatar: user.avatar,
+        companyName: user.company_name,
+        balance: Number(user.balance) || 0,
+        about: user.about
+      }
+    });
+  } catch (error: any) {
+    console.error("[POST /api/auth/operator/login] error:", error);
+    return res.status(500).json({ error: "Giriş zamanı server xətası baş verdi: " + error.message });
+  }
 });
 
 // ADMIN: CREATE OPERATOR (Admins can register dynamic backend operators)
@@ -826,6 +856,49 @@ app.put("/api/bookings/:id", async (req, res) => {
   } catch (error: any) {
     console.error("[PUT /api/bookings/:id] error:", error);
     res.status(500).json({ error: "Rezervasiya yenilənə bilmədi: " + error.message });
+  }
+});
+
+// POST /api/bookings/checkin — operator scans a ticket's QR code/reference to check the
+// customer in. Requires a valid operator JWT (authenticateOperator); only succeeds for
+// bookings under tours that belong to the authenticated operator's own vendor account.
+app.post("/api/bookings/checkin", authenticateOperator, async (req: any, res) => {
+  try {
+    const { reference } = req.body;
+    if (!reference) {
+      return res.status(400).json({ error: "Skan edilmiş bilet kodu göndərilmədi." });
+    }
+
+    let rows = await dbClient.query('SELECT * FROM bookings WHERE booking_reference = ?', [reference]);
+    if (!rows.length) {
+      // Fallback: some older/manual bookings are referenced by a short code derived from
+      // their id (TUR-XXXXX) rather than the stored booking_reference.
+      const candidates = await dbClient.query('SELECT * FROM bookings WHERE vendor_id = ?', [req.operator.id]);
+      rows = candidates.filter((b: any) => `TUR-${String(b.id).slice(0, 5).toUpperCase()}` === reference);
+    }
+
+    if (!rows.length) {
+      return res.status(404).json({ error: "Sistemdə bu bilet məlumatı tapılmadı!" });
+    }
+
+    const bookingRow = rows[0];
+    if (bookingRow.vendor_id !== req.operator.id) {
+      return res.status(403).json({ error: "Bu bilet sizin hesabınıza aid deyil." });
+    }
+
+    const booking = rowToBooking(bookingRow);
+    if ((booking as any).attendanceStatus === 'İştirakçı gəldi') {
+      return res.json({ alreadyCheckedIn: true, booking });
+    }
+
+    const extra = splitBookingBody({ ...booking, attendanceStatus: 'İştirakçı gəldi' });
+    await dbClient.execute('UPDATE bookings SET extra_data = ? WHERE id = ?', [JSON.stringify(extra), booking.id]);
+
+    const updatedRows = await dbClient.query('SELECT * FROM bookings WHERE id = ?', [booking.id]);
+    res.json({ alreadyCheckedIn: false, booking: rowToBooking(updatedRows[0]) });
+  } catch (error: any) {
+    console.error("[POST /api/bookings/checkin] error:", error);
+    res.status(500).json({ error: "Check-in zamanı xəta baş verdi: " + error.message });
   }
 });
 

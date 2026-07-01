@@ -6,6 +6,7 @@ import FAQPage from './FAQPage';
 import OrganizerProfile from './OrganizerProfile';
 import { SearchDropdown } from './SearchDropdown';
 import { PriceCalculator } from './PriceCalculator';
+import { getRecentSearches, addRecentSearch } from '../utils/recentSearches';
 import { 
   Search, 
   MapPin, 
@@ -201,8 +202,9 @@ export default function CustomerPortal({
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const searchContainerRef = React.useRef<HTMLDivElement>(null);
   
-  // Recent searches mock data
-  const [recentSearches, setRecentSearches] = useState<string[]>(['Quba', 'Qəbələ']);
+  // Real search history, persisted to localStorage (shared with the header's search bar)
+  const [recentSearches, setRecentSearches] = useState<string[]>(() => getRecentSearches());
+  const recordSearch = (term: string) => setRecentSearches(addRecentSearch(term));
 
   React.useEffect(() => {
     function handleClickOutsideSearch(event: MouseEvent) {
@@ -219,6 +221,23 @@ export default function CustomerPortal({
       setActiveView('home');
       setSelectedTour(null);
       setSelectedOrganizer(null);
+
+      // Fully reset search + filters so the logo click returns to a genuinely blank
+      // homepage state, not just the view — otherwise a stale query/filter combo from
+      // before stays applied to the (now invisible) tour list underneath.
+      setLocalSearchQuery('');
+      if (onSearchChange) onSearchChange('');
+      setIsSearchFocused(false);
+      setSelectedCategory('all');
+      setSelectedDifficulty('all');
+      setSelectedRegion('all');
+      setSelectedMonth('');
+      setSortBy('default');
+      setCalendarDateStart('');
+      setCalendarDateEnd('');
+      setShowCalendarWidget(false);
+      setIsFiltersExpanded(false);
+
       window.scrollTo({ top: 0, behavior: 'smooth' });
     };
     window.addEventListener('nav-home', handleNavHome);
@@ -1082,7 +1101,10 @@ export default function CustomerPortal({
         <div className="space-y-4">
           
           {/* Search & Filters (Clean Minimalism Style) */}
-          <div className="flex flex-col items-center justify-center py-2 mb-2 relative z-10 w-full animate-fadeIn">
+          {/* z-30 (not z-10): this wrapper's z-index caps the stacking context for the
+              suggestions dropdown inside it, so it must outrank the tour cards' own
+              z-10 share buttons below or the dropdown gets painted underneath them. */}
+          <div className="flex flex-col items-center justify-center py-2 mb-2 relative z-30 w-full animate-fadeIn">
             <h2 className="text-xl md:text-2xl font-extrabold text-slate-800 mb-4 tracking-tight text-center">{t('discoverTours')}</h2>
             
             {/* Main Pill Search Box & Budget Calculator */}
@@ -1096,15 +1118,22 @@ export default function CustomerPortal({
                      value={currentSearchQuery}
                      onChange={(e) => handleSearchChange(e.target.value)}
                      onFocus={() => setIsSearchFocused(true)}
+                     onKeyDown={(e) => {
+                       if (e.key === 'Enter') {
+                         recordSearch(currentSearchQuery);
+                         setIsSearchFocused(false);
+                       }
+                     }}
                      className="w-full py-2.5 bg-transparent text-slate-700 text-[13px] focus:outline-none font-medium placeholder-slate-400"
                    />
                 </div>
-                <button 
+                <button
                   onClick={() => {
+                    recordSearch(currentSearchQuery);
                     setIsSearchFocused(false);
                     const toursSection = document.getElementById('tours-list');
                     if(toursSection) {
-                      const yOffset = -100; 
+                      const yOffset = -100;
                       const y = toursSection.getBoundingClientRect().top + window.pageYOffset + yOffset;
                       window.scrollTo({top: y, behavior: 'smooth'});
                     }
@@ -1116,12 +1145,13 @@ export default function CustomerPortal({
 
                 {/* Suggestions Dropdown */}
                 {isSearchFocused && (
-                  <SearchDropdown 
+                  <SearchDropdown
                     query={currentSearchQuery}
                     tours={tours}
                     recentSearches={recentSearches}
                     onSelect={(val) => {
                       handleSearchChange(val);
+                      recordSearch(val);
                       setIsSearchFocused(false);
                     }}
                     appLanguage={appLanguage}

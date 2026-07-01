@@ -51,23 +51,34 @@ export const SearchDropdown: React.FC<SearchDropdownProps> = ({
        });
     });
   } else {
-    // Default popular suggestions if no query
-    const popularRegions = ['Quba', 'Qəbələ', 'Şahdağ', 'Tufandağ'];
-    popularRegions.forEach(region => {
-      const count = tours.filter(t => t.region === region || t.name.includes(region)).length;
-      if (count > 0 || region === 'Şahdağ' || region === 'Tufandağ') {
+    // Popular regions computed from real tour data: rank active/approved tours by
+    // region, using total review count as the popularity signal (a real demand proxy,
+    // not a guess) — replaces the previously hardcoded ['Quba', 'Qəbələ', ...] list.
+    const regionStats = new Map<string, { count: number; totalReviews: number }>();
+    tours
+      .filter(t => t.isApproved && t.isActive !== false)
+      .forEach(t => {
+        const stat = regionStats.get(t.region) || { count: 0, totalReviews: 0 };
+        stat.count += 1;
+        stat.totalReviews += t.reviewsCount || 0;
+        regionStats.set(t.region, stat);
+      });
+
+    Array.from(regionStats.entries())
+      .sort((a, b) => b[1].totalReviews - a[1].totalReviews)
+      .slice(0, 4)
+      .forEach(([region, stat]) => {
         suggestions.push({
           title: region,
-          subtitle: `${count || '10+'} ${appLanguage === 'az' ? 'aktivite' : appLanguage === 'ru' ? 'активностей' : 'activities'} • ${appLanguage === 'az' ? 'Populyar' : appLanguage === 'ru' ? 'Популярное' : 'Popular'}`,
+          subtitle: `${stat.count} ${appLanguage === 'az' ? 'aktivite' : appLanguage === 'ru' ? 'активностей' : 'activities'} • ${appLanguage === 'az' ? 'Populyar' : appLanguage === 'ru' ? 'Популярное' : 'Popular'}`,
           type: 'region'
         });
-      }
-    });
+      });
   }
 
   if (suggestions.length === 0 && !showRecent) {
     return (
-      <div className="absolute top-full left-0 right-0 mt-3 bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden z-50 py-4 text-left">
+      <div className="absolute top-full left-0 right-0 mt-3 bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden z-[100] py-4 text-left">
         <div className="px-4 text-center text-slate-500 py-4 text-sm font-medium">
           {appLanguage === 'az' ? 'Nəticə tapılmadı' : appLanguage === 'ru' ? 'Ничего не найдено' : 'No results found'}
         </div>
@@ -76,7 +87,7 @@ export const SearchDropdown: React.FC<SearchDropdownProps> = ({
   }
 
   return (
-    <div className="absolute top-full left-0 right-0 mt-3 bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden z-50 py-4 text-left max-h-[70vh] overflow-y-auto">
+    <div className="absolute top-full left-0 right-0 mt-3 bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden z-[100] py-4 text-left max-h-[70vh] overflow-y-auto">
       {/* Recent Searches */}
       {showRecent && (
         <div className="px-4 mb-5">
