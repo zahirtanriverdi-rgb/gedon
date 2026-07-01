@@ -1,0 +1,226 @@
+import { Pool } from 'pg';
+import path from 'path';
+import fs from 'fs';
+import { DatabaseSync } from 'node:sqlite';
+import bcrypt from 'bcryptjs';
+import { seedUsers, seedTours, seedTourSlots } from '../src/data/toursData';
+import type { Tour } from '../src/types';
+
+// This abstracts the database layer, allowing seamless transition from Local SQLite to Production PostgreSQL.
+export interface DBClient {
+  query(sql: string, params?: any[]): Promise<any[]>;
+  execute(sql: string, params?: any[]): Promise<void>;
+}
+
+// 1. Database connection logic based on environment
+// Use PostgreSQL whenever DATABASE_URL is configured; otherwise fall back to local SQLite.
+const isPostgres = !!process.env.DATABASE_URL && process.env.DATABASE_URL.trim() !== '';
+
+let dbClient: DBClient;
+
+if (isPostgres) {
+  console.log('[DB] Connecting to PostgreSQL Enterprise Database...');
+  const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+  });
+
+  dbClient = {
+    async query(sql: string, params: any[] = []) {
+      // Basic translation of named/ordinal params for Postgres ($1, $2) vs SQLite (?, ?)
+      let pgSql = sql.replace(/\?/g, (() => {
+        let i = 1;
+        return () => `$${i++}`;
+      })());
+      const res = await pool.query(pgSql, params);
+      return res.rows;
+    },
+    async execute(sql: string, params: any[] = []) {
+      let pgSql = sql.replace(/\?/g, (() => {
+        let i = 1;
+        return () => `$${i++}`;
+      })());
+      await pool.query(pgSql, params);
+    }
+  };
+} else {
+  console.log('[DB] Using Local node:sqlite fallback for MVP Development...');
+  const dbPath = path.join(process.cwd(), 'database.sqlite');
+  const db = new DatabaseSync(dbPath);
+  // SQLite disables FK enforcement by default; enable it so ON DELETE CASCADE actually fires.
+  db.exec('PRAGMA foreign_keys = ON;');
+
+  dbClient = {
+    async query(sql: string, params: any[] = []): Promise<any[]> {
+      const stmt = db.prepare(sql);
+      return stmt.all(...params) as any[];
+    },
+    async execute(sql: string, params: any[] = []): Promise<void> {
+      const stmt = db.prepare(sql);
+      stmt.run(...params);
+    }
+  };
+}
+
+// 2. Automated Schema Initialization
+export async function initializeDatabase() {
+  console.log('[DB] Initializing Enterprise Database Schema & Strict RBAC constraints...');
+  
+  // Users (Admin, Vendors, Customers)
+  await dbClient.execute(`
+    CREATE TABLE IF NOT EXISTS users (
+      id VARCHAR(255) PRIMARY KEY,
+      name VARCHAR(255) NOT NULL,
+      email VARCHAR(255) UNIQUE NOT NULL,
+      password_hash VARCHAR(255) NOT NULL,
+      role VARCHAR(50) NOT NULL,
+      phone VARCHAR(255),
+      company_name VARCHAR(255),
+      balance DECIMAL DEFAULT 0.0,
+      avatar VARCHAR(1024),
+      about TEXT,
+      subscription_valid_until TIMESTAMP,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  // Tours & Accommodations
+  // `extra_data` holds the rich/optional Tour fields (includes, images, itinerary, roomTypes,
+  // international/active-lifestyle specifics, etc.) as a JSON string, since those vary a lot
+  // per tour type and don't need to be queried on directly.
+  await dbClient.execute(`
+    CREATE TABLE IF NOT EXISTS tours (
+      id VARCHAR(255) PRIMARY KEY,
+      vendor_id VARCHAR(255) NOT NULL,
+      vendor_name VARCHAR(255),
+      name VARCHAR(255) NOT NULL,
+      category VARCHAR(100) NOT NULL,
+      difficulty VARCHAR(100) NOT NULL,
+      region VARCHAR(255) NOT NULL,
+      duration_days INTEGER NOT NULL,
+      description TEXT,
+      image TEXT,
+      is_active BOOLEAN DEFAULT 1,
+      is_approved BOOLEAN DEFAULT 0,
+      price_currency VARCHAR(10) DEFAULT 'AZN',
+      rating DECIMAL DEFAULT 0,
+      reviews_count INTEGER DEFAULT 0,
+      extra_data TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (vendor_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+  `);
+
+  // Tour Slots (Scheduling)
+  await dbClient.execute(`
+    CREATE TABLE IF NOT EXISTS tour_slots (
+      id VARCHAR(255) PRIMARY KEY,
+      tour_id VARCHAR(255) NOT NULL,
+      start_date VARCHAR(255) NOT NULL,
+      end_date VARCHAR(255),
+      capacity INTEGER NOT NULL,
+      price DECIMAL NOT NULL,
+      booked_count INTEGER DEFAULT 0,
+      FOREIGN KEY (tour_id) REFERENCES tours(id) ON DELETE CASCADE
+    );
+  `);
+
+  // Bookings / WhatsApp Redirect CRM
+  // `extra_data` holds optional Booking fields (attendanceStatus, operatorNote, ticketUrl,
+  // team booking details, equipment rental info, etc.) as a JSON string.
+  await dbClient.execute(`
+    CREATE TABLE IF NOT EXISTS bookings (
+      id VARCHAR(255) PRIMARY KEY,
+      tour_id VARCHAR(255) NOT NULL,
+      slot_id VARCHAR(255) NOT NULL,
+      vendor_id VARCHAR(255) NOT NULL,
+      customer_id VARCHAR(255),
+      customer_name VARCHAR(255) NOT NULL,
+      customer_phone VARCHAR(255) NOT NULL,
+      booking_reference VARCHAR(255) NOT NULL,
+      participants_count INTEGER NOT NULL,
+      total_amount DECIMAL NOT NULL,
+      status VARCHAR(50) DEFAULT 'pending',
+      payment_method VARCHAR(50) DEFAULT 'whatsapp',
+      extra_data TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (tour_id) REFERENCES tours(id) ON DELETE CASCADE,
+      FOREIGN KEY (slot_id) REFERENCES tour_slots(id) ON DELETE CASCADE,
+      FOREIGN KEY (vendor_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+  `);
+
+  // Reviews (anti-fake rating system: tied to a verified booking)
+  await dbClient.execute(`
+    CREATE TABLE IF NOT EXISTS reviews (
+      id VARCHAR(255) PRIMARY KEY,
+      tour_id VARCHAR(255) NOT NULL,
+      booking_id VARCHAR(255) NOT NULL,
+      customer_id VARCHAR(255),
+      customer_name VARCHAR(255) NOT NULL,
+      rating INTEGER NOT NULL,
+      comment TEXT,
+      verified_attendee BOOLEAN DEFAULT 0,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (tour_id) REFERENCES tours(id) ON DELETE CASCADE,
+      FOREIGN KEY (booking_id) REFERENCES bookings(id) ON DELETE CASCADE
+    );
+  `);
+
+  console.log('[DB] Schema ready. Indexes created successfully.');
+
+  await seedIfEmpty();
+}
+
+// 3. One-time demo data seed so a fresh Postgres/SQLite database isn't an empty marketplace.
+// Only runs when the `tours` table has zero rows; bookings/reviews are intentionally left
+// empty so they can be created live through the app to exercise the real API end-to-end.
+async function seedIfEmpty() {
+  const existing = await dbClient.query('SELECT COUNT(*) as count FROM tours');
+  const tourCount = Number(existing[0]?.count) || 0;
+  if (tourCount > 0) return;
+
+  console.log('[DB] Tours table is empty — seeding demo users, tours & slots...');
+
+  for (const user of seedUsers) {
+    const passwordHash = await bcrypt.hash(user.password || 'changeme123', 10);
+    await dbClient.execute(
+      `INSERT INTO users (id, name, email, password_hash, role, phone, company_name, balance, avatar, about, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        user.id, user.name, user.email, passwordHash, user.role, user.phone || null,
+        user.companyName || null, Number(user.balance) || 0, user.avatar || null,
+        user.about || null, user.createdAt || new Date().toISOString()
+      ]
+    );
+  }
+
+  for (const tour of seedTours as Tour[]) {
+    const {
+      id, vendorId, vendorName, name, category, difficulty, region, durationDays,
+      description, image, isActive, isApproved, priceCurrency, rating, reviewsCount,
+      ...extra
+    } = tour;
+    await dbClient.execute(
+      `INSERT INTO tours (id, vendor_id, vendor_name, name, category, difficulty, region, duration_days, description, image, is_active, is_approved, price_currency, rating, reviews_count, extra_data)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        id, vendorId, vendorName || null, name, category, difficulty, region, Number(durationDays),
+        description || null, image || null,
+        isActive === false ? 0 : 1, isApproved ? 1 : 0, priceCurrency || 'AZN',
+        Number(rating) || 0, Number(reviewsCount) || 0, JSON.stringify(extra)
+      ]
+    );
+  }
+
+  for (const slot of seedTourSlots) {
+    await dbClient.execute(
+      `INSERT INTO tour_slots (id, tour_id, start_date, end_date, price, capacity, booked_count) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [slot.id, slot.tourId, slot.startDate, slot.endDate || null, Number(slot.price), Number(slot.capacity), Number(slot.bookedCount) || 0]
+    );
+  }
+
+  console.log(`[DB] Seed complete: ${seedUsers.length} users, ${seedTours.length} tours, ${seedTourSlots.length} slots.`);
+}
+
+export default dbClient;

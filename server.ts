@@ -1,0 +1,1550 @@
+import express from "express";
+import path from "path";
+import fs from "fs";
+import { jsPDF } from "jspdf";
+import { createServer as createViteServer } from "vite";
+import { GoogleGenAI, Type } from "@google/genai";
+import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
+import { randomUUID } from "crypto";
+import { initializeDatabase } from "./server/db";
+import dbClient from "./server/db";
+
+const app = express();
+const PORT = 3000;
+
+// Lazy initialize GoogleGenAI client
+let aiClient: GoogleGenAI | null = null;
+function getGeminiClient(): GoogleGenAI {
+  if (!aiClient) {
+    const key = process.env.GEMINI_API_KEY;
+    if (!key) {
+      throw new Error("GEMINI_API_KEY environment variable is required.");
+    }
+    aiClient = new GoogleGenAI({
+      apiKey: key,
+      httpOptions: {
+        headers: {
+          'User-Agent': 'aistudio-build',
+        }
+      }
+    });
+  }
+  return aiClient;
+}
+
+// Body parser (raised limit: tour/vendor forms can include base64-encoded images/GPX data
+// well beyond Express's 100kb default, which otherwise fails with a hard-to-diagnose
+// "request entity too large" 413 whose HTML error page breaks response.json() on the client)
+app.use(express.json({ limit: '50mb' }));
+
+// JWT/bcrypt Database Definitions and Authentication System
+interface BackendUser {
+  id: string;
+  name: string;
+  email: string;
+  role: 'customer' | 'vendor' | 'admin';
+  phone: string;
+  passwordHash: string; // bcrypt
+  avatar?: string;
+  companyName?: string;
+  balance: number;
+  about?: string;
+}
+
+const JWT_SECRET = process.env.JWT_SECRET || "turlar-secure-marketplace-fallback-jwt-hash-key";
+
+// Pre-seeded operator and admin accounts
+const backendUsers: BackendUser[] = [
+  {
+    id: "user-admin",
+    name: "Elnur Cəfərov",
+    email: "admin@turlar.az",
+    role: "admin",
+    phone: "+994 55 555 55 55",
+    passwordHash: bcrypt.hashSync("admin12345", 8),
+    avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80",
+    balance: 1450.0
+  },
+  {
+    id: "user-vendor-1",
+    name: "Azerbaijan Mountain Adventures",
+    email: "info@mountain.az",
+    role: "vendor",
+    phone: "+994 50 123 45 67",
+    passwordHash: bcrypt.hashSync("operator1", 8),
+    companyName: "Mountain Guides LLC",
+    balance: 450.0,
+    avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80"
+  },
+  {
+    id: "user-vendor-2",
+    name: "Caspian Campers & Hikers",
+    email: "camp@caspian.az",
+    role: "vendor",
+    phone: "+994 70 987 65 43",
+    passwordHash: bcrypt.hashSync("operator2", 8),
+    companyName: "Caspian EcoTours",
+    balance: 890.0,
+    avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80"
+  }
+];
+
+// Profile Change Request DB
+interface BackendProfileUpdate {
+  id: string;
+  userId: string;
+  name: string;
+  email: string;
+  phone: string;
+  companyName?: string;
+  avatar?: string;
+  about?: string;
+  submittedAt: string;
+  status: "pending" | "approved" | "rejected";
+}
+
+const pendingProfileUpdates: BackendProfileUpdate[] = [];
+
+// ADMIN LOGIN (JWT Sign & Return)
+app.post("/api/auth/admin/login", (req, res) => {
+  const { email, password } = req.body;
+  if (!email || !password) {
+    return res.status(400).json({ error: "Zəhmət olmasa e-poçt və şifrəni daxil edin." });
+  }
+
+  const user = backendUsers.find(u => u.email === email && u.role === "admin");
+  if (!user || !bcrypt.compareSync(password, user.passwordHash)) {
+    return res.status(401).json({ error: "E-poçt və ya şifrə yanlışdır!" });
+  }
+
+  const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: "24h" });
+  return res.json({
+    success: true,
+    token,
+    user: {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      phone: user.phone,
+      avatar: user.avatar,
+      balance: user.balance
+    }
+  });
+});
+
+// OPERATOR LOGIN (JWT Sign & Return)
+app.post("/api/auth/operator/login", (req, res) => {
+  const { email, password } = req.body;
+  if (!email || !password) {
+    return res.status(400).json({ error: "Zəhmət olmasa e-poçt və şifrəni daxil edin." });
+  }
+
+  const user = backendUsers.find(u => u.email === email && u.role === "vendor");
+  if (!user || !bcrypt.compareSync(password, user.passwordHash)) {
+    return res.status(401).json({ error: "E-poçt və ya şifrə yanlışdır!" });
+  }
+
+  const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: "24h" });
+  return res.json({
+    success: true,
+    token,
+    user: {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      phone: user.phone,
+      avatar: user.avatar,
+      companyName: user.companyName,
+      balance: user.balance,
+      about: user.about
+    }
+  });
+});
+
+// ADMIN: CREATE OPERATOR (Admins can register dynamic backend operators)
+app.post("/api/auth/register-operator", (req, res) => {
+  const { name, email, password, phone, companyName } = req.body;
+  if (!name || !email || !password || !phone) {
+    return res.status(400).json({ error: "Zəhmət olmasa bütün məlumatları daxil edin (name, email, password, phone)." });
+  }
+
+  const exists = backendUsers.some(u => u.email === email);
+  if (exists) {
+    return res.status(400).json({ error: "Bu e-poçt ünvanı ilə artıq qeydiyyatdan keçilib!" });
+  }
+
+  const newUser: BackendUser = {
+    id: `user-vendor-${Date.now()}`,
+    name,
+    email,
+    role: "vendor",
+    phone,
+    passwordHash: bcrypt.hashSync(password, 8),
+    companyName: companyName || "",
+    balance: 0.0,
+    avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
+    about: ""
+  };
+
+  backendUsers.push(newUser);
+  return res.json({
+    success: true,
+    message: "Operator müvəffəqiyyətlə qeydiyyata alındı!",
+    operator: {
+      id: newUser.id,
+      name: newUser.name,
+      email: newUser.email,
+      role: newUser.role,
+      phone: newUser.phone,
+      companyName: newUser.companyName,
+      balance: newUser.balance,
+      avatar: newUser.avatar,
+      about: newUser.about
+    }
+  });
+});
+
+// OPERATOR: SUBMIT PROFILE CHANGE FOR APPROVAL (Staged updates)
+app.post("/api/profile/update-request", (req, res) => {
+  const { userId, name, email, phone, companyName, avatar, about } = req.body;
+  if (!userId || !name || !email || !phone) {
+    return res.status(400).json({ error: "Zəhmət olmasa tələb olunan profil məlumatlarını daxil edin." });
+  }
+
+  const targetUser = backendUsers.find(u => u.id === userId);
+  if (!targetUser) {
+    return res.status(404).json({ error: "İstifadəçi tapılmadı." });
+  }
+
+  const newRequest: BackendProfileUpdate = {
+    id: `req-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+    userId,
+    name,
+    email,
+    phone,
+    companyName,
+    avatar,
+    about,
+    submittedAt: new Date().toISOString(),
+    status: "pending"
+  };
+
+  pendingProfileUpdates.push(newRequest);
+  return res.json({
+    success: true,
+    message: "Profil yeniləmə müraciəti uğurla fiksasiya olundu və təsdiq üçün adminə göndərildi!",
+    request: newRequest
+  });
+});
+
+// ADMIN: GET REGISTERED OPERATORS
+app.get("/api/operators", (req, res) => {
+  res.json({
+    operators: backendUsers.filter(u => u.role === "vendor").map(u => ({
+      id: u.id,
+      name: u.name,
+      email: u.email,
+      phone: u.phone,
+      companyName: u.companyName,
+      balance: u.balance,
+      avatar: u.avatar,
+      about: u.about
+    }))
+  });
+});
+
+// ADMIN: GET PENDING PROFILE CHANGE REQUESTS
+app.get("/api/admin/profile-requests", (req, res) => {
+  res.json({
+    requests: pendingProfileUpdates
+  });
+});
+
+// ADMIN: AUDIT ACTION ON A CHANGE REQUEST (Approve / Reject)
+app.post("/api/admin/profile-requests/:id/action", (req, res) => {
+  const requestId = req.params.id;
+  const { action } = req.body; // "approve" or "reject"
+
+  const requestIndex = pendingProfileUpdates.findIndex(r => r.id === requestId);
+  if (requestIndex === -1) {
+    return res.status(404).json({ error: "Müraciət tapılmadı." });
+  }
+
+  const request = pendingProfileUpdates[requestIndex];
+  if (request.status !== "pending") {
+    return res.status(400).json({ error: "Bu müraciət artıq emal olunub!" });
+  }
+
+  if (action === "approve") {
+    request.status = "approved";
+    // Apply proposed updates immediately to live back-end DB
+    const user = backendUsers.find(u => u.id === request.userId);
+    if (user) {
+      user.name = request.name;
+      user.email = request.email;
+      user.phone = request.phone;
+      if (request.companyName !== undefined) user.companyName = request.companyName;
+      if (request.avatar !== undefined) user.avatar = request.avatar;
+      if (request.about !== undefined) user.about = request.about;
+    }
+    return res.json({
+      success: true,
+      message: "Profil yeniləməsi admin tərəfindən uğurla təsdiqləndi və canlı aktivləşdirildi!",
+      request,
+      updatedUser: user ? {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        phone: user.phone,
+        companyName: user.companyName,
+        balance: user.balance,
+        avatar: user.avatar,
+        about: user.about
+      } : null
+    });
+  } else if (action === "reject") {
+    request.status = "rejected";
+    return res.json({
+      success: true,
+      message: "Profil yeniləməsi rədd edildi və ləğv olundu.",
+      request
+    });
+  } else {
+    return res.status(400).json({ error: "Yanlış fəaliyyət tipi daxil edilib (yalnız 'approve' və ya 'reject' ola bilər)." });
+  }
+});
+
+
+// In-memory "Bookings" table to act as our backend DB tracking WhatsApp click-through leads
+interface ServerBooking {
+  id: string;
+  tourId: string;
+  startDate: string;
+  participantsCount: number;
+  vendorId: string;
+  booking_reference: string;
+  status: 'Redirected_to_WhatsApp';
+  clickedAt: string;
+}
+
+const serverBookings: ServerBooking[] = [];
+
+// Endpoint to fetch CBAR live rates (dynamic or fallback to 22.05.2026)
+app.get("/api/exchange-rates/cbar", async (req, res) => {
+  try {
+    const today = new Date();
+    const day = String(today.getDate()).padStart(2, '0');
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const year = today.getFullYear();
+    const dateStr = `${day}.${month}.${year}`;
+
+    let url = `https://cbar.az/currencies/${dateStr}.xml`;
+    console.log(`[CBAR] Fetching live rates from: ${url}`);
+
+    let response = await globalThis.fetch(url);
+    if (!response.ok) {
+      console.log(`[CBAR] Fetch failed for dynamic date ${dateStr} (status ${response.status}). Falling back to static target 22.05.2026.xml`);
+      url = "https://cbar.az/currencies/22.05.2026.xml";
+      response = await globalThis.fetch(url);
+    }
+
+    if (!response.ok) {
+      throw new Error(`CBAR returned status ${response.status}`);
+    }
+
+    const xmlText = await response.text();
+
+    const usdMatch = xmlText.match(/<Valute Code="USD">[\s\S]*?<Value>([\d.]+)<\/Value>/);
+    const eurMatch = xmlText.match(/<Valute Code="EUR">[\s\S]*?<Value>([\d.]+)<\/Value>/);
+
+    if (!usdMatch || !eurMatch) {
+      throw new Error("Could not parse USD/EUR values from CBAR XML response.");
+    }
+
+    const usd = parseFloat(usdMatch[1]);
+    const eur = parseFloat(eurMatch[1]);
+
+    console.log(`[CBAR] Successfully parsed rates: USD = ${usd} AZN, EUR = ${eur} AZN`);
+    return res.json({ success: true, USD: usd, EUR: eur, date: dateStr, source: url });
+  } catch (error: any) {
+    console.error("[CBAR Rate Fetch Error]", error);
+    try {
+      const fallbackUrl = "https://cbar.az/currencies/22.05.2026.xml";
+      const resp = await globalThis.fetch(fallbackUrl);
+      if (resp.ok) {
+        const text = await resp.text();
+        const usdMatch = text.match(/<Valute Code="USD">[\s\S]*?<Value>([\d.]+)<\/Value>/);
+        const eurMatch = text.match(/<Valute Code="EUR">[\s\S]*?<Value>([\d.]+)<\/Value>/);
+        if (usdMatch && eurMatch) {
+          return res.json({
+            success: true,
+            USD: parseFloat(usdMatch[1]),
+            EUR: parseFloat(eurMatch[1]),
+            date: "22.05.2026",
+            source: fallbackUrl,
+            warning: "Fetched from backup date due to primary error"
+          });
+        }
+      }
+    } catch (e) {}
+
+    return res.status(500).json({ error: "CBAR məzənnələrini gətirmək mümkün olmadı: " + error.message });
+  }
+});
+
+// Endpoint to track WhatsApp redirect analytics (Lead Tracking)
+app.post("/api/bookings/whatsapp-click", (req, res) => {
+  const { tourId, startDate, participantsCount, vendorId, booking_reference } = req.body;
+
+  if (!tourId || !startDate || !participantsCount || !vendorId || !booking_reference) {
+    return res.status(400).json({ error: "Zəhmət olmasa bütün məlumatları qeyd edin (tourId, startDate, participantsCount, vendorId, booking_reference)" });
+  }
+
+  const newLead: ServerBooking = {
+    id: `lead-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+    tourId,
+    startDate,
+    participantsCount: Number(participantsCount),
+    vendorId,
+    booking_reference,
+    status: "Redirected_to_WhatsApp",
+    clickedAt: new Date().toISOString()
+  };
+
+  serverBookings.push(newLead);
+  console.log(`[Lead Tracked] Booking Ref: ${booking_reference} | Tour: ${tourId} -> Redirected to WhatsApp.`);
+
+  return res.json({
+    success: true,
+    message: "Klik statistikası uğurla qeydə alındı (Redirected_to_WhatsApp)",
+    lead: newLead,
+    totalLeadsForVendor: serverBookings.filter(b => b.vendorId === vendorId).length
+  });
+});
+
+// Endpoint to expose all tracked WhatsApp leads for admin/vendor analytic panels
+app.get("/api/bookings/whatsapp-leads", (req, res) => {
+  res.json({
+    leads: serverBookings,
+    totalCount: serverBookings.length
+  });
+});
+
+// ============================================================================
+// Marketplace Core Data API — Tours / Slots / Bookings / Reviews
+// Backed by dbClient (server/db.ts), which talks to PostgreSQL when
+// DATABASE_URL is configured and falls back to local SQLite otherwise.
+// All queries below use "?" placeholders bound through dbClient's params
+// array, which dbClient translates into safely parameterized queries for
+// both drivers — no request value is ever concatenated into SQL text.
+// ============================================================================
+
+// Fields that live as real columns on the `tours` table. Everything else on
+// the request body (itinerary, roomTypes, includes, etc.) is preserved as-is
+// inside the `extra_data` JSON column so the full Tour shape round-trips.
+const TOUR_CORE_FIELDS = [
+  'id', 'vendorId', 'vendorName', 'name', 'category', 'difficulty', 'region',
+  'durationDays', 'description', 'image', 'isActive', 'isApproved',
+  'priceCurrency', 'rating', 'reviewsCount', 'createdAt'
+];
+
+function rowToTour(row: any) {
+  let extra: Record<string, any> = {};
+  try { extra = row.extra_data ? JSON.parse(row.extra_data) : {}; } catch { extra = {}; }
+  return {
+    ...extra,
+    id: row.id,
+    vendorId: row.vendor_id,
+    vendorName: row.vendor_name,
+    name: row.name,
+    category: row.category,
+    difficulty: row.difficulty,
+    region: row.region,
+    durationDays: Number(row.duration_days),
+    description: row.description,
+    image: row.image,
+    isActive: !!row.is_active,
+    isApproved: !!row.is_approved,
+    priceCurrency: row.price_currency,
+    rating: Number(row.rating) || 0,
+    reviewsCount: Number(row.reviews_count) || 0,
+    createdAt: row.created_at,
+  };
+}
+
+function splitTourBody(body: Record<string, any>) {
+  const extra: Record<string, any> = {};
+  for (const key of Object.keys(body)) {
+    if (!TOUR_CORE_FIELDS.includes(key)) extra[key] = body[key];
+  }
+  return extra;
+}
+
+// GET /api/tours — list tours, optionally filtered by vendorId / category / isApproved / isActive
+app.get("/api/tours", async (req, res) => {
+  try {
+    const { vendorId, category, isApproved, isActive } = req.query;
+    const conditions: string[] = [];
+    const params: any[] = [];
+
+    if (vendorId) { conditions.push('vendor_id = ?'); params.push(String(vendorId)); }
+    if (category) { conditions.push('category = ?'); params.push(String(category)); }
+    if (isApproved !== undefined) { conditions.push('is_approved = ?'); params.push(isApproved === 'true' ? 1 : 0); }
+    if (isActive !== undefined) { conditions.push('is_active = ?'); params.push(isActive === 'true' ? 1 : 0); }
+
+    const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+    const rows = await dbClient.query(`SELECT * FROM tours ${whereClause} ORDER BY created_at DESC`, params);
+    res.json({ tours: rows.map(rowToTour) });
+  } catch (error: any) {
+    console.error("[GET /api/tours] error:", error);
+    res.status(500).json({ error: "Turları gətirmək mümkün olmadı: " + error.message });
+  }
+});
+
+// GET /api/tours/:id — single tour
+app.get("/api/tours/:id", async (req, res) => {
+  try {
+    const rows = await dbClient.query('SELECT * FROM tours WHERE id = ?', [req.params.id]);
+    if (!rows.length) return res.status(404).json({ error: "Tur tapılmadı." });
+    res.json({ tour: rowToTour(rows[0]) });
+  } catch (error: any) {
+    console.error("[GET /api/tours/:id] error:", error);
+    res.status(500).json({ error: "Turu gətirmək mümkün olmadı: " + error.message });
+  }
+});
+
+// POST /api/tours — create a tour
+app.post("/api/tours", async (req, res) => {
+  try {
+    const body = req.body || {};
+    const { vendorId, name, category, difficulty, region, durationDays, description, image } = body;
+    if (!vendorId || !name || !category || !difficulty || !region || !durationDays) {
+      return res.status(400).json({ error: "Zəhmət olmasa bütün məcburi sahələri doldurun (vendorId, name, category, difficulty, region, durationDays)." });
+    }
+
+    const id = body.id || `tour-${randomUUID()}`;
+    const extra = splitTourBody(body);
+
+    await dbClient.execute(
+      `INSERT INTO tours (id, vendor_id, vendor_name, name, category, difficulty, region, duration_days, description, image, is_active, is_approved, price_currency, rating, reviews_count, extra_data)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        id, vendorId, body.vendorName || null, name, category, difficulty, region, Number(durationDays),
+        description || null, image || null,
+        body.isActive === undefined ? 1 : (body.isActive ? 1 : 0),
+        body.isApproved ? 1 : 0,
+        body.priceCurrency || 'AZN',
+        Number(body.rating) || 0,
+        Number(body.reviewsCount) || 0,
+        JSON.stringify(extra)
+      ]
+    );
+
+    const rows = await dbClient.query('SELECT * FROM tours WHERE id = ?', [id]);
+    res.status(201).json({ tour: rowToTour(rows[0]) });
+  } catch (error: any) {
+    console.error("[POST /api/tours] error:", error);
+    res.status(500).json({ error: "Tur yaradıla bilmədi: " + error.message });
+  }
+});
+
+// PUT /api/tours/:id — update a tour (partial update; merges onto the existing row)
+app.put("/api/tours/:id", async (req, res) => {
+  try {
+    const existingRows = await dbClient.query('SELECT * FROM tours WHERE id = ?', [req.params.id]);
+    if (!existingRows.length) return res.status(404).json({ error: "Tur tapılmadı." });
+
+    const existing = rowToTour(existingRows[0]);
+    const merged = { ...existing, ...(req.body || {}), id: req.params.id };
+    const extra = splitTourBody(merged);
+
+    await dbClient.execute(
+      `UPDATE tours SET vendor_id = ?, vendor_name = ?, name = ?, category = ?, difficulty = ?, region = ?, duration_days = ?, description = ?, image = ?, is_active = ?, is_approved = ?, price_currency = ?, rating = ?, reviews_count = ?, extra_data = ? WHERE id = ?`,
+      [
+        merged.vendorId, merged.vendorName || null, merged.name, merged.category, merged.difficulty, merged.region,
+        Number(merged.durationDays), merged.description || null, merged.image || null,
+        merged.isActive ? 1 : 0, merged.isApproved ? 1 : 0, merged.priceCurrency || 'AZN',
+        Number(merged.rating) || 0, Number(merged.reviewsCount) || 0,
+        JSON.stringify(extra), req.params.id
+      ]
+    );
+
+    const rows = await dbClient.query('SELECT * FROM tours WHERE id = ?', [req.params.id]);
+    res.json({ tour: rowToTour(rows[0]) });
+  } catch (error: any) {
+    console.error("[PUT /api/tours/:id] error:", error);
+    res.status(500).json({ error: "Tur yenilənə bilmədi: " + error.message });
+  }
+});
+
+// DELETE /api/tours/:id
+app.delete("/api/tours/:id", async (req, res) => {
+  try {
+    const existingRows = await dbClient.query('SELECT id FROM tours WHERE id = ?', [req.params.id]);
+    if (!existingRows.length) return res.status(404).json({ error: "Tur tapılmadı." });
+
+    await dbClient.execute('DELETE FROM tours WHERE id = ?', [req.params.id]);
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error("[DELETE /api/tours/:id] error:", error);
+    res.status(500).json({ error: "Tur silinə bilmədi: " + error.message });
+  }
+});
+
+function rowToSlot(row: any) {
+  return {
+    id: row.id,
+    tourId: row.tour_id,
+    startDate: row.start_date,
+    endDate: row.end_date,
+    price: Number(row.price),
+    capacity: Number(row.capacity),
+    bookedCount: Number(row.booked_count) || 0,
+  };
+}
+
+// GET /api/slots — list all slots, optionally filtered by tourId (flat list across every tour)
+app.get("/api/slots", async (req, res) => {
+  try {
+    const { tourId } = req.query;
+    const conditions: string[] = [];
+    const params: any[] = [];
+    if (tourId) { conditions.push('tour_id = ?'); params.push(String(tourId)); }
+
+    const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+    const rows = await dbClient.query(`SELECT * FROM tour_slots ${whereClause} ORDER BY start_date ASC`, params);
+    res.json({ slots: rows.map(rowToSlot) });
+  } catch (error: any) {
+    console.error("[GET /api/slots] error:", error);
+    res.status(500).json({ error: "Tarixləri gətirmək mümkün olmadı: " + error.message });
+  }
+});
+
+// GET /api/tours/:tourId/slots — list slots for a tour
+app.get("/api/tours/:tourId/slots", async (req, res) => {
+  try {
+    const rows = await dbClient.query('SELECT * FROM tour_slots WHERE tour_id = ? ORDER BY start_date ASC', [req.params.tourId]);
+    res.json({ slots: rows.map(rowToSlot) });
+  } catch (error: any) {
+    console.error("[GET /api/tours/:tourId/slots] error:", error);
+    res.status(500).json({ error: "Tarixləri gətirmək mümkün olmadı: " + error.message });
+  }
+});
+
+// POST /api/tours/:tourId/slots — create a slot for a tour
+app.post("/api/tours/:tourId/slots", async (req, res) => {
+  try {
+    const tourRows = await dbClient.query('SELECT id FROM tours WHERE id = ?', [req.params.tourId]);
+    if (!tourRows.length) return res.status(404).json({ error: "Tur tapılmadı." });
+
+    const { startDate, endDate, price, capacity } = req.body || {};
+    if (!startDate || price === undefined || capacity === undefined) {
+      return res.status(400).json({ error: "Zəhmət olmasa bütün məcburi sahələri doldurun (startDate, price, capacity)." });
+    }
+
+    const id = req.body.id || `slot-${randomUUID()}`;
+    await dbClient.execute(
+      `INSERT INTO tour_slots (id, tour_id, start_date, end_date, price, capacity, booked_count) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [id, req.params.tourId, startDate, endDate || null, Number(price), Number(capacity), Number(req.body.bookedCount) || 0]
+    );
+
+    const rows = await dbClient.query('SELECT * FROM tour_slots WHERE id = ?', [id]);
+    res.status(201).json({ slot: rowToSlot(rows[0]) });
+  } catch (error: any) {
+    console.error("[POST /api/tours/:tourId/slots] error:", error);
+    res.status(500).json({ error: "Tarix yaradıla bilmədi: " + error.message });
+  }
+});
+
+// PUT /api/slots/:id — update a slot (partial update)
+app.put("/api/slots/:id", async (req, res) => {
+  try {
+    const existingRows = await dbClient.query('SELECT * FROM tour_slots WHERE id = ?', [req.params.id]);
+    if (!existingRows.length) return res.status(404).json({ error: "Tarix tapılmadı." });
+
+    const existing = rowToSlot(existingRows[0]);
+    const merged = { ...existing, ...(req.body || {}) };
+
+    await dbClient.execute(
+      `UPDATE tour_slots SET start_date = ?, end_date = ?, price = ?, capacity = ?, booked_count = ? WHERE id = ?`,
+      [merged.startDate, merged.endDate || null, Number(merged.price), Number(merged.capacity), Number(merged.bookedCount) || 0, req.params.id]
+    );
+
+    const rows = await dbClient.query('SELECT * FROM tour_slots WHERE id = ?', [req.params.id]);
+    res.json({ slot: rowToSlot(rows[0]) });
+  } catch (error: any) {
+    console.error("[PUT /api/slots/:id] error:", error);
+    res.status(500).json({ error: "Tarix yenilənə bilmədi: " + error.message });
+  }
+});
+
+// DELETE /api/slots/:id
+app.delete("/api/slots/:id", async (req, res) => {
+  try {
+    const existingRows = await dbClient.query('SELECT id FROM tour_slots WHERE id = ?', [req.params.id]);
+    if (!existingRows.length) return res.status(404).json({ error: "Tarix tapılmadı." });
+
+    await dbClient.execute('DELETE FROM tour_slots WHERE id = ?', [req.params.id]);
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error("[DELETE /api/slots/:id] error:", error);
+    res.status(500).json({ error: "Tarix silinə bilmədi: " + error.message });
+  }
+});
+
+const BOOKING_CORE_FIELDS = [
+  'id', 'tourId', 'slotId', 'vendorId', 'customerId', 'customerName', 'customerPhone',
+  'bookingDate', 'participantsCount', 'totalAmount', 'status', 'paymentMethod', 'booking_reference'
+];
+
+function rowToBooking(row: any) {
+  let extra: Record<string, any> = {};
+  try { extra = row.extra_data ? JSON.parse(row.extra_data) : {}; } catch { extra = {}; }
+  return {
+    ...extra,
+    id: row.id,
+    tourId: row.tour_id,
+    slotId: row.slot_id,
+    vendorId: row.vendor_id,
+    customerId: row.customer_id,
+    customerName: row.customer_name,
+    customerPhone: row.customer_phone,
+    bookingDate: row.created_at,
+    participantsCount: Number(row.participants_count),
+    totalAmount: Number(row.total_amount),
+    status: row.status,
+    paymentMethod: row.payment_method,
+    booking_reference: row.booking_reference,
+  };
+}
+
+function splitBookingBody(body: Record<string, any>) {
+  const extra: Record<string, any> = {};
+  for (const key of Object.keys(body)) {
+    if (!BOOKING_CORE_FIELDS.includes(key)) extra[key] = body[key];
+  }
+  return extra;
+}
+
+// GET /api/bookings — list bookings, optionally filtered by vendorId / tourId / customerId / status
+app.get("/api/bookings", async (req, res) => {
+  try {
+    const { vendorId, tourId, customerId, status } = req.query;
+    const conditions: string[] = [];
+    const params: any[] = [];
+
+    if (vendorId) { conditions.push('vendor_id = ?'); params.push(String(vendorId)); }
+    if (tourId) { conditions.push('tour_id = ?'); params.push(String(tourId)); }
+    if (customerId) { conditions.push('customer_id = ?'); params.push(String(customerId)); }
+    if (status) { conditions.push('status = ?'); params.push(String(status)); }
+
+    const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+    const rows = await dbClient.query(`SELECT * FROM bookings ${whereClause} ORDER BY created_at DESC`, params);
+    res.json({ bookings: rows.map(rowToBooking) });
+  } catch (error: any) {
+    console.error("[GET /api/bookings] error:", error);
+    res.status(500).json({ error: "Rezervasiyaları gətirmək mümkün olmadı: " + error.message });
+  }
+});
+
+// POST /api/bookings — create a booking (vendorId is derived from the tour, and the
+// matching slot's booked_count is incremented so capacity stays consistent)
+app.post("/api/bookings", async (req, res) => {
+  try {
+    const body = req.body || {};
+    const { tourId, slotId, customerName, customerPhone, participantsCount, totalAmount } = body;
+    if (!tourId || !slotId || !customerName || !customerPhone || !participantsCount || totalAmount === undefined) {
+      return res.status(400).json({ error: "Zəhmət olmasa bütün məcburi sahələri doldurun (tourId, slotId, customerName, customerPhone, participantsCount, totalAmount)." });
+    }
+
+    const tourRows = await dbClient.query('SELECT vendor_id FROM tours WHERE id = ?', [tourId]);
+    if (!tourRows.length) return res.status(404).json({ error: "Tur tapılmadı." });
+
+    const slotRows = await dbClient.query('SELECT id FROM tour_slots WHERE id = ? AND tour_id = ?', [slotId, tourId]);
+    if (!slotRows.length) return res.status(404).json({ error: "Bu tur üçün belə bir tarix tapılmadı." });
+
+    const id = body.id || `book-${randomUUID()}`;
+    const bookingReference = body.booking_reference || `#TUR-${Math.floor(1000 + Math.random() * 9000)}`;
+    const extra = splitBookingBody(body);
+
+    await dbClient.execute(
+      `INSERT INTO bookings (id, tour_id, slot_id, vendor_id, customer_id, customer_name, customer_phone, booking_reference, participants_count, total_amount, status, payment_method, extra_data)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        id, tourId, slotId, tourRows[0].vendor_id, body.customerId || null, customerName, customerPhone,
+        bookingReference, Number(participantsCount), Number(totalAmount),
+        body.status || 'pending', body.paymentMethod || 'whatsapp', JSON.stringify(extra)
+      ]
+    );
+
+    await dbClient.execute(
+      'UPDATE tour_slots SET booked_count = booked_count + ? WHERE id = ?',
+      [Number(participantsCount), slotId]
+    );
+
+    const rows = await dbClient.query('SELECT * FROM bookings WHERE id = ?', [id]);
+    res.status(201).json({ booking: rowToBooking(rows[0]) });
+  } catch (error: any) {
+    console.error("[POST /api/bookings] error:", error);
+    res.status(500).json({ error: "Rezervasiya yaradıla bilmədi: " + error.message });
+  }
+});
+
+// PUT /api/bookings/:id — update a booking (e.g. status changes, operator notes)
+app.put("/api/bookings/:id", async (req, res) => {
+  try {
+    const existingRows = await dbClient.query('SELECT * FROM bookings WHERE id = ?', [req.params.id]);
+    if (!existingRows.length) return res.status(404).json({ error: "Rezervasiya tapılmadı." });
+
+    const existing = rowToBooking(existingRows[0]);
+    const merged = { ...existing, ...(req.body || {}), id: req.params.id };
+    const extra = splitBookingBody(merged);
+
+    await dbClient.execute(
+      `UPDATE bookings SET customer_id = ?, customer_name = ?, customer_phone = ?, participants_count = ?, total_amount = ?, status = ?, payment_method = ?, extra_data = ? WHERE id = ?`,
+      [
+        merged.customerId || null, merged.customerName, merged.customerPhone,
+        Number(merged.participantsCount), Number(merged.totalAmount),
+        merged.status, merged.paymentMethod || 'whatsapp', JSON.stringify(extra), req.params.id
+      ]
+    );
+
+    // Keep slot capacity consistent: cancelling frees up the seats, reinstating retakes them.
+    const wasCancelled = existing.status === 'cancelled';
+    const isCancelled = merged.status === 'cancelled';
+    if (wasCancelled !== isCancelled) {
+      const delta = isCancelled ? -Number(merged.participantsCount) : Number(merged.participantsCount);
+      await dbClient.execute('UPDATE tour_slots SET booked_count = booked_count + ? WHERE id = ?', [delta, merged.slotId]);
+    }
+
+    const rows = await dbClient.query('SELECT * FROM bookings WHERE id = ?', [req.params.id]);
+    res.json({ booking: rowToBooking(rows[0]) });
+  } catch (error: any) {
+    console.error("[PUT /api/bookings/:id] error:", error);
+    res.status(500).json({ error: "Rezervasiya yenilənə bilmədi: " + error.message });
+  }
+});
+
+function rowToReview(row: any) {
+  return {
+    id: row.id,
+    tourId: row.tour_id,
+    bookingId: row.booking_id,
+    customerId: row.customer_id,
+    customerName: row.customer_name,
+    rating: Number(row.rating),
+    comment: row.comment,
+    createdAt: row.created_at,
+    verifiedAttendee: !!row.verified_attendee,
+  };
+}
+
+// GET /api/reviews — list reviews, optionally filtered by tourId
+app.get("/api/reviews", async (req, res) => {
+  try {
+    const { tourId } = req.query;
+    const conditions: string[] = [];
+    const params: any[] = [];
+    if (tourId) { conditions.push('tour_id = ?'); params.push(String(tourId)); }
+
+    const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+    const rows = await dbClient.query(`SELECT * FROM reviews ${whereClause} ORDER BY created_at DESC`, params);
+    res.json({ reviews: rows.map(rowToReview) });
+  } catch (error: any) {
+    console.error("[GET /api/reviews] error:", error);
+    res.status(500).json({ error: "Rəyləri gətirmək mümkün olmadı: " + error.message });
+  }
+});
+
+// POST /api/reviews — create a review (must reference a real booking for that tour,
+// enforcing the anti-fake-rating rule), then refreshes the tour's rating/reviewsCount
+app.post("/api/reviews", async (req, res) => {
+  try {
+    const body = req.body || {};
+    const { tourId, bookingId, customerName, rating, comment } = body;
+    if (!tourId || !bookingId || !customerName || rating === undefined) {
+      return res.status(400).json({ error: "Zəhmət olmasa bütün məcburi sahələri doldurun (tourId, bookingId, customerName, rating)." });
+    }
+
+    const bookingRows = await dbClient.query('SELECT id FROM bookings WHERE id = ? AND tour_id = ?', [bookingId, tourId]);
+    const verifiedAttendee = bookingRows.length > 0;
+    if (!verifiedAttendee) {
+      return res.status(400).json({ error: "Rəy yalnız həmin turu rezerv etmiş müştərilər üçün mümkündür (bookingId uyğun gəlmədi)." });
+    }
+
+    const id = body.id || `review-${randomUUID()}`;
+    await dbClient.execute(
+      `INSERT INTO reviews (id, tour_id, booking_id, customer_id, customer_name, rating, comment, verified_attendee)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, tourId, bookingId, body.customerId || null, customerName, Number(rating), comment || null, 1]
+    );
+
+    // Refresh the tour's aggregate rating / reviewsCount from the reviews table.
+    const aggRows = await dbClient.query(
+      'SELECT AVG(rating) as avg_rating, COUNT(*) as review_count FROM reviews WHERE tour_id = ?',
+      [tourId]
+    );
+    const avgRating = Number(aggRows[0]?.avg_rating) || 0;
+    const reviewCount = Number(aggRows[0]?.review_count) || 0;
+    await dbClient.execute('UPDATE tours SET rating = ?, reviews_count = ? WHERE id = ?', [avgRating, reviewCount, tourId]);
+
+    const rows = await dbClient.query('SELECT * FROM reviews WHERE id = ?', [id]);
+    res.status(201).json({ review: rowToReview(rows[0]) });
+  } catch (error: any) {
+    console.error("[POST /api/reviews] error:", error);
+    res.status(500).json({ error: "Rəy yaradıla bilmədi: " + error.message });
+  }
+});
+
+// High-Performance Instagram/Facebook Caption parser with Gemini
+app.post("/api/parse-caption", async (req, res) => {
+  const { caption } = req.body;
+  if (!caption) {
+    return res.status(400).json({ error: "Zəhmət olmasa təhlil ediləcək paylaşım mətnini daxil edin." });
+  }
+
+  try {
+    const ai = getGeminiClient();
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3.5-flash",
+      contents: `You are a bulletproof, high-performance Data Extraction API for an Azerbaijani Tour Marketplace. Your single job is to parse messy, unstructured social media (Instagram, Facebook) tour captions written in Azerbaijani and convert them into a rigid, structured JSON format to automatically populate a web form.
+
+Analyze the following tour caption and convert it according to the strict extraction rules below:
+
+TOUR CAPTION:
+"""
+${caption}
+"""
+
+FIELD EXTRACTION RULES:
+1. "location": Look closely for the tour destination. Output ONLY the official district (rayon) or city name in Azerbaijan (e.g., "Qusar", "Lerik", "Şəki", "Quba"). If the text mentions villages or landmarks (e.g., "Qusar (Laza kəndi)", "Lerik Hamarmeşə", "Qəbələ Nohurgöl"), STRIP the extra details and output only the city/district name: "Qusar", "Lerik", "Qəbələ", etc.
+2. "price": Extract only the raw numeric value as a float decimal (e.g., "30 AZN" or "30 azn" becomes 30.00). If no price is explicitly found, set it to null.
+3. "duration_days": Calculate the total length of the tour. Look for keywords like "gecələmə", "hosteldə qalma", "2-ci gün", "1-ci gün". If it is a one-day trip (same day return), set it to 1. If it involves staying overnight, set it to 2 or more.
+4. "guide_whatsapp": Extract the contact phone number. You must sanitize it completely: remove all white spaces, dashes, parentheses, or any leading zeros. It must ALWAYS output in international format starting with the Azerbaijan country code: "+994XXXXXXXXX".
+5. "group_limit": Extract the maximum capacity or group size as an integer (e.g., from "15-18 nəfər", extract 18). Do not confuse remaining spots ("9 yer qalıb") with total group limit. If not mentioned, set to null.
+6. "difficulty": Standardize into one of these strict values: "Asan", "Orta", "Çətin", or a combined "Asan-Orta" / "Orta-Çətin".
+
+CONSTRAINTS:
+- Your response must contain ONLY the valid JSON object. Do not include markdown code wraps like \`\`\`json ... \`\`\`, do not include introduction texts, and do not include conversational responses. 
+- If a field is missing from the caption, map it to null. Never hallucinate or guess missing services.
+
+STRICT JSON SCHEMA TO OUTPUT:
+{
+  "tour_title": string,
+  "location": string,
+  "difficulty": string or null,
+  "group_limit": integer or null,
+  "duration_days": integer,
+  "price": float or null,
+  "currency": "AZN",
+  "guide_whatsapp": string,
+  "included_services": array of strings,
+  "excluded_services": array of strings,
+  "required_gear": array of strings,
+  "important_note": string or null
+}`,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            tour_title: {
+              type: Type.STRING,
+              description: "A beautifully cleaned title or headline for the tour, in Azerbaijani. Strip typical emoji decorations"
+            },
+            location: {
+              type: Type.STRING,
+              description: "The official district (rayon) or city name in Azerbaijan. Strip any village or street/landmark details (e.g. 'Qusar' instead of 'Qusar Laza')"
+            },
+            difficulty: {
+              type: Type.STRING,
+              description: "Strictly one of: 'Asan', 'Orta', 'Çətin', 'Asan-Orta', 'Orta-Çətin' or null."
+            },
+            group_limit: {
+              type: Type.INTEGER,
+              description: "Integer maximum group size, or null if not stated."
+            },
+            duration_days: {
+              type: Type.INTEGER,
+              description: "Estimated days duration. Set 1 if same day return."
+            },
+            price: {
+              type: Type.NUMBER,
+              description: "Extracted price value as float/number, or null."
+            },
+            currency: {
+              type: Type.STRING,
+              description: "Must be 'AZN'."
+            },
+            guide_whatsapp: {
+              type: Type.STRING,
+              description: "Sanitized international number. Starts with '+994', e.g., '+994706717804'."
+            },
+            included_services: {
+              type: Type.ARRAY,
+              items: { type: Type.STRING },
+              description: "List of services that are included (e.g., transport, food, photography, etc.)."
+            },
+            excluded_services: {
+              type: Type.ARRAY,
+              items: { type: Type.STRING },
+              description: "List of explicit exclusions (e.g. Lunch, museum fees), or empty list."
+            },
+            required_gear: {
+              type: Type.ARRAY,
+              items: { type: Type.STRING },
+              description: "List of suggested gear or equipment (e.g. Hiking shoes, raincoat), or empty list."
+            },
+            important_note: {
+              type: Type.STRING,
+              description: "Any special note, regulation, age limit, or null."
+            }
+          },
+          required: [
+            "tour_title",
+            "location",
+            "difficulty",
+            "group_limit",
+            "duration_days",
+            "price",
+            "currency",
+            "guide_whatsapp",
+            "included_services",
+            "excluded_services",
+            "required_gear",
+            "important_note"
+          ]
+        }
+      }
+    });
+
+    const parsedResponse = JSON.parse(response.text || "{}");
+    return res.json(parsedResponse);
+  } catch (err: any) {
+    console.error("Gemini Data Extraction Error:", err);
+    return res.status(550).json({ error: err.message || "Xəta baş verdi" });
+  }
+});
+
+// Endpoint for AI chatbot tour advisor
+app.post("/api/gemini/advisor", async (req, res) => {
+  const { messages, tourDetails } = req.body;
+  if (!messages || !Array.isArray(messages)) {
+    return res.status(400).json({ error: "Zəhmət olmasa düzgün mesaj tarixçəsi daxil edin." });
+  }
+
+  try {
+    const ai = getGeminiClient();
+
+    const tourCtx = tourDetails ? `
+Sən turistlər üçün ağıllı və peşəkar bir süni intellekt bələdçi köməkçisisən (AI Bələdçi).
+Hazırda müştəri bu konkret tur haqqında məlumat almaq istəyir:
+- Turun adı: ${tourDetails.name}
+- Region: ${tourDetails.region}
+- Kateqoriya: ${tourDetails.category === 'hiking' ? 'Yürüş / Hiking' : tourDetails.category === 'camp' ? 'Kamp' : 'Zirvə'}
+- Çətinlik səviyyəsi: ${tourDetails.difficulty === 'easy' ? 'Asan' : tourDetails.difficulty === 'medium' ? 'Orta' : tourDetails.difficulty === 'hard' ? 'Çətin' : 'Ekstrim'}
+- Müddət: ${tourDetails.durationDays} Gün
+- Təşkilatçı operator: ${tourDetails.vendorName}
+- Ətraflı məlumat/Təsvir: ${tourDetails.description}
+- Qiymətə daxil olan xidmətlər: ${(tourDetails.includes || []).join(', ')}
+- Birbaşa WhatsApp əlaqə nömrəsi: ${tourDetails.whatsapp_number || '+994706717804'}
+` : "Sən Azərbaycan təbiət turları üzrə peşəkar bələdçi köməkçisisən.";
+
+    const systemInstruction = `${tourCtx}
+Müştəriyə tur haqqında səmimi, dürüst, mehriban və son dərəcə faydalı cavablar ver. 
+Bütün cavablar mütləq doğma Azərbaycan dilində və tam aydın olmalıdır.
+Danışarkən şirin, cəlbedici bir tonda danış, lakin lakonik və dolğun olmağı unutma (gərəksiz uzun uzadı danışma).
+Müştəri tur haqqında çətinlik, ləvazimatlar və ya nəqliyyat soruşduqda, ona bu tura aid detalları izah et.
+Müştəri tura qoşulmaq və ya bilet almaq istədiyini bildirdikdə, onu birbaşa "Rezervasiya Et / WhatsApp" bölməsinə müraciət etməyə təşviq et və de ki, rezervasiyanı elə indi səhifədəki düymələrdən asanlıqla rəsmiləşdirə bilər!`;
+
+    const contents = messages.map(m => {
+      const role = m.role === 'user' ? 'user' : 'model';
+      return {
+        role,
+        parts: [{ text: m.content || "" }]
+      };
+    });
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3.5-flash",
+      contents,
+      config: {
+        systemInstruction,
+      }
+    });
+
+    return res.json({
+      reply: response.text || "Bağışlayın, bu suala hazırda cavab verə bilmirəm."
+    });
+  } catch (err: any) {
+    console.error("Gemini Advisor Error:", err);
+    return res.status(500).json({ error: err.message || "Süni intellekt bələdçisi ilə əlaqə qurularkən gözlənilməz xəta daxil oldu." });
+  }
+});
+
+// Endpoint for AI beginner and experienced packing assistant returning strict JSON
+app.post("/api/gemini/packing", async (req, res) => {
+  const { tourDetails } = req.body;
+  if (!tourDetails) {
+    return res.status(400).json({ error: "Tur detalları tələb olunur." });
+  }
+
+  try {
+    const ai = getGeminiClient();
+
+    const systemInstruction = `Sən Azərbaycanda fəaliyyət göstərən turlar üçün peşəkar "Ağıllı Çanta və Yürüş Hazırlığı AI Kökləndiricisi"sən.
+İstifadəçilərin həm yeni başlayan ("basics" siyahısı), həm də təcrübəli yürüşçülər ("pro_gear" siyahısı) olduğunu nəzərə alaraq, xüsusi çanta tövsiyələri hazırlamalısan.
+Tövsiyələri mütləq doğma Azərbaycan dilində, hər bir bənddə aydın, anlaşıqlı və tam faydalı şəkildə formalaşdır.
+
+Siyahı tələbləri:
+1. "basics" siyahısı: İlk dəfə və ya yeni başlayanlar üçün mütləq olan baza elementlər (məsələn: lazım olan su miqdarı, adi rahat sürüşməyən idman ayaqqabısı, günəşdən qorunma, yüngül qidalar). Bunlar hər kəsin evində asanlıqla tapa biləcəyi və ya ucuz şəkildə əldə edə biləcəyi detallar olmalıdır ki, insanların gözü qorxmasın.
+2. "pro_gear" siyahısı: Təcrübəli yürüşçülər üçün nəzərdə tutulmuş texniki, daxili relyef və hava şəraitinə uyğun peşəkar avadanlıqlar (məsələn: dik yoxuş-enişlər üçün teleskopik yürüş çubuqları, diz qoruyucuları, sukeçirməyən Gore-Tex botlar, palçıqlı relyef üçün ayaq qamaşları, gecikmələr üçün alın fənəri, termal alt paltarı və ya membran gödəkçə). Baza elementləri bura qətiyyən daxil etmə!
+
+Mövcud turun adı, regionu, çətinliyi və xüsusiyyətlərini analiz edərək tam nöqtə atışı tövsiyələr siyahısı yarat.`;
+
+    const promptText = `Aşağıdakı tur üçün həm yeni başlayanlar ("basics"), həm də təcrübəli yürüşçülər ("pro_gear") üçün Azərbaycan dilində çanta tövsiyələri hazırlat.
+- Tur adı: ${tourDetails.name}
+- Region: ${tourDetails.region}
+- Çətinlik səviyyəsi: ${tourDetails.difficulty === 'easy' ? 'Asan' : tourDetails.difficulty === 'medium' ? 'Orta' : tourDetails.difficulty === 'hard' ? 'Çətin' : 'Ekstrim'}
+- Kateqoriya: ${tourDetails.category === 'hiking' ? 'Yürüş / Hiking' : tourDetails.category === 'camp' ? 'Kamp' : 'Zirvə'}
+- Müddət: ${tourDetails.durationDays} Gün`;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3.5-flash",
+      contents: promptText,
+      config: {
+        systemInstruction,
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            packing_advice: {
+              type: Type.OBJECT,
+              properties: {
+                basics: {
+                  type: Type.ARRAY,
+                  items: { type: Type.STRING },
+                  description: "Azərbaycan dilində: Yeni başlayanlar üçün sadə və evdə asan tapılan təməl əşyalar və hazırlıq addımları"
+                },
+                pro_gear: {
+                  type: Type.ARRAY,
+                  items: { type: Type.STRING },
+                  description: "Azərbaycan dilində: Təcrübəli yürüşçülər üçün bu turun çətinliyinə və relyefinə uyğun sırf texniki, peşəkar avadanlıq və geyim təklifləri"
+                }
+              },
+              required: ["basics", "pro_gear"]
+            }
+          },
+          required: ["packing_advice"]
+        }
+      }
+    });
+
+    const parsedData = JSON.parse(response.text || "{}");
+    return res.json(parsedData);
+  } catch (err: any) {
+    console.error("Gemini Packing Advice error:", err);
+    return res.status(500).json({ error: err.message || "Xəta baş verdi" });
+  }
+});
+
+// Setup directory for generated tickets and cache directory for fonts
+const ticketsDir = path.join(process.cwd(), "tickets");
+if (!fs.existsSync(ticketsDir)) {
+  fs.mkdirSync(ticketsDir, { recursive: true });
+}
+
+// Custom force download endpoint for tickets to prevent mobile opening in new tab
+app.get("/tickets/:filename", (req, res, next) => {
+  const filename = req.params.filename;
+  const filepath = path.join(ticketsDir, filename);
+  if (fs.existsSync(filepath)) {
+    // res.download sets the correct Content-Disposition headers for direct device file download
+    res.download(filepath, filename);
+  } else {
+    res.status(404).send("Bilet tapılmadı.");
+  }
+});
+
+app.use("/tickets", express.static(ticketsDir));
+
+const fontsDir = path.join(process.cwd(), "fonts");
+if (!fs.existsSync(fontsDir)) {
+  fs.mkdirSync(fontsDir, { recursive: true });
+}
+
+let robotoRegularBase64: string | null = null;
+let robotoBoldBase64: string | null = null;
+
+// Download Google Fonts helper to safely support Azerbaijani UTF-8 characters natively (Ə, ə, İ, ı, etc.)
+async function ensureFonts() {
+  const regPath = path.join(fontsDir, "Roboto-Regular.ttf");
+  const boldPath = path.join(fontsDir, "Roboto-Bold.ttf");
+
+  const regUrl = "https://raw.githubusercontent.com/google/fonts/main/ofl/roboto/Roboto-Regular.ttf";
+  const boldUrl = "https://raw.githubusercontent.com/google/fonts/main/ofl/roboto/Roboto-Bold.ttf";
+
+  try {
+    if (!fs.existsSync(regPath)) {
+      console.log("[Fonts] Downloading Roboto-Regular.ttf for Azerbaijani UTF-8 PDF formatting...");
+      const res = await globalThis.fetch(regUrl);
+      if (res.ok) {
+        const buf = await res.arrayBuffer();
+        fs.writeFileSync(regPath, Buffer.from(buf));
+      }
+    }
+    if (fs.existsSync(regPath)) {
+      robotoRegularBase64 = fs.readFileSync(regPath).toString("base64");
+    }
+
+    if (!fs.existsSync(boldPath)) {
+      console.log("[Fonts] Downloading Roboto-Bold.ttf for Azerbaijani UTF-8 PDF formatting...");
+      const res = await globalThis.fetch(boldUrl);
+      if (res.ok) {
+        const buf = await res.arrayBuffer();
+        fs.writeFileSync(boldPath, Buffer.from(buf));
+      }
+    }
+    if (fs.existsSync(boldPath)) {
+      robotoBoldBase64 = fs.readFileSync(boldPath).toString("base64");
+    }
+    console.log("[Fonts] Roboto UTF-8 fonts are loaded and cached successfully.");
+  } catch (err) {
+    console.error("[Fonts] Failed to download or cache Roboto fonts. PDF generator will fallback to standard built-in fonts gracefully.", err);
+  }
+}
+
+// Fetch QR Code helper
+async function fetchQrCodeBase64(data: string): Promise<string | null> {
+  try {
+    const url = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(data)}`;
+    const res = await globalThis.fetch(url);
+    if (!res.ok) throw new Error("Failed to fetch QR image");
+    const arrayBuffer = await res.arrayBuffer();
+    return Buffer.from(arrayBuffer).toString("base64");
+  } catch (err) {
+    console.error("[QR Code] Failed to fetch live QR code from qrserver API:", err);
+    return null;
+  }
+}
+
+// Automated Landscape Ticket PDF Generation API (Redesigned as beautiful vertical A4 FlixBus format)
+app.post("/api/bookings/generate-ticket", async (req, res) => {
+  const {
+    bookingId,
+    customerName,
+    customerPhone,
+    tourName,
+    region,
+    date,
+    reference,
+    participantsCount,
+    amount,
+    status
+  } = req.body;
+
+  if (!bookingId || !customerName || !tourName) {
+    return res.status(400).json({ error: "Zəhmət olmasa tələb olunan booking məlumatlarını göndərin." });
+  }
+
+  try {
+    // Generate compact Portrait Mobile-Friendly PDF (Optimized for beautiful layout on phones)
+    const doc = new jsPDF({
+      orientation: "portrait",
+      unit: "px",
+      format: [360, 660]
+    });
+
+    const pageHeight = 660;
+    const pageWidth = 360;
+
+    let hasCustomFonts = false;
+    if (robotoRegularBase64 && robotoBoldBase64) {
+      try {
+        doc.addFileToVFS("Roboto-Regular.ttf", robotoRegularBase64);
+        doc.addFont("Roboto-Regular.ttf", "Roboto", "normal");
+
+        doc.addFileToVFS("Roboto-Bold.ttf", robotoBoldBase64);
+        doc.addFont("Roboto-Bold.ttf", "Roboto", "bold");
+
+        doc.setFont("Roboto", "normal");
+        hasCustomFonts = true;
+      } catch (e) {
+        console.error("Failed to register Roboto fonts in jsPDF:", e);
+      }
+    }
+
+    const fontName = hasCustomFonts ? "Roboto" : "Helvetica";
+
+    // Force sanitizing clean Azerbaijani/Turkish UTF-8 accents so that standard Helvetica renders flawlessly on all devices
+    const sanitizeText = (str: string) => {
+      return (str || "")
+        .replace(/Ə/g, "E").replace(/ə/g, "e")
+        .replace(/ı/g, "i").replace(/I/g, "I")
+        .replace(/Ö/g, "O").replace(/ö/g, "o")
+        .replace(/Ü/g, "U").replace(/ü/g, "u")
+        .replace(/Ç/g, "C").replace(/ç/g, "c")
+        .replace(/Ş/g, "S").replace(/ş/g, "s")
+        .replace(/Ğ/g, "G").replace(/ğ/g, "g")
+        .replace(/İ/g, "I");
+    };
+
+    const bRef = reference || `TUR-${bookingId.slice(0, 5).toUpperCase()}`;
+
+    // --- DRAW BACKGROUND & SOLID OUTER GREENISH-TEAL DASHED CONTAINER FRAME ---
+    // Background pure white
+    doc.setFillColor(255, 255, 255);
+    doc.rect(0, 0, pageWidth, pageHeight, "F");
+
+    // Decorative green-emerald dashed rounded outer frame border (matching the green frame in original picture)
+    doc.setDrawColor(34, 197, 94); // emerald/green-500 (#22C55E)
+    doc.setLineWidth(1.2);
+    doc.setLineDashPattern([3, 3], 0);
+    // Draw rounded rect enclosing ticket content
+    doc.roundedRect(12, 12, 336, 636, 10, 10, "D");
+    doc.setLineDashPattern([], 0); // Restore line rendering
+
+    // --- 1. CENTERED BRAND HEADER DIRECTLY LIKE SCREENSHOT ---
+    // Center indicator brand colors above text
+    doc.setFillColor(234, 179, 8); // Golden Amber
+    doc.rect(168, 25, 4, 11, "F");
+    doc.setFillColor(34, 197, 94); // Leaf Emerald
+    doc.rect(174, 25, 4, 11, "F");
+
+    // Center header text
+    doc.setTextColor(3, 105, 161); // Sky-700 (#0369A1)
+    doc.setFont(fontName, "bold");
+    doc.setFontSize(13);
+    doc.text(sanitizeText("TURLAR.AZ ELEKTRON BİLET"), 180, 48, { align: "center" });
+
+    // Center pill badge detailing "TƏSDİQLƏNİB - ÖDƏNİLİB" below title
+    doc.setFillColor(240, 253, 244); // Green-50 background tint
+    doc.setDrawColor(34, 197, 94); // Green-500 border
+    doc.setLineWidth(1);
+    doc.roundedRect(115, 56, 130, 15, 7, 7, "FD");
+
+    doc.setTextColor(21, 128, 61); // Green-700 accent
+    doc.setFont(fontName, "bold");
+    doc.setFontSize(7.5);
+    doc.text(sanitizeText("TƏSDİQLƏNİB - ÖDƏNİLİB"), 180, 66, { align: "center" });
+
+    // Soft header separator line below the badge
+    doc.setDrawColor(241, 245, 249); // slate-100
+    doc.setLineWidth(1);
+    doc.line(25, 82, 335, 82);
+
+
+    // --- 2. THE TICKET INFORMATION FIELD GRID LIST (LEFT) & QR CODE BOX (RIGHT) ---
+    const safeTourName = sanitizeText(tourName);
+
+    // Route Details Header Anchor
+    doc.setFont(fontName, "bold");
+    doc.setFontSize(7.5);
+    doc.setTextColor(100, 116, 139); // slate-500
+    doc.text(sanitizeText("TUR MARSRUTU"), 25, 96);
+
+    const routeFullText = `${safeTourName} (${sanitizeText(region || "Azərbaycan")})`;
+    const routeTextLines = doc.splitTextToSize(sanitizeText(routeFullText), 300);
+    doc.setFont(fontName, "bold");
+    doc.setFontSize(9);
+    doc.setTextColor(15, 23, 42); // slate-900
+
+    // Small green leaf circle decoration bullet
+    doc.setFillColor(34, 197, 94); 
+    doc.circle(29, 107, 2.5, "F");
+    doc.text(routeTextLines, 36, 109);
+
+    let cY = 111 + (routeTextLines.length * 11) + 12;
+
+    const drawField = (colNum: 1 | 2, label: string, val: string, isBold: boolean = false, fontSz: number = 8.5, customColor: [number, number, number] | null = null) => {
+      const startX = colNum === 1 ? 25 : 190;
+      
+      // Draw Label
+      doc.setFont(fontName, "bold");
+      doc.setFontSize(7.5);
+      doc.setTextColor(100, 116, 139); // slate-500 label
+      doc.text(sanitizeText(label), startX, cY);
+
+      // Draw Value
+      doc.setFont(fontName, isBold ? "bold" : "normal");
+      doc.setFontSize(fontSz);
+      if (customColor) {
+        doc.setTextColor(customColor[0], customColor[1], customColor[2]);
+      } else {
+        doc.setTextColor(15, 23, 42); // slate-900 value
+      }
+      doc.text(sanitizeText(val), startX, cY + 11);
+    };
+
+    // Row 1
+    drawField(1, "SIFARIS / BILET ID", `#${bRef}`, true, 9);
+    drawField(2, "EKSKURSİYA TARİXİ", date || "N/A", true, 9);
+    cY += 26;
+
+    // Row 2
+    drawField(1, "MÜŞTƏRİ ADI", customerName, true, 8.5);
+    drawField(2, "ƏLAQƏ NÖMRƏSİ", customerPhone || "N/A", true, 8.5);
+    cY += 26;
+
+    // Row 3
+    drawField(1, "İŞTİRAKÇI SAYI", `${participantsCount || 1} nəfər`, true, 8.5);
+    drawField(2, "ÜMUMİ MƏBLƏĞ", `${amount || 0} AZN`, true, 11, [16, 185, 129]); // emerald-500 emphasis
+    cY += 26;
+
+    // Row 4
+    drawField(1, "ÖDƏNİŞ METODU", "WhatsApp / m10", true, 8.5);
+    drawField(2, "STATUS", "TƏSDİQLƏNİB", true, 8.5, [21, 128, 61]); // green-700
+    cY += 28;
+
+    // Thin dash list divider
+    doc.setDrawColor(226, 232, 240); // slate-200
+    doc.setLineWidth(1);
+    doc.setLineDashPattern([2, 3], 0);
+    doc.line(25, cY, 335, cY);
+    doc.setLineDashPattern([], 0); // Restore line rendering
+    cY += 12;
+
+    // Center Scanning Live QR Block Frame
+    const qSz = 90;
+    const qX = (360 - qSz) / 2; // 135
+    const qY = cY;
+    
+    const qrBase64 = await fetchQrCodeBase64(bRef);
+    if (qrBase64) {
+      try {
+        doc.addImage(qrBase64, "PNG", qX, qY, qSz, qSz);
+        doc.setDrawColor(226, 232, 240);
+        doc.setLineWidth(0.8);
+        doc.rect(qX, qY, qSz, qSz, "D");
+      } catch (err) {
+        console.error("Failed to add live QR code image to pdf document:", err);
+      }
+    } else {
+      // Gray placeholder boundary
+      doc.setFillColor(248, 250, 252);
+      doc.rect(qX, qY, qSz, qSz, "F");
+      doc.setDrawColor(226, 232, 240);
+      doc.setLineWidth(0.8);
+      doc.rect(qX, qY, qSz, qSz, "D");
+
+      doc.setTextColor(148, 163, 184);
+      doc.setFont(fontName, "normal");
+      doc.setFontSize(7.5);
+      doc.text(sanitizeText("ONLINE QR SCAN"), qX + (qSz / 2), qY + 42, { align: "center" });
+      doc.text(sanitizeText("Birləşdirilmədi"), qX + (qSz / 2), qY + 54, { align: "center" });
+    }
+
+    // QR validation caption label underneath
+    doc.setFont(fontName, "bold");
+    doc.setFontSize(7.5);
+    doc.setTextColor(148, 163, 184); // slate-400
+    doc.text(sanitizeText("TƏSDİQ QR-KODU"), 180, qY + qSz + 11, { align: "center" });
+
+    cY += qSz + 24;
+
+
+    // --- 3. MÜHÜM TƏHLÜKƏSİZLİK QAYDALARI VƏ TƏLİMATLAR (BOTTOM SAFETY NOTE) ---
+    const boxY = cY;
+    const boxH = 132;
+    // Draw clean solid background wrapper block
+    doc.setFillColor(248, 250, 252); // slate-50
+    doc.rect(25, boxY, 310, boxH, "F");
+    
+    // Solid emerald-500 highlight vertical timeline bar on the left bounds
+    doc.setFillColor(16, 185, 129); // emerald-500
+    doc.rect(25, boxY, 3, boxH, "F");
+
+    // Title of regulations
+    doc.setFont(fontName, "bold");
+    doc.setFontSize(7.8);
+    doc.setTextColor(15, 23, 42); // slate-900
+    doc.text(sanitizeText("MÜHÜM TƏHLÜKƏSİZLİK QAYDALARI VƏ TƏLİMATLAR:"), 36, boxY + 14);
+
+    const rules = [
+      "1. Bələdçinin təhlükəsizlik və yürüş təlimatlarına 100% əməl edilməlidir.",
+      "2. Hava şəraitinə uyğun geyim və sürüşməyən rahat yürüş ayaqqabısı mütləqdir.",
+      "3. Təbiətə hörmətlə yanaşılmalı, heç bir növ zibil heç yerə atılmamalıdır.",
+      "4. Xroniki xəstəlik, astma barədə bələdçiyə öncədən məlumat verilməlidir.",
+      "5. Yürüş boyu alkoqollu içkilərin qəbulu qətiyyən qadağandır."
+    ];
+
+    doc.setFont(fontName, "normal");
+    doc.setFontSize(7);
+    doc.setTextColor(71, 85, 105); // slate-600 soft
+    
+    let ruleY = boxY + 27;
+    rules.forEach((rule) => {
+      const ruleLines = doc.splitTextToSize(sanitizeText(rule), 285);
+      doc.text(ruleLines, 36, ruleY);
+      ruleY += (ruleLines.length * 9.5) + 2;
+    });
+
+
+    // --- 4. TICKET FOOTER WITH REFINED CRM SIGNATURE LINE ---
+    // Subtle horizontal divider line anchored relative to bottom
+    doc.setDrawColor(241, 245, 249);
+    doc.setLineWidth(1);
+    doc.line(25, pageHeight - 34, 335, pageHeight - 34);
+
+    // Centered fine-print footer signoff matching original picture exactly
+    doc.setFont(fontName, "bold");
+    doc.setFontSize(6.5);
+    doc.setTextColor(148, 163, 184); // slate-400
+    doc.text(sanitizeText("XİDMƏTDƏN YARARLANDIĞINIZ ÜÇÜN TƏŞƏKKÜR EDİRİK! • TURLAR.AZ"), pageWidth / 2, pageHeight - 22, { align: "center" });
+
+    // Output binary array format for flawless Node file writing
+    const pdfOutputArrayBuffer = doc.output("arraybuffer");
+
+    const filename = `ticket_${bookingId}.pdf`;
+    const filepath = path.join(ticketsDir, filename);
+
+    fs.writeFileSync(filepath, Buffer.from(pdfOutputArrayBuffer));
+
+    const ticketUrl = `/tickets/${filename}`;
+    console.log(`[Ticket Success] Beautiful customized vertical mobile boarding pass stored at: ${ticketUrl}`);
+    return res.json({ success: true, ticketUrl });
+
+  } catch (error: any) {
+    console.error("PDF generation exception:", error);
+    return res.status(500).json({ error: "PDF bilet yaradılması zamanı xətalar baş verdi: " + error.message });
+  }
+});
+
+async function startServer() {
+  // Initialize Enterprise Database schemas / SQLite fallback
+  try {
+    await initializeDatabase();
+  } catch (err) {
+    console.error("[DB] Failed to initialize database:", err);
+  }
+
+  // Safe load custom UTF-8 Fonts at application startup
+  await ensureFonts();
+
+  // Vite middleware for development
+  if (process.env.NODE_ENV !== "production") {
+    const vite = await createViteServer({
+      server: { middlewareMode: true },
+      appType: "spa",
+    });
+    app.use(vite.middlewares);
+  } else {
+    const distPath = path.join(process.cwd(), 'dist');
+    app.use(express.static(distPath));
+    // SPA fallback handling
+    app.get('*', (req, res) => {
+      res.sendFile(path.join(distPath, 'index.html'));
+    });
+  }
+
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`Server running on http://localhost:${PORT}`);
+  });
+}
+
+startServer();
