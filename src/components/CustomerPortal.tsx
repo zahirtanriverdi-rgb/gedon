@@ -1814,15 +1814,6 @@ export default function CustomerPortal({
                     <div className="mt-3.5 pt-3.5 border-t border-dashed border-slate-200/80 flex gap-2">
                       <button
                         type="button"
-                        onClick={(e) => handleOpenAiChat(tour, e)}
-                        className="flex-1 bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white font-black text-[10px] py-2 px-2.5 rounded-lg transition-all hover:shadow-2xs tracking-wider flex items-center justify-center gap-1 cursor-pointer"
-                        title="Canlı AI bələdçidən dərhal məsləhət al"
-                      >
-                        <MessageSquare className="w-3.5 h-3.5 animate-pulse" />
-                        AI-dən Soruş
-                      </button>
-                      <button
-                        type="button"
                         onClick={(e) => handleQuickWhatsApp(tour, e)}
                         className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[10px] py-2 px-2.5 rounded-lg transition-all hover:shadow-2xs tracking-wider flex items-center justify-center gap-1 cursor-pointer"
                         title="Bələdçinin nömrəsinə WhatsApp ilə birbaşa keçid et"
