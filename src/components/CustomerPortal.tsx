@@ -356,6 +356,8 @@ export default function CustomerPortal({
   const [isDescExpanded, setIsDescExpanded] = useState<boolean>(false);
   const [selectedSlot, setSelectedSlot] = useState<TourSlot | null>(null);
   const [bookingQty, setBookingQty] = useState<number>(1);
+  const [sidebarParticipants, setSidebarParticipants] = useState<number>(1);
+  const [showParticipantsDropdown, setShowParticipantsDropdown] = useState<boolean>(false);
   const [paymentGateway, setPaymentGateway] = useState<string>('whatsapp');
   const [isBookingStep, setIsBookingStep] = useState<boolean>(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState<boolean>(false);
@@ -716,7 +718,8 @@ export default function CustomerPortal({
   // Open booking sub-section
   const handleOpenBooking = (slot: TourSlot) => {
     setSelectedSlot(slot);
-    setBookingQty(1);
+    const availableCapacity = Math.max(1, slot.capacity - slot.bookedCount);
+    setBookingQty(Math.min(sidebarParticipants, availableCapacity));
     setIsBookingStep(true);
     setBookingCustomerName('');
     setBookingCustomerPhone('');
@@ -3192,7 +3195,7 @@ export default function CustomerPortal({
             
           {/* RIGHT COLUMN: Sticky Booking Widget (GYG Style) */}
             <div className="w-full lg:w-[35%] relative" id="booking-widget-container">
-              <div className="sticky top-24 bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-slate-200 overflow-hidden">
+              <div className="sticky top-24 bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-slate-200">
                 <div className="p-6 space-y-6">
                   {/* Pricing Header */}
                   <div className="flex flex-col gap-1">
@@ -3217,19 +3220,62 @@ export default function CustomerPortal({
                   
                   {/* Selectors */}
                   <div className="space-y-4">
-                    <div className="flex flex-col border border-slate-300 rounded-xl overflow-hidden shadow-xs hover:border-slate-400 transition-colors">
-                      {/* Participants Dropdown Simulation */}
-                      <button className="flex items-center justify-between bg-white px-4 py-3 border-b border-slate-200 text-left cursor-pointer hover:bg-slate-50">
-                        <div className="flex items-center gap-3">
-                          <Users className="w-5 h-5 text-emerald-700" />
-                          <span className="text-sm font-extrabold text-slate-800">Böyük × 1</span>
-                        </div>
-                        <ChevronDown className="w-4 h-4 text-slate-400" />
-                      </button>
-                      
+                    <div className="flex flex-col border border-slate-300 rounded-xl shadow-xs hover:border-slate-400 transition-colors">
+                      {/* Participants Dropdown */}
+                      <div className="relative">
+                        <button
+                          type="button"
+                          onClick={() => setShowParticipantsDropdown(prev => !prev)}
+                          className="w-full flex items-center justify-between bg-white px-4 py-3 border-b border-slate-200 text-left cursor-pointer hover:bg-slate-50 rounded-t-xl"
+                        >
+                          <div className="flex items-center gap-3">
+                            <Users className="w-5 h-5 text-emerald-700" />
+                            <span className="text-sm font-extrabold text-slate-800">Böyük × {sidebarParticipants}</span>
+                          </div>
+                          <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${showParticipantsDropdown ? 'rotate-180' : ''}`} />
+                        </button>
+
+                        {showParticipantsDropdown && (
+                          <>
+                          <div className="fixed inset-0 z-10" onClick={() => setShowParticipantsDropdown(false)} />
+                          <div className="absolute left-0 right-0 top-full z-20 bg-white border border-slate-200 rounded-xl shadow-lg p-4 mt-1">
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm font-bold text-slate-700">Böyük</span>
+                              <div className="flex items-center gap-3">
+                                <button
+                                  type="button"
+                                  disabled={sidebarParticipants <= 1}
+                                  onClick={() => setSidebarParticipants(prev => Math.max(1, prev - 1))}
+                                  className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold w-8 h-8 rounded-full flex items-center justify-center transition disabled:opacity-40"
+                                >
+                                  -
+                                </button>
+                                <span className="font-bold text-slate-800 text-sm w-4 text-center">{sidebarParticipants}</span>
+                                <button
+                                  type="button"
+                                  disabled={sidebarParticipants >= 20}
+                                  onClick={() => setSidebarParticipants(prev => Math.min(20, prev + 1))}
+                                  className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold w-8 h-8 rounded-full flex items-center justify-center transition disabled:opacity-40"
+                                >
+                                  +
+                                </button>
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => setShowParticipantsDropdown(false)}
+                              className="mt-3 w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-2 rounded-lg transition-colors"
+                            >
+                              Təsdiqlə
+                            </button>
+                          </div>
+                          </>
+                        )}
+                      </div>
+
                       {/* Date Dropdown Simulation */}
-                      <button 
-                        className="flex items-center justify-between bg-white px-4 py-3 text-left cursor-pointer hover:bg-slate-50"
+                      <button
+                        className="flex items-center justify-between bg-white px-4 py-3 text-left cursor-pointer hover:bg-slate-50 rounded-b-xl"
                         onClick={() => {
                            const el = document.getElementById('tour-slots-calendar');
                            if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
