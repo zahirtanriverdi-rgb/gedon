@@ -27,8 +27,7 @@ import {
   X,
   RotateCcw,
   Heart,
-  Globe,
-  UserCircle
+  Globe
 } from 'lucide-react';
 
 // The API always responds with JSON, but if a request slips past Express (e.g. a 413
@@ -177,8 +176,13 @@ export default function App() {
     showNotification('Valyuta məzənnələri uğurla yeniləndi! 💱✨', 'success');
   };
 
-  // Active Role State (Customer, Vendor, Admin) inside the Marketplace simulation
-  const [selectedRole, setSelectedRole] = useState<UserRole>('customer');
+  // Active Role State (Customer, Vendor, Admin) inside the Marketplace simulation.
+  // No client-side router is set up, so entry into the vendor/admin portals is via a
+  // `?portal=vendor` or `?portal=admin` query param read once on initial load.
+  const [selectedRole] = useState<UserRole>(() => {
+    const portal = new URLSearchParams(window.location.search).get('portal');
+    return portal === 'vendor' || portal === 'admin' ? portal : 'customer';
+  });
   const [loggedInVendor, setLoggedInVendor] = useState<User | null>(null);
   // JWT from /api/auth/operator/login — kept in memory only (not localStorage), matches
   // the token's own short lifetime and is cleared on logout.
@@ -202,7 +206,6 @@ export default function App() {
   const [displayCurrency, setDisplayCurrency] = useState<'AZN' | 'USD' | 'EUR'>('AZN');
   const [appLanguage, setAppLanguage] = useState<'az' | 'en' | 'ru'>('az');
   const [isLangMenuOpen, setIsLangMenuOpen] = useState(false);
-  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
 
   React.useEffect(() => {
     function handleClickOutsideSearch(event: MouseEvent) {
@@ -491,63 +494,6 @@ export default function App() {
   // data that no longer exists now that tours/slots/bookings/reviews are server-backed,
   // and neither was wired up to any button in the UI.
 
-  // Profile button + dropdown: houses the dev-only role switcher (previously its own
-  // panel on the homepage), so it stays reachable no matter which role is active.
-  const profileMenu = (
-    <div className="relative">
-      <button
-        onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
-        className="flex flex-col items-center justify-center gap-1 hover:text-emerald-600 transition group cursor-pointer bg-transparent border-none p-0"
-      >
-        <UserCircle className="w-5 h-5 stroke-[2px]" />
-        <span className="text-[11px] font-semibold">Profil</span>
-      </button>
-      {isProfileMenuOpen && (
-        <div className="absolute top-12 -right-4 w-72 bg-white border border-slate-200 shadow-xl rounded-xl overflow-hidden z-50 animate-fadeIn p-4 space-y-3">
-          <div className="space-y-1">
-            <span className="text-[10px] font-semibold tracking-wider text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full inline-block">Gizli Tərtibatçı Rejimi</span>
-            <h3 className="text-sm font-bold text-slate-900">Sistem Rolları (Test Rejimi)</h3>
-            <p className="text-[11px] text-slate-500 leading-normal">
-              Rolu dəyişdirərək müştəri olaraq bilet ala və ya bələdçi hesabından müştəri rezervasiyasını dərhal izləyə bilərsiniz.
-            </p>
-          </div>
-          <div className="flex p-1 bg-slate-100 border border-slate-200 rounded-lg gap-1">
-            <button
-              onClick={() => { setSelectedRole('customer'); setIsProfileMenuOpen(false); }}
-              className={`flex-1 py-1.5 px-3 rounded text-xs font-semibold transition whitespace-nowrap ${
-                selectedRole === 'customer'
-                  ? 'bg-slate-950 text-white shadow-sm font-bold'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              Son İstifadəçi
-            </button>
-            <button
-              onClick={() => { setSelectedRole('vendor'); setIsProfileMenuOpen(false); }}
-              className={`flex-1 py-1.5 px-3 rounded text-xs font-semibold transition whitespace-nowrap ${
-                selectedRole === 'vendor'
-                  ? 'bg-slate-950 text-white shadow-sm font-bold'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              Operator
-            </button>
-            <button
-              onClick={() => { setSelectedRole('admin'); setIsProfileMenuOpen(false); }}
-              className={`flex-1 py-1.5 px-3 rounded text-xs font-semibold transition whitespace-nowrap ${
-                selectedRole === 'admin'
-                  ? 'bg-slate-950 text-white shadow-sm font-bold'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              Admin
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-
   return (
     <div className="min-h-screen bg-[#f8fafc] font-sans text-slate-700 flex flex-col justify-between" id="app_root">
       {/* Main Elegant Header */}
@@ -673,7 +619,6 @@ export default function App() {
                     </div>
                   )}
                 </div>
-                {profileMenu}
               </div>
             ) : (
               <nav className="flex items-center gap-6">
@@ -717,9 +662,6 @@ export default function App() {
                     Çıxış
                   </button>
                 )}
-                <div className="text-slate-700 ml-2">
-                  {profileMenu}
-                </div>
               </nav>
             )}
           </div>
