@@ -551,7 +551,7 @@ export default function App() {
 
           {/* Sticky Search Bar (Only visible when scrolled in Customer mode) */}
           {selectedRole === 'customer' && isScrolled && (
-            <div ref={globalSearchRef} className="flex flex-1 w-full md:max-w-xl mx-auto md:mx-8 animate-fadeIn order-3 md:order-none mt-2 md:mt-0 relative">
+            <div ref={globalSearchRef} className="flex flex-1 w-full md:max-w-xl mx-auto md:mx-8 animate-fadeIn order-3 md:order-2 mt-2 md:mt-0 relative">
               <div className="relative w-full bg-white shadow-sm rounded-full p-1.5 border border-slate-200 flex items-center">
                 <div className="pl-4 pr-2 flex items-center flex-1">
                    <input

@@ -1945,8 +1945,11 @@ export default function CustomerPortal({
       {/* DETAILED TOUR PAGE (Full Page Dynamic Route) */}
       {activeView === 'home' && selectedTour && (
         <div className="animate-fadeIn bg-white min-h-screen pb-20">
-          {/* Top Navbar / Back Button */}
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 border-b border-slate-100 flex items-center justify-between sticky top-0 bg-white/90 backdrop-blur-md z-40">
+          {/* Top Navbar / Back Button — sticks just below the app's own sticky header
+              (App.tsx's <header>, which grows from ~65.5px to 75px once the scroll-triggered
+              search bar appears) instead of top-0, which put both bars in the same spot and
+              made this one flicker/overlap under the main header's search bar + nav icons. */}
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 border-b border-slate-100 flex items-center justify-between sticky top-[75px] bg-white/90 backdrop-blur-md z-30">
             <button 
               type="button" 
               onClick={() => handleTourClick(null)}
