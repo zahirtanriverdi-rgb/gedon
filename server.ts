@@ -124,32 +124,42 @@ interface BackendProfileUpdate {
 
 const pendingProfileUpdates: BackendProfileUpdate[] = [];
 
-// ADMIN LOGIN (JWT Sign & Return)
-app.post("/api/auth/admin/login", (req, res) => {
+// ADMIN LOGIN (JWT Sign & Return) — checks the real `users` table (Postgres/SQLite via
+// server/db.ts), not the mock `backendUsers` list, so the actual seeded admin account works.
+app.post("/api/auth/admin/login", async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) {
     return res.status(400).json({ error: "Zəhmət olmasa e-poçt və şifrəni daxil edin." });
   }
 
-  const user = backendUsers.find(u => u.email === email && u.role === "admin");
-  if (!user || !bcrypt.compareSync(password, user.passwordHash)) {
-    return res.status(401).json({ error: "E-poçt və ya şifrə yanlışdır!" });
-  }
-
-  const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: "24h" });
-  return res.json({
-    success: true,
-    token,
-    user: {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
-      phone: user.phone,
-      avatar: user.avatar,
-      balance: user.balance
+  try {
+    const rows = await dbClient.query(
+      `SELECT * FROM users WHERE email = ? AND role = 'admin'`,
+      [email]
+    );
+    const user = rows[0];
+    if (!user || !bcrypt.compareSync(password, user.password_hash)) {
+      return res.status(401).json({ error: "E-poçt və ya şifrə yanlışdır!" });
     }
-  });
+
+    const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: "24h" });
+    return res.json({
+      success: true,
+      token,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        phone: user.phone,
+        avatar: user.avatar,
+        balance: Number(user.balance) || 0
+      }
+    });
+  } catch (error: any) {
+    console.error("[POST /api/auth/admin/login] error:", error);
+    return res.status(500).json({ error: "Giriş zamanı server xətası baş verdi: " + error.message });
+  }
 });
 
 // OPERATOR LOGIN (JWT Sign & Return) — checks the real `users` table (Postgres/SQLite via

@@ -6,6 +6,7 @@ import CustomerPortal from './components/CustomerPortal';
 import VendorPortal from './components/VendorPortal';
 import AdminPortal from './components/AdminPortal';
 import OperatorLogin from './components/OperatorLogin';
+import AdminLogin from './components/AdminLogin';
 import { SearchDropdown } from './components/SearchDropdown';
 import { getRecentSearches, addRecentSearch } from './utils/recentSearches';
 import { 
@@ -196,6 +197,19 @@ export default function App() {
     setOperatorToken(null);
   };
 
+  const [loggedInAdmin, setLoggedInAdmin] = useState<User | null>(null);
+  // JWT from /api/auth/admin/login — kept in memory only (not localStorage), matches
+  // the token's own short lifetime and is cleared on logout.
+  const [adminToken, setAdminToken] = useState<string | null>(null);
+  const handleAdminLogin = (user: User, token: string) => {
+    setLoggedInAdmin(user);
+    setAdminToken(token);
+  };
+  const handleAdminLogout = () => {
+    setLoggedInAdmin(null);
+    setAdminToken(null);
+  };
+
   // Global search and scroll state for sticky header
   const [globalSearchQuery, setGlobalSearchQuery] = useState('');
   const [isGlobalSearchFocused, setIsGlobalSearchFocused] = useState(false);
@@ -228,6 +242,7 @@ export default function App() {
   // Active Simulated User
   const getActiveUser = (): User => {
     if (selectedRole === 'vendor' && loggedInVendor) return loggedInVendor;
+    if (selectedRole === 'admin' && loggedInAdmin) return loggedInAdmin;
     const safeUsers = Array.isArray(users) && users.length > 0 ? users : seedUsers;
     const found = safeUsers.find(u => u.role === selectedRole);
     if (found) return found;
@@ -662,6 +677,14 @@ export default function App() {
                     Çıxış
                   </button>
                 )}
+                {loggedInAdmin && (
+                  <button
+                    onClick={handleAdminLogout}
+                    className="text-xs font-semibold py-1 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-all ml-4"
+                  >
+                    Çıxış
+                  </button>
+                )}
               </nav>
             )}
           </div>
@@ -746,8 +769,12 @@ export default function App() {
               />
             )}
 
-            {selectedRole === 'admin' && (
-              <AdminPortal 
+            {selectedRole === 'admin' && !loggedInAdmin && (
+              <AdminLogin onLogin={handleAdminLogin} />
+            )}
+
+            {selectedRole === 'admin' && loggedInAdmin && (
+              <AdminPortal
                 tours={tours}
                 bookings={bookings}
                 users={users}
