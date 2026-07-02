@@ -976,62 +976,6 @@ STRICT JSON SCHEMA TO OUTPUT:
   }
 });
 
-// Endpoint for AI chatbot tour advisor
-app.post("/api/gemini/advisor", async (req, res) => {
-  const { messages, tourDetails } = req.body;
-  if (!messages || !Array.isArray(messages)) {
-    return res.status(400).json({ error: "Zəhmət olmasa düzgün mesaj tarixçəsi daxil edin." });
-  }
-
-  try {
-    const ai = getGeminiClient();
-
-    const tourCtx = tourDetails ? `
-Sən turistlər üçün ağıllı və peşəkar bir süni intellekt bələdçi köməkçisisən (AI Bələdçi).
-Hazırda müştəri bu konkret tur haqqında məlumat almaq istəyir:
-- Turun adı: ${tourDetails.name}
-- Region: ${tourDetails.region}
-- Kateqoriya: ${tourDetails.category === 'hiking' ? 'Yürüş / Hiking' : tourDetails.category === 'camp' ? 'Kamp' : 'Zirvə'}
-- Çətinlik səviyyəsi: ${tourDetails.difficulty === 'easy' ? 'Asan' : tourDetails.difficulty === 'medium' ? 'Orta' : tourDetails.difficulty === 'hard' ? 'Çətin' : 'Ekstrim'}
-- Müddət: ${tourDetails.durationDays} Gün
-- Təşkilatçı operator: ${tourDetails.vendorName}
-- Ətraflı məlumat/Təsvir: ${tourDetails.description}
-- Qiymətə daxil olan xidmətlər: ${(tourDetails.includes || []).join(', ')}
-- Birbaşa WhatsApp əlaqə nömrəsi: ${tourDetails.whatsapp_number || '+994706717804'}
-` : "Sən Azərbaycan təbiət turları üzrə peşəkar bələdçi köməkçisisən.";
-
-    const systemInstruction = `${tourCtx}
-Müştəriyə tur haqqında səmimi, dürüst, mehriban və son dərəcə faydalı cavablar ver. 
-Bütün cavablar mütləq doğma Azərbaycan dilində və tam aydın olmalıdır.
-Danışarkən şirin, cəlbedici bir tonda danış, lakin lakonik və dolğun olmağı unutma (gərəksiz uzun uzadı danışma).
-Müştəri tur haqqında çətinlik, ləvazimatlar və ya nəqliyyat soruşduqda, ona bu tura aid detalları izah et.
-Müştəri tura qoşulmaq və ya bilet almaq istədiyini bildirdikdə, onu birbaşa "Rezervasiya Et / WhatsApp" bölməsinə müraciət etməyə təşviq et və de ki, rezervasiyanı elə indi səhifədəki düymələrdən asanlıqla rəsmiləşdirə bilər!`;
-
-    const contents = messages.map(m => {
-      const role = m.role === 'user' ? 'user' : 'model';
-      return {
-        role,
-        parts: [{ text: m.content || "" }]
-      };
-    });
-
-    const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
-      contents,
-      config: {
-        systemInstruction,
-      }
-    });
-
-    return res.json({
-      reply: response.text || "Bağışlayın, bu suala hazırda cavab verə bilmirəm."
-    });
-  } catch (err: any) {
-    console.error("Gemini Advisor Error:", err);
-    return res.status(500).json({ error: err.message || "Süni intellekt bələdçisi ilə əlaqə qurularkən gözlənilməz xəta daxil oldu." });
-  }
-});
-
 // Endpoint for AI beginner and experienced packing assistant returning strict JSON
 app.post("/api/gemini/packing", async (req, res) => {
   const { tourDetails } = req.body;

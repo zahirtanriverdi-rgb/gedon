@@ -19,7 +19,6 @@ import {
   X, 
   Check, 
   CreditCard,
-  MessageSquare,
   AlertCircle,
   MessageCircle,
   ExternalLink,
@@ -393,35 +392,10 @@ export default function CustomerPortal({
   const [isSubmittingReview, setIsSubmittingReview] = useState<boolean>(false);
   const [reviewSubmitError, setReviewSubmitError] = useState<string | null>(null);
 
-  // AI assistant Advisor Chatbot states
-  const [activeAiTourId, setActiveAiTourId] = useState<string | null>(null);
-  const [isAiOpen, setIsAiOpen] = useState<boolean>(false);
-  const [aiChatHistory, setAiChatHistory] = useState<Array<{ role: 'user' | 'model'; content: string }>>([]);
-  const [aiInputText, setAiInputText] = useState<string>('');
-  const [aiLoading, setAiLoading] = useState<boolean>(false);
-
   // AI Smart packing states
   const [packingAdviceMap, setPackingAdviceMap] = useState<Record<string, { packing_advice?: { basics: string[]; pro_gear: string[] } }>>({});
   const [packingLoading, setPackingLoading] = useState<boolean>(false);
   const [packingExperienceMap, setPackingExperienceMap] = useState<Record<string, 'beginner' | 'pro' | null>>({});
-
-  // AI chat opening helper
-  const handleOpenAiChat = (tour: Tour, e?: React.MouseEvent) => {
-    if (e) e.stopPropagation();
-    setActiveAiTourId(tour.id);
-    setIsAiOpen(true);
-    
-    const welcomeMessage = tour.isInternational
-      ? `Salam! Mən '${tour.name}' turları üzrə sizin ağıllı bələdçi AI köməkçinizəm. ✈️🌍\nSəyahətə başlamazdan öncə bu tur üzrə viza qaydaları, uçuş detalları, yerli valyuta, mütləq dadmalı olduğunuz milli yeməklər və gəzməli əsas yerlər haqqında məndən məsləhət ala bilərsiniz. Sizə necə kömək edə bilərəm?`
-      : `Salam! Mən '${tour.name}' turları üzrə sizin ağıllı bələdçi AI köməkçinizəm. ⛰️🤖\nBələdçi ilə danışmadan öncə bu turun çətinlik dərəcəsi, geyim tələbləri, daxil olan xidmətlər və ya hava təxminləri barədə məndən məsləhət ala bilərsiniz. Sizə necə kömək edə bilərəm?`;
-
-    setAiChatHistory([
-      { 
-        role: 'model', 
-        content: welcomeMessage
-      }
-    ]);
-  };
 
   // Quick WhatsApp opening helper
   const handleQuickWhatsApp = (tour: Tour, e: React.MouseEvent) => {
@@ -446,58 +420,6 @@ export default function CustomerPortal({
     const text = `Salam! GedəkGörək saytından '${tour.name}' turu haqqında məlumat və rezervasiya daxil etmək istəyirəm. Zəhmət olmasa köməklik edərdiniz.`;
     const whatsappUrl = `https://api.whatsapp.com/send?phone=${targetWa}&text=${encodeURIComponent(text)}`;
     window.open(whatsappUrl, '_blank');
-  };
-
-  // Chat message sender to backend Gemini API
-  const sendAiMessage = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (!aiInputText.trim() || aiLoading || !activeAiTourId) return;
-
-    const tour = tours.find(t => t.id === activeAiTourId);
-    if (!tour) return;
-
-    const userText = aiInputText.trim();
-    setAiInputText('');
-
-    const updatedHistory = [...aiChatHistory, { role: 'user' as const, content: userText }];
-    setAiChatHistory(updatedHistory);
-    setAiLoading(true);
-
-    try {
-      const resp = await fetch('/api/gemini/advisor', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          messages: updatedHistory,
-          tourDetails: {
-            name: tour.name,
-            region: tour.region,
-            category: tour.category,
-            difficulty: tour.difficulty,
-            durationDays: tour.durationDays,
-            vendorName: tour.vendorName,
-            description: tour.description,
-            includes: tour.includes || [],
-            whatsapp_number: tour.whatsapp_number
-          }
-        })
-      });
-
-      if (!resp.ok) {
-        throw new Error("Süni intellekt cavab xətası.");
-      }
-
-      const resData = await resp.json();
-      setAiChatHistory([...updatedHistory, { role: 'model' as const, content: resData.reply }]);
-    } catch (err: any) {
-      console.error(err);
-      setAiChatHistory([...updatedHistory, { 
-        role: 'model' as const, 
-        content: "Bağışlayın, hazırda rabitə kanalında kiçik bir yüklənmə var. Sualınıza bir neçə saniyə sonra yenidən cəhd etməyi, yaxud birbaşa operatorun WhatsApp nömrəsinə müraciət etməyi tövsiyə edirəm!" 
-      }]);
-    } finally {
-      setAiLoading(false);
-    }
   };
 
   // Fetch beginner and experienced packing list recommendations
@@ -528,44 +450,6 @@ export default function CustomerPortal({
       setPackingLoading(false);
     }
   };
-
-  // Helper to format chatbot message markdown-style asterisks to actual JSX
-  const formatMessageText = React.useCallback((text: string, isUserMessage: boolean) => {
-    if (!text) return null;
-    
-    // Split on double-asterisks first to find bold segments
-    const parts = text.split(/(\*\*.*?\*\*)/g);
-    
-    return parts.map((part, index) => {
-      if (part.startsWith('**') && part.endsWith('**')) {
-        const boldText = part.slice(2, -2);
-        return (
-          <strong 
-            key={index} 
-            className={isUserMessage ? "font-black text-white" : "font-black text-slate-900 bg-slate-100/60 px-1 py-0.5 rounded-[4px] border border-slate-200/50"}
-          >
-            {boldText}
-          </strong>
-        );
-      }
-      
-      const subParts = part.split(/(\*.*?\*)/g);
-      return subParts.map((subPart, subIndex) => {
-        if (subPart.startsWith('*') && subPart.endsWith('*')) {
-          const italicText = subPart.slice(1, -1);
-          return (
-            <strong 
-              key={`${index}-${subIndex}`} 
-              className={isUserMessage ? "font-bold text-white" : "font-extrabold text-slate-800"}
-            >
-              {italicText}
-            </strong>
-          );
-        }
-        return subPart;
-      });
-    });
-  }, []);
 
   // Extract unique regions for the filter dropdown
   const uniqueRegions = Array.from(new Set(tours.map(t => t.region.split(' ')[0].replace('(', ''))));
@@ -2275,29 +2159,6 @@ export default function CustomerPortal({
                     return null;
                   })()}
 
-                  {/* Stunning AI Tour Advisor Banner within details modal */}
-                  <div className="bg-gradient-to-r from-violet-600/10 via-indigo-600/10 to-blue-600/10 border border-indigo-200/50 p-4 rounded-xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 shadow-3xs hover:border-indigo-300 transition duration-300">
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-1.5 text-indigo-955 text-xs font-extrabold tracking-wide">
-                        <span className="bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-black text-[9px] px-1.5 py-0.5 rounded flex items-center gap-0.5 animate-pulse">
-                          <span>AI bələdçi</span> ⚡🤖
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-slate-600 leading-normal max-w-md">
-                        Bələdçi ilə əlaqə saxlamazdan əvvəl turun çətinliyi, geyim tələbləri, ləvazimatlar və bu tur haqqında hər şeyi ağıllı bələdçimizdən dərhal soruşun!
-                      </p>
-                    </div>
-                    
-                    <button
-                      type="button"
-                      onClick={(e) => handleOpenAiChat(selectedTour, e)}
-                      className="bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 text-white font-extrabold text-[10px] px-4 py-2 rounded-lg tracking-wider transition duration-300 transform hover:scale-[1.02] shadow-3xs cursor-pointer inline-flex items-center justify-center gap-1.5 shrink-0"
-                    >
-                      <MessageSquare className="w-3.5 h-3.5" />
-                      Yoldaşdan Soruş (AI Chat)
-                    </button>
-                  </div>
-
                   {/* Smart Pack Assistant vs. International Travel Agent Integration */}
                   {selectedTour.isInternational ? (
                     <div className="bg-gradient-to-br from-indigo-900/10 to-teal-900/5 border border-indigo-200/60 rounded-2xl p-6 space-y-5 shadow-3xs hover:border-indigo-300 transition duration-300">
@@ -2360,13 +2221,11 @@ export default function CustomerPortal({
                               mainPlace = day.title.split(':')[0] || selectedTour.destinationCity;
                             }
                             return (
-                              <div 
-                                key={di} 
-                                className="bg-white p-3 rounded-xl border border-slate-150 flex items-start gap-2.5 hover:border-indigo-400/70 transition duration-200 cursor-pointer group"
-                                onClick={(e) => handleOpenAiChat(selectedTour, e)}
-                                title="Bu gün haqqında AI Bələdçidən ətraflı soruşun"
+                              <div
+                                key={di}
+                                className="bg-white p-3 rounded-xl border border-slate-150 flex items-start gap-2.5"
                               >
-                                <div className="w-6 h-6 rounded-full bg-indigo-50 border border-indigo-150 text-[10px] font-bold text-indigo-700 flex items-center justify-center shrink-0 mt-0.5 group-hover:bg-indigo-650 group-hover:text-white transition-all">
+                                <div className="w-6 h-6 rounded-full bg-indigo-50 border border-indigo-150 text-[10px] font-bold text-indigo-700 flex items-center justify-center shrink-0 mt-0.5">
                                   {day.day}
                                 </div>
                                 <div className="space-y-1 overflow-hidden">
@@ -2374,73 +2233,13 @@ export default function CustomerPortal({
                                     <span className="text-[9px] font-extrabold text-indigo-805 bg-indigo-55/75 px-1.5 py-0.5 rounded leading-none truncate">
                                       🗺️ {mainPlace}
                                     </span>
-                                    <span className="text-[8px] text-emerald-700 font-extrabold flex items-center gap-0.5 whitespace-nowrap">
-                                      <span className="w-1 h-1 bg-emerald-500 rounded-full animate-ping" />
-                                      Xəritə
-                                    </span>
                                   </div>
-                                  <h6 className="text-[10px] font-extrabold text-[#1f2937] leading-tight truncate group-hover:text-indigo-950 transition-all">{day.title}</h6>
+                                  <h6 className="text-[10px] font-extrabold text-[#1f2937] leading-tight truncate">{day.title}</h6>
                                   <p className="text-[9.5px] text-slate-500 leading-snug line-clamp-2">{day.description}</p>
                                 </div>
                               </div>
                             );
                           })}
-                        </div>
-                      </div>
-
-                      {/* PART 3: SMART AI TOURIST EXPEDITION CHAT ASSISTANT */}
-                      <div className="bg-indigo-950 text-indigo-100 p-4 rounded-xl space-y-3.5 border border-indigo-800 shadow-sm relative overflow-hidden">
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-600/30 blur-2xl rounded-full" />
-                        
-                        <div className="relative">
-                          <h5 className="text-[11px] font-black tracking-wider text-slate-300 flex items-center gap-1.5 leading-none">
-                            💬 SÜNİ İNTELLEKT BƏLƏDÇİSİNƏ SUAL VERİN
-                          </h5>
-                          <p className="text-[10px] text-slate-400 mt-1 leading-normal">
-                            Süni İntellekt bələdçimiz {selectedTour.destinationCity} haqqında viza, yerli qanunlar, milli təamlar və nəqliyyat suallarına 24/7 saniyələr içində cavab verir!
-                          </p>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-2 relative">
-                          <button
-                            type="button"
-                            onClick={(e) => handleOpenAiChat(selectedTour, e)}
-                            className="bg-indigo-900/40 hover:bg-indigo-850/60 p-2 rounded-lg border border-indigo-700 text-left transition duration-200 cursor-pointer"
-                          >
-                            <span className="text-[11px] font-black text-white block">✈️ Viza və Giriş</span>
-                            <span className="text-[9px] text-slate-300 font-medium block">Sərhəd, pasport qaydaları</span>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={(e) => handleOpenAiChat(selectedTour, e)}
-                            className="bg-indigo-900/40 hover:bg-indigo-850/60 p-2 rounded-lg border border-indigo-700 text-left transition duration-200 cursor-pointer"
-                          >
-                            <span className="text-[11px] font-black text-white block">🍽️ Dadmalı Ləzzətlər</span>
-                            <span className="text-[9px] text-slate-300 font-medium block">Hansı yeməkləri sınaqdan keçirməli?</span>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={(e) => handleOpenAiChat(selectedTour, e)}
-                            className="bg-indigo-900/40 hover:bg-indigo-850/60 p-2 rounded-lg border border-indigo-700 text-left transition duration-200 cursor-pointer"
-                          >
-                            <span className="text-[11px] font-black text-white block">💰 Valyuta və Büdcə</span>
-                            <span className="text-[9px] text-slate-300 font-medium block">Kurs məlumatları, cib xərcləri</span>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={(e) => handleOpenAiChat(selectedTour, e)}
-                            className="bg-indigo-900/40 hover:bg-indigo-850/60 p-2 rounded-lg border border-indigo-700 text-left transition duration-200 cursor-pointer"
-                          >
-                            <span className="text-[11px] font-black text-white block">🚇 Nəqliyyat Kartı</span>
-                            <span className="text-[9px] text-slate-300 font-medium block">Şəhərdaxili gediş haqları və bilet</span>
-                          </button>
-                        </div>
-
-                        <div className="flex items-center gap-2 pt-1 border-t border-indigo-900/80">
-                          <span className="text-[10px] text-indigo-300">💡 <strong>Məsləhət:</strong> Yuxarıdakı suallardan hər hansı birinə klikləyərək fərdi bələdçi çatını dərhal başladın!</span>
                         </div>
                       </div>
                     </div>
@@ -3692,119 +3491,6 @@ export default function CustomerPortal({
           </div>
         );
       })()}
-
-      {/* PERSISTENT FLOATING AI CHAT INTEGRATION WIDGET */}
-      {isAiOpen && activeAiTourId && (() => {
-        const activeTour = tours.find(t => t.id === activeAiTourId);
-        if (!activeTour) return null;
-
-        return (
-          <div className="fixed bottom-6 right-6 z-[95] w-92 max-w-[calc(100vw-2rem)] bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col h-[520px] transition duration-300">
-            {/* Header with tour context preview */}
-            <div className="bg-gradient-to-r from-violet-600 via-indigo-600 to-indigo-700 text-white p-4 flex items-center justify-between shadow-xs shrink-0 select-none">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg overflow-hidden border border-white/20 shrink-0 bg-slate-100">
-                  <img src={activeTour.image || undefined} alt={activeTour.name} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                </div>
-                <div className="flex flex-col min-w-0 font-sans">
-                  <span className="text-[9px] font-black text-indigo-200 tracking-wider">AI BƏLƏDÇİ KÖMƏKÇİSİ ⚡</span>
-                  <span className="text-xs font-extrabold truncate text-white">{activeTour.name}</span>
-                </div>
-              </div>
-              
-              <button
-                type="button"
-                className="bg-white/15 hover:bg-white/25 text-white p-1.5 rounded-full transition-all cursor-pointer flex items-center justify-center border border-white/5"
-                onClick={() => {
-                  setIsAiOpen(false);
-                  setActiveAiTourId(null);
-                }}
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Message Chat Room Area */}
-            <div className="flex-1 p-4 overflow-y-auto space-y-3.5 bg-slate-50 scrollbar-thin scrollbar-thumb-slate-200">
-              {aiChatHistory.map((m, i) => {
-                const isUser = m.role === 'user';
-                return (
-                  <div key={i} className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-xs leading-relaxed ${
-                      isUser 
-                        ? 'bg-indigo-650 bg-indigo-600 text-white rounded-br-none shadow-3xs font-medium' 
-                        : 'bg-white text-slate-850 rounded-bl-none shadow-3xs border border-slate-150/50 font-medium'
-                    }`}>
-                      <p className="whitespace-pre-line break-words">{formatMessageText(m.content, isUser)}</p>
-                    </div>
-                  </div>
-                );
-              })}
-
-              {aiLoading && (
-                <div className="flex justify-start">
-                  <div className="bg-white rounded-2xl rounded-bl-none px-3.5 py-3 border border-slate-150 shadow-3xs flex items-center gap-2.5">
-                    <span className="flex gap-1 shrink-0">
-                      <span className="w-1.5 h-1.5 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                      <span className="w-1.5 h-1.5 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                      <span className="w-1.5 h-1.5 bg-indigo-600 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-                    </span>
-                    <span className="text-[11px] text-slate-500 font-bold tracking-wide">Sizin AI bələdçiniz düşünür...</span>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Quick Helper Suggestion Chips Panel */}
-            <div className="bg-slate-50 px-3 pb-2 pt-1.5 border-t border-slate-150/35 flex gap-1.5 overflow-x-auto shrink-0 select-none scrollbar-none">
-              {(activeTour.isInternational
-                ? [
-                    { label: '🛂 Viza sənədləri?', query: `Bu tura (${activeTour.destinationCountry}) gedərkən Azərbaycan vətəndaşları üçün hər hansı viza və ya sərhəd keçid tələbləri mövcuddurmu?` },
-                    { label: '💶 Valyuta və Cib xərci?', query: `Səyahət edəcəyimiz ${activeTour.destinationCity} şəhərində hansı valyuta keçərlidir və özümlə gündəlik nə qədər cib xərci götürməliyəm?` },
-                    { label: '🍽️ Dadmalı Ləzzətlər?', query: `${activeTour.destinationCity} səyahəti zamanı mütləq dadmalı olduğum yerli mətbəxin maraqlı, məşhur təamları hansılardır?` },
-                    { label: '🏛️ Gəzməli əsas yerlər?', query: `Bu turun əhatə etdiyi günlərdə ${activeTour.destinationCity} şəhərində maraqlı boş vaxtlarımızda hansı əsas turistik və muzey guşələrini gəzə bilərik?` }
-                  ]
-                : [
-                    { label: '🥾 Nə geyinməli?', query: 'Bu tura gedərkən hansı xüsusi avadanlıq, ayaqqabı və geyimlər lazımdır?' },
-                    { label: '🌨️ Hava təxmini?', query: 'Bu tur regionunun havası və meteoroloji təxminləri bələdçi olaraq necədir?' },
-                    { label: '🏔️ Çətinlik?', query: 'Bu turun çətinlik səviyyəsi asandır yoxsa orta-çətin? Kimlər üçün uyğun deyil?' }
-                  ]
-              ).map((chip, idx) => (
-                <button
-                  key={idx}
-                  type="button"
-                  onClick={() => {
-                    setAiInputText(chip.query);
-                  }}
-                  className="bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-full px-2.5 py-1 text-[10px] font-bold shadow-4xs shrink-0 cursor-pointer transition select-none"
-                >
-                  {chip.label}
-                </button>
-              ))}
-            </div>
-
-            {/* Chat Input Field Action Block */}
-            <form onSubmit={sendAiMessage} className="p-3 bg-white border-t border-slate-150/80 flex gap-2 shrink-0">
-              <input
-                type="text"
-                value={aiInputText}
-                onChange={(e) => setAiInputText(e.target.value)}
-                placeholder="AI-dan tur haqqında nə isə soruşun..."
-                className="flex-1 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-hidden focus:border-indigo-400 focus:bg-white text-slate-800 font-medium"
-                disabled={aiLoading}
-              />
-              <button
-                type="submit"
-                disabled={aiLoading || !aiInputText.trim()}
-                className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white px-3.5 py-2 rounded-xl text-xs font-black tracking-wider transition-all cursor-pointer flex items-center justify-center shrink-0"
-              >
-                Göndər
-              </button>
-            </form>
-          </div>
-        );
-      })()}
-
     </>
   );
 }
