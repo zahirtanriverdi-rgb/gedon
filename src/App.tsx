@@ -900,15 +900,12 @@ export default function App() {
       <footer className="bg-slate-900 text-slate-400 py-8 border-t border-slate-850 text-xs">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-4">
           <div>
-            <p className="font-bold text-slate-200">Google AI Studio Build - Enterprise Solution</p>
             <p className="text-slate-500 mt-1">Azərbaycan daxili turlar ekosistemi SaaS arxitektura sənədləşməsi və simulyator paneli.</p>
           </div>
           <div className="flex gap-4">
             <span className="hover:text-white transition">Privacy Policy</span>
             <span className="text-slate-750">|</span>
             <span className="hover:text-white transition">Technical Support</span>
-            <span className="text-slate-750">|</span>
-            <span className="hover:text-white transition text-emerald-400">Senior Software Architect Design v1.0</span>
           </div>
         </div>
       </footer>
