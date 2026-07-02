@@ -710,6 +710,43 @@ export default function CustomerPortal({
     });
   }, [filteredTours, sortBy, slots]);
 
+  // Upcoming tours for the horizontal slider, one slot per tour (nearest date), shuffled
+  // so different vendors' tours get an equal chance of appearing first.
+  const uniqueUpcomingTours = React.useMemo(() => {
+    const upcomingSlots = [...slots]
+      .sort((a, b) => a.startDate.localeCompare(b.startDate))
+      .filter(s => {
+        const parts = s.startDate.split('-');
+        if (parts.length < 3) return false;
+        const slotDate = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        return slotDate >= today;
+      });
+
+    const picked: { tour: Tour; slot: TourSlot }[] = [];
+    const seenTourIds = new Set();
+    for (const slot of upcomingSlots) {
+      if (!seenTourIds.has(slot.tourId)) {
+        const t = tours.find(t => t.id === slot.tourId && t.isActive !== false);
+        if (t) {
+          picked.push({ tour: t, slot: slot });
+          seenTourIds.add(slot.tourId);
+        }
+      }
+      if (picked.length >= 8) break;
+    }
+
+    const shuffled = [...picked];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
+  }, [slots, tours]);
+
+  const [upcomingScrollLeft, setUpcomingScrollLeft] = useState(0);
+
   console.log(`Total Tours: ${tours.length}, Displayed Tours: ${sortedAndFilteredTours.length}`);
 
   // Calculate Average rating - Supports manual back-office rating override if specified in tour.rating
@@ -1455,34 +1492,7 @@ export default function CustomerPortal({
           </div>
 
           {/* Horizontal Slider for Upcoming Tours (Minimal) */}
-          {(() => {
-            const upcomingSlots = [...slots]
-              .sort((a, b) => a.startDate.localeCompare(b.startDate))
-              .filter(s => {
-                const parts = s.startDate.split('-');
-                if (parts.length < 3) return false;
-                const slotDate = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
-                const today = new Date();
-                today.setHours(0,0,0,0);
-                return slotDate >= today;
-              });
-
-            const uniqueUpcomingTours = [];
-            const seenTourIds = new Set();
-            for (const slot of upcomingSlots) {
-              if (!seenTourIds.has(slot.tourId)) {
-                const t = tours.find(t => t.id === slot.tourId && t.isActive !== false);
-                if (t) {
-                  uniqueUpcomingTours.push({ tour: t, slot: slot });
-                  seenTourIds.add(slot.tourId);
-                }
-              }
-              if (uniqueUpcomingTours.length >= 8) break;
-            }
-
-            if (uniqueUpcomingTours.length === 0) return null;
-
-            return (
+          {uniqueUpcomingTours.length > 0 && (
               <div className="mb-2 w-full max-w-[1400px] mx-auto animate-fadeIn relative">
                 <div className="flex items-center justify-between mb-2 px-1">
                   <h3 className="text-sm font-extrabold text-slate-800 tracking-tight flex items-center gap-1.5">
@@ -1490,10 +1500,10 @@ export default function CustomerPortal({
                     {t('upcomingTours')}
                   </h3>
                 </div>
-                
+
                 <div className="relative group">
-                  {uniqueUpcomingTours.length > 3 && (
-                    <button 
+                  {uniqueUpcomingTours.length > 3 && upcomingScrollLeft > 5 && (
+                    <button
                       onClick={(e) => {
                         e.stopPropagation();
                         const slider = document.getElementById('upcoming-tours-slider');
@@ -1505,7 +1515,10 @@ export default function CustomerPortal({
                     </button>
                   )}
                   {/* Horizontal slider container */}
-                  <div id="upcoming-tours-slider" className="flex overflow-x-auto gap-3 pb-2 snap-x snap-mandatory scroll-smooth w-full pr-4 md:pr-0" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+                  <div
+                    id="upcoming-tours-slider"
+                    onScroll={(e) => setUpcomingScrollLeft(e.currentTarget.scrollLeft)}
+                    className="flex overflow-x-auto gap-3 pb-2 snap-x snap-mandatory scroll-smooth w-full pr-4 md:pr-0" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
                     {uniqueUpcomingTours.map(({ tour, slot }) => (
                       <div 
                         key={tour.id}
@@ -1551,8 +1564,7 @@ export default function CustomerPortal({
                   )}
                 </div>
               </div>
-            );
-          })()}
+          )}
 
 
 
