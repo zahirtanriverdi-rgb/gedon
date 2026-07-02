@@ -65,6 +65,53 @@ export default function App() {
     }, 4500);
   };
 
+  // Active Role State (Customer, Vendor, Admin) inside the Marketplace simulation.
+  // No client-side router is set up, so entry into the vendor/admin portals is via a
+  // `?portal=vendor` or `?portal=admin` query param read once on initial load.
+  const [selectedRole] = useState<UserRole>(() => {
+    const portal = new URLSearchParams(window.location.search).get('portal');
+    return portal === 'vendor' || portal === 'admin' ? portal : 'customer';
+  });
+  const [loggedInVendor, setLoggedInVendor] = useState<User | null>(null);
+  // JWT from /api/auth/operator/login — kept in memory only (not localStorage), matches
+  // the token's own short lifetime and is cleared on logout.
+  const [operatorToken, setOperatorToken] = useState<string | null>(null);
+  const handleOperatorLogin = (user: User, token: string) => {
+    setLoggedInVendor(user);
+    setOperatorToken(token);
+  };
+  const handleOperatorLogout = () => {
+    setLoggedInVendor(null);
+    setOperatorToken(null);
+  };
+
+  const [loggedInAdmin, setLoggedInAdmin] = useState<User | null>(null);
+  // JWT from /api/auth/admin/login — kept in memory only (not localStorage), matches
+  // the token's own short lifetime and is cleared on logout.
+  const [adminToken, setAdminToken] = useState<string | null>(null);
+  const handleAdminLogin = (user: User, token: string) => {
+    setLoggedInAdmin(user);
+    setAdminToken(token);
+  };
+  const handleAdminLogout = () => {
+    setLoggedInAdmin(null);
+    setAdminToken(null);
+  };
+
+  // Whichever role is currently logged in — server-side mutation endpoints for
+  // tours/slots/bookings now require this as a Bearer token (see server.ts's
+  // authenticateUser middleware + per-resource ownership checks). GET /api/tours and
+  // GET /api/bookings also read it: with a vendor token they scope the response to that
+  // vendor's own rows server-side (not just in the UI), with an admin token they return
+  // everything, and with no token they keep the public/unfiltered shape the customer
+  // marketplace relies on.
+  const authToken = operatorToken || adminToken;
+  const authHeaders = (): Record<string, string> => {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+    return headers;
+  };
+
   // Marketplace core data (tours, slots, bookings, reviews) is served from Postgres/SQLite
   // (server/db.ts) through the REST API in server.ts — these just hold the client-side copy.
   const [tours, setTours] = useState<Tour[]>([]);
@@ -79,10 +126,15 @@ export default function App() {
     setIsMarketplaceDataLoading(true);
     setMarketplaceDataError(null);
     try {
+      // /api/tours and /api/bookings scope their response server-side when an
+      // Authorization header is present: a vendor token gets only that vendor's own
+      // rows, an admin token gets everything. No token (public/customer) keeps the
+      // existing unfiltered shape the marketplace browsing relies on.
+      const authedGet = (url: string) => authToken ? fetch(url, { headers: { Authorization: `Bearer ${authToken}` } }) : fetch(url);
       const [toursRes, slotsRes, bookingsRes, reviewsRes] = await Promise.all([
-        fetch('/api/tours'),
+        authedGet('/api/tours'),
         fetch('/api/slots'),
-        fetch('/api/bookings'),
+        authedGet('/api/bookings'),
         fetch('/api/reviews'),
       ]);
       if (!toursRes.ok || !slotsRes.ok || !bookingsRes.ok || !reviewsRes.ok) {
@@ -100,8 +152,10 @@ export default function App() {
     } finally {
       setIsMarketplaceDataLoading(false);
     }
-  }, []);
+  }, [authToken]);
 
+  // Re-runs on mount and again whenever a vendor/admin logs in or out, so the tours/
+  // bookings scope (own-vendor-only vs. everything vs. public) matches the current session.
   React.useEffect(() => {
     loadMarketplaceData();
   }, [loadMarketplaceData]);
@@ -175,39 +229,6 @@ export default function App() {
       localStorage.setItem('turlar_exchange_rates', JSON.stringify(newRates));
     } catch (e) {}
     showNotification('Valyuta məzənnələri uğurla yeniləndi! 💱✨', 'success');
-  };
-
-  // Active Role State (Customer, Vendor, Admin) inside the Marketplace simulation.
-  // No client-side router is set up, so entry into the vendor/admin portals is via a
-  // `?portal=vendor` or `?portal=admin` query param read once on initial load.
-  const [selectedRole] = useState<UserRole>(() => {
-    const portal = new URLSearchParams(window.location.search).get('portal');
-    return portal === 'vendor' || portal === 'admin' ? portal : 'customer';
-  });
-  const [loggedInVendor, setLoggedInVendor] = useState<User | null>(null);
-  // JWT from /api/auth/operator/login — kept in memory only (not localStorage), matches
-  // the token's own short lifetime and is cleared on logout.
-  const [operatorToken, setOperatorToken] = useState<string | null>(null);
-  const handleOperatorLogin = (user: User, token: string) => {
-    setLoggedInVendor(user);
-    setOperatorToken(token);
-  };
-  const handleOperatorLogout = () => {
-    setLoggedInVendor(null);
-    setOperatorToken(null);
-  };
-
-  const [loggedInAdmin, setLoggedInAdmin] = useState<User | null>(null);
-  // JWT from /api/auth/admin/login — kept in memory only (not localStorage), matches
-  // the token's own short lifetime and is cleared on logout.
-  const [adminToken, setAdminToken] = useState<string | null>(null);
-  const handleAdminLogin = (user: User, token: string) => {
-    setLoggedInAdmin(user);
-    setAdminToken(token);
-  };
-  const handleAdminLogout = () => {
-    setLoggedInAdmin(null);
-    setAdminToken(null);
   };
 
   // Global search and scroll state for sticky header
@@ -351,7 +372,7 @@ export default function App() {
     try {
       const response = await fetch(`/api/tours/${newSlot.tourId}/slots`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders(),
         body: JSON.stringify(newSlot),
       });
       const data = await parseApiResponse(response);
@@ -369,7 +390,7 @@ export default function App() {
     try {
       const response = await fetch('/api/tours', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders(),
         body: JSON.stringify(newTour),
       });
       const data = await parseApiResponse(response);
@@ -392,7 +413,7 @@ export default function App() {
     try {
       const response = await fetch(`/api/tours/${tourId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders(),
         body: JSON.stringify({ isApproved: true }),
       });
       const data = await parseApiResponse(response);
@@ -410,7 +431,7 @@ export default function App() {
     try {
       const response = await fetch(`/api/bookings/${bookingId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders(),
         body: JSON.stringify({ status: 'paid' }),
       });
       const data = await parseApiResponse(response);
@@ -428,7 +449,7 @@ export default function App() {
     try {
       const response = await fetch(`/api/tours/${updatedTour.id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders(),
         body: JSON.stringify(updatedTour),
       });
       const data = await parseApiResponse(response);
@@ -444,7 +465,7 @@ export default function App() {
 
   const handleDeleteTour = async (tourId: string) => {
     try {
-      const response = await fetch(`/api/tours/${tourId}`, { method: 'DELETE' });
+      const response = await fetch(`/api/tours/${tourId}`, { method: 'DELETE', headers: authHeaders() });
       if (!response.ok) {
         const data = await parseApiResponse(response);
         throw new Error(data.error || 'Tur silinə bilmədi.');
@@ -465,7 +486,7 @@ export default function App() {
     try {
       const response = await fetch(`/api/bookings/${updatedBooking.id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders(),
         body: JSON.stringify(updatedBooking),
       });
       const data = await parseApiResponse(response);
@@ -492,7 +513,7 @@ export default function App() {
     try {
       const response = await fetch(`/api/tours/${tourId}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: authHeaders(),
         body: JSON.stringify({ isActive }),
       });
       const data = await parseApiResponse(response);

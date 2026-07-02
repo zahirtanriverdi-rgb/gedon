@@ -38,27 +38,21 @@ function getGeminiClient(): GoogleGenAI {
 // "request entity too large" 413 whose HTML error page breaks response.json() on the client)
 app.use(express.json({ limit: '50mb' }));
 
-// JWT/bcrypt Database Definitions and Authentication System
-interface BackendUser {
-  id: string;
-  name: string;
-  email: string;
-  role: 'customer' | 'vendor' | 'admin';
-  phone: string;
-  passwordHash: string; // bcrypt
-  avatar?: string;
-  companyName?: string;
-  balance: number;
-  about?: string;
+// JWT/bcrypt Authentication System
+//
+// JWT_SECRET must come from the environment in any real deployment. If it's missing we
+// generate a random one at boot instead of falling back to a fixed string — a hardcoded
+// fallback would let anyone who reads this source forge valid tokens for any user/role.
+// The tradeoff: without JWT_SECRET set, all sessions are invalidated on server restart.
+if (!process.env.JWT_SECRET) {
+  console.warn("[SECURITY] JWT_SECRET is not set — generating a random one for this process only. Set JWT_SECRET in your environment for stable sessions across restarts.");
 }
+const JWT_SECRET = process.env.JWT_SECRET || randomUUID() + randomUUID();
 
-const JWT_SECRET = process.env.JWT_SECRET || "turlar-secure-marketplace-fallback-jwt-hash-key";
-
-// Verifies the `Authorization: Bearer <token>` header issued by /api/auth/operator/login.
-// Tokens are signed on login but were never actually checked anywhere until now — this
-// middleware is what makes that check real. Attaches the decoded { id, email, role } to
-// req.operator for route handlers that need to know which vendor is calling.
-function authenticateOperator(req: any, res: any, next: any) {
+// Verifies the `Authorization: Bearer <token>` header issued by /api/auth/operator/login or
+// /api/auth/admin/login. Attaches the decoded { id, email, role } to req.operator for route
+// handlers that need to know which user is calling and enforce per-resource ownership.
+function authenticateUser(req: any, res: any, next: any) {
   const authHeader = req.headers.authorization as string | undefined;
   const token = authHeader && authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
   if (!token) {
@@ -72,60 +66,23 @@ function authenticateOperator(req: any, res: any, next: any) {
   }
 }
 
-// Pre-seeded operator and admin accounts
-const backendUsers: BackendUser[] = [
-  {
-    id: "user-admin",
-    name: "Elnur Cəfərov",
-    email: "admin@turlar.az",
-    role: "admin",
-    phone: "+994 55 555 55 55",
-    passwordHash: bcrypt.hashSync("admin12345", 8),
-    avatar: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80",
-    balance: 1450.0
-  },
-  {
-    id: "user-vendor-1",
-    name: "Azerbaijan Mountain Adventures",
-    email: "info@mountain.az",
-    role: "vendor",
-    phone: "+994 50 123 45 67",
-    passwordHash: bcrypt.hashSync("operator1", 8),
-    companyName: "Mountain Guides LLC",
-    balance: 450.0,
-    avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80"
-  },
-  {
-    id: "user-vendor-2",
-    name: "Caspian Campers & Hikers",
-    email: "camp@caspian.az",
-    role: "vendor",
-    phone: "+994 70 987 65 43",
-    passwordHash: bcrypt.hashSync("operator2", 8),
-    companyName: "Caspian EcoTours",
-    balance: 890.0,
-    avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80"
+// Non-throwing variant for GET endpoints that are public by default (customer marketplace
+// browsing needs no login) but scope their response when a valid vendor/admin token IS
+// present. Returns the decoded { id, email, role } payload, or null if there's no token
+// or it doesn't verify — callers treat null the same as "anonymous/public request".
+function getOptionalUser(req: any): { id: string; email: string; role: string } | null {
+  const authHeader = req.headers.authorization as string | undefined;
+  const token = authHeader && authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+  if (!token) return null;
+  try {
+    return jwt.verify(token, JWT_SECRET) as any;
+  } catch {
+    return null;
   }
-];
-
-// Profile Change Request DB
-interface BackendProfileUpdate {
-  id: string;
-  userId: string;
-  name: string;
-  email: string;
-  phone: string;
-  companyName?: string;
-  avatar?: string;
-  about?: string;
-  submittedAt: string;
-  status: "pending" | "approved" | "rejected";
 }
 
-const pendingProfileUpdates: BackendProfileUpdate[] = [];
-
 // ADMIN LOGIN (JWT Sign & Return) — checks the real `users` table (Postgres/SQLite via
-// server/db.ts), not the mock `backendUsers` list, so the actual seeded admin account works.
+// server/db.ts).
 app.post("/api/auth/admin/login", async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) {
@@ -203,161 +160,6 @@ app.post("/api/auth/operator/login", async (req, res) => {
     return res.status(500).json({ error: "Giriş zamanı server xətası baş verdi: " + error.message });
   }
 });
-
-// ADMIN: CREATE OPERATOR (Admins can register dynamic backend operators)
-app.post("/api/auth/register-operator", (req, res) => {
-  const { name, email, password, phone, companyName } = req.body;
-  if (!name || !email || !password || !phone) {
-    return res.status(400).json({ error: "Zəhmət olmasa bütün məlumatları daxil edin (name, email, password, phone)." });
-  }
-
-  const exists = backendUsers.some(u => u.email === email);
-  if (exists) {
-    return res.status(400).json({ error: "Bu e-poçt ünvanı ilə artıq qeydiyyatdan keçilib!" });
-  }
-
-  const newUser: BackendUser = {
-    id: `user-vendor-${Date.now()}`,
-    name,
-    email,
-    role: "vendor",
-    phone,
-    passwordHash: bcrypt.hashSync(password, 8),
-    companyName: companyName || "",
-    balance: 0.0,
-    avatar: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80",
-    about: ""
-  };
-
-  backendUsers.push(newUser);
-  return res.json({
-    success: true,
-    message: "Operator müvəffəqiyyətlə qeydiyyata alındı!",
-    operator: {
-      id: newUser.id,
-      name: newUser.name,
-      email: newUser.email,
-      role: newUser.role,
-      phone: newUser.phone,
-      companyName: newUser.companyName,
-      balance: newUser.balance,
-      avatar: newUser.avatar,
-      about: newUser.about
-    }
-  });
-});
-
-// OPERATOR: SUBMIT PROFILE CHANGE FOR APPROVAL (Staged updates)
-app.post("/api/profile/update-request", (req, res) => {
-  const { userId, name, email, phone, companyName, avatar, about } = req.body;
-  if (!userId || !name || !email || !phone) {
-    return res.status(400).json({ error: "Zəhmət olmasa tələb olunan profil məlumatlarını daxil edin." });
-  }
-
-  const targetUser = backendUsers.find(u => u.id === userId);
-  if (!targetUser) {
-    return res.status(404).json({ error: "İstifadəçi tapılmadı." });
-  }
-
-  const newRequest: BackendProfileUpdate = {
-    id: `req-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-    userId,
-    name,
-    email,
-    phone,
-    companyName,
-    avatar,
-    about,
-    submittedAt: new Date().toISOString(),
-    status: "pending"
-  };
-
-  pendingProfileUpdates.push(newRequest);
-  return res.json({
-    success: true,
-    message: "Profil yeniləmə müraciəti uğurla fiksasiya olundu və təsdiq üçün adminə göndərildi!",
-    request: newRequest
-  });
-});
-
-// ADMIN: GET REGISTERED OPERATORS
-app.get("/api/operators", (req, res) => {
-  res.json({
-    operators: backendUsers.filter(u => u.role === "vendor").map(u => ({
-      id: u.id,
-      name: u.name,
-      email: u.email,
-      phone: u.phone,
-      companyName: u.companyName,
-      balance: u.balance,
-      avatar: u.avatar,
-      about: u.about
-    }))
-  });
-});
-
-// ADMIN: GET PENDING PROFILE CHANGE REQUESTS
-app.get("/api/admin/profile-requests", (req, res) => {
-  res.json({
-    requests: pendingProfileUpdates
-  });
-});
-
-// ADMIN: AUDIT ACTION ON A CHANGE REQUEST (Approve / Reject)
-app.post("/api/admin/profile-requests/:id/action", (req, res) => {
-  const requestId = req.params.id;
-  const { action } = req.body; // "approve" or "reject"
-
-  const requestIndex = pendingProfileUpdates.findIndex(r => r.id === requestId);
-  if (requestIndex === -1) {
-    return res.status(404).json({ error: "Müraciət tapılmadı." });
-  }
-
-  const request = pendingProfileUpdates[requestIndex];
-  if (request.status !== "pending") {
-    return res.status(400).json({ error: "Bu müraciət artıq emal olunub!" });
-  }
-
-  if (action === "approve") {
-    request.status = "approved";
-    // Apply proposed updates immediately to live back-end DB
-    const user = backendUsers.find(u => u.id === request.userId);
-    if (user) {
-      user.name = request.name;
-      user.email = request.email;
-      user.phone = request.phone;
-      if (request.companyName !== undefined) user.companyName = request.companyName;
-      if (request.avatar !== undefined) user.avatar = request.avatar;
-      if (request.about !== undefined) user.about = request.about;
-    }
-    return res.json({
-      success: true,
-      message: "Profil yeniləməsi admin tərəfindən uğurla təsdiqləndi və canlı aktivləşdirildi!",
-      request,
-      updatedUser: user ? {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        phone: user.phone,
-        companyName: user.companyName,
-        balance: user.balance,
-        avatar: user.avatar,
-        about: user.about
-      } : null
-    });
-  } else if (action === "reject") {
-    request.status = "rejected";
-    return res.json({
-      success: true,
-      message: "Profil yeniləməsi rədd edildi və ləğv olundu.",
-      request
-    });
-  } else {
-    return res.status(400).json({ error: "Yanlış fəaliyyət tipi daxil edilib (yalnız 'approve' və ya 'reject' ola bilər)." });
-  }
-});
-
 
 // In-memory "Bookings" table to act as our backend DB tracking WhatsApp click-through leads
 interface ServerBooking {
@@ -525,13 +327,25 @@ function splitTourBody(body: Record<string, any>) {
 }
 
 // GET /api/tours — list tours, optionally filtered by vendorId / category / isApproved / isActive
+// GET /api/tours — public by default (the customer marketplace needs to browse everyone's
+// tours), but a valid vendor token scopes the result to that vendor's own tours only —
+// the vendorId query param is ignored in that case so a vendor can't request another
+// vendor's data just by passing a different id. An admin token sees everything, same as
+// an anonymous/public request.
 app.get("/api/tours", async (req, res) => {
   try {
-    const { vendorId, category, isApproved, isActive } = req.query;
+    const user = getOptionalUser(req);
+    const { category, isApproved, isActive } = req.query;
     const conditions: string[] = [];
     const params: any[] = [];
 
-    if (vendorId) { conditions.push('vendor_id = ?'); params.push(String(vendorId)); }
+    if (user && user.role === 'vendor') {
+      conditions.push('vendor_id = ?');
+      params.push(user.id);
+    } else if (req.query.vendorId) {
+      conditions.push('vendor_id = ?');
+      params.push(String(req.query.vendorId));
+    }
     if (category) { conditions.push('category = ?'); params.push(String(category)); }
     if (isApproved !== undefined) { conditions.push('is_approved = ?'); params.push(isApproved === 'true' ? 1 : 0); }
     if (isActive !== undefined) { conditions.push('is_active = ?'); params.push(isActive === 'true' ? 1 : 0); }
@@ -558,10 +372,15 @@ app.get("/api/tours/:id", async (req, res) => {
 });
 
 // POST /api/tours — create a tour
-app.post("/api/tours", async (req, res) => {
+// POST /api/tours — vendors may only create tours under their own vendorId (the JWT's
+// subject, not whatever the client sends); admins may create/assign on any vendor's behalf.
+// New vendor-created tours are always forced unapproved — only an admin can approve.
+app.post("/api/tours", authenticateUser, async (req: any, res) => {
   try {
     const body = req.body || {};
-    const { vendorId, name, category, difficulty, region, durationDays, description, image } = body;
+    const isAdmin = req.operator.role === 'admin';
+    const vendorId = isAdmin ? body.vendorId : req.operator.id;
+    const { name, category, difficulty, region, durationDays, description, image } = body;
     if (!vendorId || !name || !category || !difficulty || !region || !durationDays) {
       return res.status(400).json({ error: "Zəhmət olmasa bütün məcburi sahələri doldurun (vendorId, name, category, difficulty, region, durationDays)." });
     }
@@ -576,7 +395,7 @@ app.post("/api/tours", async (req, res) => {
         id, vendorId, body.vendorName || null, name, category, difficulty, region, Number(durationDays),
         description || null, image || null,
         body.isActive === undefined ? 1 : (body.isActive ? 1 : 0),
-        body.isApproved ? 1 : 0,
+        isAdmin && body.isApproved ? 1 : 0,
         body.priceCurrency || 'AZN',
         Number(body.rating) || 0,
         Number(body.reviewsCount) || 0,
@@ -592,14 +411,26 @@ app.post("/api/tours", async (req, res) => {
   }
 });
 
-// PUT /api/tours/:id — update a tour (partial update; merges onto the existing row)
-app.put("/api/tours/:id", async (req, res) => {
+// PUT /api/tours/:id — update a tour (partial update; merges onto the existing row).
+// Vendors may only edit their own tours and can't self-approve or reassign ownership;
+// admins can edit any tour, including approval status.
+app.put("/api/tours/:id", authenticateUser, async (req: any, res) => {
   try {
     const existingRows = await dbClient.query('SELECT * FROM tours WHERE id = ?', [req.params.id]);
     if (!existingRows.length) return res.status(404).json({ error: "Tur tapılmadı." });
 
     const existing = rowToTour(existingRows[0]);
+    const isAdmin = req.operator.role === 'admin';
+    if (!isAdmin && existing.vendorId !== req.operator.id) {
+      return res.status(403).json({ error: "Bu tur sizin hesabınıza aid deyil." });
+    }
+
     const merged = { ...existing, ...(req.body || {}), id: req.params.id };
+    if (!isAdmin) {
+      // A vendor's edit can't reassign ownership or self-approve their own tour.
+      merged.vendorId = existing.vendorId;
+      merged.isApproved = existing.isApproved;
+    }
     const extra = splitTourBody(merged);
 
     await dbClient.execute(
@@ -621,11 +452,14 @@ app.put("/api/tours/:id", async (req, res) => {
   }
 });
 
-// DELETE /api/tours/:id
-app.delete("/api/tours/:id", async (req, res) => {
+// DELETE /api/tours/:id — vendors may only delete their own tours; admins may delete any.
+app.delete("/api/tours/:id", authenticateUser, async (req: any, res) => {
   try {
-    const existingRows = await dbClient.query('SELECT id FROM tours WHERE id = ?', [req.params.id]);
+    const existingRows = await dbClient.query('SELECT vendor_id FROM tours WHERE id = ?', [req.params.id]);
     if (!existingRows.length) return res.status(404).json({ error: "Tur tapılmadı." });
+    if (req.operator.role !== 'admin' && existingRows[0].vendor_id !== req.operator.id) {
+      return res.status(403).json({ error: "Bu tur sizin hesabınıza aid deyil." });
+    }
 
     await dbClient.execute('DELETE FROM tours WHERE id = ?', [req.params.id]);
     res.json({ success: true });
@@ -676,10 +510,13 @@ app.get("/api/tours/:tourId/slots", async (req, res) => {
 });
 
 // POST /api/tours/:tourId/slots — create a slot for a tour
-app.post("/api/tours/:tourId/slots", async (req, res) => {
+app.post("/api/tours/:tourId/slots", authenticateUser, async (req: any, res) => {
   try {
-    const tourRows = await dbClient.query('SELECT id FROM tours WHERE id = ?', [req.params.tourId]);
+    const tourRows = await dbClient.query('SELECT id, vendor_id FROM tours WHERE id = ?', [req.params.tourId]);
     if (!tourRows.length) return res.status(404).json({ error: "Tur tapılmadı." });
+    if (req.operator.role !== 'admin' && tourRows[0].vendor_id !== req.operator.id) {
+      return res.status(403).json({ error: "Bu tur sizin hesabınıza aid deyil." });
+    }
 
     const { startDate, endDate, price, capacity } = req.body || {};
     if (!startDate || price === undefined || capacity === undefined) {
@@ -701,12 +538,18 @@ app.post("/api/tours/:tourId/slots", async (req, res) => {
 });
 
 // PUT /api/slots/:id — update a slot (partial update)
-app.put("/api/slots/:id", async (req, res) => {
+app.put("/api/slots/:id", authenticateUser, async (req: any, res) => {
   try {
     const existingRows = await dbClient.query('SELECT * FROM tour_slots WHERE id = ?', [req.params.id]);
     if (!existingRows.length) return res.status(404).json({ error: "Tarix tapılmadı." });
 
     const existing = rowToSlot(existingRows[0]);
+    if (req.operator.role !== 'admin') {
+      const tourRows = await dbClient.query('SELECT vendor_id FROM tours WHERE id = ?', [existing.tourId]);
+      if (!tourRows.length || tourRows[0].vendor_id !== req.operator.id) {
+        return res.status(403).json({ error: "Bu tarix sizin hesabınıza aid deyil." });
+      }
+    }
     const merged = { ...existing, ...(req.body || {}) };
 
     await dbClient.execute(
@@ -723,10 +566,16 @@ app.put("/api/slots/:id", async (req, res) => {
 });
 
 // DELETE /api/slots/:id
-app.delete("/api/slots/:id", async (req, res) => {
+app.delete("/api/slots/:id", authenticateUser, async (req: any, res) => {
   try {
-    const existingRows = await dbClient.query('SELECT id FROM tour_slots WHERE id = ?', [req.params.id]);
+    const existingRows = await dbClient.query('SELECT id, tour_id FROM tour_slots WHERE id = ?', [req.params.id]);
     if (!existingRows.length) return res.status(404).json({ error: "Tarix tapılmadı." });
+    if (req.operator.role !== 'admin') {
+      const tourRows = await dbClient.query('SELECT vendor_id FROM tours WHERE id = ?', [existingRows[0].tour_id]);
+      if (!tourRows.length || tourRows[0].vendor_id !== req.operator.id) {
+        return res.status(403).json({ error: "Bu tarix sizin hesabınıza aid deyil." });
+      }
+    }
 
     await dbClient.execute('DELETE FROM tour_slots WHERE id = ?', [req.params.id]);
     res.json({ success: true });
@@ -771,13 +620,23 @@ function splitBookingBody(body: Record<string, any>) {
 }
 
 // GET /api/bookings — list bookings, optionally filtered by vendorId / tourId / customerId / status
+// GET /api/bookings — same optional-auth scoping as GET /api/tours: a vendor token
+// restricts the result to that vendor's own bookings (ignoring any client-supplied
+// vendorId), an admin token or no token at all keeps the existing behavior.
 app.get("/api/bookings", async (req, res) => {
   try {
-    const { vendorId, tourId, customerId, status } = req.query;
+    const user = getOptionalUser(req);
+    const { tourId, customerId, status } = req.query;
     const conditions: string[] = [];
     const params: any[] = [];
 
-    if (vendorId) { conditions.push('vendor_id = ?'); params.push(String(vendorId)); }
+    if (user && user.role === 'vendor') {
+      conditions.push('vendor_id = ?');
+      params.push(user.id);
+    } else if (req.query.vendorId) {
+      conditions.push('vendor_id = ?');
+      params.push(String(req.query.vendorId));
+    }
     if (tourId) { conditions.push('tour_id = ?'); params.push(String(tourId)); }
     if (customerId) { conditions.push('customer_id = ?'); params.push(String(customerId)); }
     if (status) { conditions.push('status = ?'); params.push(String(status)); }
@@ -835,12 +694,15 @@ app.post("/api/bookings", async (req, res) => {
 });
 
 // PUT /api/bookings/:id — update a booking (e.g. status changes, operator notes)
-app.put("/api/bookings/:id", async (req, res) => {
+app.put("/api/bookings/:id", authenticateUser, async (req: any, res) => {
   try {
     const existingRows = await dbClient.query('SELECT * FROM bookings WHERE id = ?', [req.params.id]);
     if (!existingRows.length) return res.status(404).json({ error: "Rezervasiya tapılmadı." });
 
     const existing = rowToBooking(existingRows[0]);
+    if (req.operator.role !== 'admin' && existing.vendorId !== req.operator.id) {
+      return res.status(403).json({ error: "Bu rezervasiya sizin hesabınıza aid deyil." });
+    }
     const merged = { ...existing, ...(req.body || {}), id: req.params.id };
     const extra = splitBookingBody(merged);
 
@@ -870,9 +732,9 @@ app.put("/api/bookings/:id", async (req, res) => {
 });
 
 // POST /api/bookings/checkin — operator scans a ticket's QR code/reference to check the
-// customer in. Requires a valid operator JWT (authenticateOperator); only succeeds for
+// customer in. Requires a valid operator JWT (authenticateUser); only succeeds for
 // bookings under tours that belong to the authenticated operator's own vendor account.
-app.post("/api/bookings/checkin", authenticateOperator, async (req: any, res) => {
+app.post("/api/bookings/checkin", authenticateUser, async (req: any, res) => {
   try {
     const { reference } = req.body;
     if (!reference) {
