@@ -9,22 +9,9 @@ import AdminLogin from './components/AdminLogin';
 import { SearchDropdown } from './components/SearchDropdown';
 import { getRecentSearches, addRecentSearch } from './utils/recentSearches';
 import {
-  Compass,
-  Layers,
-  Database,
-  Map,
-  Tv,
-  Award,
-  BookOpen,
-  ArrowRight,
   ShieldAlert,
-  Download,
-  Terminal,
   RefreshCw,
-  Clock,
-  Briefcase,
   X,
-  RotateCcw,
   Heart,
   Globe
 } from 'lucide-react';

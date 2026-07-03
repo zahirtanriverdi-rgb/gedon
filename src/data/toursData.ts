@@ -1,4 +1,4 @@
-import { Tour, TourSlot, User, Review } from '../types';
+import { Tour, TourSlot, User } from '../types';
 
 // Mock/Seed users in our database representing Vendor (Tour Operators), Admin, and Customers
 export const seedUsers: User[] = [
@@ -840,41 +840,4 @@ export const seedTourSlots: TourSlot[] = [
   { id: 'slot-active-vball-1', tourId: 'tour-active-volleyball', startDate: '2026-06-05', endDate: '2026-06-05', price: 25.0, capacity: 24, bookedCount: 16 },
   { id: 'slot-active-vball-2', tourId: 'tour-active-volleyball', startDate: '2026-06-12', endDate: '2026-06-12', price: 25.0, capacity: 24, bookedCount: 4 },
   { id: 'slot-active-rafting-1', tourId: 'tour-active-rafting', startDate: '2026-06-20', endDate: '2026-06-20', price: 60.0, capacity: 12, bookedCount: 3 }
-];
-
-// Pre-filled reviews with verified attendee status
-export const seedReviews: Review[] = [
-  {
-    id: 'rev-1',
-    tourId: 'tour-mestdergah',
-    bookingId: 'book-past-1',
-    customerId: 'user-customer-1',
-    customerName: 'Zahir Tanrıverdi',
-    rating: 5,
-    comment: 'İnanılmaz gözəl mövsüm yürüşü idi. Keçidlər çətin olsa da, dağ bələdçiləri çox professionaldır, hər kəsə fərdi nəzarət etdilər. Ləvəngi dadlı idi!',
-    createdAt: '2026-04-27T10:00:00Z',
-    verifiedAttendee: true
-  },
-  {
-    id: 'rev-2',
-    tourId: 'tour-kuzun-laza',
-    bookingId: 'book-past-2',
-    customerId: 'user-customer-1',
-    customerName: 'Aytən Məmmədova',
-    rating: 5,
-    comment: 'Laza şəlalələri heyranedicidir. Yeni başlayanlar üçün ən ideal marşrutdur, heç yorulmadıq. Təşkilatçılıq əla idi.',
-    createdAt: '2025-05-04T12:30:00Z',
-    verifiedAttendee: true
-  },
-  {
-    id: 'rev-3',
-    tourId: 'tour-qaranohur',
-    bookingId: 'book-past-3',
-    customerId: 'user-customer-x',
-    customerName: 'Fərid Əliyev',
-    rating: 4,
-    comment: 'Yüksəliş olduqca dik və dumanlı idi. Yağış səbəbindən palçıqlı idi, amma gölün mənzərəsi çəkilən bütün əziyyətlərə dəyərdi.',
-    createdAt: '2026-04-20T18:00:00Z',
-    verifiedAttendee: true
-  }
 ];
