@@ -8,6 +8,7 @@ import OperatorLogin from './components/OperatorLogin';
 import AdminLogin from './components/AdminLogin';
 import { SearchDropdown } from './components/SearchDropdown';
 import { getRecentSearches, addRecentSearch } from './utils/recentSearches';
+import { getWishlist, WISHLIST_CHANGED_EVENT } from './utils/wishlist';
 import {
   ShieldAlert,
   RefreshCw,
@@ -223,6 +224,19 @@ export default function App() {
   const [displayCurrency, setDisplayCurrency] = useState<'AZN' | 'USD' | 'EUR'>('AZN');
   const [appLanguage, setAppLanguage] = useState<'az' | 'en' | 'ru'>('az');
   const [isLangMenuOpen, setIsLangMenuOpen] = useState(false);
+
+  // Wishlist ids live in localStorage (see utils/wishlist.ts); we mirror them here so the
+  // header badge can react instantly when a tour is added/removed elsewhere, without a reload.
+  const [wishlistIds, setWishlistIds] = useState<string[]>(() => getWishlist());
+  React.useEffect(() => {
+    const syncWishlist = () => setWishlistIds(getWishlist());
+    window.addEventListener(WISHLIST_CHANGED_EVENT, syncWishlist);
+    return () => window.removeEventListener(WISHLIST_CHANGED_EVENT, syncWishlist);
+  }, []);
+  const wishlistCount = React.useMemo(
+    () => tours.filter(tour => wishlistIds.includes(tour.id) && tour.status === 'approved').length,
+    [tours, wishlistIds]
+  );
 
   React.useEffect(() => {
     function handleClickOutsideSearch(event: MouseEvent) {
@@ -629,9 +643,16 @@ export default function App() {
               <div className="flex items-center gap-5 text-slate-700">
                 <button
                   onClick={() => window.dispatchEvent(new CustomEvent('nav-wishlist'))}
-                  className="flex flex-col items-center justify-center gap-1 hover:text-emerald-600 transition group cursor-pointer bg-transparent border-none p-0"
+                  className="relative flex flex-col items-center justify-center gap-1 hover:text-emerald-600 transition group cursor-pointer bg-transparent border-none p-0"
                 >
-                  <Heart className="w-5 h-5 stroke-[2px] transition-colors group-hover:fill-emerald-500 group-hover:stroke-emerald-500" />
+                  <span className="relative">
+                    <Heart className="w-5 h-5 stroke-[2px] transition-colors group-hover:fill-emerald-500 group-hover:stroke-emerald-500" />
+                    {wishlistCount > 0 && (
+                      <span className="absolute -top-1.5 -right-2 bg-rose-600 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">
+                        {wishlistCount}
+                      </span>
+                    )}
+                  </span>
                   <span className="text-[11px] font-semibold">İstəklər</span>
                 </button>
                 <div className="relative">
