@@ -333,13 +333,11 @@ export default function CustomerPortal({
   }, [tours]);
 
   // Use this function to navigate to a tour or reset back to home
+  // (booking flow state itself is reset by the effect below whenever selectedTour changes)
   const handleTourClick = (tour: Tour | null) => {
     if (tour) {
       window.history.pushState({}, '', `/tours/${tour.id}`);
       setSelectedTour(tour);
-      setIsBookingStep(false);
-      setBookingSuccessData(null);
-      setSelectedSlot(null);
     } else {
       window.history.pushState({}, '', '/');
       setSelectedTour(null);
@@ -356,11 +354,40 @@ export default function CustomerPortal({
   const [isDescExpanded, setIsDescExpanded] = useState<boolean>(false);
   const [selectedSlot, setSelectedSlot] = useState<TourSlot | null>(null);
   const [bookingQty, setBookingQty] = useState<number>(1);
-  const [sidebarParticipants, setSidebarParticipants] = useState<number>(1);
   const [showParticipantsDropdown, setShowParticipantsDropdown] = useState<boolean>(false);
+  const [showDateDropdown, setShowDateDropdown] = useState<boolean>(false);
+  const [showTourSlots, setShowTourSlots] = useState<boolean>(false);
+
+  // Keep participant count within the capacity of whichever slot is currently selected,
+  // so the sticky sidebar and the booking form below always agree on the same numbers.
+  React.useEffect(() => {
+    if (selectedSlot) {
+      const availableCapacity = Math.max(1, selectedSlot.capacity - selectedSlot.bookedCount);
+      setBookingQty(prev => Math.min(Math.max(1, prev), availableCapacity));
+    }
+  }, [selectedSlot]);
   const [paymentGateway, setPaymentGateway] = useState<string>('whatsapp');
   const [isBookingStep, setIsBookingStep] = useState<boolean>(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState<boolean>(false);
+
+  // Scroll to the booking form once it actually exists in the DOM. Doing this in the click
+  // handler that opens it doesn't work — setIsBookingStep(true) is an async state update, so
+  // the #booking-form-section node isn't rendered yet at the time of that click.
+  React.useEffect(() => {
+    if (isBookingStep) {
+      const formEl = document.getElementById('booking-form-section');
+      if (formEl) formEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [isBookingStep]);
+
+  // Same DOM-timing reasoning as above: scroll to the tour-slots-calendar section only after
+  // showTourSlots flips to true and React has actually rendered it.
+  React.useEffect(() => {
+    if (showTourSlots) {
+      const el = document.getElementById('tour-slots-calendar');
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }, [showTourSlots]);
   const [bookingSubmitError, setBookingSubmitError] = useState<string | null>(null);
   const [bookingSuccessData, setBookingSuccessData] = useState<any>(null);
 
@@ -386,6 +413,37 @@ export default function CustomerPortal({
     { name: '', phone: '' }
   ]);
   const [safetyAcknowledged, setSafetyAcknowledged] = useState<boolean>(false);
+
+  // Reset the whole booking flow whenever the user switches to a different tour (or closes one),
+  // so leftover participant counts / selected dates / form fields don't leak between tours.
+  React.useEffect(() => {
+    setSelectedSlot(null);
+    setBookingQty(1);
+    setShowParticipantsDropdown(false);
+    setShowDateDropdown(false);
+    setShowTourSlots(false);
+    setIsBookingStep(false);
+    setBookingSuccessData(null);
+    setBookingCustomerName('');
+    setBookingCustomerPhone('');
+    setVerificationOtpCode('');
+    setUserInputOtp('');
+    setIsOtpSent(false);
+    setIsPhoneVerified(false);
+    setShowIncomingOtpBanner(false);
+    setUsingOwnEquipment(false);
+    setRentEquipment(false);
+    setBookingRegType('individual');
+    setBookingTeamName('');
+    setBookingTeamMembers([
+      { name: '', phone: '' },
+      { name: '', phone: '' },
+      { name: '', phone: '' },
+      { name: '', phone: '' },
+      { name: '', phone: '' }
+    ]);
+    setSafetyAcknowledged(false);
+  }, [selectedTour?.id]);
 
   // New review state
   const [reviewRating, setReviewRating] = useState<number>(5);
@@ -718,8 +776,6 @@ export default function CustomerPortal({
   // Open booking sub-section
   const handleOpenBooking = (slot: TourSlot) => {
     setSelectedSlot(slot);
-    const availableCapacity = Math.max(1, slot.capacity - slot.bookedCount);
-    setBookingQty(Math.min(sidebarParticipants, availableCapacity));
     setIsBookingStep(true);
     setBookingCustomerName('');
     setBookingCustomerPhone('');
@@ -1835,21 +1891,6 @@ export default function CustomerPortal({
       {/* DETAILED TOUR PAGE (Full Page Dynamic Route) */}
       {activeView === 'home' && selectedTour && (
         <div className="animate-fadeIn bg-white min-h-screen pb-20">
-          {/* Top Navbar / Back Button — sticks just below the app's own sticky header
-              (App.tsx's <header>, which grows from ~65.5px to 75px once the scroll-triggered
-              search bar appears) instead of top-0, which put both bars in the same spot and
-              made this one flicker/overlap under the main header's search bar + nav icons. */}
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 border-b border-slate-100 flex items-center justify-between sticky top-[75px] bg-white/90 backdrop-blur-md z-30">
-            <button 
-              type="button" 
-              onClick={() => handleTourClick(null)}
-              className="flex items-center gap-2 text-slate-700 hover:text-emerald-700 font-bold transition text-sm cursor-pointer"
-            >
-              <ChevronLeft className="w-5 h-5" />
-              bütün turlara qayıt
-            </button>
-          </div>
-
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
             
             {/* Header Section */}
@@ -1884,8 +1925,10 @@ export default function CustomerPortal({
               </div>
             </div>
 
-            {/* TWO COLUMN WRAPPER */}
-            <div className="flex flex-col lg:flex-row gap-10 relative items-start">
+            {/* TWO COLUMN WRAPPER — items-stretch (default) so the right column wrapper is as tall as the
+                left column's content; without that, the sticky sidebar's own container is only as tall as
+                the sidebar itself, leaving no scroll room for position:sticky to actually stick. */}
+            <div className="flex flex-col lg:flex-row gap-10 relative items-stretch">
               
               {/* LEFT COLUMN: Gallery & Info */}
               <div className="w-full lg:w-[65%] shrink-0 space-y-10">
@@ -1953,596 +1996,9 @@ export default function CustomerPortal({
                   </div>
                 </div>
 
-                {/* Highlights */}
-                <div className="space-y-4 py-4">
-                  <h2 className="text-xl font-extrabold text-slate-900">Önə Çıxanlar</h2>
-                  <div className="flex flex-col gap-4">
-                    <div className="flex items-start gap-4">
-                      <div className="mt-0.5"><Check className="w-5 h-5 text-emerald-600" /></div>
-                      <span className="text-slate-700 leading-relaxed font-medium">Peşəkar bələdçilərlə {selectedTour.region} regionunun nəfəskəsici təbiətini kəşf edin.</span>
-                    </div>
-                    <div className="flex items-start gap-4">
-                      <div className="mt-0.5"><Check className="w-5 h-5 text-emerald-600" /></div>
-                      <span className="text-slate-700 leading-relaxed font-medium">Seçilmiş səviyyənizə uyğun {selectedTour.difficulty} çətinlikdə macəra yaşayın.</span>
-                    </div>
-                    {selectedTour.isInternational && (
-                      <div className="flex items-start gap-4">
-                        <div className="mt-0.5"><Check className="w-5 h-5 text-emerald-600" /></div>
-                        <span className="text-slate-700 leading-relaxed font-medium">{selectedTour.destinationCity} şəhərində gündəlik istiqamətinizi izləyən ağıllı marşrut proqramı.</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-                
-                {/* Full description */}
-                <div className="space-y-4 py-4 border-t border-slate-200">
-                  <h2 className="text-xl font-extrabold text-slate-900">Tam təsvir</h2>
-                  <p className="text-slate-700 text-sm leading-relaxed whitespace-pre-line font-medium antialiased">
-                    {selectedTour.description.length > 320 && !isDescExpanded
-                      ? `${selectedTour.description.substring(0, 310)}...`
-                      : selectedTour.description}
-                  </p>
-                  {selectedTour.description.length > 320 && (
-                    <button
-                      type="button"
-                      onClick={() => setIsDescExpanded(!isDescExpanded)}
-                      className="text-sm font-extrabold text-slate-900 hover:underline flex items-center gap-1 cursor-pointer transition-all mt-2"
-                    >
-                      {isDescExpanded ? 'Daha az göstər' : 'Daha çox göstər'}
-                    </button>
-                  )}
-                </div>
-
-                {/* Includes / Excludes */}
-                <div className="space-y-4 py-4 border-t border-slate-200">
-                  <h2 className="text-xl font-extrabold text-slate-900">Qiymətə daxildir</h2>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                   <div className="flex items-start gap-3">
-                     <Check className="w-5 h-5 text-emerald-600 shrink-0" />
-                     <span className="text-slate-700 text-sm font-medium">Peşəkar canlı tur bələdçisi</span>
-                   </div>
-                   {selectedTour.mealType && (
-                     <div className="flex items-start gap-3">
-                       <Check className="w-5 h-5 text-emerald-600 shrink-0" />
-                       <span className="text-slate-700 text-sm font-medium">Qida: {selectedTour.mealType}</span>
-                     </div>
-                   )}
-                   {selectedTour.flightIncluded && (
-                     <div className="flex items-start gap-3">
-                       <Check className="w-5 h-5 text-emerald-600 shrink-0" />
-                       <span className="text-slate-700 text-sm font-medium">Aviabilet və transfer daxildir</span>
-                     </div>
-                   )}
-                   <div className="flex items-start gap-3">
-                     <Check className="w-5 h-5 text-emerald-600 shrink-0" />
-                     <span className="text-slate-700 text-sm font-medium">Yerli vergilər və xərclər</span>
-                   </div>
-                   <div className="flex items-start gap-3 opacity-60">
-                     <X className="w-5 h-5 text-red-500 shrink-0" />
-                     <span className="text-slate-700 text-sm font-medium line-through decoration-slate-300">Şəxsi suvenirlər (Daxil deyil)</span>
-                   </div>
-                   {!selectedTour.flightIncluded && selectedTour.isInternational && (
-                     <div className="flex items-start gap-3 opacity-60">
-                       <X className="w-5 h-5 text-red-500 shrink-0" />
-                       <span className="text-slate-700 text-sm font-medium line-through decoration-slate-300">Aviabiletlər (Ayrı alınmalıdır)</span>
-                     </div>
-                   )}
-                  </div>
-                </div>
-
-                {/* Meeting Point */}
-                <div className="space-y-4 py-4 border-t border-slate-200">
-                  <h2 className="text-xl font-extrabold text-slate-900">Görüş yeri</h2>
-                  {!selectedTour.isInternational ? (
-                    <div className="space-y-3">
-                      <p className="text-sm font-medium text-slate-700 leading-relaxed">
-                        Tofiq Bəhramov adına Respublika Stadionunun qarşısı. Xahiş edirik ki, başlama vaxtından 15 dəqiqə əvvəl orada olasınız.
-                      </p>
-                      <div className="w-full h-[300px] rounded-xl overflow-hidden shadow-sm border border-slate-200">
-                        <iframe 
-                          src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3097.7169141972613!2d49.847440975921245!3d40.40056995662297!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x40307d0008f3743b%3A0x8e152613424aac00!2zR2VkyZlrIEfDtnLJmWsgLSBUb3BsYW7EscWfIHllcmk!5e1!3m2!1str!2slv!4v1779641889812!5m2!1str!2slv" 
-                          width="100%" 
-                          height="100%" 
-                          style={{ border: 0 }} 
-                          allowFullScreen={true} 
-                          loading="lazy" 
-                          referrerPolicy="no-referrer-when-downgrade"
-                        ></iframe>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      <p className="text-sm font-medium text-slate-700 leading-relaxed">
-                        Bələdçinizlə əsas girişin qarşısında görüşün. Üzərində {selectedTour.vendorName} yazılmış lövhə tutan şəxsi axtarın. Xahiş edirik ki, başlama vaxtından 15 dəqiqə əvvəl orada olasınız.
-                      </p>
-                      <a href="#" className="font-extrabold text-blue-600 text-sm hover:underline flex items-center gap-1.5 transition">
-                        Google Maps-də açın <ExternalLink className="w-4 h-4" />
-                      </a>
-                    </div>
-                  )}
-                </div>
-
-                {/* Important Information */}
-                <div className="space-y-4 py-4 border-t border-slate-200">
-                  <h2 className="text-xl font-extrabold text-slate-900">Mühüm məlumatlar</h2>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 mt-4">
-                    <div>
-                      <h3 className="font-bold text-slate-800 text-sm mb-3">Özünüzlə gətirin</h3>
-                      <ul className="space-y-2">
-                        <li className="flex items-start gap-3 text-sm text-slate-700 font-medium">
-                          <Check className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" /> {selectedTour.requiredEquipment || 'Rahat ayaqqabı'}
-                        </li>
-                        <li className="flex items-start gap-3 text-sm text-slate-700 font-medium">
-                          <Check className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" /> Pasport və ya şəxsiyyət vəsiqəsi
-                        </li>
-                        <li className="flex items-start gap-3 text-sm text-slate-700 font-medium">
-                          <Check className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" /> Hava şəraitinə uyğun geyim
-                        </li>
-                      </ul>
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-slate-800 text-sm mb-3">İcazə verilmir</h3>
-                      <ul className="space-y-2">
-                        <li className="flex items-start gap-3 text-sm text-slate-700 font-medium">
-                          <X className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" /> Böyük çamadanlar və çantalar
-                        </li>
-                        <li className="flex items-start gap-3 text-sm text-slate-700 font-medium">
-                          <X className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" /> Müşayiətsiz yetkinlik yaşına çatmayanlar
-                        </li>
-                      </ul>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Extra dynamic details (Admin warnings, Weather, GPT assistant) */}
-                <div className="space-y-6 pt-4 border-t border-slate-200">
-              
-              {selectedTour.isApproved === false && (
-                <div className="bg-amber-50 border border-amber-250 p-4 rounded-xl flex items-start gap-3 shadow-3xs animate-fadeIn">
-                  <div className="p-2 bg-amber-100 rounded-lg text-amber-850 shrink-0">
-                    <AlertCircle className="w-5 h-5 text-amber-750" />
-                  </div>
-                  <div className="space-y-1">
-                    <h4 className="text-xs font-black text-amber-850 tracking-wider">⏳ BU TUR ADMIN TƏSDİQİ GÖZLƏYİR</h4>
-                    <p className="text-[11px] text-amber-700 leading-normal font-semibold">
-                      Bu marşrut operator tərəfindən uğurla yaradılıb, lakin hələ rəsmi təsdiqlənməyib. 
-                      Sınaq etmək üçün yuxarıdakı paneldən <strong>"Admin"</strong> rolunu seçib, təsdiqləmə növbəsindən bu turu aktivləşdirə bilərsiniz. 
-                      Test rejimində detallarla tanış ola və WhatsApp sifarişi klikini sınaya bilərsiniz.
-                    </p>
-                  </div>
-                </div>
-              )}
-              
-              {/* Tabs Info / Scheduling */}
-              {!isBookingStep ? (
-                <div className="space-y-6">
-                  {/* Dynamic Integrations */}
-
-                  {/* High fidelity Weather Integration */}
-                  {slots.filter(s => s.tourId === selectedTour.id).length > 0 && (
-                    <TourWeatherForecast 
-                      dates={slots.filter(s => s.tourId === selectedTour.id).map(s => s.startDate)} 
-                      region={selectedTour.region} 
-                      variant="detailed" 
-                    />
-                  )}
-
-                  {/* Stunning Interactive 3D/2D GPX Trail Explorer Map */}
-                  {selectedTour.gpxData && (
-                    <GpsTrackVisualizer gpxDataString={selectedTour.gpxData} />
-                  )}
-
-                  {(() => {
-                    const organizer = users.find(u => u.id === selectedTour.vendorId);
-                    if (organizer && organizer.guides && organizer.guides.length > 0) {
-                      return (
-                        <div className="mt-6 mb-2 border border-slate-200 rounded-2xl p-5 bg-gradient-to-r from-slate-50 to-white shadow-sm">
-                          <h4 className="font-extrabold text-slate-800 mb-4 text-sm flex items-center gap-2">
-                            👥 Təşkilatçının Komandası
-                          </h4>
-                          <div className="flex gap-4 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-none sm:scrollbar-thin">
-                            {organizer.guides.map((g, i) => (
-                              <div key={i} className="flex flex-col items-start flex-shrink-0 w-[260px] snap-start bg-white p-4 rounded-xl border border-slate-200 shadow-sm transition hover:shadow-md">
-                                <div className="flex items-center gap-4 mb-3 w-full">
-                                  <div className="w-12 h-12 rounded-full overflow-hidden bg-slate-100 border-2 border-emerald-50 flex-shrink-0">
-                                    {g.avatar ? <img src={g.avatar} className="w-full h-full object-cover"/> : <span className="flex items-center justify-center font-bold text-slate-400 w-full h-full text-sm">{g.name.charAt(0)}</span>}
-                                  </div>
-                                  <div className="flex-1 overflow-hidden">
-                                     <span className="text-sm font-bold text-slate-800 block truncate" title={g.name}>{g.name}</span>
-                                     <span className="text-[10px] text-emerald-600 font-bold block line-clamp-2 tracking-wide mt-0.5" title={g.specialty}>{g.specialty || 'Bələdçi'}</span>
-                                  </div>
-                                </div>
-                                <p className="text-xs text-slate-600 font-medium leading-relaxed line-clamp-3" title={g.bio}>{g.bio}</p>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      );
-                    }
-                    return null;
-                  })()}
-
-                  {/* Smart Pack Assistant vs. International Travel Agent Integration */}
-                  {selectedTour.isInternational ? (
-                    <div className="bg-gradient-to-br from-indigo-900/10 to-teal-900/5 border border-indigo-200/60 rounded-2xl p-6 space-y-5 shadow-3xs hover:border-indigo-300 transition duration-300">
-                      <div className="flex items-start justify-between flex-wrap gap-3 border-b border-indigo-200/40 pb-3">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xl">✈️</span>
-                          <div>
-                            <h4 className="text-xs font-black text-indigo-950 tracking-widest leading-none">
-                              XARİCİ SƏYAHƏTİN SEHRLİ PLANLAŞDIRICISI
-                            </h4>
-                            <p className="text-[10px] text-slate-500 font-bold mt-1.5 leading-none">
-                              {selectedTour.destinationCountry} və {selectedTour.destinationCity} üçün rəqəmsal bələdçi paneli
-                            </p>
-                          </div>
-                        </div>
-                        <span className="text-[9px] font-black text-white bg-indigo-600 px-2.5 py-1 rounded tracking-widest">
-                          AĞILLI BƏLƏDÇİ
-                        </span>
-                      </div>
-
-                      {/* PART 1: WEATHER FORECAST SPECIALLY INTEGRATED FOR DESTINATION */}
-                      <div className="space-y-2">
-                        <h5 className="text-[10px] font-black text-indigo-900 tracking-wider flex items-center gap-1">
-                          ☀️ Təyinat Məntəqəsinin Gündəlik Hava Proqnozu
-                        </h5>
-                        
-                        <div className="bg-white p-3.5 rounded-xl border border-slate-150 shadow-4xs grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
-                          {selectedTour.itinerary && selectedTour.itinerary.map((it, idx) => {
-                            const weathers = [
-                              { temp: '24°C', tag: 'Açıq Səma', emoji: '☀️' },
-                              { temp: '22°C', tag: 'Parlaq Gün', emoji: '🌤️' },
-                              { temp: '25°C', tag: 'Az buludlu', emoji: '⛅' },
-                              { temp: '21°C', tag: 'Möhtəşəm hava', emoji: '☀️' },
-                              { temp: '23°C', tag: 'Sərin meh', emoji: '🌬️' },
-                              { temp: '24°C', tag: 'Gözəl hava', emoji: '☀️' },
-                            ];
-                            const w = weathers[idx % weathers.length];
-                            return (
-                              <div key={idx} className="bg-slate-50/50 p-2 rounded-lg border border-slate-100 flex flex-col items-center">
-                                <span className="text-[9px] font-extrabold text-slate-400 block tracking-tight">GÜN {it.day}</span>
-                                <span className="text-xl my-1">{w.emoji}</span>
-                                <span className="text-xs font-black text-slate-800 leading-none">{w.temp}</span>
-                                <span className="text-[9px] text-slate-500 font-medium block truncate mt-0.5 max-w-[90px]">{w.tag}</span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                      {/* PART 2: THE SPOTS COVERED IN THESE DAYS */}
-                      <div className="space-y-2">
-                        <h5 className="text-[10px] font-black text-indigo-900 tracking-wider flex items-center gap-1.5">
-                          📍 Günlərə Görə Baş Çəkəcəyiniz Məkanlar (Gəzməli Yerlər)
-                        </h5>
-                        
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                          {selectedTour.itinerary && selectedTour.itinerary.map((day, di) => {
-                            let mainPlace = selectedTour.destinationCity;
-                            if (day.title.includes('Kilsə') || day.title.includes('Kolizey') || day.title.includes('Məbəd') || day.title.includes('Vadi') || day.title.includes('Ubud')) {
-                              mainPlace = day.title.split(':')[0] || selectedTour.destinationCity;
-                            }
-                            return (
-                              <div
-                                key={di}
-                                className="bg-white p-3 rounded-xl border border-slate-150 flex items-start gap-2.5"
-                              >
-                                <div className="w-6 h-6 rounded-full bg-indigo-50 border border-indigo-150 text-[10px] font-bold text-indigo-700 flex items-center justify-center shrink-0 mt-0.5">
-                                  {day.day}
-                                </div>
-                                <div className="space-y-1 overflow-hidden">
-                                  <div className="flex items-center justify-between gap-1">
-                                    <span className="text-[9px] font-extrabold text-indigo-805 bg-indigo-55/75 px-1.5 py-0.5 rounded leading-none truncate">
-                                      🗺️ {mainPlace}
-                                    </span>
-                                  </div>
-                                  <h6 className="text-[10px] font-extrabold text-[#1f2937] leading-tight truncate">{day.title}</h6>
-                                  <p className="text-[9.5px] text-slate-500 leading-snug line-clamp-2">{day.description}</p>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="bg-amber-50/45 border border-amber-200/60 rounded-2xl p-5 space-y-4 hover:border-amber-300/85 transition duration-300">
-                      <div className="flex items-start justify-between flex-wrap gap-3 border-b border-amber-200/40 pb-3">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xl">🎒</span>
-                          <div>
-                            <h4 className="text-xs font-black text-amber-900 tracking-widest leading-none border-b border-amber-200/20 pb-0.5">
-                              Ağıllı Çanta & İlkin Hazırlıq
-                            </h4>
-                            <p className="text-[10px] text-amber-800/80 font-bold mt-1">
-                              Sizin fərdi təcrübənizə uyğun çanta və yürüş tövsiyələri
-                            </p>
-                          </div>
-                        </div>
-
-                        {packingAdviceMap[selectedTour.id] && (
-                          <button
-                            type="button"
-                            onClick={() => fetchPackingAdvice(selectedTour)}
-                            disabled={packingLoading}
-                            className="bg-amber-100/80 hover:bg-amber-150 text-amber-955 font-extrabold text-[9px] px-2.5 py-1.5 rounded-lg tracking-wider transition-all cursor-pointer flex items-center gap-1 shrink-0"
-                          >
-                            {packingLoading ? "Yenilənir..." : "🔄 Yenilə"}
-                          </button>
-                        )}
-                      </div>
-
-                      {/* INTERACTIVE QUESTION SECTION */}
-                      <div className="bg-white/95 border border-amber-150 p-4 rounded-xl space-y-3.5 shadow-4xs">
-                        <p className="text-xs font-extrabold text-slate-800 flex items-center gap-1.5">
-                          <span className="animate-pulse">❓</span> Bundan öncə neçə yürüşdə (hiking-də) olmusunuz?
-                        </p>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setPackingExperienceMap(prev => ({ ...prev, [selectedTour.id]: 'beginner' }));
-                              if (!packingAdviceMap[selectedTour.id]) {
-                                fetchPackingAdvice(selectedTour);
-                              }
-                            }}
-                            className={`p-3.5 rounded-xl border text-left transition duration-200 cursor-pointer flex flex-col justify-between ${
-                              packingExperienceMap[selectedTour.id] === 'beginner'
-                                ? 'border-emerald-500 bg-emerald-50/30 ring-1 ring-emerald-500'
-                                : 'border-slate-200 bg-white hover:border-amber-300'
-                            }`}
-                          >
-                            <span className="text-[11px] font-black text-slate-800 flex items-center gap-1">
-                              <span className="text-xs">🟢</span> 0 - 2 dəfə (Yeni başlayan)
-                            </span>
-                            <span className="text-[9px] text-slate-500 mt-1.5 font-medium leading-normal">
-                              Evdə olan rahat əşyalarla sadə hazırlıq. Bahalı avadanlığa ehtiyac yoxdur!
-                            </span>
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setPackingExperienceMap(prev => ({ ...prev, [selectedTour.id]: 'pro' }));
-                              if (!packingAdviceMap[selectedTour.id]) {
-                                fetchPackingAdvice(selectedTour);
-                              }
-                            }}
-                            className={`p-3.5 rounded-xl border text-left transition duration-200 cursor-pointer flex flex-col justify-between ${
-                              packingExperienceMap[selectedTour.id] === 'pro'
-                                ? 'border-indigo-500 bg-indigo-50/10 ring-1 ring-indigo-500'
-                                : 'border-slate-200 bg-white hover:border-amber-300'
-                            }`}
-                          >
-                            <span className="text-[11px] font-black text-slate-800 flex items-center gap-1">
-                              <span className="text-xs">⚡</span> 3 və ya daha çox (Təcrübəli)
-                            </span>
-                            <span className="text-[9px] text-slate-500 mt-1.5 font-medium leading-normal">
-                              Relyefə və çətinliyə xüsusi texniki səviyyə avadanlığı və qoruyucu geyim.
-                            </span>
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* PACKING LIST DISPLAY AREA */}
-                      {packingLoading ? (
-                        <div className="bg-white border border-amber-200/60 p-6 rounded-xl text-center space-y-2.5 shadow-5xs">
-                          <div className="w-5 h-5 border-2 border-amber-600 border-t-transparent rounded-full animate-spin mx-auto" />
-                          <p className="text-[10px] text-slate-500 font-bold tracking-wider">
-                            Sizin təcrübə səviyyənizə uyğun hazırlıq planı tərtib edilir...
-                          </p>
-                        </div>
-                      ) : packingAdviceMap[selectedTour.id] ? (
-                        (() => {
-                          const adviceObj = packingAdviceMap[selectedTour.id].packing_advice;
-                          const basics = adviceObj?.basics || [];
-                          const proGear = adviceObj?.pro_gear || [];
-                          const userChoice = packingExperienceMap[selectedTour.id] || 'beginner';
-
-                          return (
-                            <div className="bg-white border border-amber-200/80 p-4.5 rounded-xl text-xs space-y-3 shadow-xs text-slate-850 animate-fadeIn">
-                              {userChoice === 'beginner' ? (
-                                <div className="space-y-3 bg-emerald-50/20 border border-emerald-100/70 p-4 rounded-lg">
-                                  <div className="flex items-center justify-between border-b border-emerald-100/40 pb-2 mb-1">
-                                    <span className="flex items-center gap-1.5 text-xs font-black text-emerald-800 tracking-widest">
-                                      <span>🟢</span> Sizə Uyğun: Yeni Başlayan Çantası
-                                    </span>
-                                    <span className="bg-emerald-100 text-emerald-800 font-bold text-[9px] px-1.5 py-0.5 rounded leading-none select-none">
-                                      Məsləhət Görülür
-                                    </span>
-                                  </div>
-                                  {basics.length > 0 ? (
-                                    <ul className="space-y-1.5">
-                                      {basics.map((item, index) => (
-                                        <li key={index} className="flex items-start gap-2 text-[11px] text-slate-700 font-medium">
-                                          <input type="checkbox" className="mt-0.5 accent-emerald-600 rounded cursor-pointer shrink-0" />
-                                          <span>{item}</span>
-                                        </li>
-                                      ))}
-                                    </ul>
-                                  ) : (
-                                    <span className="text-[10px] text-slate-400 font-bold block">Bu səviyyə üçün xüsusi təklif yoxdur.</span>
-                                  )}
-                                </div>
-                              ) : (
-                                <div className="space-y-3 bg-indigo-50/15 border border-indigo-100/60 p-4 rounded-lg">
-                                  <div className="flex items-center justify-between border-b border-indigo-150/40 pb-2 mb-1">
-                                    <span className="flex items-center gap-1.5 text-xs font-black text-indigo-800 tracking-widest">
-                                      <span>⚡</span> Sizə Uyğun: Texniki Peşəkar Siyahı
-                                    </span>
-                                  </div>
-                                  {proGear.length > 0 ? (
-                                    <ul className="space-y-1.5">
-                                      {proGear.map((item, index) => (
-                                        <li key={index} className="flex items-start gap-2 text-[11px] text-slate-700 font-medium">
-                                          <input type="checkbox" className="mt-0.5 accent-indigo-600 rounded cursor-pointer shrink-0" />
-                                          <span>{item}</span>
-                                        </li>
-                                      ))}
-                                    </ul>
-                                  ) : (
-                                    <span className="text-[10px] text-slate-400 font-bold block">Bu səviyyə üçün xüsusi təklif yoxdur.</span>
-                                  )}
-                                </div>
-                              )}
-
-                              <div className="pt-2 text-[9px] text-emerald-700 font-bold border-t border-slate-100 flex items-center justify-between gap-1 leading-normal">
-                                <span>💚 <strong>Bələdçi Rəyi:</strong> Sizə hər zaman rahat olacaq geyim və ayaqqabılar seçin; yürüşün, fəslin ləzzətini hiss edin!</span>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setPackingExperienceMap(prev => ({
-                                      ...prev,
-                                      [selectedTour.id]: userChoice === 'beginner' ? 'pro' : 'beginner'
-                                    }));
-                                  }}
-                                  className="text-[9px] text-indigo-700 font-black underline hover:text-indigo-800 cursor-pointer select-none whitespace-nowrap"
-                                >
-                                  {userChoice === 'beginner' ? "Təcrübəli siyahısına keç" : "Başlayanlar üçün keç"}
-                                </button>
-                              </div>
-                            </div>
-                          );
-                        })()
-                      ) : (
-                        <div className="text-center p-4 bg-white/70 border border-dashed border-slate-200 rounded-xl text-[11px] text-slate-500 font-medium">
-                          💡 Yuxarıdakı suala cavab seçərək sizə özəl olan ağıllı bələdçi tövsiyələrini dərhal açın!
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Mehmanxana və Nəqliyyat Loqistikası */}
-                  {selectedTour.isInternational && (
-                    <div className="bg-gradient-to-r from-amber-500/10 to-teal-800/5 border border-amber-200 p-5 rounded-xl space-y-4">
-                      <h4 className="text-xs font-black text-amber-900 tracking-wider flex items-center gap-1.5 border-b pb-1.5 border-amber-200">
-                        🏨 Səyahət, Mehmanxana və VIP Rezervasiya Təfərrüatları
-                      </h4>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="space-y-1 text-xs">
-                          <span className="text-slate-400 block font-bold text-[9px]">MEHMANXANA NÖVÜ</span>
-                          <span className="text-slate-900 font-bold block">{selectedTour.hotelName}</span>
-                          <span className="text-amber-500 text-xs tracking-widest font-bold block">
-                            {Array(Number(selectedTour.hotelStars || 5)).fill('★').join('')}
-                          </span>
-                        </div>
-                        <div className="space-y-1 text-xs">
-                          <span className="text-slate-400 block font-bold text-[9px]">QİDALANMA TƏMİNATI</span>
-                          <span className="text-[#0f533a] font-extrabold block">🍽️ {selectedTour.mealType || 'Səhər yeməyi'}</span>
-                        </div>
-
-                        <div className="space-y-1 text-xs">
-                          <span className="text-slate-400 block font-bold text-[9px]">UÇUŞ BİLETLƏRİ</span>
-                          <span className="text-slate-700 block text-[11px] font-medium leading-relaxed">
-                            {selectedTour.flightIncluded ? '✈️ Aviabilet ümumi qiymətə daxildir' : '❌ Aviabilet müştəri tərəfindən ayrıca alınmalıdır'}
-                          </span>
-                          {selectedTour.flightDetails && (
-                            <span className="text-[10px] text-slate-500 italic block mt-0.5">{selectedTour.flightDetails}</span>
-                          )}
-                        </div>
-
-                        <div className="space-y-1 text-xs">
-                          <span className="text-slate-400 block font-bold text-[9px]">YERDAXİLİ TRANSFER</span>
-                          <span className="text-slate-700 block text-[11px] font-medium leading-relaxed">🚍 {selectedTour.transferDetails || 'Hava limanından otelə komfortlu transfer daxildir.'}</span>
-                        </div>
-                      </div>
-
-                      {/* Room options pricing */}
-                      {selectedTour.roomTypes && selectedTour.roomTypes.length > 0 && (
-                        <div className="bg-white p-3 rounded-lg border border-amber-150 space-y-2 mt-2">
-                          <span className="text-[10px] text-amber-900 font-extrabold block tracking-wide">
-                            🏨 Otaq Tiplərinə görə qiymət tənzimləməsi (Əlavələr):
-                          </span>
-                          <div className="grid grid-cols-3 gap-2 text-center">
-                            {selectedTour.roomTypes.map((room, ri) => (
-                              <div key={ri} className="bg-slate-50 p-2 rounded border border-slate-100 text-[10px]">
-                                <span className="block text-slate-500 font-bold">{room.name}</span>
-                                <strong className="block text-emerald-800 font-black">
-                                  +{room.priceDiff} {selectedTour.priceCurrency || '₼'}
-                                </strong>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Program Exclusions (Not Included) for Outbound Tours */}
-                  {selectedTour.isInternational && selectedTour.notIncluded && selectedTour.notIncluded.length > 0 && (
-                    <div className="border border-red-150 bg-red-500/5 p-4 rounded-xl">
-                      <h4 className="text-xs font-bold text-red-900 tracking-wider mb-2 border-b border-red-200/50 pb-1">❌ QİYMƏTƏ DAXİL OLMAYANLAR</h4>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                        {selectedTour.notIncluded.map((exc, i) => (
-                          <div key={i} className="flex items-center gap-2 text-xs text-slate-650">
-                            <span className="text-red-500 font-black">×</span>
-                            <span>{exc}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Gündəlik Səyahət Proqramı (Itinerary Map) */}
-                  {selectedTour.isInternational && selectedTour.itinerary && selectedTour.itinerary.length > 0 && (
-                    <div className="space-y-4">
-                      <h4 className="text-xs font-black text-slate-500 tracking-widest border-b pb-1.5 flex items-center gap-1.5">
-                        ⏳ Günbəgün Ətraflı Səyahət Proqramı
-                      </h4>
-
-                      <div className="space-y-5">
-                        {selectedTour.itinerary.map((day, di) => (
-                          <div key={di} className="relative pl-6 border-l-2 border-amber-500/40 space-y-2">
-                            {/* Marker */}
-                            <div className="absolute -left-[7px] top-1.5 w-3 h-3 rounded-full bg-amber-500 border-2 border-white ring-2 ring-amber-500/20" />
-                            
-                            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2">
-                              <span className="text-xs font-black text-amber-900 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-sm">
-                                📅 {day.day}-ci GÜN
-                              </span>
-                              <h5 className="text-xs font-extrabold text-[#111827] flex-1 sm:ml-3">
-                                {day.title}
-                              </h5>
-                            </div>
-
-                            <p className="text-xs text-slate-600 leading-relaxed pl-1">
-                              {day.description}
-                            </p>
-
-                            {day.image ? (
-                              <div className="mt-2 h-36 max-w-md rounded-lg overflow-hidden bg-slate-100 border border-slate-150 shadow-sm relative group">
-                                <img
-                                  src={day.image}
-                                  alt={day.title}
-                                  className="w-full h-full object-cover transition duration-350 group-hover:scale-101"
-                                  referrerPolicy="no-referrer"
-                                />
-                              </div>
-                            ) : null}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Program Inclusions */}
-                  <div>
-                    <h4 className="text-sm font-bold text-slate-800 tracking-wide">Qiymətə nələr daxildir?</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
-                      {selectedTour.includes.map((inc, i) => (
-                        <div key={i} className="flex items-center gap-2 text-xs text-slate-600">
-                          <Check className="w-4 h-4 text-emerald-500 flex-shrink-0" />
-                          <span>{inc}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* ACTIVE Tour Slots List (The One-To-Many Scheduling Module) */}
-                  <div id="tour-slots-calendar" className="scroll-mt-32">
+                {/* ACTIVE Tour Slots List — hidden until "Yerləri yoxla" is clicked in the sidebar */}
+                {showTourSlots && (
+                  <div id="tour-slots-calendar" className="scroll-mt-32 animate-fadeIn">
                     <h4 className="text-sm font-bold text-slate-800 tracking-wide flex items-center gap-2">
                       <Calendar className="w-4 h-4 text-slate-500" />
                       Yürüş Təqvimi və Qiymətlər
@@ -2556,11 +2012,11 @@ export default function CustomerPortal({
                         const remainingSpots = Math.max(0, slot.capacity - slot.bookedCount);
                         const isFull = remainingSpots <= 0;
                         return (
-                          <div 
+                          <div
                             key={slot.id}
                             className={`flex items-center justify-between p-3 rounded-lg border text-xs transition ${
-                              isFull 
-                                ? 'bg-slate-50 border-slate-200 opacity-60' 
+                              isFull
+                                ? 'bg-slate-50 border-slate-200 opacity-60'
                                 : 'bg-white border-slate-150 shadow-sm hover:border-emerald-300'
                             }`}
                           >
@@ -2599,38 +2055,14 @@ export default function CustomerPortal({
                       })}
                     </div>
                   </div>
+                )}
 
-                  {/* Historical verified feedbacks inside detailed modals */}
-                  <div>
-                    <h4 className="text-xs font-bold text-slate-500 tracking-widest">İştirakçı Rəyləri ({getReviewsCount(selectedTour.id)})</h4>
-                    <div className="space-y-2.5 mt-2">
-                      {reviews.filter(r => r.tourId === selectedTour.id).length === 0 ? (
-                        <div className="text-slate-400 text-xs italic">Hələ ki rəy yazılmayıb. İlk yazan siz olun!</div>
-                      ) : (
-                        reviews.filter(r => r.tourId === selectedTour.id).map((rev) => (
-                          <div key={rev.id} className="bg-slate-50 p-3 rounded-lg space-y-1">
-                            <div className="flex items-center justify-between text-xs">
-                              <strong className="text-slate-700 font-bold">{rev.customerName}</strong>
-                              <div className="flex items-center text-amber-500">
-                                <Star className="w-3.5 h-3.5 fill-current" />
-                                <span className="font-bold ml-0.5">{rev.rating}</span>
-                              </div>
-                            </div>
-                            <p className="text-[11px] text-slate-600">{rev.comment}</p>
-                            {rev.verifiedAttendee && (
-                              <span className="inline-flex items-center gap-1 text-[9px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded mt-1">
-                                <CheckCircle className="w-2.5 h-2.5" /> Real İştirakçı
-                              </span>
-                            )}
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ) : (
+                {/* STEP 2 registration form — rendered right below the tour-slots-calendar
+                    section instead of far down the page, so it opens exactly where the user
+                    just clicked "Rezerv et". */}
+                {isBookingStep && (
                 /* STEP 2: BOOKING FLOW INTELLIGENCE / SIMULATION */
-                <div className="space-y-6">
+                <div id="booking-form-section" className="space-y-6">
                   {bookingSuccessData ? (
                     // Success View
                     <div className="text-center py-6 space-y-4">
@@ -3188,7 +2620,623 @@ export default function CustomerPortal({
                     </div>
                   )}
                 </div>
+                )}
+
+                {/* Highlights */}
+                <div className="space-y-4 py-4">
+                  <h2 className="text-xl font-extrabold text-slate-900">Önə Çıxanlar</h2>
+                  <div className="flex flex-col gap-4">
+                    <div className="flex items-start gap-4">
+                      <div className="mt-0.5"><Check className="w-5 h-5 text-emerald-600" /></div>
+                      <span className="text-slate-700 leading-relaxed font-medium">Peşəkar bələdçilərlə {selectedTour.region} regionunun nəfəskəsici təbiətini kəşf edin.</span>
+                    </div>
+                    <div className="flex items-start gap-4">
+                      <div className="mt-0.5"><Check className="w-5 h-5 text-emerald-600" /></div>
+                      <span className="text-slate-700 leading-relaxed font-medium">Seçilmiş səviyyənizə uyğun {selectedTour.difficulty} çətinlikdə macəra yaşayın.</span>
+                    </div>
+                    {selectedTour.isInternational && (
+                      <div className="flex items-start gap-4">
+                        <div className="mt-0.5"><Check className="w-5 h-5 text-emerald-600" /></div>
+                        <span className="text-slate-700 leading-relaxed font-medium">{selectedTour.destinationCity} şəhərində gündəlik istiqamətinizi izləyən ağıllı marşrut proqramı.</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                
+                {/* Full description */}
+                <div className="space-y-4 py-4 border-t border-slate-200">
+                  <h2 className="text-xl font-extrabold text-slate-900">Tam təsvir</h2>
+                  <p className="text-slate-700 text-sm leading-relaxed whitespace-pre-line font-medium antialiased">
+                    {selectedTour.description.length > 320 && !isDescExpanded
+                      ? `${selectedTour.description.substring(0, 310)}...`
+                      : selectedTour.description}
+                  </p>
+                  {selectedTour.description.length > 320 && (
+                    <button
+                      type="button"
+                      onClick={() => setIsDescExpanded(!isDescExpanded)}
+                      className="text-sm font-extrabold text-slate-900 hover:underline flex items-center gap-1 cursor-pointer transition-all mt-2"
+                    >
+                      {isDescExpanded ? 'Daha az göstər' : 'Daha çox göstər'}
+                    </button>
+                  )}
+                </div>
+
+                {/* Includes / Excludes */}
+                <div className="space-y-4 py-4 border-t border-slate-200">
+                  <h2 className="text-xl font-extrabold text-slate-900">Qiymətə daxildir</h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                   <div className="flex items-start gap-3">
+                     <Check className="w-5 h-5 text-emerald-600 shrink-0" />
+                     <span className="text-slate-700 text-sm font-medium">Peşəkar canlı tur bələdçisi</span>
+                   </div>
+                   {selectedTour.mealType && (
+                     <div className="flex items-start gap-3">
+                       <Check className="w-5 h-5 text-emerald-600 shrink-0" />
+                       <span className="text-slate-700 text-sm font-medium">Qida: {selectedTour.mealType}</span>
+                     </div>
+                   )}
+                   {selectedTour.flightIncluded && (
+                     <div className="flex items-start gap-3">
+                       <Check className="w-5 h-5 text-emerald-600 shrink-0" />
+                       <span className="text-slate-700 text-sm font-medium">Aviabilet və transfer daxildir</span>
+                     </div>
+                   )}
+                   <div className="flex items-start gap-3">
+                     <Check className="w-5 h-5 text-emerald-600 shrink-0" />
+                     <span className="text-slate-700 text-sm font-medium">Yerli vergilər və xərclər</span>
+                   </div>
+                   <div className="flex items-start gap-3 opacity-60">
+                     <X className="w-5 h-5 text-red-500 shrink-0" />
+                     <span className="text-slate-700 text-sm font-medium line-through decoration-slate-300">Şəxsi suvenirlər (Daxil deyil)</span>
+                   </div>
+                   {!selectedTour.flightIncluded && selectedTour.isInternational && (
+                     <div className="flex items-start gap-3 opacity-60">
+                       <X className="w-5 h-5 text-red-500 shrink-0" />
+                       <span className="text-slate-700 text-sm font-medium line-through decoration-slate-300">Aviabiletlər (Ayrı alınmalıdır)</span>
+                     </div>
+                   )}
+                  </div>
+                </div>
+
+                {/* Meeting Point */}
+                <div className="space-y-4 py-4 border-t border-slate-200">
+                  <h2 className="text-xl font-extrabold text-slate-900">Görüş yeri</h2>
+                  {!selectedTour.isInternational ? (
+                    <div className="space-y-3">
+                      <p className="text-sm font-medium text-slate-700 leading-relaxed">
+                        Tofiq Bəhramov adına Respublika Stadionunun qarşısı. Xahiş edirik ki, başlama vaxtından 15 dəqiqə əvvəl orada olasınız.
+                      </p>
+                      <div className="w-full h-[300px] rounded-xl overflow-hidden shadow-sm border border-slate-200">
+                        <iframe 
+                          src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3097.7169141972613!2d49.847440975921245!3d40.40056995662297!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x40307d0008f3743b%3A0x8e152613424aac00!2zR2VkyZlrIEfDtnLJmWsgLSBUb3BsYW7EscWfIHllcmk!5e1!3m2!1str!2slv!4v1779641889812!5m2!1str!2slv" 
+                          width="100%" 
+                          height="100%" 
+                          style={{ border: 0 }} 
+                          allowFullScreen={true} 
+                          loading="lazy" 
+                          referrerPolicy="no-referrer-when-downgrade"
+                        ></iframe>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium text-slate-700 leading-relaxed">
+                        Bələdçinizlə əsas girişin qarşısında görüşün. Üzərində {selectedTour.vendorName} yazılmış lövhə tutan şəxsi axtarın. Xahiş edirik ki, başlama vaxtından 15 dəqiqə əvvəl orada olasınız.
+                      </p>
+                      <a href="#" className="font-extrabold text-blue-600 text-sm hover:underline flex items-center gap-1.5 transition">
+                        Google Maps-də açın <ExternalLink className="w-4 h-4" />
+                      </a>
+                    </div>
+                  )}
+                </div>
+
+                {/* Important Information */}
+                <div className="space-y-4 py-4 border-t border-slate-200">
+                  <h2 className="text-xl font-extrabold text-slate-900">Mühüm məlumatlar</h2>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 mt-4">
+                    <div>
+                      <h3 className="font-bold text-slate-800 text-sm mb-3">Özünüzlə gətirin</h3>
+                      <ul className="space-y-2">
+                        <li className="flex items-start gap-3 text-sm text-slate-700 font-medium">
+                          <Check className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" /> {selectedTour.requiredEquipment || 'Rahat ayaqqabı'}
+                        </li>
+                        <li className="flex items-start gap-3 text-sm text-slate-700 font-medium">
+                          <Check className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" /> Pasport və ya şəxsiyyət vəsiqəsi
+                        </li>
+                        <li className="flex items-start gap-3 text-sm text-slate-700 font-medium">
+                          <Check className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" /> Hava şəraitinə uyğun geyim
+                        </li>
+                      </ul>
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-slate-800 text-sm mb-3">İcazə verilmir</h3>
+                      <ul className="space-y-2">
+                        <li className="flex items-start gap-3 text-sm text-slate-700 font-medium">
+                          <X className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" /> Böyük çamadanlar və çantalar
+                        </li>
+                        <li className="flex items-start gap-3 text-sm text-slate-700 font-medium">
+                          <X className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" /> Müşayiətsiz yetkinlik yaşına çatmayanlar
+                        </li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Extra dynamic details (Admin warnings, Weather, GPT assistant) */}
+                <div className="space-y-6 pt-4 border-t border-slate-200">
+              
+              {selectedTour.isApproved === false && (
+                <div className="bg-amber-50 border border-amber-250 p-4 rounded-xl flex items-start gap-3 shadow-3xs animate-fadeIn">
+                  <div className="p-2 bg-amber-100 rounded-lg text-amber-850 shrink-0">
+                    <AlertCircle className="w-5 h-5 text-amber-750" />
+                  </div>
+                  <div className="space-y-1">
+                    <h4 className="text-xs font-black text-amber-850 tracking-wider">⏳ BU TUR ADMIN TƏSDİQİ GÖZLƏYİR</h4>
+                    <p className="text-[11px] text-amber-700 leading-normal font-semibold">
+                      Bu marşrut operator tərəfindən uğurla yaradılıb, lakin hələ rəsmi təsdiqlənməyib. 
+                      Sınaq etmək üçün yuxarıdakı paneldən <strong>"Admin"</strong> rolunu seçib, təsdiqləmə növbəsindən bu turu aktivləşdirə bilərsiniz. 
+                      Test rejimində detallarla tanış ola və WhatsApp sifarişi klikini sınaya bilərsiniz.
+                    </p>
+                  </div>
+                </div>
               )}
+              
+              {/* Tabs Info / Scheduling */}
+                <div className="space-y-6">
+                  {/* Dynamic Integrations */}
+
+                  {/* High fidelity Weather Integration */}
+                  {slots.filter(s => s.tourId === selectedTour.id).length > 0 && (
+                    <TourWeatherForecast 
+                      dates={slots.filter(s => s.tourId === selectedTour.id).map(s => s.startDate)} 
+                      region={selectedTour.region} 
+                      variant="detailed" 
+                    />
+                  )}
+
+                  {/* Stunning Interactive 3D/2D GPX Trail Explorer Map */}
+                  {selectedTour.gpxData && (
+                    <GpsTrackVisualizer gpxDataString={selectedTour.gpxData} />
+                  )}
+
+                  {(() => {
+                    const organizer = users.find(u => u.id === selectedTour.vendorId);
+                    if (organizer && organizer.guides && organizer.guides.length > 0) {
+                      return (
+                        <div className="mt-6 mb-2 border border-slate-200 rounded-2xl p-5 bg-gradient-to-r from-slate-50 to-white shadow-sm">
+                          <h4 className="font-extrabold text-slate-800 mb-4 text-sm flex items-center gap-2">
+                            👥 Təşkilatçının Komandası
+                          </h4>
+                          <div className="flex gap-4 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-none sm:scrollbar-thin">
+                            {organizer.guides.map((g, i) => (
+                              <div key={i} className="flex flex-col items-start flex-shrink-0 w-[260px] snap-start bg-white p-4 rounded-xl border border-slate-200 shadow-sm transition hover:shadow-md">
+                                <div className="flex items-center gap-4 mb-3 w-full">
+                                  <div className="w-12 h-12 rounded-full overflow-hidden bg-slate-100 border-2 border-emerald-50 flex-shrink-0">
+                                    {g.avatar ? <img src={g.avatar} className="w-full h-full object-cover"/> : <span className="flex items-center justify-center font-bold text-slate-400 w-full h-full text-sm">{g.name.charAt(0)}</span>}
+                                  </div>
+                                  <div className="flex-1 overflow-hidden">
+                                     <span className="text-sm font-bold text-slate-800 block truncate" title={g.name}>{g.name}</span>
+                                     <span className="text-[10px] text-emerald-600 font-bold block line-clamp-2 tracking-wide mt-0.5" title={g.specialty}>{g.specialty || 'Bələdçi'}</span>
+                                  </div>
+                                </div>
+                                <p className="text-xs text-slate-600 font-medium leading-relaxed line-clamp-3" title={g.bio}>{g.bio}</p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
+
+                  {/* Smart Pack Assistant vs. International Travel Agent Integration */}
+                  {selectedTour.isInternational ? (
+                    <div className="bg-gradient-to-br from-indigo-900/10 to-teal-900/5 border border-indigo-200/60 rounded-2xl p-6 space-y-5 shadow-3xs hover:border-indigo-300 transition duration-300">
+                      <div className="flex items-start justify-between flex-wrap gap-3 border-b border-indigo-200/40 pb-3">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xl">✈️</span>
+                          <div>
+                            <h4 className="text-xs font-black text-indigo-950 tracking-widest leading-none">
+                              XARİCİ SƏYAHƏTİN SEHRLİ PLANLAŞDIRICISI
+                            </h4>
+                            <p className="text-[10px] text-slate-500 font-bold mt-1.5 leading-none">
+                              {selectedTour.destinationCountry} və {selectedTour.destinationCity} üçün rəqəmsal bələdçi paneli
+                            </p>
+                          </div>
+                        </div>
+                        <span className="text-[9px] font-black text-white bg-indigo-600 px-2.5 py-1 rounded tracking-widest">
+                          AĞILLI BƏLƏDÇİ
+                        </span>
+                      </div>
+
+                      {/* PART 1: WEATHER FORECAST SPECIALLY INTEGRATED FOR DESTINATION */}
+                      <div className="space-y-2">
+                        <h5 className="text-[10px] font-black text-indigo-900 tracking-wider flex items-center gap-1">
+                          ☀️ Təyinat Məntəqəsinin Gündəlik Hava Proqnozu
+                        </h5>
+                        
+                        <div className="bg-white p-3.5 rounded-xl border border-slate-150 shadow-4xs grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
+                          {selectedTour.itinerary && selectedTour.itinerary.map((it, idx) => {
+                            const weathers = [
+                              { temp: '24°C', tag: 'Açıq Səma', emoji: '☀️' },
+                              { temp: '22°C', tag: 'Parlaq Gün', emoji: '🌤️' },
+                              { temp: '25°C', tag: 'Az buludlu', emoji: '⛅' },
+                              { temp: '21°C', tag: 'Möhtəşəm hava', emoji: '☀️' },
+                              { temp: '23°C', tag: 'Sərin meh', emoji: '🌬️' },
+                              { temp: '24°C', tag: 'Gözəl hava', emoji: '☀️' },
+                            ];
+                            const w = weathers[idx % weathers.length];
+                            return (
+                              <div key={idx} className="bg-slate-50/50 p-2 rounded-lg border border-slate-100 flex flex-col items-center">
+                                <span className="text-[9px] font-extrabold text-slate-400 block tracking-tight">GÜN {it.day}</span>
+                                <span className="text-xl my-1">{w.emoji}</span>
+                                <span className="text-xs font-black text-slate-800 leading-none">{w.temp}</span>
+                                <span className="text-[9px] text-slate-500 font-medium block truncate mt-0.5 max-w-[90px]">{w.tag}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* PART 2: THE SPOTS COVERED IN THESE DAYS */}
+                      <div className="space-y-2">
+                        <h5 className="text-[10px] font-black text-indigo-900 tracking-wider flex items-center gap-1.5">
+                          📍 Günlərə Görə Baş Çəkəcəyiniz Məkanlar (Gəzməli Yerlər)
+                        </h5>
+                        
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                          {selectedTour.itinerary && selectedTour.itinerary.map((day, di) => {
+                            let mainPlace = selectedTour.destinationCity;
+                            if (day.title.includes('Kilsə') || day.title.includes('Kolizey') || day.title.includes('Məbəd') || day.title.includes('Vadi') || day.title.includes('Ubud')) {
+                              mainPlace = day.title.split(':')[0] || selectedTour.destinationCity;
+                            }
+                            return (
+                              <div
+                                key={di}
+                                className="bg-white p-3 rounded-xl border border-slate-150 flex items-start gap-2.5"
+                              >
+                                <div className="w-6 h-6 rounded-full bg-indigo-50 border border-indigo-150 text-[10px] font-bold text-indigo-700 flex items-center justify-center shrink-0 mt-0.5">
+                                  {day.day}
+                                </div>
+                                <div className="space-y-1 overflow-hidden">
+                                  <div className="flex items-center justify-between gap-1">
+                                    <span className="text-[9px] font-extrabold text-indigo-805 bg-indigo-55/75 px-1.5 py-0.5 rounded leading-none truncate">
+                                      🗺️ {mainPlace}
+                                    </span>
+                                  </div>
+                                  <h6 className="text-[10px] font-extrabold text-[#1f2937] leading-tight truncate">{day.title}</h6>
+                                  <p className="text-[9.5px] text-slate-500 leading-snug line-clamp-2">{day.description}</p>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="bg-amber-50/45 border border-amber-200/60 rounded-2xl p-5 space-y-4 hover:border-amber-300/85 transition duration-300">
+                      <div className="flex items-start justify-between flex-wrap gap-3 border-b border-amber-200/40 pb-3">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xl">🎒</span>
+                          <div>
+                            <h4 className="text-xs font-black text-amber-900 tracking-widest leading-none border-b border-amber-200/20 pb-0.5">
+                              Ağıllı Çanta & İlkin Hazırlıq
+                            </h4>
+                            <p className="text-[10px] text-amber-800/80 font-bold mt-1">
+                              Sizin fərdi təcrübənizə uyğun çanta və yürüş tövsiyələri
+                            </p>
+                          </div>
+                        </div>
+
+                        {packingAdviceMap[selectedTour.id] && (
+                          <button
+                            type="button"
+                            onClick={() => fetchPackingAdvice(selectedTour)}
+                            disabled={packingLoading}
+                            className="bg-amber-100/80 hover:bg-amber-150 text-amber-955 font-extrabold text-[9px] px-2.5 py-1.5 rounded-lg tracking-wider transition-all cursor-pointer flex items-center gap-1 shrink-0"
+                          >
+                            {packingLoading ? "Yenilənir..." : "🔄 Yenilə"}
+                          </button>
+                        )}
+                      </div>
+
+                      {/* INTERACTIVE QUESTION SECTION */}
+                      <div className="bg-white/95 border border-amber-150 p-4 rounded-xl space-y-3.5 shadow-4xs">
+                        <p className="text-xs font-extrabold text-slate-800 flex items-center gap-1.5">
+                          <span className="animate-pulse">❓</span> Bundan öncə neçə yürüşdə (hiking-də) olmusunuz?
+                        </p>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPackingExperienceMap(prev => ({ ...prev, [selectedTour.id]: 'beginner' }));
+                              if (!packingAdviceMap[selectedTour.id]) {
+                                fetchPackingAdvice(selectedTour);
+                              }
+                            }}
+                            className={`p-3.5 rounded-xl border text-left transition duration-200 cursor-pointer flex flex-col justify-between ${
+                              packingExperienceMap[selectedTour.id] === 'beginner'
+                                ? 'border-emerald-500 bg-emerald-50/30 ring-1 ring-emerald-500'
+                                : 'border-slate-200 bg-white hover:border-amber-300'
+                            }`}
+                          >
+                            <span className="text-[11px] font-black text-slate-800 flex items-center gap-1">
+                              <span className="text-xs">🟢</span> 0 - 2 dəfə (Yeni başlayan)
+                            </span>
+                            <span className="text-[9px] text-slate-500 mt-1.5 font-medium leading-normal">
+                              Evdə olan rahat əşyalarla sadə hazırlıq. Bahalı avadanlığa ehtiyac yoxdur!
+                            </span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setPackingExperienceMap(prev => ({ ...prev, [selectedTour.id]: 'pro' }));
+                              if (!packingAdviceMap[selectedTour.id]) {
+                                fetchPackingAdvice(selectedTour);
+                              }
+                            }}
+                            className={`p-3.5 rounded-xl border text-left transition duration-200 cursor-pointer flex flex-col justify-between ${
+                              packingExperienceMap[selectedTour.id] === 'pro'
+                                ? 'border-indigo-500 bg-indigo-50/10 ring-1 ring-indigo-500'
+                                : 'border-slate-200 bg-white hover:border-amber-300'
+                            }`}
+                          >
+                            <span className="text-[11px] font-black text-slate-800 flex items-center gap-1">
+                              <span className="text-xs">⚡</span> 3 və ya daha çox (Təcrübəli)
+                            </span>
+                            <span className="text-[9px] text-slate-500 mt-1.5 font-medium leading-normal">
+                              Relyefə və çətinliyə xüsusi texniki səviyyə avadanlığı və qoruyucu geyim.
+                            </span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* PACKING LIST DISPLAY AREA */}
+                      {packingLoading ? (
+                        <div className="bg-white border border-amber-200/60 p-6 rounded-xl text-center space-y-2.5 shadow-5xs">
+                          <div className="w-5 h-5 border-2 border-amber-600 border-t-transparent rounded-full animate-spin mx-auto" />
+                          <p className="text-[10px] text-slate-500 font-bold tracking-wider">
+                            Sizin təcrübə səviyyənizə uyğun hazırlıq planı tərtib edilir...
+                          </p>
+                        </div>
+                      ) : packingAdviceMap[selectedTour.id] ? (
+                        (() => {
+                          const adviceObj = packingAdviceMap[selectedTour.id].packing_advice;
+                          const basics = adviceObj?.basics || [];
+                          const proGear = adviceObj?.pro_gear || [];
+                          const userChoice = packingExperienceMap[selectedTour.id] || 'beginner';
+
+                          return (
+                            <div className="bg-white border border-amber-200/80 p-4.5 rounded-xl text-xs space-y-3 shadow-xs text-slate-850 animate-fadeIn">
+                              {userChoice === 'beginner' ? (
+                                <div className="space-y-3 bg-emerald-50/20 border border-emerald-100/70 p-4 rounded-lg">
+                                  <div className="flex items-center justify-between border-b border-emerald-100/40 pb-2 mb-1">
+                                    <span className="flex items-center gap-1.5 text-xs font-black text-emerald-800 tracking-widest">
+                                      <span>🟢</span> Sizə Uyğun: Yeni Başlayan Çantası
+                                    </span>
+                                    <span className="bg-emerald-100 text-emerald-800 font-bold text-[9px] px-1.5 py-0.5 rounded leading-none select-none">
+                                      Məsləhət Görülür
+                                    </span>
+                                  </div>
+                                  {basics.length > 0 ? (
+                                    <ul className="space-y-1.5">
+                                      {basics.map((item, index) => (
+                                        <li key={index} className="flex items-start gap-2 text-[11px] text-slate-700 font-medium">
+                                          <input type="checkbox" className="mt-0.5 accent-emerald-600 rounded cursor-pointer shrink-0" />
+                                          <span>{item}</span>
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  ) : (
+                                    <span className="text-[10px] text-slate-400 font-bold block">Bu səviyyə üçün xüsusi təklif yoxdur.</span>
+                                  )}
+                                </div>
+                              ) : (
+                                <div className="space-y-3 bg-indigo-50/15 border border-indigo-100/60 p-4 rounded-lg">
+                                  <div className="flex items-center justify-between border-b border-indigo-150/40 pb-2 mb-1">
+                                    <span className="flex items-center gap-1.5 text-xs font-black text-indigo-800 tracking-widest">
+                                      <span>⚡</span> Sizə Uyğun: Texniki Peşəkar Siyahı
+                                    </span>
+                                  </div>
+                                  {proGear.length > 0 ? (
+                                    <ul className="space-y-1.5">
+                                      {proGear.map((item, index) => (
+                                        <li key={index} className="flex items-start gap-2 text-[11px] text-slate-700 font-medium">
+                                          <input type="checkbox" className="mt-0.5 accent-indigo-600 rounded cursor-pointer shrink-0" />
+                                          <span>{item}</span>
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  ) : (
+                                    <span className="text-[10px] text-slate-400 font-bold block">Bu səviyyə üçün xüsusi təklif yoxdur.</span>
+                                  )}
+                                </div>
+                              )}
+
+                              <div className="pt-2 text-[9px] text-emerald-700 font-bold border-t border-slate-100 flex items-center justify-between gap-1 leading-normal">
+                                <span>💚 <strong>Bələdçi Rəyi:</strong> Sizə hər zaman rahat olacaq geyim və ayaqqabılar seçin; yürüşün, fəslin ləzzətini hiss edin!</span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setPackingExperienceMap(prev => ({
+                                      ...prev,
+                                      [selectedTour.id]: userChoice === 'beginner' ? 'pro' : 'beginner'
+                                    }));
+                                  }}
+                                  className="text-[9px] text-indigo-700 font-black underline hover:text-indigo-800 cursor-pointer select-none whitespace-nowrap"
+                                >
+                                  {userChoice === 'beginner' ? "Təcrübəli siyahısına keç" : "Başlayanlar üçün keç"}
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })()
+                      ) : (
+                        <div className="text-center p-4 bg-white/70 border border-dashed border-slate-200 rounded-xl text-[11px] text-slate-500 font-medium">
+                          💡 Yuxarıdakı suala cavab seçərək sizə özəl olan ağıllı bələdçi tövsiyələrini dərhal açın!
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Mehmanxana və Nəqliyyat Loqistikası */}
+                  {selectedTour.isInternational && (
+                    <div className="bg-gradient-to-r from-amber-500/10 to-teal-800/5 border border-amber-200 p-5 rounded-xl space-y-4">
+                      <h4 className="text-xs font-black text-amber-900 tracking-wider flex items-center gap-1.5 border-b pb-1.5 border-amber-200">
+                        🏨 Səyahət, Mehmanxana və VIP Rezervasiya Təfərrüatları
+                      </h4>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-1 text-xs">
+                          <span className="text-slate-400 block font-bold text-[9px]">MEHMANXANA NÖVÜ</span>
+                          <span className="text-slate-900 font-bold block">{selectedTour.hotelName}</span>
+                          <span className="text-amber-500 text-xs tracking-widest font-bold block">
+                            {Array(Number(selectedTour.hotelStars || 5)).fill('★').join('')}
+                          </span>
+                        </div>
+                        <div className="space-y-1 text-xs">
+                          <span className="text-slate-400 block font-bold text-[9px]">QİDALANMA TƏMİNATI</span>
+                          <span className="text-[#0f533a] font-extrabold block">🍽️ {selectedTour.mealType || 'Səhər yeməyi'}</span>
+                        </div>
+
+                        <div className="space-y-1 text-xs">
+                          <span className="text-slate-400 block font-bold text-[9px]">UÇUŞ BİLETLƏRİ</span>
+                          <span className="text-slate-700 block text-[11px] font-medium leading-relaxed">
+                            {selectedTour.flightIncluded ? '✈️ Aviabilet ümumi qiymətə daxildir' : '❌ Aviabilet müştəri tərəfindən ayrıca alınmalıdır'}
+                          </span>
+                          {selectedTour.flightDetails && (
+                            <span className="text-[10px] text-slate-500 italic block mt-0.5">{selectedTour.flightDetails}</span>
+                          )}
+                        </div>
+
+                        <div className="space-y-1 text-xs">
+                          <span className="text-slate-400 block font-bold text-[9px]">YERDAXİLİ TRANSFER</span>
+                          <span className="text-slate-700 block text-[11px] font-medium leading-relaxed">🚍 {selectedTour.transferDetails || 'Hava limanından otelə komfortlu transfer daxildir.'}</span>
+                        </div>
+                      </div>
+
+                      {/* Room options pricing */}
+                      {selectedTour.roomTypes && selectedTour.roomTypes.length > 0 && (
+                        <div className="bg-white p-3 rounded-lg border border-amber-150 space-y-2 mt-2">
+                          <span className="text-[10px] text-amber-900 font-extrabold block tracking-wide">
+                            🏨 Otaq Tiplərinə görə qiymət tənzimləməsi (Əlavələr):
+                          </span>
+                          <div className="grid grid-cols-3 gap-2 text-center">
+                            {selectedTour.roomTypes.map((room, ri) => (
+                              <div key={ri} className="bg-slate-50 p-2 rounded border border-slate-100 text-[10px]">
+                                <span className="block text-slate-500 font-bold">{room.name}</span>
+                                <strong className="block text-emerald-800 font-black">
+                                  +{room.priceDiff} {selectedTour.priceCurrency || '₼'}
+                                </strong>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Program Exclusions (Not Included) for Outbound Tours */}
+                  {selectedTour.isInternational && selectedTour.notIncluded && selectedTour.notIncluded.length > 0 && (
+                    <div className="border border-red-150 bg-red-500/5 p-4 rounded-xl">
+                      <h4 className="text-xs font-bold text-red-900 tracking-wider mb-2 border-b border-red-200/50 pb-1">❌ QİYMƏTƏ DAXİL OLMAYANLAR</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        {selectedTour.notIncluded.map((exc, i) => (
+                          <div key={i} className="flex items-center gap-2 text-xs text-slate-650">
+                            <span className="text-red-500 font-black">×</span>
+                            <span>{exc}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Gündəlik Səyahət Proqramı (Itinerary Map) */}
+                  {selectedTour.isInternational && selectedTour.itinerary && selectedTour.itinerary.length > 0 && (
+                    <div className="space-y-4">
+                      <h4 className="text-xs font-black text-slate-500 tracking-widest border-b pb-1.5 flex items-center gap-1.5">
+                        ⏳ Günbəgün Ətraflı Səyahət Proqramı
+                      </h4>
+
+                      <div className="space-y-5">
+                        {selectedTour.itinerary.map((day, di) => (
+                          <div key={di} className="relative pl-6 border-l-2 border-amber-500/40 space-y-2">
+                            {/* Marker */}
+                            <div className="absolute -left-[7px] top-1.5 w-3 h-3 rounded-full bg-amber-500 border-2 border-white ring-2 ring-amber-500/20" />
+                            
+                            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2">
+                              <span className="text-xs font-black text-amber-900 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-sm">
+                                📅 {day.day}-ci GÜN
+                              </span>
+                              <h5 className="text-xs font-extrabold text-[#111827] flex-1 sm:ml-3">
+                                {day.title}
+                              </h5>
+                            </div>
+
+                            <p className="text-xs text-slate-600 leading-relaxed pl-1">
+                              {day.description}
+                            </p>
+
+                            {day.image ? (
+                              <div className="mt-2 h-36 max-w-md rounded-lg overflow-hidden bg-slate-100 border border-slate-150 shadow-sm relative group">
+                                <img
+                                  src={day.image}
+                                  alt={day.title}
+                                  className="w-full h-full object-cover transition duration-350 group-hover:scale-101"
+                                  referrerPolicy="no-referrer"
+                                />
+                              </div>
+                            ) : null}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Program Inclusions */}
+                  <div>
+                    <h4 className="text-sm font-bold text-slate-800 tracking-wide">Qiymətə nələr daxildir?</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
+                      {selectedTour.includes.map((inc, i) => (
+                        <div key={i} className="flex items-center gap-2 text-xs text-slate-600">
+                          <Check className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+                          <span>{inc}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Historical verified feedbacks inside detailed modals */}
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-500 tracking-widest">İştirakçı Rəyləri ({getReviewsCount(selectedTour.id)})</h4>
+                    <div className="space-y-2.5 mt-2">
+                      {reviews.filter(r => r.tourId === selectedTour.id).length === 0 ? (
+                        <div className="text-slate-400 text-xs italic">Hələ ki rəy yazılmayıb. İlk yazan siz olun!</div>
+                      ) : (
+                        reviews.filter(r => r.tourId === selectedTour.id).map((rev) => (
+                          <div key={rev.id} className="bg-slate-50 p-3 rounded-lg space-y-1">
+                            <div className="flex items-center justify-between text-xs">
+                              <strong className="text-slate-700 font-bold">{rev.customerName}</strong>
+                              <div className="flex items-center text-amber-500">
+                                <Star className="w-3.5 h-3.5 fill-current" />
+                                <span className="font-bold ml-0.5">{rev.rating}</span>
+                              </div>
+                            </div>
+                            <p className="text-[11px] text-slate-600">{rev.comment}</p>
+                            {rev.verifiedAttendee && (
+                              <span className="inline-flex items-center gap-1 text-[9px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded mt-1">
+                                <CheckCircle className="w-2.5 h-2.5" /> Real İştirakçı
+                              </span>
+                            )}
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </div>
 
             </div> {/* Closes Extra dynamic details */}
           </div> {/* Closes Left Column */}
@@ -3221,7 +3269,7 @@ export default function CustomerPortal({
                   {/* Selectors */}
                   <div className="space-y-4">
                     <div className="flex flex-col border border-slate-300 rounded-xl shadow-xs hover:border-slate-400 transition-colors">
-                      {/* Participants Dropdown */}
+                      {/* Participants Dropdown — bound to the same bookingQty used by the reservation form below */}
                       <div className="relative">
                         <button
                           type="button"
@@ -3230,76 +3278,135 @@ export default function CustomerPortal({
                         >
                           <div className="flex items-center gap-3">
                             <Users className="w-5 h-5 text-emerald-700" />
-                            <span className="text-sm font-extrabold text-slate-800">Böyük × {sidebarParticipants}</span>
+                            <span className="text-sm font-extrabold text-slate-800">Böyük × {bookingQty}</span>
                           </div>
                           <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${showParticipantsDropdown ? 'rotate-180' : ''}`} />
                         </button>
 
-                        {showParticipantsDropdown && (
-                          <>
-                          <div className="fixed inset-0 z-10" onClick={() => setShowParticipantsDropdown(false)} />
-                          <div className="absolute left-0 right-0 top-full z-20 bg-white border border-slate-200 rounded-xl shadow-lg p-4 mt-1">
-                            <div className="flex items-center justify-between">
-                              <span className="text-sm font-bold text-slate-700">Böyük</span>
-                              <div className="flex items-center gap-3">
-                                <button
-                                  type="button"
-                                  disabled={sidebarParticipants <= 1}
-                                  onClick={() => setSidebarParticipants(prev => Math.max(1, prev - 1))}
-                                  className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold w-8 h-8 rounded-full flex items-center justify-center transition disabled:opacity-40"
-                                >
-                                  -
-                                </button>
-                                <span className="font-bold text-slate-800 text-sm w-4 text-center">{sidebarParticipants}</span>
-                                <button
-                                  type="button"
-                                  disabled={sidebarParticipants >= 20}
-                                  onClick={() => setSidebarParticipants(prev => Math.min(20, prev + 1))}
-                                  className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold w-8 h-8 rounded-full flex items-center justify-center transition disabled:opacity-40"
-                                >
-                                  +
-                                </button>
+                        {showParticipantsDropdown && (() => {
+                          const maxParticipants = selectedSlot ? Math.max(1, selectedSlot.capacity - selectedSlot.bookedCount) : 20;
+                          return (
+                            <>
+                            <div className="fixed inset-0 z-10" onClick={() => setShowParticipantsDropdown(false)} />
+                            <div className="absolute left-0 right-0 top-full z-20 bg-white border border-slate-200 rounded-xl shadow-lg p-4 mt-1">
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm font-bold text-slate-700">Böyük</span>
+                                <div className="flex items-center gap-3">
+                                  <button
+                                    type="button"
+                                    disabled={bookingQty <= 1}
+                                    onClick={() => setBookingQty(prev => Math.max(1, prev - 1))}
+                                    className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold w-8 h-8 rounded-full flex items-center justify-center transition disabled:opacity-40"
+                                  >
+                                    -
+                                  </button>
+                                  <span className="font-bold text-slate-800 text-sm w-4 text-center">{bookingQty}</span>
+                                  <button
+                                    type="button"
+                                    disabled={bookingQty >= maxParticipants}
+                                    onClick={() => setBookingQty(prev => Math.min(maxParticipants, prev + 1))}
+                                    className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold w-8 h-8 rounded-full flex items-center justify-center transition disabled:opacity-40"
+                                  >
+                                    +
+                                  </button>
+                                </div>
                               </div>
+                              {selectedSlot && (
+                                <p className="text-[10px] text-slate-400 italic mt-2">
+                                  (Maksimum {maxParticipants} yer mövcuddur)
+                                </p>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => setShowParticipantsDropdown(false)}
+                                className="mt-3 w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-2 rounded-lg transition-colors"
+                              >
+                                Təsdiqlə
+                              </button>
                             </div>
-                            <button
-                              type="button"
-                              onClick={() => setShowParticipantsDropdown(false)}
-                              className="mt-3 w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-2 rounded-lg transition-colors"
-                            >
-                              Təsdiqlə
-                            </button>
+                            </>
+                          );
+                        })()}
+                      </div>
+
+                      {/* Date Dropdown — lists only this tour's real slots; full/expired dates are disabled */}
+                      <div className="relative">
+                        <button
+                          type="button"
+                          onClick={() => setShowDateDropdown(prev => !prev)}
+                          className="w-full flex items-center justify-between bg-white px-4 py-3 text-left cursor-pointer hover:bg-slate-50 rounded-b-xl"
+                        >
+                          <div className="flex items-center gap-3">
+                            <Calendar className="w-5 h-5 text-emerald-700" />
+                            <span className="text-sm font-extrabold text-slate-800">{selectedSlot ? `Tarix: ${selectedSlot.startDate}` : 'Tarix seçin'}</span>
+                          </div>
+                          <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${showDateDropdown ? 'rotate-180' : ''}`} />
+                        </button>
+
+                        {showDateDropdown && (
+                          <>
+                          <div className="fixed inset-0 z-10" onClick={() => setShowDateDropdown(false)} />
+                          <div className="absolute left-0 right-0 top-full z-20 bg-white border border-slate-200 rounded-xl shadow-lg p-2 mt-1 max-h-64 overflow-y-auto">
+                            {slots.filter(s => s.tourId === selectedTour.id).length === 0 ? (
+                              <p className="text-xs text-slate-400 font-medium p-3 text-center">Hazırda aktiv tarix yoxdur.</p>
+                            ) : (
+                              [...slots.filter(s => s.tourId === selectedTour.id)]
+                                .sort((a, b) => a.startDate.localeCompare(b.startDate))
+                                .map((slot) => {
+                                  const remainingSpots = Math.max(0, slot.capacity - slot.bookedCount);
+                                  const dateParts = slot.startDate.split('-');
+                                  const slotDate = dateParts.length >= 3
+                                    ? new Date(Number(dateParts[0]), Number(dateParts[1]) - 1, Number(dateParts[2]))
+                                    : null;
+                                  const today = new Date();
+                                  today.setHours(0, 0, 0, 0);
+                                  const isPast = slotDate ? slotDate < today : false;
+                                  const isDisabled = remainingSpots <= 0 || isPast;
+                                  return (
+                                    <button
+                                      key={slot.id}
+                                      type="button"
+                                      disabled={isDisabled}
+                                      onClick={() => {
+                                        setSelectedSlot(slot);
+                                        setShowDateDropdown(false);
+                                      }}
+                                      className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-left transition ${
+                                        isDisabled
+                                          ? 'opacity-40 cursor-not-allowed'
+                                          : selectedSlot?.id === slot.id
+                                            ? 'bg-emerald-50 border border-emerald-300'
+                                            : 'hover:bg-slate-50 cursor-pointer'
+                                      }`}
+                                    >
+                                      <span className="text-xs font-bold text-slate-700">📅 {slot.startDate}</span>
+                                      <span className={`text-[10px] font-bold ${isDisabled ? 'text-red-400' : 'text-slate-400'}`}>
+                                        {isPast ? 'Bitib' : remainingSpots <= 0 ? 'Dolub' : `${remainingSpots} yer`}
+                                      </span>
+                                    </button>
+                                  );
+                                })
+                            )}
                           </div>
                           </>
                         )}
                       </div>
-
-                      {/* Date Dropdown Simulation */}
-                      <button
-                        className="flex items-center justify-between bg-white px-4 py-3 text-left cursor-pointer hover:bg-slate-50 rounded-b-xl"
-                        onClick={() => {
-                           const el = document.getElementById('tour-slots-calendar');
-                           if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                        }}
-                      >
-                        <div className="flex items-center gap-3">
-                          <Calendar className="w-5 h-5 text-emerald-700" />
-                          <span className="text-sm font-extrabold text-slate-800">Tarix seçin</span>
-                        </div>
-                        <ChevronDown className="w-4 h-4 text-slate-400" />
-                      </button>
                     </div>
                   </div>
 
-                  {/* Primary CTA Action */}
-                  <button 
-                    onClick={() => {
-                       const el = document.getElementById('tour-slots-calendar');
-                       if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    }}
-                    className="w-full bg-[#0071eb] hover:bg-[#005ec4] text-white text-base md:text-lg font-black py-3.5 rounded-full shadow-md transition-all active:scale-95 cursor-pointer block text-center"
-                  >
-                    Yerləri yoxla
-                  </button>
+                  {/* Primary CTA Action — just reveals the tour-slots-calendar section (moved up next to the
+                      Quick Info Grid). Once that section is open there's nothing left for this button to do,
+                      so it's hidden entirely instead of switching label/behavior. */}
+                  {!showTourSlots && (
+                    <button
+                      type="button"
+                      disabled={slots.filter(s => s.tourId === selectedTour.id).length === 0}
+                      onClick={() => setShowTourSlots(true)}
+                      className="w-full bg-[#0071eb] hover:bg-[#005ec4] text-white text-base md:text-lg font-black py-3.5 rounded-full shadow-md transition-all active:scale-95 cursor-pointer block text-center disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      Yerləri yoxla
+                    </button>
+                  )}
 
                   {/* Guarantees */}
                   <div className="space-y-3 pt-2">
