@@ -193,7 +193,7 @@ export default function VendorPortal({
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs flex items-center justify-between">
           <div className="space-y-1">
             <span className="text-[10px] text-slate-400 font-bold tracking-widest">Satılan Biletlər</span>
-            <h4 className="text-xl font-extrabold text-[#0369a1]">{myBookings.length} Bilet</h4>
+            <h4 className="text-xl font-extrabold text-primary-700">{myBookings.length} Bilet</h4>
             <p className="text-[10px] text-slate-500">Uğurlu iştirakçı qeydiyyatı</p>
           </div>
           <div className="p-2.5 bg-sky-50 border border-sky-100 text-sky-700 rounded-lg">

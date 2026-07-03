@@ -566,7 +566,7 @@ export default function App() {
   // and neither was wired up to any button in the UI.
 
   return (
-    <div className="min-h-screen bg-[#f8fafc] font-sans text-slate-700 flex flex-col justify-between" id="app_root">
+    <div className="min-h-screen bg-ink-50 font-sans text-slate-700 flex flex-col justify-between" id="app_root">
       {/* Main Elegant Header */}
       <header className={`bg-white border-b border-slate-200 sticky top-0 z-40 transition-shadow ${isScrolled ? 'shadow-md' : ''}`}>
         <div className="max-w-[1400px] mx-auto px-6 sm:px-8 py-3 flex flex-wrap md:flex-nowrap items-center justify-between gap-4">
@@ -614,7 +614,7 @@ export default function App() {
                     setIsGlobalSearchFocused(false);
                     window.scrollTo({ top: 300, behavior: 'smooth' });
                   }}
-                  className="bg-[#2dd4bf] hover:bg-[#14b8a6] text-white font-bold py-2 px-5 rounded-full transition-colors flex-shrink-0 text-sm shadow-sm cursor-pointer"
+                  className="bg-primary-500 hover:bg-primary-600 text-white font-bold py-2 px-5 rounded-full transition-colors flex-shrink-0 text-sm shadow-sm cursor-pointer"
                 >
                   Axtar
                 </button>

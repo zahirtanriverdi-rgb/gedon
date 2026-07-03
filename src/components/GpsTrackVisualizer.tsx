@@ -321,7 +321,7 @@ const GpsMapOverlay: React.FC<GpsMapOverlayProps> = ({ parsed, onClose }) => {
           'line-cap': 'round'
         },
         paint: {
-          'line-color': '#f59e0b', // Vibrant gold amber 
+          'line-color': '#ff7300', // Brand accent orange
           'line-width': 5.5,
           'line-opacity': 0.95
         }
@@ -481,7 +481,7 @@ const GpsMapOverlay: React.FC<GpsMapOverlayProps> = ({ parsed, onClose }) => {
     <div className="fixed inset-0 bg-slate-950 z-[99999] flex flex-col text-slate-100 font-sans transition-all">
       
       {/* Main Maplibre Map Container */}
-      <div className="flex-1 relative w-full h-full bg-[#f0f9ff] overflow-hidden select-none">
+      <div className="flex-1 relative w-full h-full bg-primary-50 overflow-hidden select-none">
         
         {/* Map Canvas */}
         <div ref={mapContainerRef} className="w-full h-full text-slate-900" style={{ outline: 'none' }} />

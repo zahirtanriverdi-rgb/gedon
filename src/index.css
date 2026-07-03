@@ -5,6 +5,213 @@
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  /* ---- Brand palette (single source of truth) ---- */
+
+  /* Primary: turquoise — single accent color for the one main CTA / active state per screen */
+  --color-primary-50: #f0fdfa;
+  --color-primary-100: #ccfbf1;
+  --color-primary-200: #99f6e4;
+  --color-primary-300: #5eead4;
+  --color-primary-400: #45dbc5;
+  --color-primary-500: #2dd4bf;
+  --color-primary-600: #14b8a6;
+  --color-primary-700: #0d9488;
+  --color-primary-800: #0f766e;
+  --color-primary-900: #115e59;
+  --color-primary-950: #134e4a;
+
+  /* WhatsApp brand green — reserved exclusively for WhatsApp-branded actions, never remapped */
+  --color-whatsapp-500: #25d366;
+  --color-whatsapp-600: #1ebe57;
+
+  /* Secondary: orange — CTAs, discount/HOT badges, warnings (use sparingly) */
+  --color-accent-orange-50: #fff4eb;
+  --color-accent-orange-100: #ffe0c6;
+  --color-accent-orange-200: #ffbe88;
+  --color-accent-orange-300: #ff9b49;
+  --color-accent-orange-400: #ff841f;
+  --color-accent-orange-500: #ff7300;
+  --color-accent-orange-600: #de6400;
+  --color-accent-orange-700: #bc5500;
+  --color-accent-orange-800: #9f4800;
+  --color-accent-orange-900: #863d00;
+  --color-accent-orange-950: #472000;
+
+  /* Secondary: pink-red — CTAs, discount/HOT badges, warnings (use sparingly) */
+  --color-accent-pink-50: #ffeaf0;
+  --color-accent-pink-100: #ffd7e1;
+  --color-accent-pink-200: #ffb4c8;
+  --color-accent-pink-300: #ff799d;
+  --color-accent-pink-400: #ff3369;
+  --color-accent-pink-500: #ec003f;
+  --color-accent-pink-600: #b1002f;
+  --color-accent-pink-700: #830023;
+  --color-accent-pink-800: #66001b;
+  --color-accent-pink-900: #540016;
+  --color-accent-pink-950: #1f0008;
+
+  /* Tertiary: ink/surface neutrals — text/contrast (dark) and card/page backgrounds (light) */
+  --color-ink-50: #f9fbfb;
+  --color-ink-100: #f3f8f7;
+  --color-ink-200: #e4efef;
+  --color-ink-300: #cbe4e3;
+  --color-ink-400: #8fbcbd;
+  --color-ink-500: #579598;
+  --color-ink-600: #406e70;
+  --color-ink-700: #315557;
+  --color-ink-800: #203739;
+  --color-ink-900: #0d1c1e;
+  --color-ink-950: #090f10;
+
+  /* ---- Remap the generic Tailwind palettes used across the app to the brand tokens ----
+     This lets existing utility classes (bg-emerald-600, text-slate-700, etc.) render
+     the brand colors without rewriting every className. New code should prefer the
+     primary-*, accent-orange-*, accent-pink-* and ink-* tokens directly. */
+
+  --color-emerald-50: var(--color-primary-50);
+  --color-emerald-100: var(--color-primary-100);
+  --color-emerald-200: var(--color-primary-200);
+  --color-emerald-300: var(--color-primary-300);
+  --color-emerald-400: var(--color-primary-400);
+  --color-emerald-500: var(--color-primary-500);
+  --color-emerald-600: var(--color-primary-600);
+  --color-emerald-700: var(--color-primary-700);
+  --color-emerald-800: var(--color-primary-800);
+  --color-emerald-900: var(--color-primary-900);
+  --color-emerald-950: var(--color-primary-950);
+
+  --color-sky-50: var(--color-primary-50);
+  --color-sky-100: var(--color-primary-100);
+  --color-sky-200: var(--color-primary-200);
+  --color-sky-300: var(--color-primary-300);
+  --color-sky-400: var(--color-primary-400);
+  --color-sky-500: var(--color-primary-500);
+  --color-sky-600: var(--color-primary-600);
+  --color-sky-700: var(--color-primary-700);
+  --color-sky-800: var(--color-primary-800);
+  --color-sky-900: var(--color-primary-900);
+  --color-sky-950: var(--color-primary-950);
+
+  --color-blue-50: var(--color-primary-50);
+  --color-blue-100: var(--color-primary-100);
+  --color-blue-200: var(--color-primary-200);
+  --color-blue-300: var(--color-primary-300);
+  --color-blue-400: var(--color-primary-400);
+  --color-blue-500: var(--color-primary-500);
+  --color-blue-600: var(--color-primary-600);
+  --color-blue-700: var(--color-primary-700);
+  --color-blue-800: var(--color-primary-800);
+  --color-blue-900: var(--color-primary-900);
+  --color-blue-950: var(--color-primary-950);
+
+  --color-indigo-50: var(--color-primary-50);
+  --color-indigo-100: var(--color-primary-100);
+  --color-indigo-200: var(--color-primary-200);
+  --color-indigo-300: var(--color-primary-300);
+  --color-indigo-400: var(--color-primary-400);
+  --color-indigo-500: var(--color-primary-500);
+  --color-indigo-600: var(--color-primary-600);
+  --color-indigo-700: var(--color-primary-700);
+  --color-indigo-800: var(--color-primary-800);
+  --color-indigo-900: var(--color-primary-900);
+  --color-indigo-950: var(--color-primary-950);
+
+  --color-teal-50: var(--color-primary-50);
+  --color-teal-100: var(--color-primary-100);
+  --color-teal-200: var(--color-primary-200);
+  --color-teal-300: var(--color-primary-300);
+  --color-teal-400: var(--color-primary-400);
+  --color-teal-500: var(--color-primary-500);
+  --color-teal-600: var(--color-primary-600);
+  --color-teal-700: var(--color-primary-700);
+  --color-teal-800: var(--color-primary-800);
+  --color-teal-900: var(--color-primary-900);
+  --color-teal-950: var(--color-primary-950);
+
+  --color-cyan-50: var(--color-primary-50);
+  --color-cyan-100: var(--color-primary-100);
+  --color-cyan-200: var(--color-primary-200);
+  --color-cyan-300: var(--color-primary-300);
+  --color-cyan-400: var(--color-primary-400);
+  --color-cyan-500: var(--color-primary-500);
+  --color-cyan-600: var(--color-primary-600);
+  --color-cyan-700: var(--color-primary-700);
+  --color-cyan-800: var(--color-primary-800);
+  --color-cyan-900: var(--color-primary-900);
+  --color-cyan-950: var(--color-primary-950);
+
+  --color-amber-50: var(--color-accent-orange-50);
+  --color-amber-100: var(--color-accent-orange-100);
+  --color-amber-200: var(--color-accent-orange-200);
+  --color-amber-300: var(--color-accent-orange-300);
+  --color-amber-400: var(--color-accent-orange-400);
+  --color-amber-500: var(--color-accent-orange-500);
+  --color-amber-600: var(--color-accent-orange-600);
+  --color-amber-700: var(--color-accent-orange-700);
+  --color-amber-800: var(--color-accent-orange-800);
+  --color-amber-900: var(--color-accent-orange-900);
+  --color-amber-950: var(--color-accent-orange-950);
+
+  --color-orange-50: var(--color-accent-orange-50);
+  --color-orange-100: var(--color-accent-orange-100);
+  --color-orange-200: var(--color-accent-orange-200);
+  --color-orange-300: var(--color-accent-orange-300);
+  --color-orange-400: var(--color-accent-orange-400);
+  --color-orange-500: var(--color-accent-orange-500);
+  --color-orange-600: var(--color-accent-orange-600);
+  --color-orange-700: var(--color-accent-orange-700);
+  --color-orange-800: var(--color-accent-orange-800);
+  --color-orange-900: var(--color-accent-orange-900);
+  --color-orange-950: var(--color-accent-orange-950);
+
+  --color-red-50: var(--color-accent-pink-50);
+  --color-red-100: var(--color-accent-pink-100);
+  --color-red-200: var(--color-accent-pink-200);
+  --color-red-300: var(--color-accent-pink-300);
+  --color-red-400: var(--color-accent-pink-400);
+  --color-red-500: var(--color-accent-pink-500);
+  --color-red-600: var(--color-accent-pink-600);
+  --color-red-700: var(--color-accent-pink-700);
+  --color-red-800: var(--color-accent-pink-800);
+  --color-red-900: var(--color-accent-pink-900);
+  --color-red-950: var(--color-accent-pink-950);
+
+  --color-rose-50: var(--color-accent-pink-50);
+  --color-rose-100: var(--color-accent-pink-100);
+  --color-rose-200: var(--color-accent-pink-200);
+  --color-rose-300: var(--color-accent-pink-300);
+  --color-rose-400: var(--color-accent-pink-400);
+  --color-rose-500: var(--color-accent-pink-500);
+  --color-rose-600: var(--color-accent-pink-600);
+  --color-rose-700: var(--color-accent-pink-700);
+  --color-rose-800: var(--color-accent-pink-800);
+  --color-rose-900: var(--color-accent-pink-900);
+  --color-rose-950: var(--color-accent-pink-950);
+
+  --color-slate-50: var(--color-ink-50);
+  --color-slate-100: var(--color-ink-100);
+  --color-slate-200: var(--color-ink-200);
+  --color-slate-300: var(--color-ink-300);
+  --color-slate-400: var(--color-ink-400);
+  --color-slate-500: var(--color-ink-500);
+  --color-slate-600: var(--color-ink-600);
+  --color-slate-700: var(--color-ink-700);
+  --color-slate-800: var(--color-ink-800);
+  --color-slate-900: var(--color-ink-900);
+  --color-slate-950: var(--color-ink-950);
+
+  --color-gray-50: var(--color-ink-50);
+  --color-gray-100: var(--color-ink-100);
+  --color-gray-200: var(--color-ink-200);
+  --color-gray-300: var(--color-ink-300);
+  --color-gray-400: var(--color-ink-400);
+  --color-gray-500: var(--color-ink-500);
+  --color-gray-600: var(--color-ink-600);
+  --color-gray-700: var(--color-ink-700);
+  --color-gray-800: var(--color-ink-800);
+  --color-gray-900: var(--color-ink-900);
+  --color-gray-950: var(--color-ink-950);
 }
 
 @layer utilities {

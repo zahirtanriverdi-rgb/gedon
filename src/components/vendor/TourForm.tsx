@@ -613,7 +613,7 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
           </div>
 
           {/* Multi-date calendar + price */}
-          <div className="md:col-span-2 bg-[#f0fdf4]/60 p-4 rounded-xl border border-emerald-100 space-y-3">
+          <div className="md:col-span-2 bg-primary-50/60 p-4 rounded-xl border border-emerald-100 space-y-3">
             <h4 className="text-[10px] font-extrabold text-emerald-800 tracking-widest">📅 Aktiv Olacağı Günlər və Bilet Qiyməti</h4>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:max-w-md">
               <div>

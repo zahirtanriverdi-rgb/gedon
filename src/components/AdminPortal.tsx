@@ -689,7 +689,7 @@ export default function AdminPortal({
 
         {/* Right Column: Mini Logs */}
         <div className="space-y-6">
-          <div className="bg-[#0f172a] p-5 rounded-xl border border-slate-850 text-slate-300 space-y-4 h-full shadow-md">
+          <div className="bg-ink-900 p-5 rounded-xl border border-slate-850 text-slate-300 space-y-4 h-full shadow-md">
             <h4 className="text-xs font-bold text-emerald-400 tracking-widest font-mono flex items-center gap-1.5 border-b border-slate-800 pb-2">
               <Activity className="w-3.5 h-3.5 animate-pulse text-emerald-400" />
               Sistem Maliyyə Jurnalı (Ledger Audits)

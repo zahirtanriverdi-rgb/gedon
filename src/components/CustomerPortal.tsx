@@ -1201,7 +1201,7 @@ export default function CustomerPortal({
                       window.scrollTo({top: y, behavior: 'smooth'});
                     }
                   }}
-                  className="bg-[#2dd4bf] hover:bg-[#14b8a6] text-white font-bold py-2.5 px-6 rounded-full transition-colors flex-shrink-0 text-xs shadow-md"
+                  className="bg-primary-500 hover:bg-primary-600 text-white font-bold py-2.5 px-6 rounded-full transition-colors flex-shrink-0 text-xs shadow-md"
                 >
                   {t('searchButton')}
                 </button>
@@ -1223,12 +1223,12 @@ export default function CustomerPortal({
               </div>
 
               {/* Budget Calculator Button */}
-              <button 
+              <button
                 onClick={() => {
                   setActiveView('calculator');
                   window.scrollTo({ top: 0, behavior: 'smooth' });
                 }}
-                className="bg-amber-100 hover:bg-amber-200 text-amber-700 font-bold py-3.5 px-5 rounded-full transition-colors flex-shrink-0 text-sm shadow-sm flex items-center justify-center gap-2 border border-amber-200/50 w-full sm:w-auto"
+                className="bg-white hover:bg-slate-50 text-slate-800 font-bold py-3.5 px-5 rounded-full transition-colors flex-shrink-0 text-sm shadow-sm flex items-center justify-center gap-2 border border-slate-300 w-full sm:w-auto"
               >
                 <span>🧮</span>
                 <span className="whitespace-nowrap">Qrup üçün qiymət hesabla</span>
@@ -1241,7 +1241,7 @@ export default function CustomerPortal({
                 onClick={() => setSelectedCategory('all')}
                 className={`px-4 py-2 rounded-full text-xs font-bold transition-all border ${
                   selectedCategory === 'all' 
-                    ? 'bg-[#2dd4bf] text-white border-[#2dd4bf] shadow-sm' 
+                    ? 'bg-primary-500 text-white border-primary-500 shadow-sm' 
                     : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300 hover:bg-slate-50'
                 }`}
               >
@@ -1251,7 +1251,7 @@ export default function CustomerPortal({
                 onClick={() => setSelectedCategory('peak')}
                 className={`px-4 py-2 rounded-full text-xs font-bold transition-all border flex items-center gap-1.5 ${
                   selectedCategory === 'peak' 
-                    ? 'bg-[#2dd4bf] text-white border-[#2dd4bf] shadow-sm' 
+                    ? 'bg-primary-500 text-white border-primary-500 shadow-sm' 
                     : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300 hover:bg-slate-50'
                 }`}
               >
@@ -1261,7 +1261,7 @@ export default function CustomerPortal({
                 onClick={() => setSelectedCategory('camp')}
                 className={`px-4 py-2 rounded-full text-xs font-bold transition-all border flex items-center gap-1.5 ${
                   selectedCategory === 'camp' 
-                    ? 'bg-[#2dd4bf] text-white border-[#2dd4bf] shadow-sm' 
+                    ? 'bg-primary-500 text-white border-primary-500 shadow-sm' 
                     : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300 hover:bg-slate-50'
                 }`}
               >
@@ -1271,7 +1271,7 @@ export default function CustomerPortal({
                 onClick={() => setSelectedCategory('hiking')}
                 className={`px-4 py-2 rounded-full text-xs font-bold transition-all border flex items-center gap-1.5 ${
                   selectedCategory === 'hiking' 
-                    ? 'bg-[#2dd4bf] text-white border-[#2dd4bf] shadow-sm' 
+                    ? 'bg-primary-500 text-white border-primary-500 shadow-sm' 
                     : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300 hover:bg-slate-50'
                 }`}
               >
@@ -1281,23 +1281,23 @@ export default function CustomerPortal({
                 onClick={() => setSelectedCategory('active')}
                 className={`px-4 py-2 rounded-full text-xs font-bold transition-all border relative flex items-center gap-1.5 ${
                   selectedCategory === 'active' 
-                    ? 'bg-[#2dd4bf] text-white border-[#2dd4bf] shadow-sm' 
+                    ? 'bg-primary-500 text-white border-primary-500 shadow-sm' 
                     : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300 hover:bg-slate-50'
                 }`}
               >
                 🏃‍♂️ Aktiv Həyat
-                <span className="absolute -top-2 -right-1 bg-emerald-600 text-[9px] text-white px-1.5 py-0.5 rounded-full font-black scale-90 shadow-sm">YENİ</span>
+                <span className="absolute -top-2 -right-1 bg-primary-100 text-primary-700 text-[9px] px-1.5 py-0.5 rounded-full font-black scale-90 shadow-sm">YENİ</span>
               </button>
               <button
                 onClick={() => setSelectedCategory('international')}
                 className={`px-4 py-2 rounded-full text-xs font-bold transition-all border relative flex items-center gap-1.5 ${
                   selectedCategory === 'international' 
-                    ? 'bg-[#2dd4bf] text-white border-[#2dd4bf] shadow-sm' 
+                    ? 'bg-primary-500 text-white border-primary-500 shadow-sm' 
                     : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300 hover:bg-slate-50'
                 }`}
               >
                 ✈️ Xarici Turlar
-                <span className="absolute -top-2 -right-1 bg-amber-500 text-[9px] text-white px-1.5 py-0.5 rounded-full font-black scale-90 shadow-sm">HOT</span>
+                <span className="absolute -top-2 -right-1 bg-accent-orange-100 text-accent-orange-700 text-[9px] px-1.5 py-0.5 rounded-full font-black scale-90 shadow-sm">HOT</span>
               </button>
             </div>
 
@@ -1535,7 +1535,7 @@ export default function CustomerPortal({
                         const slider = document.getElementById('upcoming-tours-slider');
                         if(slider) slider.scrollBy({ left: -300, behavior: 'smooth' });
                       }}
-                      className="absolute left-0 top-1/2 -translate-y-1/2 -ml-3 md:-ml-4 z-10 bg-[#2dd4bf] text-white p-2.5 rounded-full shadow-lg hover:bg-[#14b8a6] transition-colors flex items-center justify-center border-2 border-white"
+                      className="absolute left-0 top-1/2 -translate-y-1/2 -ml-3 md:-ml-4 z-10 bg-primary-500 text-white p-2.5 rounded-full shadow-lg hover:bg-primary-600 transition-colors flex items-center justify-center border-2 border-white"
                     >
                       <ChevronLeft className="w-5 h-5" />
                     </button>
@@ -1602,7 +1602,7 @@ export default function CustomerPortal({
                         const slider = document.getElementById('upcoming-tours-slider');
                         if(slider) slider.scrollBy({ left: 300, behavior: 'smooth' });
                       }}
-                      className="absolute right-0 top-1/2 -translate-y-1/2 -mr-3 md:-mr-4 z-10 bg-[#2dd4bf] text-white p-2.5 rounded-full shadow-lg hover:bg-[#14b8a6] transition-colors flex items-center justify-center border-2 border-white"
+                      className="absolute right-0 top-1/2 -translate-y-1/2 -mr-3 md:-mr-4 z-10 bg-primary-500 text-white p-2.5 rounded-full shadow-lg hover:bg-primary-600 transition-colors flex items-center justify-center border-2 border-white"
                     >
                       <ChevronRight className="w-5 h-5" />
                     </button>
@@ -1699,7 +1699,7 @@ export default function CustomerPortal({
                     referrerPolicy="no-referrer"
                   />
                   <div className="absolute top-3 left-3 flex gap-1.5 flex-wrap">
-                    <span className={`text-[10px] font-bold tracking-tight px-2 py-0.5 rounded-md shadow-xs ${tour.isInternational ? 'bg-amber-500 text-white' : 'bg-slate-900/90 text-white'}`}>
+                    <span className={`text-[10px] font-bold tracking-tight px-2 py-0.5 rounded-md shadow-xs ${tour.isInternational ? 'bg-accent-orange-100 text-accent-orange-800' : 'bg-slate-900/90 text-white'}`}>
                       {badges[tour.category]?.emoji || '✈️'} {badges[tour.category]?.label || 'Xarici'}
                     </span>
                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md shadow-xs ${difficultyBg}`}>
@@ -1864,7 +1864,7 @@ export default function CustomerPortal({
                         </div>
                       ) : (
                         <span className="text-slate-900 text-xs font-semibold">
-                          <strong className="text-emerald-750 text-sm font-extrabold">
+                          <strong className="text-slate-900 text-base font-extrabold">
                             {getConvertedPriceInfo(tour.price ?? minPrice, tour.priceCurrency).both} / nəfər
                           </strong>
                         </span>
@@ -1878,7 +1878,7 @@ export default function CustomerPortal({
                       <button
                         type="button"
                         onClick={(e) => handleQuickWhatsApp(tour, e)}
-                        className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[10px] py-2 px-2.5 rounded-lg transition-all hover:shadow-2xs tracking-wider flex items-center justify-center gap-1 cursor-pointer"
+                        className="flex-1 bg-whatsapp-500 hover:bg-whatsapp-600 text-white font-black text-[10px] py-2 px-2.5 rounded-lg transition-all hover:shadow-2xs tracking-wider flex items-center justify-center gap-1 cursor-pointer"
                         title="Bələdçinin nömrəsinə WhatsApp ilə birbaşa keçid et"
                       >
                         <MessageCircle className="w-3.5 h-3.5" />
@@ -2240,7 +2240,7 @@ export default function CustomerPortal({
                               href={`https://wa.me/${bookingSuccessData.waNumber}?text=${encodeURIComponent(bookingSuccessData.waMessage)}`}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 hover:scale-[1.02] transform transition-all text-white font-extrabold text-xs rounded-xl shadow-lg shadow-emerald-200 flex items-center justify-center gap-2 cursor-pointer no-underline"
+                              className="w-full py-3 bg-whatsapp-500 hover:bg-whatsapp-600 hover:scale-[1.02] transform transition-all text-white font-extrabold text-xs rounded-xl shadow-lg shadow-whatsapp-500/20 flex items-center justify-center gap-2 cursor-pointer no-underline"
                             >
                               <MessageCircle className="w-4 h-4 fill-current" />
                               WhatsApp ilə Mesajı Göndər ↗
@@ -2733,7 +2733,7 @@ export default function CustomerPortal({
                           type="button"
                           disabled={isProcessingPayment || !isPhoneVerified || (((selectedTour.category === 'active' || selectedTour.isActiveLife)) && !safetyAcknowledged)}
                           onClick={handleProceedBookingSimulate}
-                          className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-lg shadow-md transition flex items-center gap-2 disabled:opacity-40 hover:scale-[1.02] cursor-pointer"
+                          className="px-5 py-2.5 bg-whatsapp-500 hover:bg-whatsapp-600 text-white font-extrabold text-xs rounded-lg shadow-md transition flex items-center gap-2 disabled:opacity-40 hover:scale-[1.02] cursor-pointer"
                         >
                           {isProcessingPayment ? (
                             <>
@@ -2770,19 +2770,19 @@ export default function CustomerPortal({
                           : ['Peşəkar canlı tur bələdçisi', 'Yerli vergilər və xərclər']
                         ).map((item, idx) => (
                           <div key={`inc-${idx}`} className="flex items-start gap-3">
-                            <CheckCircle className="w-5 h-5 text-green-500 shrink-0" />
+                            <CheckCircle className="w-5 h-5 text-emerald-500 shrink-0" />
                             <span className="text-slate-700 text-sm font-medium">{item}</span>
                           </div>
                         ))}
                         {selectedTour.mealType && (
                           <div className="flex items-start gap-3">
-                            <CheckCircle className="w-5 h-5 text-green-500 shrink-0" />
+                            <CheckCircle className="w-5 h-5 text-emerald-500 shrink-0" />
                             <span className="text-slate-700 text-sm font-medium">Qida: {selectedTour.mealType}</span>
                           </div>
                         )}
                         {selectedTour.flightIncluded && (
                           <div className="flex items-start gap-3">
-                            <CheckCircle className="w-5 h-5 text-green-500 shrink-0" />
+                            <CheckCircle className="w-5 h-5 text-emerald-500 shrink-0" />
                             <span className="text-slate-700 text-sm font-medium">Aviabilet və transfer daxildir</span>
                           </div>
                         )}
@@ -3037,7 +3037,7 @@ export default function CustomerPortal({
                                       🗺️ {mainPlace}
                                     </span>
                                   </div>
-                                  <h6 className="text-[10px] font-extrabold text-[#1f2937] leading-tight truncate">{day.title}</h6>
+                                  <h6 className="text-[10px] font-extrabold text-ink-800 leading-tight truncate">{day.title}</h6>
                                   <p className="text-[9.5px] text-slate-500 leading-snug line-clamp-2">{day.description}</p>
                                 </div>
                               </div>
@@ -3215,7 +3215,7 @@ export default function CustomerPortal({
                         </div>
                         <div className="space-y-1 text-xs">
                           <span className="text-slate-400 block font-bold text-[9px]">QİDALANMA TƏMİNATI</span>
-                          <span className="text-[#0f533a] font-extrabold block">🍽️ {selectedTour.mealType || 'Səhər yeməyi'}</span>
+                          <span className="text-primary-900 font-extrabold block">🍽️ {selectedTour.mealType || 'Səhər yeməyi'}</span>
                         </div>
 
                         <div className="space-y-1 text-xs">
@@ -3272,7 +3272,7 @@ export default function CustomerPortal({
                               <span className="text-xs font-black text-amber-900 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-sm">
                                 📅 {day.day}-ci GÜN
                               </span>
-                              <h5 className="text-xs font-extrabold text-[#111827] flex-1 sm:ml-3">
+                              <h5 className="text-xs font-extrabold text-ink-900 flex-1 sm:ml-3">
                                 {day.title}
                               </h5>
                             </div>
@@ -3356,7 +3356,7 @@ export default function CustomerPortal({
                           </>
                         ) : (
                           <div className="flex items-baseline gap-2">
-                            <span className="text-3xl font-extrabold text-rose-600">
+                            <span className="text-3xl font-extrabold text-slate-900">
                               {getConvertedPriceInfo(basePrice, selectedTour.priceCurrency).both}
                             </span>
                             <span className="text-slate-500 font-medium text-sm">adam başı</span>
@@ -3365,7 +3365,7 @@ export default function CustomerPortal({
                       })()
                     ) : (
                       <div className="flex items-baseline gap-2">
-                        <span className="text-3xl font-extrabold text-rose-600">Məlumat yoxdur</span>
+                        <span className="text-2xl font-bold text-slate-400">Məlumat yoxdur</span>
                       </div>
                     )}
                   </div>
@@ -3506,7 +3506,7 @@ export default function CustomerPortal({
                       type="button"
                       disabled={slots.filter(s => s.tourId === selectedTour.id).length === 0}
                       onClick={() => setShowTourSlots(true)}
-                      className="w-full bg-[#0071eb] hover:bg-[#005ec4] text-white text-base md:text-lg font-black py-3.5 rounded-full shadow-md transition-all active:scale-95 cursor-pointer block text-center disabled:opacity-40 disabled:cursor-not-allowed"
+                      className="w-full bg-primary-500 hover:bg-primary-600 text-white text-base md:text-lg font-black py-3.5 rounded-full shadow-md transition-all active:scale-95 cursor-pointer block text-center disabled:opacity-40 disabled:cursor-not-allowed"
                     >
                       Yerləri yoxla
                     </button>

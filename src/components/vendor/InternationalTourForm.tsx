@@ -424,7 +424,7 @@ export function InternationalTourForm({ currentUser, tour, slots, onAddTour, onE
             </div>
           </div>
 
-          <div className="bg-[#f0fdf4]/60 p-4 rounded-xl border border-emerald-100 space-y-3">
+          <div className="bg-primary-50/60 p-4 rounded-xl border border-emerald-100 space-y-3">
             <h4 className="text-[10px] font-extrabold text-emerald-800 tracking-widest">📅 Turun Aktiv Olacağı Yola Çıxış Tarixləri</h4>
             <MultiDateCalendar selectedDates={selectedDates} onChange={setSelectedDates} />
           </div>
@@ -516,7 +516,7 @@ export function InternationalTourForm({ currentUser, tour, slots, onAddTour, onE
             {intlItinerary.map((iti, index) => (
               <div key={index} className="border border-slate-200 p-4 rounded-xl bg-slate-50 relative space-y-3">
                 <div className="flex justify-between items-center bg-slate-200/50 p-1.5 rounded-lg">
-                  <span className="text-xs font-extrabold text-[#065f46]">📅 {iti.day}-ci Gün Planı</span>
+                  <span className="text-xs font-extrabold text-primary-800">📅 {iti.day}-ci Gün Planı</span>
                   {intlItinerary.length > 1 && (
                     <button type="button" onClick={() => handleIntlRemoveDay(index)} className="text-red-500 hover:text-red-705 text-xs font-bold px-2 py-0.5">Günü Sil 🗑️</button>
                   )}

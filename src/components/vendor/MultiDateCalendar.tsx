@@ -21,7 +21,7 @@ export function MultiDateCalendar({ selectedDates, onChange }: MultiDateCalendar
 
   return (
     <div className="space-y-3">
-      <div className="bg-white border border-slate-200 rounded-xl p-3 inline-block" style={{ ['--rdp-accent-color' as any]: '#059669', ['--rdp-today-color' as any]: '#047857' }}>
+      <div className="bg-white border border-slate-200 rounded-xl p-3 inline-block" style={{ ['--rdp-accent-color' as any]: '#2aa8b7', ['--rdp-today-color' as any]: '#24909d' }}>
         <DayPicker
           mode="multiple"
           selected={selectedDates}

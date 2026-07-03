@@ -69,8 +69,8 @@ export function TicketModal({ booking, tours, onApproveBooking, onShowNotificati
                     }
                     body {
                       font-family: 'Inter', sans-serif;
-                      background: #f8fafc;
-                      color: #0f172a;
+                      background: #f9fbfb;
+                      color: #0d1c1e;
                       margin: 0;
                       padding: 20px;
                       line-height: 1.5;
@@ -84,7 +84,7 @@ export function TicketModal({ booking, tours, onApproveBooking, onShowNotificati
                       margin: 0 auto;
                       background: #ffffff;
                       border-radius: 20px;
-                      border: 1px solid #e2e8f0;
+                      border: 1px solid #e4efef;
                       box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
                       overflow: hidden;
                       position: relative;
@@ -93,7 +93,7 @@ export function TicketModal({ booking, tours, onApproveBooking, onShowNotificati
                     
                     /* Brand Header */
                     .brand-bar {
-                      background: #064e3b; /* Deep forest emerald */
+                      background: #1c6e78; /* Deep forest emerald */
                       color: #ffffff;
                       padding: 16px 28px;
                       display: flex;
@@ -111,11 +111,11 @@ export function TicketModal({ booking, tours, onApproveBooking, onShowNotificati
                       gap: 6px;
                     }
                     .brand-logo-text span {
-                      color: #34d399; /* Emerald accent */
+                      color: #67d0dc; /* Emerald accent */
                     }
                     .badge {
-                      background: #34d399;
-                      color: #064e3b;
+                      background: #67d0dc;
+                      color: #1c6e78;
                       padding: 6px 14px;
                       font-weight: 800;
                       border-radius: 9999px;
@@ -124,8 +124,8 @@ export function TicketModal({ booking, tours, onApproveBooking, onShowNotificati
                       text-transform: uppercase;
                     }
                     .badge.unpaid {
-                      background: #fef3c7;
-                      color: #92400e;
+                      background: #fff4eb;
+                      color: #9f4800;
                     }
                     
                     /* Pass Body Layout */
@@ -138,38 +138,38 @@ export function TicketModal({ booking, tours, onApproveBooking, onShowNotificati
                     .notch-top {
                       width: 20px;
                       height: 20px;
-                      background: #f8fafc;
+                      background: #f9fbfb;
                       border-radius: 50%;
                       position: absolute;
                       top: -10px;
                       right: 170px;
                       z-index: 10;
-                      border-bottom: 1px solid #e2e8f0;
+                      border-bottom: 1px solid #e4efef;
                     }
                     .notch-bottom {
                       width: 20px;
                       height: 20px;
-                      background: #f8fafc;
+                      background: #f9fbfb;
                       border-radius: 50%;
                       position: absolute;
                       bottom: -10px;
                       right: 170px;
                       z-index: 10;
-                      border-top: 1px solid #e2e8f0;
+                      border-top: 1px solid #e4efef;
                     }
                     
                     /* Main stub (Left) */
                     .main-stub {
                       flex: 1;
                       padding: 24px 28px;
-                      border-right: 2px dashed #cbd5e1;
+                      border-right: 2px dashed #cbe4e3;
                     }
                     
                     /* Right Stub (Validator) */
                     .side-stub {
                       width: 180px;
                       padding: 24px 20px;
-                      background: #fafbfd;
+                      background: #f9fbfb;
                       display: flex;
                       flex-direction: column;
                       align-items: center;
@@ -185,7 +185,7 @@ export function TicketModal({ booking, tours, onApproveBooking, onShowNotificati
                       gap: 15px;
                       margin-bottom: 24px;
                       padding-bottom: 20px;
-                      border-bottom: 1px solid #e2e8f0;
+                      border-bottom: 1px solid #e4efef;
                     }
                     .route-point {
                       display: flex;
@@ -193,7 +193,7 @@ export function TicketModal({ booking, tours, onApproveBooking, onShowNotificati
                     }
                     .route-label {
                       font-size: 9px;
-                      color: #64748b;
+                      color: #579598;
                       font-weight: 700;
                       text-transform: uppercase;
                       letter-spacing: 0.5px;
@@ -201,11 +201,11 @@ export function TicketModal({ booking, tours, onApproveBooking, onShowNotificati
                     .route-value {
                       font-size: 14px;
                       font-weight: 800;
-                      color: #0f172a;
+                      color: #0d1c1e;
                       margin-top: 2px;
                     }
                     .route-arrow {
-                      color: #059669;
+                      color: #2aa8b7;
                       font-size: 18px;
                       font-weight: 700;
                     }
@@ -222,7 +222,7 @@ export function TicketModal({ booking, tours, onApproveBooking, onShowNotificati
                     }
                     .info-label {
                       font-size: 9px;
-                      color: #627285;
+                      color: #579598;
                       font-weight: 700;
                       text-transform: uppercase;
                       letter-spacing: 0.5px;
@@ -231,10 +231,10 @@ export function TicketModal({ booking, tours, onApproveBooking, onShowNotificati
                     .info-value {
                       font-size: 12px;
                       font-weight: 700;
-                      color: #0f172a;
+                      color: #0d1c1e;
                     }
                     .price-highlight {
-                      color: #047857;
+                      color: #24909d;
                       font-weight: 800;
                       font-size: 15px;
                     }
@@ -242,7 +242,7 @@ export function TicketModal({ booking, tours, onApproveBooking, onShowNotificati
                     /* QR style on stub */
                     .qr-wrapper {
                       background: #ffffff;
-                      border: 1px solid #e2e8f0;
+                      border: 1px solid #e4efef;
                       padding: 10px;
                       border-radius: 12px;
                       box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
@@ -255,7 +255,7 @@ export function TicketModal({ booking, tours, onApproveBooking, onShowNotificati
                     }
                     .ref-title {
                       font-size: 9px;
-                      color: #64748b;
+                      color: #579598;
                       font-weight: 800;
                       margin-bottom: 4px;
                     }
@@ -263,7 +263,7 @@ export function TicketModal({ booking, tours, onApproveBooking, onShowNotificati
                       font-family: monospace;
                       font-size: 13px;
                       font-weight: 700;
-                      color: #0f172a;
+                      color: #0d1c1e;
                       letter-spacing: 0.5px;
                     }
                     
@@ -273,13 +273,13 @@ export function TicketModal({ booking, tours, onApproveBooking, onShowNotificati
                       margin: 0 auto;
                       background: #ffffff;
                       border-radius: 16px;
-                      border: 1px solid #e1e8f0;
+                      border: 1px solid #e4efef;
                       padding: 20px 24px;
                     }
                     .safety-title {
                       font-size: 11px;
                       font-weight: 800;
-                      color: #92400e;
+                      color: #9f4800;
                       text-transform: uppercase;
                       letter-spacing: 0.5px;
                       margin: 0 0 12px 0;
@@ -293,7 +293,7 @@ export function TicketModal({ booking, tours, onApproveBooking, onShowNotificati
                     }
                     .safety-list li {
                       font-size: 10.5px;
-                      color: #475569;
+                      color: #406e70;
                       margin-bottom: 6px;
                       line-height: 1.45;
                       font-weight: 500;
@@ -303,7 +303,7 @@ export function TicketModal({ booking, tours, onApproveBooking, onShowNotificati
                     .pass-footer {
                       text-align: center;
                       font-size: 9px;
-                      color: #94a3b8;
+                      color: #8fbcbd;
                       margin-top: 30px;
                       font-weight: 600;
                       text-transform: uppercase;
@@ -318,10 +318,10 @@ export function TicketModal({ booking, tours, onApproveBooking, onShowNotificati
                       }
                       .boarding-pass {
                         box-shadow: none !important;
-                        border: 1px solid #94a3b8 !important;
+                        border: 1px solid #8fbcbd !important;
                       }
                       .safety-panel {
-                        border: 1px solid #94a3b8 !important;
+                        border: 1px solid #8fbcbd !important;
                       }
                     }
                   </style>
@@ -393,7 +393,7 @@ export function TicketModal({ booking, tours, onApproveBooking, onShowNotificati
                           <img class="qr-image" src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${bookingRef}" alt="Verification Qrcode" />
                         </div>
                         
-                        <div style="font-size: 8px; color: #94a3b8; font-weight: 700; margin-top: 8px; letter-spacing: 0.3px; text-transform: uppercase;">
+                        <div style="font-size: 8px; color: #8fbcbd; font-weight: 700; margin-top: 8px; letter-spacing: 0.3px; text-transform: uppercase;">
                           Validasiya üçün QR kod
                         </div>
                       </div>

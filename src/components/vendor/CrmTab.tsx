@@ -390,7 +390,7 @@ export function CrmTab({ tours, slots, bookings, currentUser, operatorToken, onE
 
                 <div className="overflow-x-auto font-sans">
                   <table className="w-full text-left border-collapse text-xs">
-                    <thead className="bg-[#f8fafc] border-b border-slate-200 text-slate-400 font-bold tracking-wider text-[10px]">
+                    <thead className="bg-ink-50 border-b border-slate-200 text-slate-400 font-bold tracking-wider text-[10px]">
                       <tr>
                         <th className="p-3 text-center w-12">Sıra</th>
                         <th className="p-3">Adı və Soyadı</th>
