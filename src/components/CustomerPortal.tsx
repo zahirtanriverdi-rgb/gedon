@@ -2712,18 +2712,34 @@ export default function CustomerPortal({
                 {/* Full description */}
                 <div className="space-y-4 py-4 border-t border-slate-200">
                   <h2 className="text-xl font-extrabold text-slate-900">Tam təsvir</h2>
-                  <p className="text-slate-700 text-sm leading-relaxed whitespace-pre-line font-medium antialiased">
-                    {selectedTour.description.length > 320 && !isDescExpanded
-                      ? `${selectedTour.description.substring(0, 310)}...`
-                      : selectedTour.description}
-                  </p>
+                  <div className="relative">
+                    <div
+                      className={`overflow-hidden transition-all duration-300 ease-in-out ${
+                        isDescExpanded || selectedTour.description.length <= 320 ? 'max-h-[1000px]' : 'max-h-[150px]'
+                      }`}
+                    >
+                      <p className="text-slate-700 text-sm leading-relaxed whitespace-pre-line font-medium antialiased">
+                        {selectedTour.description}
+                      </p>
+                    </div>
+                    {!isDescExpanded && selectedTour.description.length > 320 && (
+                      <div className="absolute bottom-0 left-0 w-full h-12 bg-gradient-to-t from-white to-transparent pointer-events-none" />
+                    )}
+                  </div>
                   {selectedTour.description.length > 320 && (
                     <button
                       type="button"
                       onClick={() => setIsDescExpanded(!isDescExpanded)}
-                      className="text-sm font-extrabold text-slate-900 hover:underline flex items-center gap-1 cursor-pointer transition-all mt-2"
+                      className="group inline-flex items-center gap-1.5 text-sm font-extrabold text-slate-900 hover:text-emerald-700 cursor-pointer transition-colors mt-1"
                     >
-                      {isDescExpanded ? 'Daha az göstər' : 'Daha çox göstər'}
+                      <span className="transition-transform duration-300 group-hover:translate-y-0.5">
+                        {isDescExpanded ? 'Daha az oxu' : 'Daha çox oxu'}
+                      </span>
+                      <ChevronDown
+                        className={`w-4 h-4 transition-transform duration-300 group-hover:translate-y-0.5 ${
+                          isDescExpanded ? 'rotate-180' : ''
+                        }`}
+                      />
                     </button>
                   )}
                 </div>
