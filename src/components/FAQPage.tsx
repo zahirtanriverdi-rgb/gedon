@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ChevronDown, ChevronUp, CheckCircle, Info, Navigation, Shield, BookOpen } from 'lucide-react';
+import { ChevronDown, ChevronUp, Info, Navigation, Shield, BookOpen, Activity } from 'lucide-react';
 
 const faqs = [
   {
@@ -61,9 +61,6 @@ const faqs = [
     ]
   }
 ];
-
-// We need to import the Activity icon if it's missing, let's just make sure all are imported
-import { Activity } from 'lucide-react';
 
 export default function FAQPage({ onBack }: { onBack: () => void }) {
   const [openIndex, setOpenIndex] = useState<string | null>(null);

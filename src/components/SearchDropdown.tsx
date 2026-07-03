@@ -27,7 +27,7 @@ export const SearchDropdown: React.FC<SearchDropdownProps> = ({
   
   if (lowerQuery) {
     // 1. Find matching regions
-    const matchedRegions = Array.from(new Set(tours.filter(t => t.region.toLowerCase().includes(lowerQuery)).map(t => t.region)));
+    const matchedRegions: string[] = Array.from(new Set(tours.filter(t => t.region.toLowerCase().includes(lowerQuery)).map(t => t.region)));
     
     matchedRegions.slice(0, 3).forEach(region => {
        const count = tours.filter(t => t.region === region).length;

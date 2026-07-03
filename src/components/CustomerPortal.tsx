@@ -717,8 +717,6 @@ export default function CustomerPortal({
 
   const [upcomingScrollLeft, setUpcomingScrollLeft] = useState(0);
 
-  console.log(`Total Tours: ${tours.length}, Displayed Tours: ${sortedAndFilteredTours.length}`);
-
   // Calculate Average rating - Supports manual back-office rating override if specified in tour.rating
   const getAverageRating = (tourId: string) => {
     const tour = tours.find(t => t.id === tourId);
