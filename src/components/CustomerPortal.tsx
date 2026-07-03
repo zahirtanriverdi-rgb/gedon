@@ -7,6 +7,7 @@ import OrganizerProfile from './OrganizerProfile';
 import { SearchDropdown } from './SearchDropdown';
 import { PriceCalculator } from './PriceCalculator';
 import { getRecentSearches, addRecentSearch } from '../utils/recentSearches';
+import { REVIEWS_ENABLED } from '../config/features';
 import { 
   Search, 
   MapPin, 
@@ -1723,21 +1724,23 @@ export default function CustomerPortal({
                               🔥 {selectedMonth} ayının ən çox satılanı
                             </span>
                           )}
-                          <div className="flex flex-col gap-0.5 shrink-0">
-                            <div className="flex items-center gap-0.5" title={`${getAverageRating(tour.id)} rəy xalı`}>
-                              {[1, 2, 3, 4, 5].map((starIdx) => {
-                                const isFilled = starIdx <= starRating;
-                                return (
-                                  <Star 
-                                    key={starIdx} 
-                                    className={`w-3 h-3 ${isFilled ? 'fill-amber-400 text-amber-400' : 'text-slate-200'}`} 
-                                  />
-                                );
-                              })}
-                              <span className="text-[11px] font-bold text-slate-700 ml-1">{getAverageRating(tour.id)}</span>
+                          {REVIEWS_ENABLED && (
+                            <div className="flex flex-col gap-0.5 shrink-0">
+                              <div className="flex items-center gap-0.5" title={`${getAverageRating(tour.id)} rəy xalı`}>
+                                {[1, 2, 3, 4, 5].map((starIdx) => {
+                                  const isFilled = starIdx <= starRating;
+                                  return (
+                                    <Star
+                                      key={starIdx}
+                                      className={`w-3 h-3 ${isFilled ? 'fill-amber-400 text-amber-400' : 'text-slate-200'}`}
+                                    />
+                                  );
+                                })}
+                                <span className="text-[11px] font-bold text-slate-700 ml-1">{getAverageRating(tour.id)}</span>
+                              </div>
+                              <span className="text-slate-400 text-[9px] font-medium">({getReviewsCount(tour.id)} rəy)</span>
                             </div>
-                            <span className="text-slate-400 text-[9px] font-medium">({getReviewsCount(tour.id)} rəy)</span>
-                          </div>
+                          )}
                         </div>
                       );
                     })()}
@@ -1775,6 +1778,8 @@ export default function CustomerPortal({
       </div>
 
       {/* Verified Reviews Section (Anti-Fake System demonstration in UI) */}
+      {/* Ödəniş sistemi olmadığı üçün müvəqqəti söndürülüb, bax: REVIEWS_ENABLED */}
+      {REVIEWS_ENABLED && (
       <div className="bg-white rounded-xl border border-slate-100 p-6 shadow-sm space-y-6">
         <div>
           <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
@@ -1866,6 +1871,7 @@ export default function CustomerPortal({
           </form>
         )}
       </div>
+      )}
 
       {/* Info Banner at the bottom of the page */}
       <div className="bg-emerald-50 rounded-xl p-4 border border-emerald-100 flex items-center justify-between mt-8">
@@ -1906,10 +1912,12 @@ export default function CustomerPortal({
               <div className="flex flex-wrap items-center justify-between gap-4 mt-2">
                 <div className="flex items-center gap-4">
                   <div className="bg-amber-100 text-amber-900 border border-amber-200 text-xs font-bold px-2 py-1 rounded shadow-sm shrink-0">Ən çox satılan</div>
-                  <div className="flex items-center gap-1 font-bold text-slate-800 text-sm shrink-0">
-                    <Star className="w-4 h-4 fill-amber-500 text-amber-500" />
-                    4.9 <span className="text-slate-500 font-normal underline decoration-slate-300">({getReviewsCount(selectedTour.id)} rəy)</span>
-                  </div>
+                  {REVIEWS_ENABLED && (
+                    <div className="flex items-center gap-1 font-bold text-slate-800 text-sm shrink-0">
+                      <Star className="w-4 h-4 fill-amber-500 text-amber-500" />
+                      4.9 <span className="text-slate-500 font-normal underline decoration-slate-300">({getReviewsCount(selectedTour.id)} rəy)</span>
+                    </div>
+                  )}
                   <div className="flex items-center gap-1 font-bold text-slate-800 text-sm shrink-0">
                      • <span className="text-slate-500 font-normal">{selectedTour.region}</span>
                   </div>
@@ -3210,6 +3218,8 @@ export default function CustomerPortal({
                   </div>
 
                   {/* Historical verified feedbacks inside detailed modals */}
+                  {/* Ödəniş sistemi olmadığı üçün müvəqqəti söndürülüb, bax: REVIEWS_ENABLED */}
+                  {REVIEWS_ENABLED && (
                   <div>
                     <h4 className="text-xs font-bold text-slate-500 tracking-widest">İştirakçı Rəyləri ({getReviewsCount(selectedTour.id)})</h4>
                     <div className="space-y-2.5 mt-2">
@@ -3236,6 +3246,7 @@ export default function CustomerPortal({
                       )}
                     </div>
                   </div>
+                  )}
                 </div>
 
             </div> {/* Closes Extra dynamic details */}
@@ -3478,11 +3489,13 @@ export default function CustomerPortal({
                           <h3 className="font-extrabold text-slate-900 text-sm mb-3 line-clamp-2 leading-snug group-hover:text-emerald-700 transition">
                             {tour.name}
                           </h3>
-                          <div className="flex items-center gap-1 text-xs font-bold text-slate-700 mb-4">
-                             <Star className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
-                             4.9 <span className="text-slate-500 font-normal">({getReviewsCount(tour.id)})</span>
-                          </div>
-                          
+                          {REVIEWS_ENABLED && (
+                            <div className="flex items-center gap-1 text-xs font-bold text-slate-700 mb-4">
+                               <Star className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
+                               4.9 <span className="text-slate-500 font-normal">({getReviewsCount(tour.id)})</span>
+                            </div>
+                          )}
+
                           <div className="mt-auto pt-4 border-t border-slate-100 flex items-end justify-between">
                             <span className="text-xs text-slate-500 font-medium">{tour.durationDays * 8} saat</span>
                             {minPrice ? (

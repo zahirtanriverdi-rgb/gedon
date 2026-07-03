@@ -1,6 +1,7 @@
 import React from 'react';
 import { User, Tour } from '../types';
 import { MapPin, Star, Calendar, MessageSquare, Phone, ExternalLink } from 'lucide-react';
+import { REVIEWS_ENABLED } from '../config/features';
 
 interface OrganizerProfileProps {
   organizer: User;
@@ -118,10 +119,12 @@ export default function OrganizerProfile({ organizer, tours, onBack, onTourClick
                     <div className="p-4">
                       <div className="flex items-center justify-between mb-1">
                         <span className="text-xs font-bold text-emerald-600 uppercase tracking-wider">{tour.category}</span>
-                        <div className="flex items-center gap-1 text-amber-500">
-                          <Star className="w-3.5 h-3.5 fill-current" />
-                          <span className="text-xs font-bold text-slate-700">{tour.rating}</span>
-                        </div>
+                        {REVIEWS_ENABLED && (
+                          <div className="flex items-center gap-1 text-amber-500">
+                            <Star className="w-3.5 h-3.5 fill-current" />
+                            <span className="text-xs font-bold text-slate-700">{tour.rating}</span>
+                          </div>
+                        )}
                       </div>
                       <h3 className="font-bold text-slate-900 mb-2">{tour.name}</h3>
                       <div className="flex items-center text-slate-500 text-xs font-medium gap-1">
