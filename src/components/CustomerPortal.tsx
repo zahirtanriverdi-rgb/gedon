@@ -1816,58 +1816,57 @@ export default function CustomerPortal({
                     )}
                   </div>
 
-                  {/* Rating & Price row */}
-                  <div className="flex items-center justify-between mt-4 pt-3 border-t border-slate-100">
+                  {/* Rating & Price row — price is the primary signal, rating secondary, badge tertiary */}
+                  <div className="flex items-stretch justify-between gap-3 mt-4 pt-3 border-t border-slate-100">
                     {(() => {
                       const tourMonths = getTourMonths(tour.id);
                       const isTopSeller = Number(getAverageRating(tour.id)) >= 4.5 || getReviewsCount(tour.id) >= 1 || tour.name.toLowerCase().includes('kəpəz') || tour.name.toLowerCase().includes('kuzun');
                       const selectedMonth = tourMonths.length > 0 ? tourMonths[0] : 'May';
                       const starRating = Math.round(Number(getAverageRating(tour.id)));
                       return (
-                        <div className="flex items-center gap-1.5 flex-wrap">
+                        <div className="flex flex-col justify-center gap-1.5 min-w-0">
+                          {REVIEWS_ENABLED && (
+                            <div className="flex items-center gap-0.5" title={`${getAverageRating(tour.id)} rəy xalı`}>
+                              {[1, 2, 3, 4, 5].map((starIdx) => {
+                                const isFilled = starIdx <= starRating;
+                                return (
+                                  <Star
+                                    key={starIdx}
+                                    className={`w-3.5 h-3.5 ${isFilled ? 'fill-amber-400 text-amber-400' : 'text-slate-200'}`}
+                                  />
+                                );
+                              })}
+                              <span className="text-xs font-bold text-slate-700 ml-1">{getAverageRating(tour.id)}</span>
+                              <span className="text-slate-400 text-[10px] font-medium">({getReviewsCount(tour.id)} rəy)</span>
+                            </div>
+                          )}
                           {isTopSeller && (
-                            <span className="bg-amber-50 text-amber-800 border border-amber-200/85 text-[9px] font-black px-1.5 py-0.5 rounded flex items-center gap-0.5 shadow-4xs shrink-0 animate-pulse" title="Bu ayın ən çox bilet satılan turu!">
+                            <span className="bg-amber-50/70 text-amber-700 border border-amber-100 text-[9px] font-semibold px-1.5 py-0.5 rounded flex items-center gap-0.5 w-fit" title="Bu ayın ən çox bilet satılan turu!">
                               🔥 {selectedMonth} ayının ən çox satılanı
                             </span>
-                          )}
-                          {REVIEWS_ENABLED && (
-                            <div className="flex flex-col gap-0.5 shrink-0">
-                              <div className="flex items-center gap-0.5" title={`${getAverageRating(tour.id)} rəy xalı`}>
-                                {[1, 2, 3, 4, 5].map((starIdx) => {
-                                  const isFilled = starIdx <= starRating;
-                                  return (
-                                    <Star
-                                      key={starIdx}
-                                      className={`w-3 h-3 ${isFilled ? 'fill-amber-400 text-amber-400' : 'text-slate-200'}`}
-                                    />
-                                  );
-                                })}
-                                <span className="text-[11px] font-bold text-slate-700 ml-1">{getAverageRating(tour.id)}</span>
-                              </div>
-                              <span className="text-slate-400 text-[9px] font-medium">({getReviewsCount(tour.id)} rəy)</span>
-                            </div>
                           )}
                         </div>
                       );
                     })()}
 
-                    <div className="text-right flex-shrink-0">
+                    <div className="text-right shrink-0 border-l border-slate-100 pl-4 flex flex-col justify-center">
                       <span className="text-[9px] text-slate-400 block tracking-wider font-semibold">QİYMƏT</span>
                       {tour.discountPrice && tour.discountPrice > 0 && tour.discountPrice < (tour.price ?? minPrice) ? (
                         <div className="flex flex-col items-end">
-                          <span className="line-through text-gray-400 text-sm">
+                          <span className="line-through text-gray-400 text-xs">
                             {getConvertedPriceInfo(tour.price ?? minPrice, tour.priceCurrency).both}
                           </span>
-                          <span className="text-xl font-extrabold text-rose-600">
+                          <span className="text-2xl font-extrabold text-rose-600 leading-tight">
                             {getConvertedPriceInfo(tour.discountPrice, tour.priceCurrency).both}
                           </span>
                         </div>
                       ) : (
-                        <span className="text-slate-900 text-xs font-semibold">
-                          <strong className="text-slate-900 text-base font-extrabold">
-                            {getConvertedPriceInfo(tour.price ?? minPrice, tour.priceCurrency).both} / nəfər
+                        <div className="flex flex-col items-end">
+                          <strong className="text-slate-900 text-2xl font-extrabold leading-tight">
+                            {getConvertedPriceInfo(tour.price ?? minPrice, tour.priceCurrency).both}
                           </strong>
-                        </span>
+                          <span className="text-slate-400 text-[10px] font-medium">/ nəfər</span>
+                        </div>
                       )}
                     </div>
                   </div>
