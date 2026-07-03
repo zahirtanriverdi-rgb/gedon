@@ -23,7 +23,6 @@ import {
   CreditCard,
   AlertCircle,
   MessageCircle,
-  ExternalLink,
   Copy,
   Share2,
   ChevronLeft,
@@ -331,7 +330,7 @@ export default function CustomerPortal({
       const path = window.location.pathname;
       if (path.startsWith('/tours/')) {
         const id = path.split('/tours/')[1];
-        const tour = tours.find(t => t.id === id);
+        const tour = tours.find(t => t.id === id && t.status === 'approved');
         if (tour) {
           setSelectedTour(tour);
         } else {
@@ -537,7 +536,7 @@ export default function CustomerPortal({
 
   // Extract unique sorted start dates that have active slots
   const availableTourDates = React.useMemo(() => {
-    const approvedTourIds = new Set(tours.filter(t => t.isActive !== false).map(t => t.id));
+    const approvedTourIds = new Set(tours.filter(t => t.status === 'approved' && t.isActive !== false).map(t => t.id));
     const dates = slots
       .filter(s => approvedTourIds.has(s.tourId) && s.startDate)
       .map(s => s.startDate);
@@ -580,6 +579,11 @@ export default function CustomerPortal({
   };
 
   const filteredTours = tours.filter((tour) => {
+    // 0. Approval status — belt-and-suspenders alongside the server-side filter (GET /api/tours
+    // only returns status = 'approved' to anonymous/customer requests). A pending or rejected
+    // tour must never render on the customer marketplace, full stop.
+    if (tour.status !== 'approved') return false;
+
     // 1. Text Search
     const searchNormalized = normalizeAzText(currentSearchQuery);
     const matchesSearch = normalizeAzText(tour.name).includes(searchNormalized) || 
@@ -607,10 +611,8 @@ export default function CustomerPortal({
     }
     const matchesPrice = minSlotPriceAzn <= maxPrice;
 
-    // 6. Active check — approval status is already enforced server-side (GET /api/tours only
-    // returns approved tours, or previously-approved tours mid-edit-review, to anonymous
-    // customers), so the only visibility gate left on the client is the vendor's own
-    // active/deactivated toggle.
+    // 6. Active check — the vendor's own active/deactivated toggle, on top of the approval
+    // status gate above.
     const matchesActive = tour.isActive !== false;
 
     // 6b. Subscription check (bypassed for now to prevent tours from disappearing)
@@ -698,7 +700,7 @@ export default function CustomerPortal({
     const seenTourIds = new Set();
     for (const slot of upcomingSlots) {
       if (!seenTourIds.has(slot.tourId)) {
-        const t = tours.find(t => t.id === slot.tourId && t.isActive !== false);
+        const t = tours.find(t => t.id === slot.tourId && t.status === 'approved' && t.isActive !== false);
         if (t) {
           picked.push({ tour: t, slot: slot });
           seenTourIds.add(slot.tourId);
@@ -2862,36 +2864,14 @@ export default function CustomerPortal({
                 </div>
 
                 {/* Meeting Point */}
-                <div className="space-y-4 py-4 border-t border-slate-200">
-                  <h2 className="text-xl font-extrabold text-slate-900">Görüş yeri</h2>
-                  {!selectedTour.isInternational ? (
-                    <div className="space-y-3">
-                      <p className="text-sm font-medium text-slate-700 leading-relaxed">
-                        Tofiq Bəhramov adına Respublika Stadionunun qarşısı. Xahiş edirik ki, başlama vaxtından 15 dəqiqə əvvəl orada olasınız.
-                      </p>
-                      <div className="w-full h-[300px] rounded-xl overflow-hidden shadow-sm border border-slate-200">
-                        <iframe 
-                          src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3097.7169141972613!2d49.847440975921245!3d40.40056995662297!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x40307d0008f3743b%3A0x8e152613424aac00!2zR2VkyZlrIEfDtnLJmWsgLSBUb3BsYW7EscWfIHllcmk!5e1!3m2!1str!2slv!4v1779641889812!5m2!1str!2slv" 
-                          width="100%" 
-                          height="100%" 
-                          style={{ border: 0 }} 
-                          allowFullScreen={true} 
-                          loading="lazy" 
-                          referrerPolicy="no-referrer-when-downgrade"
-                        ></iframe>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      <p className="text-sm font-medium text-slate-700 leading-relaxed">
-                        Bələdçinizlə əsas girişin qarşısında görüşün. Üzərində {selectedTour.vendorName} yazılmış lövhə tutan şəxsi axtarın. Xahiş edirik ki, başlama vaxtından 15 dəqiqə əvvəl orada olasınız.
-                      </p>
-                      <a href="#" className="font-extrabold text-blue-600 text-sm hover:underline flex items-center gap-1.5 transition">
-                        Google Maps-də açın <ExternalLink className="w-4 h-4" />
-                      </a>
-                    </div>
-                  )}
-                </div>
+                {selectedTour.meetingPoint && (
+                  <div className="space-y-4 py-4 border-t border-slate-200">
+                    <h2 className="text-xl font-extrabold text-slate-900">Görüş yeri</h2>
+                    <p className="text-sm font-medium text-slate-700 leading-relaxed">
+                      {selectedTour.meetingPoint}
+                    </p>
+                  </div>
+                )}
 
                 {/* Important Information */}
                 <div className="space-y-4 py-4 border-t border-slate-200">

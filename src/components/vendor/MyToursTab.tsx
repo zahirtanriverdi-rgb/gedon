@@ -91,6 +91,11 @@ export function MyToursTab({ tours, slots, myTours, myTourIds, tourSearchTerm, o
                       <div className="text-[10px] text-slate-500 font-semibold">
                         Aktiv Satış Slotu: <strong className="text-slate-700 font-mono">{tourSlots.length} ədəd</strong>
                       </div>
+                      {tour.status === 'rejected' && (
+                        <div className="text-[10px] text-red-700 font-semibold">
+                          ⚠️ Admin tərəfindən rədd edildi — düzəliş edib yenidən göndərməlisiniz. Təsdiqlənənə qədər müştərilərə görünməyəcək.
+                        </div>
+                      )}
                     </div>
 
                     <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
@@ -100,7 +105,7 @@ export function MyToursTab({ tours, slots, myTours, myTourIds, tourSearchTerm, o
                         </span>
                       ) : tour.status === 'rejected' ? (
                         <span className="text-[9px] bg-red-50 text-red-800 border border-red-200 font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
-                          ❌ Rədd edildi
+                          ❌ Rədd olundu - Düzəliş et
                         </span>
                       ) : tour.status === 'pending_approval' ? (
                         <span className="text-[9px] bg-amber-55/60 text-amber-800 border border-amber-200 font-bold px-2 py-0.5 rounded-full flex items-center gap-1 animate-pulse">

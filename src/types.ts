@@ -72,8 +72,6 @@ export interface Tour {
   gpxData?: string; // JSON representation of ParsedGpxRoute
   gpxFileName?: string;
   externalSales?: number; // External sales ticket count (WhatsApp, Instagram, etc)
-  latitude?: number;
-  longitude?: number;
   price?: number; // Headline listing price shown on cards/detail page, independent of per-date slot pricing
   discountPrice?: number; // Optional discounted headline price; shown with strikethrough on the original when set and lower than price
 

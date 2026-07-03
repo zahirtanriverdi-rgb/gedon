@@ -437,11 +437,11 @@ app.get("/api/tours", async (req, res) => {
         params.push(String(req.query.vendorId));
       }
     } else {
-      // Anonymous/customer requests only ever see tours that are either fully approved, or
-      // were approved and now have a pending edit under review — in the latter case the live
-      // columns still hold the last-approved content, so it's safe to show them. Brand-new
-      // tours that were never approved (or were rejected outright) stay hidden.
-      conditions.push("(status = 'approved' OR pending_data IS NOT NULL)");
+      // Anonymous/customer requests only ever see tours with status = 'approved'. The moment
+      // a vendor edits a live tour (status flips to 'pending_approval', see PUT handler below)
+      // or an admin rejects one, it disappears from the marketplace immediately — no exceptions,
+      // and no "keep showing the stale approved version while a proposal is under review".
+      conditions.push("status = 'approved'");
       if (req.query.vendorId) {
         conditions.push('vendor_id = ?');
         params.push(String(req.query.vendorId));
@@ -460,12 +460,24 @@ app.get("/api/tours", async (req, res) => {
   }
 });
 
-// GET /api/tours/:id — single tour
+// GET /api/tours/:id — single tour. Same visibility rule as the list endpoint: a vendor may
+// fetch their own tour in any status, an admin may fetch anything, but an anonymous/customer
+// request (or a vendor token for someone else's tour) 404s unless the tour is 'approved' —
+// pending/rejected tours don't leak through direct-by-id lookups either.
 app.get("/api/tours/:id", async (req, res) => {
   try {
     const rows = await dbClient.query('SELECT * FROM tours WHERE id = ?', [req.params.id]);
     if (!rows.length) return res.status(404).json({ error: "Tur tapılmadı." });
-    res.json({ tour: rowToTour(rows[0]) });
+    const tour = rowToTour(rows[0]);
+
+    const user = getOptionalUser(req);
+    const isOwnerVendor = !!user && user.role === 'vendor' && user.id === tour.vendorId;
+    const isAdmin = !!user && user.role === 'admin';
+    if (!isAdmin && !isOwnerVendor && tour.status !== 'approved') {
+      return res.status(404).json({ error: "Tur tapılmadı." });
+    }
+
+    res.json({ tour });
   } catch (error: any) {
     console.error("[GET /api/tours/:id] error:", error);
     res.status(500).json({ error: "Turu gətirmək mümkün olmadı: " + error.message });
@@ -536,8 +548,9 @@ async function writeLiveTourRow(id: string, merged: Record<string, any>, status:
 // status. Vendors editing a tour that's still under review (pending_approval/rejected, i.e.
 // never reached customers) also edit the live row directly. But a vendor editing a tour that
 // is currently `approved` (already public) never touches the live columns — the proposed
-// changes are stashed in `pending_data` and status flips to `pending_approval`, so customers
-// keep seeing the last-approved version until an admin reviews and merges the proposal.
+// changes are stashed in `pending_data` and status flips to `pending_approval`, which per the
+// GET /api/tours filter means the tour vanishes from the customer marketplace immediately and
+// stays hidden until an admin reviews and either approves (merges the proposal) or rejects it.
 app.put("/api/tours/:id", authenticateUser, async (req: any, res) => {
   try {
     const existingRows = await dbClient.query('SELECT * FROM tours WHERE id = ?', [req.params.id]);
@@ -559,16 +572,14 @@ app.put("/api/tours/:id", authenticateUser, async (req: any, res) => {
         const merged = { ...existing, ...source, id: req.params.id };
         await writeLiveTourRow(req.params.id, merged, 'approved', null);
       } else if (body.status === 'rejected') {
-        if (existing.pendingData) {
-          // Rejecting a pending edit on an already-live tour: keep the old approved version
-          // live, just drop the proposal.
-          await writeLiveTourRow(req.params.id, existing, 'approved', null);
-        } else {
-          // Rejecting a brand-new (never-approved) tour outright.
-          const merged = { ...existing, ...body, id: req.params.id };
-          delete merged.status;
-          await writeLiveTourRow(req.params.id, merged, 'rejected', null);
-        }
+        // Reject always lands on 'rejected' — it never silently reverts to 'approved'. Applies
+        // uniformly whether this is a brand-new tour or an edit proposal on a previously-live
+        // tour; either way the pending proposal is discarded and the tour stays hidden from
+        // customers (GET /api/tours only returns status = 'approved') until the vendor edits it
+        // again (which resubmits it as 'pending_approval') and an admin approves it.
+        const merged = { ...existing, ...body, id: req.params.id };
+        delete merged.status;
+        await writeLiveTourRow(req.params.id, merged, 'rejected', null);
       } else {
         // Plain admin edit/save with no status transition — updates the live row directly.
         // Clears any stale pending_data: once an admin hand-edits and saves, their write

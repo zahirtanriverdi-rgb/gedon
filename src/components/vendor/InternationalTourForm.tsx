@@ -3,7 +3,6 @@ import { Tour, TourSlot, User } from '../../types';
 import { Check } from 'lucide-react';
 import { DynamicStringListInput } from './DynamicStringListInput';
 import { MultiDateCalendar, toIsoDate } from './MultiDateCalendar';
-import { LocationPickerMap } from './LocationPickerMap';
 import { TourDangerZone } from './TourDangerZone';
 
 interface InternationalTourFormProps {
@@ -58,8 +57,7 @@ export function InternationalTourForm({ currentUser, tour, slots, onAddTour, onE
   const [intlTourDays, setIntlTourDays] = useState<number>(4);
   const [intlTourCapacity, setIntlTourCapacity] = useState<number>(20);
   const [selectedDates, setSelectedDates] = useState<Date[]>([]);
-  const [intlLatitude, setIntlLatitude] = useState<number | undefined>(undefined);
-  const [intlLongitude, setIntlLongitude] = useState<number | undefined>(undefined);
+  const [intlMeetingPoint, setIntlMeetingPoint] = useState<string>('');
   const [intlIsActive, setIntlIsActive] = useState<boolean>(true);
 
   const [intlTourFlightIncluded, setIntlTourFlightIncluded] = useState<boolean>(true);
@@ -102,8 +100,7 @@ export function InternationalTourForm({ currentUser, tour, slots, onAddTour, onE
     setIntlTourCity(tour.destinationCity || '');
     setIntlTourNights(tour.durationNights || (tour.durationDays > 1 ? tour.durationDays - 1 : 1));
     setIntlTourDays(tour.durationDays);
-    setIntlLatitude(tour.latitude);
-    setIntlLongitude(tour.longitude);
+    setIntlMeetingPoint(tour.meetingPoint || '');
     setIntlIsActive(tour.isActive !== false);
 
     setIntlTourFlightIncluded(tour.flightIncluded !== false);
@@ -207,8 +204,7 @@ export function InternationalTourForm({ currentUser, tour, slots, onAddTour, onE
         bring: cleanBringItems.length > 0 ? cleanBringItems : undefined,
         notAllowed: cleanNotAllowedItems.length > 0 ? cleanNotAllowedItems : undefined,
       } : undefined,
-      latitude: intlLatitude,
-      longitude: intlLongitude,
+      meetingPoint: intlMeetingPoint || undefined,
       price: Number(intlTourPrice) || 0,
       discountPrice: intlTourDiscountPrice !== '' && Number(intlTourDiscountPrice) > 0 ? Number(intlTourDiscountPrice) : undefined,
     };
@@ -324,11 +320,16 @@ export function InternationalTourForm({ currentUser, tour, slots, onAddTour, onE
               <input type="number" required min={1} value={intlTourCapacity} onChange={(e) => setIntlTourCapacity(Number(e.target.value))} className="w-full px-3 py-2 border border-slate-250 rounded-lg text-xs text-slate-800 focus:ring-1 focus:ring-emerald-700 focus:outline-none" />
             </div>
           </div>
-          <LocationPickerMap
-            latitude={intlLatitude}
-            longitude={intlLongitude}
-            onLocationChange={(lat, lng) => { setIntlLatitude(lat); setIntlLongitude(lng); }}
-          />
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1">Görüş Yeri (Mətn olaraq)</label>
+            <input
+              type="text"
+              value={intlMeetingPoint}
+              onChange={(e) => setIntlMeetingPoint(e.target.value)}
+              placeholder="Məsələn: Tofiq Bəhramov adına Respublika Stadionunun qarşısı..."
+              className="w-full px-3 py-2 border border-slate-250 rounded-lg text-xs text-slate-800 focus:ring-1 focus:ring-emerald-700 focus:outline-none"
+            />
+          </div>
         </div>
 
         {/* B) Loqistika və Nəqliyyat Məlumatları */}

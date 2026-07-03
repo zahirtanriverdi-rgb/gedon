@@ -25,12 +25,17 @@ export const SearchDropdown: React.FC<SearchDropdownProps> = ({
   // Get dynamic suggestions
   const suggestions: Array<{ title: string, subtitle: string, type: 'region' | 'tour', image?: string, id?: string }> = [];
   
+  // Belt-and-suspenders alongside the server-side filter (GET /api/tours only returns
+  // status = 'approved' to anonymous/customer requests) — a pending or rejected tour must
+  // never surface in search suggestions.
+  const approvedTours = tours.filter(t => t.status === 'approved');
+
   if (lowerQuery) {
     // 1. Find matching regions
-    const matchedRegions: string[] = Array.from(new Set(tours.filter(t => t.region.toLowerCase().includes(lowerQuery)).map(t => t.region)));
-    
+    const matchedRegions: string[] = Array.from(new Set(approvedTours.filter(t => t.region.toLowerCase().includes(lowerQuery)).map(t => t.region)));
+
     matchedRegions.slice(0, 3).forEach(region => {
-       const count = tours.filter(t => t.region === region).length;
+       const count = approvedTours.filter(t => t.region === region).length;
        suggestions.push({
          title: region,
          subtitle: `${count} ${appLanguage === 'az' ? 'aktivite' : appLanguage === 'ru' ? 'активностей' : 'activities'} • ${appLanguage === 'az' ? 'Region' : appLanguage === 'ru' ? 'Регион' : 'Region'}`,
@@ -39,7 +44,7 @@ export const SearchDropdown: React.FC<SearchDropdownProps> = ({
     });
 
     // 2. Find matching tours
-    const matchedTours = tours.filter(t => t.name.toLowerCase().includes(lowerQuery) || t.description.toLowerCase().includes(lowerQuery));
+    const matchedTours = approvedTours.filter(t => t.name.toLowerCase().includes(lowerQuery) || t.description.toLowerCase().includes(lowerQuery));
     
     matchedTours.slice(0, 4).forEach(tour => {
        suggestions.push({
@@ -55,8 +60,8 @@ export const SearchDropdown: React.FC<SearchDropdownProps> = ({
     // region, using total review count as the popularity signal (a real demand proxy,
     // not a guess) — replaces the previously hardcoded ['Quba', 'Qəbələ', ...] list.
     const regionStats = new Map<string, { count: number; totalReviews: number }>();
-    tours
-      .filter(t => t.isApproved && t.isActive !== false)
+    approvedTours
+      .filter(t => t.isActive !== false)
       .forEach(t => {
         const stat = regionStats.get(t.region) || { count: 0, totalReviews: 0 };
         stat.count += 1;

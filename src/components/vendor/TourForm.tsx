@@ -4,7 +4,6 @@ import { parseGpsFile } from '../../utils/gpxParser';
 import { Plus, Sparkles, Instagram, X, Check } from 'lucide-react';
 import { DynamicStringListInput } from './DynamicStringListInput';
 import { MultiDateCalendar, toIsoDate } from './MultiDateCalendar';
-import { LocationPickerMap } from './LocationPickerMap';
 import { TourDangerZone } from './TourDangerZone';
 
 interface TourFormProps {
@@ -50,8 +49,6 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
   const [tourGpxData, setTourGpxData] = useState<string>('');
   const [tourGpxFileName, setTourGpxFileName] = useState<string>('');
   const [tourRating, setTourRating] = useState<number>(5.0);
-  const [tourLatitude, setTourLatitude] = useState<number | undefined>(undefined);
-  const [tourLongitude, setTourLongitude] = useState<number | undefined>(undefined);
   const [tourIsActive, setTourIsActive] = useState<boolean>(true);
 
   // Active Lifestyle specifics
@@ -96,8 +93,6 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
     setTourGpxData(tour.gpxData || '');
     setTourGpxFileName(tour.gpxFileName || '');
     setTourRating(tour.rating !== undefined ? tour.rating : 5.0);
-    setTourLatitude(tour.latitude);
-    setTourLongitude(tour.longitude);
     setTourIsActive(tour.isActive !== false);
     setTourCategory(tour.category as any);
 
@@ -166,8 +161,6 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
       whatsapp_number: tourWhatsApp || '+994706717804',
       gpxData: tourGpxData || undefined,
       gpxFileName: tourGpxFileName || undefined,
-      latitude: tourLatitude,
-      longitude: tourLongitude,
       price: Number(tourPrice) || 0,
       discountPrice: tourDiscountPrice !== '' && Number(tourDiscountPrice) > 0 ? Number(tourDiscountPrice) : undefined,
       isActive: tourIsActive,
@@ -175,7 +168,7 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
       activityType: tourCategory === 'active' ? tourActivityType : undefined,
       activeDifficulty: tourCategory === 'active' ? (tourActiveDifficulty as 'beginner' | 'medium' | 'professional') : undefined,
       ageLimit: tourCategory === 'active' ? tourAgeLimit : undefined,
-      meetingPoint: tourCategory === 'active' ? tourMeetingPoint : undefined,
+      meetingPoint: tourMeetingPoint || undefined,
       requiredEquipment: tourCategory === 'active' ? tourRequiredEquipment : undefined,
       equipmentIncluded: tourCategory === 'active' ? tourEquipmentIncluded : undefined,
       equipmentRentalPrice: tourCategory === 'active' ? tourEquipmentRentalPrice : undefined,
@@ -566,10 +559,6 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
                 <label className="block text-[11px] font-bold text-amber-700 tracking-wide mb-1">Yaş Limiti:</label>
                 <input type="text" value={tourAgeLimit} onChange={(e) => setTourAgeLimit(e.target.value)} placeholder="Məs: 18-45 yaş" className="w-full px-3 py-2 bg-white border border-amber-200 rounded-lg text-xs" />
               </div>
-              <div>
-                <label className="block text-[11px] font-bold text-amber-700 tracking-wide mb-1">Görüş Yeri & Toplanış Nöqtəsi:</label>
-                <input type="text" value={tourMeetingPoint} onChange={(e) => setTourMeetingPoint(e.target.value)} placeholder="Məs: Gənclik Mall M/S" className="w-full px-3 py-2 bg-white border border-amber-200 rounded-lg text-xs" />
-              </div>
               <div className="md:col-span-2">
                 <label className="block text-[11px] font-bold text-amber-700 tracking-wide mb-1">Zəruri Avadanlıqlar (Təchizat Siyahısı):</label>
                 <textarea rows={2} value={tourRequiredEquipment} onChange={(e) => setTourRequiredEquipment(e.target.value)} placeholder="Məs: Xizək dəsti, kaska, əlcək..." className="w-full px-3 py-2 bg-white border border-amber-200 rounded-lg text-xs" />
@@ -612,16 +601,14 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
             </select>
           </div>
 
-          {/* Location picker map */}
           <div className="md:col-span-2">
-            <LocationPickerMap
-              latitude={tourLatitude}
-              longitude={tourLongitude}
-              onLocationChange={(lat, lng, address) => {
-                setTourLatitude(lat);
-                setTourLongitude(lng);
-                if (address) setTourRegion(address);
-              }}
+            <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">Görüş Yeri (Mətn olaraq):</label>
+            <input
+              type="text"
+              value={tourMeetingPoint}
+              onChange={(e) => setTourMeetingPoint(e.target.value)}
+              placeholder="Məsələn: Tofiq Bəhramov adına Respublika Stadionunun qarşısı..."
+              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800"
             />
           </div>
 

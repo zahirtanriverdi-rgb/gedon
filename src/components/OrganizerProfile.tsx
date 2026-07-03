@@ -11,7 +11,10 @@ interface OrganizerProfileProps {
 }
 
 export default function OrganizerProfile({ organizer, tours, onBack, onTourClick }: OrganizerProfileProps) {
-  const activeTours = tours.filter(t => t.vendorId === organizer.id);
+  // Belt-and-suspenders alongside the server-side filter (GET /api/tours only returns
+  // status = 'approved' to anonymous/customer requests) — a pending or rejected tour must
+  // never show up on a vendor's public profile.
+  const activeTours = tours.filter(t => t.vendorId === organizer.id && t.status === 'approved');
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-8 animate-fadeIn font-sans">
