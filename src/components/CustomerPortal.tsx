@@ -283,7 +283,16 @@ export default function CustomerPortal({
     window.addEventListener('nav-wishlist', handleNavWishlist);
     return () => window.removeEventListener('nav-wishlist', handleNavWishlist);
   }, []);
-  
+
+  React.useEffect(() => {
+    const handleNavCalculator = () => {
+      setActiveView('calculator');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+    window.addEventListener('nav-calculator', handleNavCalculator);
+    return () => window.removeEventListener('nav-calculator', handleNavCalculator);
+  }, []);
+
   // Use prop if provided, else use local state
   const currentSearchQuery = onSearchChange ? searchQuery : localSearchQuery;
   const handleSearchChange = (val: string) => {
@@ -1170,7 +1179,7 @@ export default function CustomerPortal({
           <div className="flex flex-col items-center justify-center py-2 mb-2 relative z-30 w-full animate-fadeIn">
             <h2 className="text-xl md:text-2xl font-extrabold text-slate-800 mb-4 tracking-tight text-center">{t('discoverTours')}</h2>
             
-            {/* Main Pill Search Box & Budget Calculator */}
+            {/* Main Pill Search Box */}
             <div className="flex flex-col sm:flex-row items-center w-full max-w-3xl gap-2 mb-4 relative">
               <div ref={searchContainerRef} className="relative w-full bg-white shadow-md rounded-full p-1 border border-slate-200 flex items-center flex-1">
                 <div className="pl-4 pr-2 flex items-center flex-1">
@@ -1221,18 +1230,6 @@ export default function CustomerPortal({
                   />
                 )}
               </div>
-
-              {/* Budget Calculator Button */}
-              <button
-                onClick={() => {
-                  setActiveView('calculator');
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
-                }}
-                className="bg-white hover:bg-slate-50 text-slate-800 font-bold py-3.5 px-5 rounded-full transition-colors flex-shrink-0 text-sm shadow-sm flex items-center justify-center gap-2 border border-slate-300 w-full sm:w-auto"
-              >
-                <span>🧮</span>
-                <span className="whitespace-nowrap">Qrup üçün qiymət hesabla</span>
-              </button>
             </div>
 
             {/* Segmented Category Pill Selectors directly below */}

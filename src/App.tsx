@@ -14,7 +14,8 @@ import {
   RefreshCw,
   X,
   Heart,
-  Globe
+  Globe,
+  Calculator
 } from 'lucide-react';
 
 // The API always responds with JSON, but if a request slips past Express (e.g. a 413
@@ -654,6 +655,13 @@ export default function App() {
                     )}
                   </span>
                   <span className="text-[11px] font-semibold">İstəklər</span>
+                </button>
+                <button
+                  onClick={() => window.dispatchEvent(new CustomEvent('nav-calculator'))}
+                  className="relative flex flex-col items-center justify-center gap-1 hover:text-emerald-600 transition group cursor-pointer bg-transparent border-none p-0"
+                >
+                  <Calculator className="w-5 h-5 stroke-[2px] transition-colors group-hover:stroke-emerald-500" />
+                  <span className="text-[11px] font-semibold whitespace-nowrap">Qrup hesabla</span>
                 </button>
                 <div className="relative">
                   <button 
