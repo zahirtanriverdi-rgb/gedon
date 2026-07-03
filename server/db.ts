@@ -81,14 +81,20 @@ export async function initializeDatabase() {
       avatar VARCHAR(1024),
       about TEXT,
       subscription_valid_until TIMESTAMP,
+      extra_data TEXT,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
   `);
 
-  // Migration for databases created before `username` existed (fresh installs already
-  // get it from the CREATE TABLE above, so this is a no-op there).
+  // Migration for databases created before `username`/`extra_data` existed (fresh installs
+  // already get them from the CREATE TABLE above, so these are no-ops there).
   try {
     await dbClient.execute(`ALTER TABLE users ADD COLUMN username VARCHAR(255)`);
+  } catch {
+    // column already exists — safe to ignore
+  }
+  try {
+    await dbClient.execute(`ALTER TABLE users ADD COLUMN extra_data TEXT`);
   } catch {
     // column already exists — safe to ignore
   }
@@ -111,6 +117,8 @@ export async function initializeDatabase() {
       image TEXT,
       is_active BOOLEAN DEFAULT 1,
       is_approved BOOLEAN DEFAULT 0,
+      status VARCHAR(20) DEFAULT 'pending_approval',
+      pending_data TEXT,
       price_currency VARCHAR(10) DEFAULT 'AZN',
       rating DECIMAL DEFAULT 0,
       reviews_count INTEGER DEFAULT 0,
@@ -119,6 +127,30 @@ export async function initializeDatabase() {
       FOREIGN KEY (vendor_id) REFERENCES users(id) ON DELETE CASCADE
     );
   `);
+
+  // Migration for databases created before `status`/`pending_data` existed (fresh installs
+  // already get them from the CREATE TABLE above, so these are no-ops there).
+  try {
+    await dbClient.execute(`ALTER TABLE tours ADD COLUMN status VARCHAR(20) DEFAULT 'pending_approval'`);
+  } catch {
+    // column already exists — safe to ignore
+  }
+  try {
+    await dbClient.execute(`ALTER TABLE tours ADD COLUMN pending_data TEXT`);
+  } catch {
+    // column already exists — safe to ignore
+  }
+  // Backfill status for rows that existed before the 3-state model (status was just added
+  // above with a 'pending_approval' default, but rows that were already is_approved=1 should
+  // read as 'approved', not go back into the review queue). Runs on every startup, so it's
+  // scoped to pending_data IS NULL — a tour with a genuine pending edit under review always
+  // has pending_data set, and must not be silently flipped back to 'approved' by this backfill.
+  await dbClient.execute(
+    `UPDATE tours SET status = 'approved' WHERE is_approved = 1 AND status = 'pending_approval' AND pending_data IS NULL`
+  );
+  await dbClient.execute(
+    `UPDATE tours SET status = 'pending_approval' WHERE status IS NULL`
+  );
 
   // Tour Slots (Scheduling)
   await dbClient.execute(`
@@ -207,13 +239,14 @@ async function seedIfEmpty() {
 
   for (const user of seedUsers) {
     const passwordHash = await bcrypt.hash(user.password || 'changeme123', 10);
+    const extra = user.guides && user.guides.length > 0 ? { guides: user.guides } : {};
     await dbClient.execute(
-      `INSERT INTO users (id, name, email, username, password_hash, role, phone, company_name, balance, avatar, about, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO users (id, name, email, username, password_hash, role, phone, company_name, balance, avatar, about, extra_data, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         user.id, user.name, user.email, user.username || null, passwordHash, user.role, user.phone || null,
         user.companyName || null, Number(user.balance) || 0, user.avatar || null,
-        user.about || null, user.createdAt || new Date().toISOString()
+        user.about || null, JSON.stringify(extra), user.createdAt || new Date().toISOString()
       ]
     );
   }
@@ -224,13 +257,14 @@ async function seedIfEmpty() {
       description, image, isActive, isApproved, priceCurrency, rating, reviewsCount,
       ...extra
     } = tour;
+    const status = isApproved ? 'approved' : 'pending_approval';
     await dbClient.execute(
-      `INSERT INTO tours (id, vendor_id, vendor_name, name, category, difficulty, region, duration_days, description, image, is_active, is_approved, price_currency, rating, reviews_count, extra_data)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO tours (id, vendor_id, vendor_name, name, category, difficulty, region, duration_days, description, image, is_active, is_approved, status, price_currency, rating, reviews_count, extra_data)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id, vendorId, vendorName || null, name, category, difficulty, region, Number(durationDays),
         description || null, image || null,
-        isActive === false ? 0 : 1, isApproved ? 1 : 0, priceCurrency || 'AZN',
+        isActive === false ? 0 : 1, isApproved ? 1 : 0, status, priceCurrency || 'AZN',
         Number(rating) || 0, Number(reviewsCount) || 0, JSON.stringify(extra)
       ]
     );

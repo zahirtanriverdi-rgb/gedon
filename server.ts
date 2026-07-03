@@ -81,6 +81,29 @@ function getOptionalUser(req: any): { id: string; email: string; role: string } 
   }
 }
 
+// Converts a raw `users` row into the shape the frontend's User type expects. `extra_data`
+// currently only carries `guides` (vendor team members) but is structured so future optional
+// profile fields can be added without another schema migration.
+function rowToUser(row: any) {
+  let extra: Record<string, any> = {};
+  try { extra = row.extra_data ? JSON.parse(row.extra_data) : {}; } catch { extra = {}; }
+  return {
+    id: row.id,
+    name: row.name,
+    email: row.email,
+    username: row.username || undefined,
+    role: row.role,
+    phone: row.phone,
+    avatar: row.avatar || undefined,
+    companyName: row.company_name || undefined,
+    balance: Number(row.balance) || 0,
+    about: row.about || undefined,
+    guides: extra.guides || undefined,
+    subscriptionValidUntil: row.subscription_valid_until || undefined,
+    createdAt: row.created_at,
+  };
+}
+
 // ADMIN LOGIN (JWT Sign & Return) — checks the real `users` table (Postgres/SQLite via
 // server/db.ts).
 app.post("/api/auth/admin/login", async (req, res) => {
@@ -103,15 +126,7 @@ app.post("/api/auth/admin/login", async (req, res) => {
     return res.json({
       success: true,
       token,
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        phone: user.phone,
-        avatar: user.avatar,
-        balance: Number(user.balance) || 0
-      }
+      user: rowToUser(user)
     });
   } catch (error: any) {
     console.error("[POST /api/auth/admin/login] error:", error);
@@ -142,22 +157,89 @@ app.post("/api/auth/operator/login", async (req, res) => {
     return res.json({
       success: true,
       token,
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        username: user.username,
-        role: user.role,
-        phone: user.phone,
-        avatar: user.avatar,
-        companyName: user.company_name,
-        balance: Number(user.balance) || 0,
-        about: user.about
-      }
+      user: rowToUser(user)
     });
   } catch (error: any) {
     console.error("[POST /api/auth/operator/login] error:", error);
     return res.status(500).json({ error: "Giriş zamanı server xətası baş verdi: " + error.message });
+  }
+});
+
+// PUT /api/users/:id — update a user's profile. An admin can update any user, including
+// login credentials (username/password) and subscription; a vendor/customer can only update
+// their own profile fields (name, email, phone, companyName, avatar, about, guides) — never
+// their own username or password through this route (password changes must go through
+// /api/auth/change-password, which verifies the current password first).
+app.put("/api/users/:id", authenticateUser, async (req: any, res) => {
+  try {
+    const rows = await dbClient.query('SELECT * FROM users WHERE id = ?', [req.params.id]);
+    if (!rows.length) return res.status(404).json({ error: "İstifadəçi tapılmadı." });
+    const existingRow = rows[0];
+    const isAdmin = req.operator.role === 'admin';
+    const isSelf = req.operator.id === req.params.id;
+    if (!isAdmin && !isSelf) {
+      return res.status(403).json({ error: "Bu istifadəçini yeniləmək icazəniz yoxdur." });
+    }
+
+    const body = req.body || {};
+    const name = body.name !== undefined ? body.name : existingRow.name;
+    const email = body.email !== undefined ? body.email : existingRow.email;
+    const phone = body.phone !== undefined ? body.phone : existingRow.phone;
+    const companyName = body.companyName !== undefined ? body.companyName : existingRow.company_name;
+    const avatar = body.avatar !== undefined ? body.avatar : existingRow.avatar;
+    const about = body.about !== undefined ? body.about : existingRow.about;
+
+    let extra: Record<string, any> = {};
+    try { extra = existingRow.extra_data ? JSON.parse(existingRow.extra_data) : {}; } catch { extra = {}; }
+    if (body.guides !== undefined) extra.guides = body.guides;
+
+    let username = existingRow.username;
+    let passwordHash = existingRow.password_hash;
+    let subscriptionValidUntil = existingRow.subscription_valid_until;
+    if (isAdmin) {
+      if (body.username !== undefined) username = body.username;
+      if (body.password) passwordHash = await bcrypt.hash(body.password, 10);
+      if (body.subscriptionValidUntil !== undefined) subscriptionValidUntil = body.subscriptionValidUntil;
+    }
+
+    await dbClient.execute(
+      `UPDATE users SET name = ?, email = ?, username = ?, password_hash = ?, phone = ?, company_name = ?, avatar = ?, about = ?, subscription_valid_until = ?, extra_data = ? WHERE id = ?`,
+      [name, email, username, passwordHash, phone, companyName, avatar, about, subscriptionValidUntil, JSON.stringify(extra), req.params.id]
+    );
+
+    const updatedRows = await dbClient.query('SELECT * FROM users WHERE id = ?', [req.params.id]);
+    res.json({ user: rowToUser(updatedRows[0]) });
+  } catch (error: any) {
+    console.error("[PUT /api/users/:id] error:", error);
+    res.status(500).json({ error: "İstifadəçi yenilənə bilmədi: " + error.message });
+  }
+});
+
+// POST /api/auth/change-password — the logged-in user changes their own password. Requires
+// the current password to verify identity before writing a new bcrypt hash.
+app.post("/api/auth/change-password", authenticateUser, async (req: any, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body || {};
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ error: "Cari və yeni şifrəni daxil edin." });
+    }
+    if (String(newPassword).length < 6) {
+      return res.status(400).json({ error: "Yeni şifrə ən azı 6 simvol olmalıdır." });
+    }
+
+    const rows = await dbClient.query('SELECT * FROM users WHERE id = ?', [req.operator.id]);
+    if (!rows.length) return res.status(404).json({ error: "İstifadəçi tapılmadı." });
+    const user = rows[0];
+    if (!bcrypt.compareSync(currentPassword, user.password_hash)) {
+      return res.status(401).json({ error: "Cari şifrə yanlışdır." });
+    }
+
+    const newHash = await bcrypt.hash(newPassword, 10);
+    await dbClient.execute('UPDATE users SET password_hash = ? WHERE id = ?', [newHash, req.operator.id]);
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error("[POST /api/auth/change-password] error:", error);
+    res.status(500).json({ error: "Şifrə yenilənə bilmədi: " + error.message });
   }
 });
 
@@ -290,13 +372,18 @@ app.get("/api/bookings/whatsapp-leads", (req, res) => {
 // inside the `extra_data` JSON column so the full Tour shape round-trips.
 const TOUR_CORE_FIELDS = [
   'id', 'vendorId', 'vendorName', 'name', 'category', 'difficulty', 'region',
-  'durationDays', 'description', 'image', 'isActive', 'isApproved',
-  'priceCurrency', 'rating', 'reviewsCount', 'createdAt'
+  'durationDays', 'description', 'image', 'isActive', 'isApproved', 'status',
+  'priceCurrency', 'rating', 'reviewsCount', 'createdAt',
+  // pendingData lives in its own `pending_data` column, never inside extra_data.
+  'pendingData'
 ];
 
 function rowToTour(row: any) {
   let extra: Record<string, any> = {};
   try { extra = row.extra_data ? JSON.parse(row.extra_data) : {}; } catch { extra = {}; }
+  let pendingData: Record<string, any> | undefined;
+  try { pendingData = row.pending_data ? JSON.parse(row.pending_data) : undefined; } catch { pendingData = undefined; }
+  const status: 'approved' | 'pending_approval' | 'rejected' = row.status || (row.is_approved ? 'approved' : 'pending_approval');
   return {
     ...extra,
     id: row.id,
@@ -310,7 +397,9 @@ function rowToTour(row: any) {
     description: row.description,
     image: row.image,
     isActive: !!row.is_active,
-    isApproved: !!row.is_approved,
+    isApproved: status === 'approved',
+    status,
+    pendingData,
     priceCurrency: row.price_currency,
     rating: Number(row.rating) || 0,
     reviewsCount: Number(row.reviews_count) || 0,
@@ -342,9 +431,21 @@ app.get("/api/tours", async (req, res) => {
     if (user && user.role === 'vendor') {
       conditions.push('vendor_id = ?');
       params.push(user.id);
-    } else if (req.query.vendorId) {
-      conditions.push('vendor_id = ?');
-      params.push(String(req.query.vendorId));
+    } else if (user && user.role === 'admin') {
+      if (req.query.vendorId) {
+        conditions.push('vendor_id = ?');
+        params.push(String(req.query.vendorId));
+      }
+    } else {
+      // Anonymous/customer requests only ever see tours that are either fully approved, or
+      // were approved and now have a pending edit under review — in the latter case the live
+      // columns still hold the last-approved content, so it's safe to show them. Brand-new
+      // tours that were never approved (or were rejected outright) stay hidden.
+      conditions.push("(status = 'approved' OR pending_data IS NOT NULL)");
+      if (req.query.vendorId) {
+        conditions.push('vendor_id = ?');
+        params.push(String(req.query.vendorId));
+      }
     }
     if (category) { conditions.push('category = ?'); params.push(String(category)); }
     if (isApproved !== undefined) { conditions.push('is_approved = ?'); params.push(isApproved === 'true' ? 1 : 0); }
@@ -387,15 +488,18 @@ app.post("/api/tours", authenticateUser, async (req: any, res) => {
 
     const id = body.id || `tour-${randomUUID()}`;
     const extra = splitTourBody(body);
+    const status: 'approved' | 'pending_approval' = isAdmin && body.status === 'approved' ? 'approved' : 'pending_approval';
 
     await dbClient.execute(
-      `INSERT INTO tours (id, vendor_id, vendor_name, name, category, difficulty, region, duration_days, description, image, is_active, is_approved, price_currency, rating, reviews_count, extra_data)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO tours (id, vendor_id, vendor_name, name, category, difficulty, region, duration_days, description, image, is_active, is_approved, status, pending_data, price_currency, rating, reviews_count, extra_data)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         id, vendorId, body.vendorName || null, name, category, difficulty, region, Number(durationDays),
         description || null, image || null,
         body.isActive === undefined ? 1 : (body.isActive ? 1 : 0),
-        isAdmin && body.isApproved ? 1 : 0,
+        status === 'approved' ? 1 : 0,
+        status,
+        null,
         body.priceCurrency || 'AZN',
         Number(body.rating) || 0,
         Number(body.reviewsCount) || 0,
@@ -411,9 +515,29 @@ app.post("/api/tours", authenticateUser, async (req: any, res) => {
   }
 });
 
-// PUT /api/tours/:id — update a tour (partial update; merges onto the existing row).
-// Vendors may only edit their own tours and can't self-approve or reassign ownership;
-// admins can edit any tour, including approval status.
+// Writes a fully-merged Tour object onto the live row's core columns + extra_data.
+async function writeLiveTourRow(id: string, merged: Record<string, any>, status: 'approved' | 'pending_approval' | 'rejected', pendingData: Record<string, any> | null) {
+  const extra = splitTourBody(merged);
+  await dbClient.execute(
+    `UPDATE tours SET vendor_id = ?, vendor_name = ?, name = ?, category = ?, difficulty = ?, region = ?, duration_days = ?, description = ?, image = ?, is_active = ?, is_approved = ?, status = ?, pending_data = ?, price_currency = ?, rating = ?, reviews_count = ?, extra_data = ? WHERE id = ?`,
+    [
+      merged.vendorId, merged.vendorName || null, merged.name, merged.category, merged.difficulty, merged.region,
+      Number(merged.durationDays), merged.description || null, merged.image || null,
+      merged.isActive ? 1 : 0, status === 'approved' ? 1 : 0, status,
+      pendingData ? JSON.stringify(pendingData) : null,
+      merged.priceCurrency || 'AZN',
+      Number(merged.rating) || 0, Number(merged.reviewsCount) || 0,
+      JSON.stringify(extra), id
+    ]
+  );
+}
+
+// PUT /api/tours/:id — update a tour. Admins edit the live row directly and control approval
+// status. Vendors editing a tour that's still under review (pending_approval/rejected, i.e.
+// never reached customers) also edit the live row directly. But a vendor editing a tour that
+// is currently `approved` (already public) never touches the live columns — the proposed
+// changes are stashed in `pending_data` and status flips to `pending_approval`, so customers
+// keep seeing the last-approved version until an admin reviews and merges the proposal.
 app.put("/api/tours/:id", authenticateUser, async (req: any, res) => {
   try {
     const existingRows = await dbClient.query('SELECT * FROM tours WHERE id = ?', [req.params.id]);
@@ -425,24 +549,50 @@ app.put("/api/tours/:id", authenticateUser, async (req: any, res) => {
       return res.status(403).json({ error: "Bu tur sizin hesabınıza aid deyil." });
     }
 
-    const merged = { ...existing, ...(req.body || {}), id: req.params.id };
-    if (!isAdmin) {
-      // A vendor's edit can't reassign ownership or self-approve their own tour.
-      merged.vendorId = existing.vendorId;
-      merged.isApproved = existing.isApproved;
-    }
-    const extra = splitTourBody(merged);
+    const body = req.body || {};
 
-    await dbClient.execute(
-      `UPDATE tours SET vendor_id = ?, vendor_name = ?, name = ?, category = ?, difficulty = ?, region = ?, duration_days = ?, description = ?, image = ?, is_active = ?, is_approved = ?, price_currency = ?, rating = ?, reviews_count = ?, extra_data = ? WHERE id = ?`,
-      [
-        merged.vendorId, merged.vendorName || null, merged.name, merged.category, merged.difficulty, merged.region,
-        Number(merged.durationDays), merged.description || null, merged.image || null,
-        merged.isActive ? 1 : 0, merged.isApproved ? 1 : 0, merged.priceCurrency || 'AZN',
-        Number(merged.rating) || 0, Number(merged.reviewsCount) || 0,
-        JSON.stringify(extra), req.params.id
-      ]
-    );
+    if (isAdmin) {
+      if (body.status === 'approved') {
+        // Merge the pending proposal (if any) plus any last-minute admin edits onto the live row.
+        const source = { ...(existing.pendingData || {}), ...body };
+        delete source.status;
+        const merged = { ...existing, ...source, id: req.params.id };
+        await writeLiveTourRow(req.params.id, merged, 'approved', null);
+      } else if (body.status === 'rejected') {
+        if (existing.pendingData) {
+          // Rejecting a pending edit on an already-live tour: keep the old approved version
+          // live, just drop the proposal.
+          await writeLiveTourRow(req.params.id, existing, 'approved', null);
+        } else {
+          // Rejecting a brand-new (never-approved) tour outright.
+          const merged = { ...existing, ...body, id: req.params.id };
+          delete merged.status;
+          await writeLiveTourRow(req.params.id, merged, 'rejected', null);
+        }
+      } else {
+        // Plain admin edit/save with no status transition — updates the live row directly.
+        // Clears any stale pending_data: once an admin hand-edits and saves, their write
+        // supersedes whatever a vendor had proposed, so there's nothing left to merge later.
+        const merged = { ...existing, ...body, id: req.params.id };
+        await writeLiveTourRow(req.params.id, merged, (body.status || existing.status), null);
+      }
+    } else if (existing.status === 'approved') {
+      // Vendor editing a currently-live tour: stash the proposal, leave the live row untouched.
+      const proposal = { ...body, id: req.params.id, vendorId: existing.vendorId };
+      delete proposal.status;
+      delete proposal.isApproved;
+      await dbClient.execute(
+        `UPDATE tours SET status = 'pending_approval', pending_data = ? WHERE id = ?`,
+        [JSON.stringify(proposal), req.params.id]
+      );
+    } else {
+      // Vendor editing a tour that's still under review (or was rejected) — no live/public
+      // version exists yet, so apply the edit directly and (re)submit for approval.
+      const merged = { ...existing, ...body, id: req.params.id, vendorId: existing.vendorId };
+      delete merged.status;
+      delete merged.isApproved;
+      await writeLiveTourRow(req.params.id, merged, 'pending_approval', null);
+    }
 
     const rows = await dbClient.query('SELECT * FROM tours WHERE id = ?', [req.params.id]);
     res.json({ tour: rowToTour(rows[0]) });

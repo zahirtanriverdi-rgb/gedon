@@ -7,6 +7,7 @@ import OrganizerProfile from './OrganizerProfile';
 import { SearchDropdown } from './SearchDropdown';
 import { PriceCalculator } from './PriceCalculator';
 import { getRecentSearches, addRecentSearch } from '../utils/recentSearches';
+import { getWishlist, toggleWishlist } from '../utils/wishlist';
 import { REVIEWS_ENABLED } from '../config/features';
 import { 
   Search, 
@@ -196,8 +197,15 @@ export default function CustomerPortal({
   const t = (key: keyof typeof translations.az) => translations[appLanguage]?.[key] || translations.az[key];
 
   // Search & Filters State
-  const [activeView, setActiveView] = useState<'home' | 'faq' | 'organizer' | 'calculator'>('home');
+  const [activeView, setActiveView] = useState<'home' | 'faq' | 'organizer' | 'calculator' | 'wishlist'>('home');
   const [selectedOrganizer, setSelectedOrganizer] = useState<User | null>(null);
+
+  // Wishlist ("İstəklərim") — localStorage-backed, no login required.
+  const [wishlist, setWishlist] = useState<string[]>(() => getWishlist());
+  const handleToggleWishlist = (tourId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    setWishlist(toggleWishlist(tourId));
+  };
 
   const [localSearchQuery, setLocalSearchQuery] = useState('');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
@@ -243,6 +251,17 @@ export default function CustomerPortal({
     };
     window.addEventListener('nav-home', handleNavHome);
     return () => window.removeEventListener('nav-home', handleNavHome);
+  }, []);
+
+  React.useEffect(() => {
+    const handleNavWishlist = () => {
+      setActiveView('wishlist');
+      setSelectedTour(null);
+      setSelectedOrganizer(null);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+    window.addEventListener('nav-wishlist', handleNavWishlist);
+    return () => window.removeEventListener('nav-wishlist', handleNavWishlist);
   }, []);
   
   // Use prop if provided, else use local state
@@ -588,8 +607,11 @@ export default function CustomerPortal({
     }
     const matchesPrice = minSlotPriceAzn <= maxPrice;
 
-    // 6. Approval check (We will show all tours regardless of isApproved status as requested, but keep them active)
-    const isApproved = tour.isActive !== false;
+    // 6. Active check — approval status is already enforced server-side (GET /api/tours only
+    // returns approved tours, or previously-approved tours mid-edit-review, to anonymous
+    // customers), so the only visibility gate left on the client is the vendor's own
+    // active/deactivated toggle.
+    const matchesActive = tour.isActive !== false;
 
     // 6b. Subscription check (bypassed for now to prevent tours from disappearing)
     let subscriptionValid = true;
@@ -605,11 +627,7 @@ export default function CustomerPortal({
       matchesCalendar = tourSlots.some(s => s.startDate === calendarDateStart);
     }
 
-    const keep = matchesSearch && matchesCategory && matchesDifficulty && matchesRegion && matchesPrice && isApproved && subscriptionValid && matchesMonth && matchesCalendar;
-    if (!keep && tour.name === 'Məst Dərgah Qusar Turu') {
-       console.log('Filtered out Məst Dərgah:', { matchesSearch, matchesCategory, matchesDifficulty, matchesRegion, matchesPrice, isApproved, subscriptionValid, matchesMonth, matchesCalendar, currentSearchQuery, maxPrice, minSlotPriceAzn });
-    }
-    return keep;
+    return matchesSearch && matchesCategory && matchesDifficulty && matchesRegion && matchesPrice && matchesActive && subscriptionValid && matchesMonth && matchesCalendar;
   });
 
   // Sort the filtered results
@@ -655,6 +673,12 @@ export default function CustomerPortal({
       return 0; // default / unsorted
     });
   }, [filteredTours, sortBy, slots]);
+
+  // Tours saved to the wishlist — filtered so a tour the vendor later deactivated or an
+  // admin un-approved doesn't leave a broken/inaccessible card in the customer's list.
+  const wishlistTours = React.useMemo(() => {
+    return tours.filter(tour => wishlist.includes(tour.id) && tour.isActive !== false && tour.status === 'approved');
+  }, [tours, wishlist]);
 
   // Upcoming tours for the horizontal slider, one slot per tour (nearest date), shuffled
   // so different vendors' tours get an equal chance of appearing first.
@@ -1079,9 +1103,61 @@ export default function CustomerPortal({
         />
       )}
 
+      {activeView === 'wishlist' && (
+        <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <h2 className="text-lg font-extrabold text-slate-800 flex items-center gap-2">
+              <Heart className="w-5 h-5 text-rose-600 fill-rose-600" /> İstəklərim
+            </h2>
+            <button
+              type="button"
+              onClick={() => setActiveView('home')}
+              className="text-xs font-bold text-emerald-700 hover:text-emerald-800 cursor-pointer"
+            >
+              ← Turlara qayıt
+            </button>
+          </div>
+
+          {wishlistTours.length === 0 ? (
+            <div className="text-center py-20 bg-white rounded-xl border border-slate-200">
+              <Heart className="w-10 h-10 text-slate-200 mx-auto mb-3" />
+              <p className="text-sm text-slate-500 font-medium">Hələ heç bir tur istəklərinizə əlavə etməmisiniz.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {wishlistTours.map(tour => (
+                <div
+                  key={tour.id}
+                  onClick={() => { setSelectedTour(tour); setActiveView('home'); setIsDescExpanded(false); }}
+                  className="bg-white rounded-2xl border border-slate-200 overflow-hidden cursor-pointer hover:shadow-lg hover:-translate-y-0.5 transition-all group"
+                >
+                  <div className="relative h-40">
+                    <img src={tour.image || undefined} className="w-full h-full object-cover" alt={tour.name} referrerPolicy="no-referrer" />
+                    <button
+                      type="button"
+                      onClick={(e) => handleToggleWishlist(tour.id, e)}
+                      className="absolute top-2 right-2 bg-white/90 hover:bg-white p-1.5 rounded-full shadow-md transition cursor-pointer"
+                      title="İstəklərdən çıxar"
+                    >
+                      <Heart className="w-4 h-4 fill-rose-600 text-rose-600" />
+                    </button>
+                  </div>
+                  <div className="p-4 space-y-1">
+                    <h4 className="font-bold text-sm text-slate-800 truncate">{tour.name}</h4>
+                    <p className="text-xs text-slate-500 flex items-center gap-1">
+                      <MapPin className="w-3 h-3 text-emerald-500" /> {tour.region}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {activeView === 'home' && !selectedTour && (
         <div className="space-y-4">
-          
+
           {/* Search & Filters (Clean Minimalism Style) */}
           {/* z-30 (not z-10): this wrapper's z-index caps the stacking context for the
               suggestions dropdown inside it, so it must outrank the tour cards' own
@@ -1471,11 +1547,19 @@ export default function CustomerPortal({
                         className="w-[85%] sm:w-[calc(50%-8px)] md:w-[calc(33.333%-12px)] flex-shrink-0 bg-white border border-slate-200 rounded-[20px] p-3 flex items-center gap-4 snap-start cursor-pointer hover:border-emerald-300 hover:shadow-xl transition-all duration-300 group shadow-sm hover:-translate-y-1"
                       >
                         <div className="w-[84px] h-[84px] rounded-xl overflow-hidden flex-shrink-0 relative shadow-sm border border-slate-100">
-                          <img 
-                            src={tour.image || `https://images.unsplash.com/photo-1542224566-6e85f2e6772f?auto=format&fit=crop&q=80&w=200`} 
-                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" 
-                            alt="" 
+                          <img
+                            src={tour.image || `https://images.unsplash.com/photo-1542224566-6e85f2e6772f?auto=format&fit=crop&q=80&w=200`}
+                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                            alt=""
                           />
+                          <button
+                            type="button"
+                            onClick={(e) => handleToggleWishlist(tour.id, e)}
+                            className="absolute top-1 right-1 bg-white/90 hover:bg-white p-1 rounded-full shadow-sm transition cursor-pointer"
+                            title={wishlist.includes(tour.id) ? 'İstəklərdən çıxar' : 'İstəklərə əlavə et'}
+                          >
+                            <Heart className={`w-2.5 h-2.5 ${wishlist.includes(tour.id) ? 'fill-rose-600 text-rose-600' : 'text-slate-600'}`} />
+                          </button>
                         </div>
                         <div className="flex flex-col flex-1 justify-center overflow-hidden h-full py-1">
                           <h4 className="text-[14px] font-black text-slate-800 truncate mb-1" title={tour.name}>{tour.name}</h4>
@@ -1487,9 +1571,20 @@ export default function CustomerPortal({
                             <span className="text-[11px] font-black text-emerald-800 bg-emerald-50 border border-emerald-100 px-2 py-1 rounded-md tracking-tight">
                               {slot.startDate}
                           </span>
-                          <span className="text-[13px] font-black text-slate-900 tracking-tight">
-                            {getConvertedPriceInfo(slot.price, tour.priceCurrency).both}
-                          </span>
+                          {tour.discountPrice && tour.discountPrice > 0 && tour.discountPrice < (tour.price ?? slot.price) ? (
+                            <span className="flex items-baseline gap-1">
+                              <span className="line-through text-gray-400 text-[10px]">
+                                {getConvertedPriceInfo(tour.price ?? slot.price, tour.priceCurrency).both}
+                              </span>
+                              <span className="text-[13px] font-black text-rose-600 tracking-tight">
+                                {getConvertedPriceInfo(tour.discountPrice, tour.priceCurrency).both}
+                              </span>
+                            </span>
+                          ) : (
+                            <span className="text-[13px] font-black text-slate-900 tracking-tight">
+                              {getConvertedPriceInfo(slot.price, tour.priceCurrency).both}
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -1605,21 +1700,26 @@ export default function CustomerPortal({
                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md shadow-xs ${difficultyBg}`}>
                       {difficultyLabel}
                     </span>
-                    {tour.isApproved === false && (
-                      <span className="bg-amber-500 text-white text-[10px] font-black tracking-tight px-2 py-0.5 rounded-md shadow-sm animate-pulse flex items-center gap-1">
-                        ⏳ Təsdiq Gözləyir
-                      </span>
-                    )}
                   </div>
-                  {/* Share button overlay */}
-                  <button 
-                    type="button"
-                    onClick={(e) => handleShareTour(tour, e)}
-                    className="absolute top-3 right-3 bg-white hover:bg-slate-50 text-slate-700 hover:text-emerald-700 p-1.5 rounded-full shadow-md z-10 transition-all hover:scale-110 flex items-center justify-center border border-slate-100 cursor-pointer"
-                    title="Dostlarınla Paylaş"
-                  >
-                    <Share2 className="w-3.5 h-3.5" />
-                  </button>
+                  {/* Wishlist + Share button overlay */}
+                  <div className="absolute top-3 right-3 flex items-center gap-1.5 z-10">
+                    <button
+                      type="button"
+                      onClick={(e) => handleToggleWishlist(tour.id, e)}
+                      className="bg-white hover:bg-slate-50 p-1.5 rounded-full shadow-md transition-all hover:scale-110 flex items-center justify-center border border-slate-100 cursor-pointer"
+                      title={wishlist.includes(tour.id) ? 'İstəklərdən çıxar' : 'İstəklərə əlavə et'}
+                    >
+                      <Heart className={`w-3.5 h-3.5 ${wishlist.includes(tour.id) ? 'fill-rose-600 text-rose-600' : 'text-slate-700'}`} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => handleShareTour(tour, e)}
+                      className="bg-white hover:bg-slate-50 text-slate-700 hover:text-emerald-700 p-1.5 rounded-full shadow-md transition-all hover:scale-110 flex items-center justify-center border border-slate-100 cursor-pointer"
+                      title="Dostlarınla Paylaş"
+                    >
+                      <Share2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                   {tour.isInternational && (
                     <div className="absolute bottom-10 right-3 bg-amber-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow-sm">
                       ✈️ Aviabilet {tour.flightIncluded ? 'Daxildir' : 'Daxil deyil'}
@@ -1748,11 +1848,22 @@ export default function CustomerPortal({
 
                     <div className="text-right flex-shrink-0">
                       <span className="text-[9px] text-slate-400 block tracking-wider font-semibold">QİYMƏT</span>
-                      <span className="text-slate-900 text-xs font-semibold">
-                        <strong className="text-emerald-750 text-sm font-extrabold">
-                          {getConvertedPriceInfo(minPrice, tour.priceCurrency).both} / nəfər
-                        </strong>
-                      </span>
+                      {tour.discountPrice && tour.discountPrice > 0 && tour.discountPrice < (tour.price ?? minPrice) ? (
+                        <div className="flex flex-col items-end">
+                          <span className="line-through text-gray-400 text-sm">
+                            {getConvertedPriceInfo(tour.price ?? minPrice, tour.priceCurrency).both}
+                          </span>
+                          <span className="text-xl font-extrabold text-rose-600">
+                            {getConvertedPriceInfo(tour.discountPrice, tour.priceCurrency).both}
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-slate-900 text-xs font-semibold">
+                          <strong className="text-emerald-750 text-sm font-extrabold">
+                            {getConvertedPriceInfo(tour.price ?? minPrice, tour.priceCurrency).both} / nəfər
+                          </strong>
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -1924,8 +2035,16 @@ export default function CustomerPortal({
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
-                  <button className="flex items-center gap-2 border border-slate-200 rounded-full px-4 py-2 hover:bg-slate-50 font-extrabold text-sm transition cursor-pointer text-slate-700 shadow-sm">
-                    <Heart className="w-4 h-4" /> İstəklərə əlavə et
+                  <button
+                    onClick={() => handleToggleWishlist(selectedTour.id)}
+                    className={`flex items-center gap-2 border rounded-full px-4 py-2 font-extrabold text-sm transition cursor-pointer shadow-sm ${
+                      wishlist.includes(selectedTour.id)
+                        ? 'border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100'
+                        : 'border-slate-200 text-slate-700 hover:bg-slate-50'
+                    }`}
+                  >
+                    <Heart className={`w-4 h-4 ${wishlist.includes(selectedTour.id) ? 'fill-rose-600 text-rose-600' : ''}`} />
+                    {wishlist.includes(selectedTour.id) ? 'İstəklərdə' : 'İstəklərə əlavə et'}
                   </button>
                   <button onClick={() => handleShareTour(selectedTour)} className="flex items-center gap-2 border border-slate-200 rounded-full px-4 py-2 hover:bg-slate-50 text-slate-700 font-extrabold text-sm transition cursor-pointer shadow-sm">
                     <Share2 className="w-4 h-4" /> Paylaş
@@ -2809,25 +2928,9 @@ export default function CustomerPortal({
                   </div>
                 </div>
 
-                {/* Extra dynamic details (Admin warnings, Weather, GPT assistant) */}
+                {/* Extra dynamic details (Weather, GPT assistant) */}
                 <div className="space-y-6 pt-4 border-t border-slate-200">
-              
-              {selectedTour.isApproved === false && (
-                <div className="bg-amber-50 border border-amber-250 p-4 rounded-xl flex items-start gap-3 shadow-3xs animate-fadeIn">
-                  <div className="p-2 bg-amber-100 rounded-lg text-amber-850 shrink-0">
-                    <AlertCircle className="w-5 h-5 text-amber-750" />
-                  </div>
-                  <div className="space-y-1">
-                    <h4 className="text-xs font-black text-amber-850 tracking-wider">⏳ BU TUR ADMIN TƏSDİQİ GÖZLƏYİR</h4>
-                    <p className="text-[11px] text-amber-700 leading-normal font-semibold">
-                      Bu marşrut operator tərəfindən uğurla yaradılıb, lakin hələ rəsmi təsdiqlənməyib. 
-                      Sınaq etmək üçün yuxarıdakı paneldən <strong>"Admin"</strong> rolunu seçib, təsdiqləmə növbəsindən bu turu aktivləşdirə bilərsiniz. 
-                      Test rejimində detallarla tanış ola və WhatsApp sifarişi klikini sınaya bilərsiniz.
-                    </p>
-                  </div>
-                </div>
-              )}
-              
+
               {/* Tabs Info / Scheduling */}
                 <div className="space-y-6">
                   {/* Dynamic Integrations */}
@@ -3269,17 +3372,30 @@ export default function CustomerPortal({
                   {/* Pricing Header */}
                   <div className="flex flex-col gap-1">
                     {slots.filter(s => s.tourId === selectedTour.id).length > 0 ? (
-                      <>
-                        <span className="text-slate-500 line-through text-sm font-medium">
-                          {getConvertedPriceInfo(slots.filter(s => s.tourId === selectedTour.id)[0].price * 1.2, selectedTour.priceCurrency).both}
-                        </span>
-                        <div className="flex items-baseline gap-2">
-                          <span className="text-3xl font-extrabold text-rose-600">
-                            {getConvertedPriceInfo(slots.filter(s => s.tourId === selectedTour.id)[0].price, selectedTour.priceCurrency).both}
-                          </span>
-                          <span className="text-slate-500 font-medium text-sm">adam başı</span>
-                        </div>
-                      </>
+                      (() => {
+                        const basePrice = selectedTour.price ?? slots.filter(s => s.tourId === selectedTour.id)[0].price;
+                        const hasDiscount = !!selectedTour.discountPrice && selectedTour.discountPrice > 0 && selectedTour.discountPrice < basePrice;
+                        return hasDiscount ? (
+                          <>
+                            <span className="line-through text-gray-400 text-sm">
+                              {getConvertedPriceInfo(basePrice, selectedTour.priceCurrency).both}
+                            </span>
+                            <div className="flex items-baseline gap-2">
+                              <span className="text-xl font-extrabold text-rose-600">
+                                {getConvertedPriceInfo(selectedTour.discountPrice!, selectedTour.priceCurrency).both}
+                              </span>
+                              <span className="text-slate-500 font-medium text-sm">adam başı</span>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="flex items-baseline gap-2">
+                            <span className="text-3xl font-extrabold text-rose-600">
+                              {getConvertedPriceInfo(basePrice, selectedTour.priceCurrency).both}
+                            </span>
+                            <span className="text-slate-500 font-medium text-sm">adam başı</span>
+                          </div>
+                        );
+                      })()
                     ) : (
                       <div className="flex items-baseline gap-2">
                         <span className="text-3xl font-extrabold text-rose-600">Məlumat yoxdur</span>

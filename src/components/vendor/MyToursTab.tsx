@@ -98,13 +98,17 @@ export function MyToursTab({ tours, slots, myTours, myTourIds, tourSearchTerm, o
                         <span className="text-[9px] bg-rose-50 text-rose-800 border border-rose-100 font-bold px-2 py-0.5 rounded-full">
                           Deaktiv edilib (Görünmür)
                         </span>
-                      ) : tour.isApproved ? (
-                        <span className="text-[9px] bg-emerald-50 text-emerald-800 border border-emerald-100 font-bold px-2 py-0.5 rounded-full">
-                          Aktiv Satışda
+                      ) : tour.status === 'rejected' ? (
+                        <span className="text-[9px] bg-red-50 text-red-800 border border-red-200 font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                          ❌ Rədd edildi
+                        </span>
+                      ) : tour.status === 'pending_approval' ? (
+                        <span className="text-[9px] bg-amber-55/60 text-amber-800 border border-amber-200 font-bold px-2 py-0.5 rounded-full flex items-center gap-1 animate-pulse">
+                          ⏳ Təsdiq gözləyir
                         </span>
                       ) : (
-                        <span className="text-[9px] bg-amber-55/60 text-amber-800 border border-amber-200 font-bold px-2 py-0.5 rounded-full flex items-center gap-1 animate-pulse">
-                          ⚠️ Təsdiq Gözləyir
+                        <span className="text-[9px] bg-emerald-50 text-emerald-800 border border-emerald-100 font-bold px-2 py-0.5 rounded-full">
+                          Aktiv Satışda
                         </span>
                       )}
                       <button

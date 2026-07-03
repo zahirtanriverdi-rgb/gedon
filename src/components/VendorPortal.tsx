@@ -2,8 +2,8 @@ import React, { useState } from 'react';
 import { Tour, TourSlot, Booking, User } from '../types';
 import { ProfileTab } from './vendor/ProfileTab';
 import { AddSlotForm } from './vendor/AddSlotForm';
-import { AddTourForm } from './vendor/AddTourForm';
-import { AddInternationalTourForm } from './vendor/AddInternationalTourForm';
+import { TourForm } from './vendor/TourForm';
+import { InternationalTourForm } from './vendor/InternationalTourForm';
 import { EditTourModal } from './vendor/EditTourModal';
 import { TicketModal } from './vendor/TicketModal';
 import { CrmTab } from './vendor/CrmTab';
@@ -21,6 +21,7 @@ interface VendorPortalProps {
   currentUser: User;
   operatorToken?: string | null;
   onAddSlot: (newSlot: TourSlot) => Promise<void>;
+  onDeleteSlot?: (slotId: string) => Promise<void>;
   onAddTour: (newTour: Tour) => Promise<void>;
   onEditTour?: (updatedTour: Tour) => Promise<void>;
   onDeleteTour?: (tourId: string) => Promise<void>;
@@ -41,6 +42,7 @@ export default function VendorPortal({
   currentUser,
   operatorToken,
   onAddSlot,
+  onDeleteSlot,
   onAddTour,
   onEditTour,
   onDeleteTour,
@@ -56,7 +58,6 @@ export default function VendorPortal({
   const [activeSubTab, setActiveSubTab] = useState<'my-tours' | 'add-tour' | 'add-intl-tour' | 'add-slot' | 'profile' | 'crm'>('my-tours');
   const [tourSearchTerm, setTourSearchTerm] = useState('');
   const [selectedTicketBooking, setSelectedTicketBooking] = useState<Booking | null>(null);
-  const [selectedVendorId, setSelectedVendorId] = useState<string>('all');
 
   const triggerTicketGeneration = async (
     booking: Booking,
@@ -117,19 +118,14 @@ export default function VendorPortal({
   // Tours Form State
   const [newTourCategory, setNewTourCategory] = useState<'peak' | 'camp' | 'hiking' | 'active'>('hiking');
 
-  // Filter tours owned by selected operator workspace (or all)
-  const unfilteredMyTours = tours.filter(t => {
-    if (selectedVendorId === 'all') return true;
-    return t.vendorId === selectedVendorId;
-  });
-
-  const myTours = unfilteredMyTours.filter(t =>
+  // The backend already scopes GET /api/tours to the logged-in vendor's own tours.
+  const myTours = tours.filter(t =>
     t.name.toLowerCase().includes(tourSearchTerm.toLowerCase()) ||
     t.region.toLowerCase().includes(tourSearchTerm.toLowerCase())
   );
 
   // Calculations
-  const allMyTourIds = unfilteredMyTours.map(t => t.id);
+  const allMyTourIds = tours.map(t => t.id);
   const myTourIds = myTours.map(t => t.id);
   const myBookings = bookings.filter(b => allMyTourIds.includes(b.tourId));
   const myTotalRevenue = myBookings.reduce((sum, b) => {
@@ -166,91 +162,6 @@ export default function VendorPortal({
         </div>
       )}
 
-      {/* Operator Filter Selector */}
-      <div className="bg-[#f0fdf4]/80 backdrop-blur-xs border border-emerald-100 p-4 rounded-2xl flex flex-col sm:flex-row gap-4 justify-between items-center shadow-xs">
-        <div className="space-y-1 text-center sm:text-left">
-          <div className="flex flex-wrap items-center justify-center sm:justify-start gap-1.5">
-            <span className="text-[9px] text-emerald-800 font-extrabold bg-emerald-100 border border-emerald-200/50 px-2 py-0.5 rounded tracking-wide">
-              Operator İş Sahəsi
-            </span>
-            <span className="text-[9px] text-slate-500 font-bold bg-slate-100 px-1.5 py-0.5 rounded">
-              Demo İnteqrasiya
-            </span>
-          </div>
-          <h3 className="text-sm font-extrabold text-slate-800">
-            {selectedVendorId === 'all' 
-              ? 'Bütün Operatorlar (Ümumi İdarəetmə Rejimi)' 
-              : selectedVendorId === 'user-vendor-1' 
-              ? 'GedəkGörək' 
-              : selectedVendorId === 'user-vendor-2'
-              ? 'NDA'
-              : 'Peak&Trails'}
-          </h3>
-          <p className="text-[11px] text-slate-550 text-slate-500">
-            Müştərinin qeydiyyatsız sifariş etdiyi hər bir bilet avtomatik müvafiq operatorun buradakı iş sahəsinə düşür.
-          </p>
-        </div>
-        
-        <div className="flex flex-wrap gap-2 w-full sm:w-auto justify-center">
-          <button
-            type="button"
-            onClick={() => {
-              setSelectedVendorId('all');
-              if (onShowNotification) onShowNotification('Bütün operatorların məlumatları göstərilir', 'info');
-            }}
-            className={`px-3 py-2 text-[10px] font-extrabold uppercase rounded-lg transition-all border cursor-pointer ${
-              selectedVendorId === 'all'
-                ? 'bg-emerald-600 text-white border-emerald-700 shadow-xs'
-                : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-            }`}
-          >
-            Bütün Turlar ({tours.length})
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setSelectedVendorId('user-vendor-1');
-              if (onShowNotification) onShowNotification('Siyahı "GedəkGörək" üzrə filtrləndi', 'info');
-            }}
-            className={`px-3 py-2 text-[10px] font-extrabold uppercase rounded-lg transition-all border cursor-pointer ${
-              selectedVendorId === 'user-vendor-1'
-                ? 'bg-emerald-600 text-white border-emerald-700 shadow-xs'
-                : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-            }`}
-          >
-            GedəkGörək ({bookings.filter(b => tours.find(t => t.id === b.tourId)?.vendorId === 'user-vendor-1').length} bilet)
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setSelectedVendorId('user-vendor-2');
-              if (onShowNotification) onShowNotification('Siyahı "NDA" üzrə filtrləndi', 'info');
-            }}
-            className={`px-3 py-2 text-[10px] font-extrabold uppercase rounded-lg transition-all border cursor-pointer ${
-              selectedVendorId === 'user-vendor-2'
-                ? 'bg-emerald-600 text-white border-emerald-700 shadow-xs'
-                : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-            }`}
-          >
-            NDA ({bookings.filter(b => tours.find(t => t.id === b.tourId)?.vendorId === 'user-vendor-2').length} bilet)
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setSelectedVendorId('user-vendor-3');
-              if (onShowNotification) onShowNotification('Siyahı "Peak&Trails" üzrə filtrləndi', 'info');
-            }}
-            className={`px-3 py-2 text-[10px] font-extrabold uppercase rounded-lg transition-all border cursor-pointer ${
-              selectedVendorId === 'user-vendor-3'
-                ? 'bg-emerald-600 text-white border-emerald-700 shadow-xs'
-                : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
-            }`}
-          >
-            Peak&Trails ({bookings.filter(b => tours.find(t => t.id === b.tourId)?.vendorId === 'user-vendor-3').length} bilet)
-          </button>
-        </div>
-      </div>
-      
       {/* Metrics Row */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
         
@@ -415,12 +326,14 @@ export default function VendorPortal({
 
       {/* Subtab HTML Form: Add Tour */}
       {activeSubTab === 'add-tour' && (
-        <AddTourForm
+        <TourForm
           currentUser={currentUser}
+          slots={slots}
           category={newTourCategory}
           onCategoryChange={setNewTourCategory}
           onAddTour={onAddTour}
           onAddSlot={onAddSlot}
+          onDeleteSlot={onDeleteSlot}
           onShowNotification={onShowNotification}
           onNavigateBack={() => setActiveSubTab('my-tours')}
         />
@@ -428,10 +341,12 @@ export default function VendorPortal({
 
       {/* Subtab HTML Form: Add International Tour */}
       {activeSubTab === 'add-intl-tour' && (
-        <AddInternationalTourForm
+        <InternationalTourForm
           currentUser={currentUser}
+          slots={slots}
           onAddTour={onAddTour}
           onAddSlot={onAddSlot}
+          onDeleteSlot={onDeleteSlot}
           onShowNotification={onShowNotification}
           onNavigateBack={() => setActiveSubTab('my-tours')}
         />
@@ -461,8 +376,12 @@ export default function VendorPortal({
       <EditTourModal
         tour={editingTour}
         slots={slots}
+        currentUser={currentUser}
+        onAddTour={onAddTour}
         onEditTour={onEditTour}
         onDeleteTour={onDeleteTour}
+        onAddSlot={onAddSlot}
+        onDeleteSlot={onDeleteSlot}
         onShowNotification={onShowNotification}
         onClose={() => setEditingTour(null)}
       />
@@ -471,6 +390,7 @@ export default function VendorPortal({
     {activeSubTab === 'profile' && (
       <ProfileTab
         currentUser={currentUser}
+        operatorToken={operatorToken}
         onShowNotification={onShowNotification}
         onCancel={() => setActiveSubTab('my-tours')}
       />

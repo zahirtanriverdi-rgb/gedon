@@ -63,14 +63,20 @@ export interface Tour {
   videos?: string[]; // Multiple videos/gallery
   rating: number;
   reviewsCount: number;
-  isApproved: boolean;
+  isApproved: boolean; // Derived from status === 'approved' (kept for backward compat)
+  status: 'approved' | 'pending_approval' | 'rejected';
+  pendingData?: Record<string, any>; // Proposed edit awaiting admin approval; live fields stay unchanged until merged
   isActive?: boolean;
   whatsapp_number?: string; // Tour specific direct WhatsApp number
   lastChangeLog?: string; // Log of edited fields
   gpxData?: string; // JSON representation of ParsedGpxRoute
   gpxFileName?: string;
   externalSales?: number; // External sales ticket count (WhatsApp, Instagram, etc)
-  
+  latitude?: number;
+  longitude?: number;
+  price?: number; // Headline listing price shown on cards/detail page, independent of per-date slot pricing
+  discountPrice?: number; // Optional discounted headline price; shown with strikethrough on the original when set and lower than price
+
   // International Outbound Tour Specifics
   isInternational?: boolean;
   destinationCountry?: string;

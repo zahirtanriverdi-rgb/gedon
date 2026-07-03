@@ -1,13 +1,15 @@
-import React, { useState } from 'react';
-import { Tour, Booking, User, PlatformConfig } from '../types';
-import { 
-  Building, 
-  Settings, 
-  TrendingUp, 
-  UserCheck, 
-  Briefcase, 
-  ShieldAlert, 
-  Percent, 
+import React, { useState, useMemo } from 'react';
+import { Tour, TourSlot, Booking, User, PlatformConfig } from '../types';
+import { TourForm } from './vendor/TourForm';
+import { InternationalTourForm } from './vendor/InternationalTourForm';
+import {
+  Building,
+  Settings,
+  TrendingUp,
+  UserCheck,
+  Briefcase,
+  ShieldAlert,
+  Percent,
   DollarSign,
   Activity,
   CheckCircle,
@@ -18,14 +20,24 @@ import {
   Plus
 } from 'lucide-react';
 
+function isTourInternational(t: Tour): boolean {
+  return !!t.isInternational || t.category === 'international';
+}
+
 interface AdminPortalProps {
   tours: Tour[];
+  slots: TourSlot[];
   bookings: Booking[];
   users: User[];
+  currentUser: User;
   platformConfig: PlatformConfig;
   onUpdateCommissionPercent: (newValue: number) => void;
   onApproveTour: (tourId: string) => Promise<void>;
+  onRejectTour?: (tourId: string) => Promise<void>;
   onEditTour?: (updatedTour: Tour) => Promise<void>;
+  onDeleteTour?: (tourId: string) => Promise<void>;
+  onAddSlot: (newSlot: TourSlot) => Promise<void>;
+  onDeleteSlot?: (slotId: string) => Promise<void>;
   onShowNotification?: (message: string, type?: 'success' | 'info' | 'error' | 'warning') => void;
   exchangeRates: { USD: number; EUR: number };
   onUpdateExchangeRates: (newRates: { USD: number; EUR: number }) => void;
@@ -35,12 +47,18 @@ interface AdminPortalProps {
 
 export default function AdminPortal({
   tours,
+  slots,
   bookings,
   users,
+  currentUser,
   platformConfig,
   onUpdateCommissionPercent,
   onApproveTour,
+  onRejectTour,
   onEditTour,
+  onDeleteTour,
+  onAddSlot,
+  onDeleteSlot,
   onShowNotification,
   exchangeRates,
   onUpdateExchangeRates,
@@ -51,8 +69,6 @@ export default function AdminPortal({
 
   const [cbarLoading, setCbarLoading] = useState<boolean>(false);
   const [approvingTourIds, setApprovingTourIds] = useState<Set<string>>(new Set());
-  const [isSavingEditedTour, setIsSavingEditedTour] = useState(false);
-  const [editTourError, setEditTourError] = useState<string | null>(null);
 
   const fetchCbarRates = async () => {
     setCbarLoading(true);
@@ -81,68 +97,11 @@ export default function AdminPortal({
     }
   };
 
-  // Editing Tour States
+  // Editing Tour States — field-level state now lives inside the shared TourForm/
+  // InternationalTourForm components; AdminPortal only tracks which tour is under review.
   const [editingTour, setEditingTour] = useState<Tour | null>(null);
-  const [editTourName, setEditTourName] = useState<string>('');
-  const [editTourCategory, setEditTourCategory] = useState<'peak' | 'camp' | 'hiking' | 'active'>('hiking');
-  const [editTourDifficulty, setEditTourDifficulty] = useState<'easy' | 'medium' | 'hard' | 'extreme'>('medium');
-  const [editTourRegion, setEditTourRegion] = useState<string>('');
-  const [editTourDays, setEditTourDays] = useState<number>(1);
-  const [editTourDescription, setEditTourDescription] = useState<string>('');
-  const [editTourIncludes, setEditTourIncludes] = useState<string>('');
-  const [editTourImage, setEditTourImage] = useState<string>('');
-  const [editTourWhatsApp, setEditTourWhatsApp] = useState<string>('');
-  const [editTourImages, setEditTourImages] = useState<string[]>([]);
-  const [editTourVideos, setEditTourVideos] = useState<string[]>([]);
-  const [editTourRating, setEditTourRating] = useState<number>(5.0);
-
-  // Editing Active Lifestyle specifics
-  const [editTourActivityType, setEditTourActivityType] = useState<string>('volleyball');
-  const [editTourActiveDifficulty, setEditTourActiveDifficulty] = useState<string>('medium');
-  const [editTourAgeLimit, setEditTourAgeLimit] = useState<string>('18-45 yaş');
-  const [editTourMeetingPoint, setEditTourMeetingPoint] = useState<string>('');
-  const [editTourRequiredEquipment, setEditTourRequiredEquipment] = useState<string>('');
-  const [editTourEquipmentIncluded, setEditTourEquipmentIncluded] = useState<boolean>(true);
-  const [editTourEquipmentRentalPrice, setEditTourEquipmentRentalPrice] = useState<number>(0);
-  const [editTourSafetyInstructions, setEditTourSafetyInstructions] = useState<string>('');
-  const [editTourAllowTeamRegistration, setEditTourAllowTeamRegistration] = useState<boolean>(true);
-  const [editTourScheduleFrequency, setEditTourScheduleFrequency] = useState<string>('one-time');
-
-  const handleEditTourImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setEditTourImage(reader.result as string);
-        if (onShowNotification) {
-          onShowNotification('Şəkil uğurla yükləndi! 📸', 'success');
-        }
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleEditMultipleImagesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (files && files.length > 0) {
-      const promises = Array.from(files).map((file: File) => {
-        return new Promise<string>((resolve) => {
-          const reader = new FileReader();
-          reader.onloadend = () => {
-            resolve(reader.result as string);
-          };
-          reader.readAsDataURL(file);
-        });
-      });
-
-      Promise.all(promises).then(base64s => {
-        setEditTourImages(prev => [...prev, ...base64s]);
-        if (onShowNotification) {
-          onShowNotification(`${base64s.length} şəkil qalerayaya əlavə edildi! 📸`, 'success');
-        }
-      });
-    }
-  };
+  const [isDecidingInModal, setIsDecidingInModal] = useState(false);
+  const [modalActionError, setModalActionError] = useState<string | null>(null);
 
   // Stats calculate
   const totalVolume = bookings.reduce((sum, b) => b.status === 'paid' ? sum + b.totalAmount : sum, 0);
@@ -153,7 +112,22 @@ export default function AdminPortal({
     return sum;
   }, 0);
 
-  const pendingTours = tours.filter(t => !t.isApproved);
+  const pendingTours = tours.filter(t => t.status === 'pending_approval');
+
+  const openTourForReview = (t: Tour) => {
+    setModalActionError(null);
+    setEditingTour(t);
+  };
+
+  // The tour under review always displays the proposal (pendingData) when one exists — that's
+  // what the admin should be inspecting/approving, not the stale still-live content the
+  // proposal is meant to replace. Memoized on `editingTour` so the shared form's edit-mode
+  // useEffect doesn't reset on every unrelated AdminPortal re-render.
+  const reviewTour = useMemo<Tour | null>(() => {
+    if (!editingTour) return null;
+    return editingTour.pendingData ? ({ ...editingTour, ...editingTour.pendingData } as Tour) : editingTour;
+  }, [editingTour]);
+
   const totalVendors = users.filter(u => u.role === 'vendor').length;
   const totalCustomers = users.filter(u => u.role === 'customer').length;
 
@@ -518,32 +492,7 @@ export default function AdminPortal({
 
                     <div className="flex items-center gap-2">
                       <button
-                        onClick={() => {
-                          setEditingTour(t);
-                          setEditTourName(t.name);
-                          setEditTourCategory(t.category);
-                          setEditTourDifficulty(t.difficulty);
-                          setEditTourRegion(t.region);
-                          setEditTourDays(t.durationDays);
-                          setEditTourDescription(t.description || '');
-                          setEditTourIncludes(Array.isArray(t.includes) ? t.includes.join(', ') : '');
-                          setEditTourImage(t.image || '');
-                          setEditTourWhatsApp(t.whatsapp_number || '');
-                          setEditTourImages(t.images || []);
-                          setEditTourRating(t.rating !== undefined ? t.rating : 5.0);
-
-                          // Active Lifestyle specifics
-                          setEditTourActivityType(t.activityType || 'volleyball');
-                          setEditTourActiveDifficulty(t.activeDifficulty || 'medium');
-                          setEditTourAgeLimit(t.ageLimit || '18-45 yaş');
-                          setEditTourMeetingPoint(t.meetingPoint || '');
-                          setEditTourRequiredEquipment(t.requiredEquipment || '');
-                          setEditTourEquipmentIncluded(t.equipmentIncluded !== false);
-                          setEditTourEquipmentRentalPrice(t.equipmentRentalPrice || 0);
-                          setEditTourSafetyInstructions(t.safetyInstructions || '');
-                          setEditTourAllowTeamRegistration(t.allowTeamRegistration !== false);
-                          setEditTourScheduleFrequency(t.scheduleFrequency || 'one-time');
-                        }}
+                        onClick={() => openTourForReview(t)}
                         className="bg-amber-600 hover:bg-amber-700 text-white text-[10px] font-bold px-3 py-1.5 rounded cursor-pointer transition flex items-center gap-1 shadow-xs"
                       >
                         <Edit className="w-3 h-3" /> Yoxla & Düzəliş Et
@@ -569,6 +518,29 @@ export default function AdminPortal({
                       >
                         <ThumbsUp className="w-3 h-3" /> {approvingTourIds.has(t.id) ? 'Təsdiqlənir...' : 'Təsdiqlə'}
                       </button>
+
+                      {onRejectTour && (
+                        <button
+                          disabled={approvingTourIds.has(t.id)}
+                          onClick={async () => {
+                            setApprovingTourIds(prev => new Set(prev).add(t.id));
+                            try {
+                              await onRejectTour(t.id);
+                            } catch {
+                              // App.tsx's handleRejectTour already showed an error toast
+                            } finally {
+                              setApprovingTourIds(prev => {
+                                const next = new Set(prev);
+                                next.delete(t.id);
+                                return next;
+                              });
+                            }
+                          }}
+                          className="bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 text-[10px] font-bold px-3 py-1.5 rounded cursor-pointer transition flex items-center gap-1 shadow-xs disabled:opacity-50"
+                        >
+                          <X className="w-3 h-3" /> Rədd Et
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -580,13 +552,13 @@ export default function AdminPortal({
           <div className="bg-white p-5 rounded-xl border border-slate-200 space-y-4 shadow-xs">
             <h3 className="text-xs font-bold text-slate-400 tracking-widest">Aktiv (Təsdiqlənmiş) Marşrutlar</h3>
             
-            {tours.filter(t => t.isApproved).length === 0 ? (
+            {tours.filter(t => t.status === 'approved').length === 0 ? (
               <div className="p-8 text-center bg-slate-50 rounded-lg text-xs italic text-slate-400 border border-slate-150 border-dashed">
                 Hazırda platformada heç bir təsdiqlənmiş aktiv tur tapılmadı.
               </div>
             ) : (
               <div className="space-y-3 max-h-96 overflow-y-auto scrollbar-thin">
-                {tours.filter(t => t.isApproved).map((t) => (
+                {tours.filter(t => t.status === 'approved').map((t) => (
                   <div key={t.id} className="p-4 bg-slate-50 rounded-lg border border-slate-210 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
                     <div className="space-y-1">
                       <strong className="text-slate-800 font-bold block">{t.name}</strong>
@@ -594,32 +566,7 @@ export default function AdminPortal({
                     </div>
 
                     <button
-                      onClick={() => {
-                        setEditingTour(t);
-                        setEditTourName(t.name);
-                        setEditTourCategory(t.category);
-                        setEditTourDifficulty(t.difficulty);
-                        setEditTourRegion(t.region);
-                        setEditTourDays(t.durationDays);
-                        setEditTourDescription(t.description || '');
-                        setEditTourIncludes(Array.isArray(t.includes) ? t.includes.join(', ') : '');
-                        setEditTourImage(t.image || '');
-                        setEditTourWhatsApp(t.whatsapp_number || '');
-                        setEditTourImages(t.images || []);
-                        setEditTourRating(t.rating !== undefined ? t.rating : 5.0);
-
-                        // Active Lifestyle specifics
-                        setEditTourActivityType(t.activityType || 'volleyball');
-                        setEditTourActiveDifficulty(t.activeDifficulty || 'medium');
-                        setEditTourAgeLimit(t.ageLimit || '18-45 yaş');
-                        setEditTourMeetingPoint(t.meetingPoint || '');
-                        setEditTourRequiredEquipment(t.requiredEquipment || '');
-                        setEditTourEquipmentIncluded(t.equipmentIncluded !== false);
-                        setEditTourEquipmentRentalPrice(t.equipmentRentalPrice || 0);
-                        setEditTourSafetyInstructions(t.safetyInstructions || '');
-                        setEditTourAllowTeamRegistration(t.allowTeamRegistration !== false);
-                        setEditTourScheduleFrequency(t.scheduleFrequency || 'one-time');
-                      }}
+                      onClick={() => openTourForReview(t)}
                       className="bg-slate-700 hover:bg-slate-800 text-white text-[10px] font-bold px-3 py-1.5 rounded cursor-pointer transition flex items-center gap-1 shadow-xs self-start md:self-auto"
                     >
                       <Edit className="w-3 h-3" /> Redaktə Et
@@ -663,20 +610,24 @@ export default function AdminPortal({
 
       </div>
 
-      {/* Edit Tour Modal Overlay */}
+      {/* Edit Tour Modal Overlay — same TourForm/InternationalTourForm the vendor uses, so
+          admin reviews/edits tours through an identical interface. Approve/Reject act on the
+          tour as-is; the form's own "Dəyişiklikləri Saxla" persists field edits directly. */}
       {editingTour && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
-            
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[92vh]">
+
             {/* Header */}
-            <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+            <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50 flex-shrink-0">
               <div className="flex items-center gap-2">
                 <div className="p-2 bg-amber-100 text-amber-800 rounded-lg">
                   <Edit className="w-5 h-5 text-amber-700" />
                 </div>
                 <div>
-                  <h3 className="font-extrabold text-slate-900 text-sm">Tur Reqlamentini Yeniləyin (Admin)</h3>
-                  <p className="text-[10px] text-slate-500 font-medium">Tur operatorunun qeyd etdiyi marşrutu yoxlayın və lazımi düzəlişləri edin</p>
+                  <h3 className="font-extrabold text-slate-900 text-sm">Tur Reqlamentini Yoxlayın (Admin)</h3>
+                  <p className="text-[10px] text-slate-500 font-medium">
+                    {editingTour.pendingData ? 'Vendorun təklif etdiyi dəyişikliklər aşağıda göstərilir.' : 'Marşrut detallarına baxın və ya düzəliş edin'}
+                  </p>
                 </div>
               </div>
               <button
@@ -688,470 +639,96 @@ export default function AdminPortal({
               </button>
             </div>
 
-            {/* Scrollable Form Body */}
-            <div className="p-6 overflow-y-auto space-y-4 text-xs text-slate-700">
-              
-              {/* Tour Name */}
-              <div>
-                <label className="block text-[10px] font-extrabold text-slate-500 tracking-wider mb-1">Turun Başlığı (Adı/İpucu):</label>
-                <input
-                  type="text"
-                  value={editTourName}
-                  onChange={(e) => setEditTourName(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl font-bold focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:bg-white text-xs"
-                  placeholder="Məsələn: Kuzun Laza Dağ Yürüşü"
-                />
-              </div>
-
-              {/* Grid: Category, Difficulty, Days, Region */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[10px] font-extrabold text-slate-500 tracking-wide mb-1">Kateqoriya:</label>
-                  <select
-                    value={editTourCategory}
-                    onChange={(e) => setEditTourCategory(e.target.value as any)}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:bg-white font-bold text-xs"
-                  >
-                    <option value="hiking">Dağ Yürüşü (Hiking)</option>
-                    <option value="camp">Gecələməli Kamp (Camping)</option>
-                    <option value="peak">Zirvə Dırmanışı (Mountain Peak)</option>
-                    <option value="active">🏃‍♂️ Aktiv Həyat (İdman və Macəra)</option>
-                  </select>
-                </div>
-
-                {editTourCategory !== 'active' && (
-                  <div>
-                    <label className="block text-[10px] font-extrabold text-slate-500 tracking-wide mb-1">Çətinlik Kriteriyası:</label>
-                    <select
-                      value={editTourDifficulty}
-                      onChange={(e) => setEditTourDifficulty(e.target.value as any)}
-                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:bg-white font-bold text-xs"
-                    >
-                      <option value="easy">Asan (Gəzinti)</option>
-                      <option value="medium">Orta (Standart dağlıq)</option>
-                      <option value="hard">Çətin (Dik dırmanış)</option>
-                      <option value="extreme">Ekstremal (Xüsusi hazırlıq)</option>
-                    </select>
-                  </div>
-                )}
-
-                <div>
-                  <label className="block text-[10px] font-extrabold text-slate-500 tracking-wide mb-1">Coğrafi Region / İstiqamət:</label>
-                  <input
-                    type="text"
-                    value={editTourRegion}
-                    onChange={(e) => setEditTourRegion(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:bg-white font-bold text-xs"
-                    placeholder="Məsələn: Qusar (Laza kəndi)"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-[10px] font-extrabold text-slate-500 tracking-wide mb-1">Müddət (Gün sayı):</label>
-                  <input
-                    type="number"
-                    min={1}
-                    max={14}
-                    value={editTourDays}
-                    onChange={(e) => setEditTourDays(parseInt(e.target.value, 10) || 1)}
-                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:bg-white font-bold text-xs"
-                  />
-                </div>
-              </div>
-
-              {editTourCategory === 'active' && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-amber-50/50 p-4 rounded-xl border border-amber-200 shadow-xs">
-                  <div className="md:col-span-2 pb-2 mb-2 border-b border-amber-200">
-                    <h4 className="text-xs font-bold text-amber-900 flex items-center gap-1.5 tracking-wider">
-                      🏅 AKTİV HƏYAT VƏ MACƏRA PARAMETRLƏRİ
-                    </h4>
-                  </div>
-                  
-                  <div>
-                    <label className="block text-[11px] font-bold text-amber-700 tracking-wide mb-1">İdman / Fəaliyyət Növü:</label>
-                    <select
-                      value={editTourActivityType}
-                      onChange={(e) => setEditTourActivityType(e.target.value)}
-                      className="w-full px-3.5 py-2.5 bg-white border border-amber-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:ring-1 focus:ring-amber-500"
-                    >
-                      <option value="volleyball">🏐 Voleybol</option>
-                      <option value="running">🏃‍♂️ Qaçış (Marafon)</option>
-                      <option value="ski">⛷️ Xizək</option>
-                      <option value="rafting">🚣‍♂️ Rafting</option>
-                      <option value="bike">🚴‍♂️ Velosiped</option>
-                      <option value="canyon">🧗‍♂️ Kanyoninq</option>
-                      <option value="other">🏆 Digər İdmanlar</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-bold text-amber-700 tracking-wide mb-1">Fiziki Hazırlıq (Çətinlik):</label>
-                    <select
-                      value={editTourActiveDifficulty}
-                      onChange={(e) => setEditTourActiveDifficulty(e.target.value)}
-                      className="w-full px-3.5 py-2.5 bg-white border border-amber-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none focus:ring-1 focus:ring-amber-500"
-                    >
-                      <option value="beginner">🟢 Başlanğıc (Hər kəs qatıla bilər)</option>
-                      <option value="medium">🟡 Orta (Fiziki aktiv insanlar)</option>
-                      <option value="professional">🔴 Professional (Peşəkar idmançılar)</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-bold text-amber-700 tracking-wide mb-1">Yaş Limiti:</label>
-                    <input
-                      type="text"
-                      value={editTourAgeLimit}
-                      onChange={(e) => setEditTourAgeLimit(e.target.value)}
-                      placeholder="Məs: 18-45 yaş, Qadınlar üçün"
-                      className="w-full px-3.5 py-2.5 bg-white border border-amber-200 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-amber-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-bold text-amber-700 tracking-wide mb-1">Görüş Yeri & Toplanış Nöqtəsi:</label>
-                    <input
-                      type="text"
-                      value={editTourMeetingPoint}
-                      onChange={(e) => setEditTourMeetingPoint(e.target.value)}
-                      placeholder="Məs: Gənclik Mall M/S və ya Maps Link"
-                      className="w-full px-3.5 py-2.5 bg-white border border-amber-200 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-amber-500"
-                    />
-                  </div>
-
-                  <div className="md:col-span-2">
-                    <label className="block text-[11px] font-bold text-amber-700 tracking-wide mb-1">Zəruri Avadanlıqlar (Təchizat Siyahısı):</label>
-                    <textarea
-                      rows={2}
-                      value={editTourRequiredEquipment}
-                      onChange={(e) => setEditTourRequiredEquipment(e.target.value)}
-                      placeholder="Məs: Xizək dəsti, kaska, əlcək, termal geyim, su qabı..."
-                      className="w-full px-3.5 py-2.5 bg-white border border-amber-200 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-amber-500"
-                    />
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      id="editAdminOptAvt"
-                      checked={editTourEquipmentIncluded}
-                      onChange={(e) => setEditTourEquipmentIncluded(e.target.checked)}
-                      className="w-4 h-4 text-emerald-600 rounded"
-                    />
-                    <label htmlFor="editAdminOptAvt" className="text-xs text-slate-700 font-semibold cursor-pointer select-none">
-                      ✅ Avadanlıqlar bilet qiymətinə daxildir
-                    </label>
-                  </div>
-
-                  {!editTourEquipmentIncluded && (
-                    <div>
-                      <label className="block text-[11px] font-bold text-amber-700 tracking-wide mb-1">Kirayə Haqqı (+AZN):</label>
-                      <input
-                        type="number"
-                        min="0"
-                        value={editTourEquipmentRentalPrice}
-                        onChange={(e) => setEditTourEquipmentRentalPrice(Number(e.target.value))}
-                        className="w-full px-3.5 py-2.5 bg-white border border-amber-200 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-amber-500"
-                        placeholder="Məs: 15 AZN"
-                      />
-                    </div>
-                  )}
-                  {editTourEquipmentIncluded && <div />}
-
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      id="editAdminOptTeam"
-                      checked={editTourAllowTeamRegistration}
-                      onChange={(e) => setEditTourAllowTeamRegistration(e.target.checked)}
-                      className="w-4 h-4 text-emerald-600 rounded"
-                    />
-                    <label htmlFor="editAdminOptTeam" className="text-xs text-slate-700 font-semibold cursor-pointer select-none">
-                      👥 Komanda qeydiyyatına izn verilsin
-                    </label>
-                  </div>
-
-                  <div className="md:col-span-2 mt-2">
-                    <label className="block text-[11px] font-bold text-rose-700 tracking-wide mb-1">Təhlükəsizlik və Tibbi Təlimat:</label>
-                    <textarea
-                      rows={3}
-                      value={editTourSafetyInstructions}
-                      onChange={(e) => setEditTourSafetyInstructions(e.target.value)}
-                      placeholder="Macəra idmanının risklərini və iştirakçının sağlamlıqla bağlı bilməli olduğu təhlükəsizlik razılaşmasını bura yazın..."
-                      className="w-full px-3.5 py-2.5 bg-white border border-rose-300 ring-1 ring-rose-100 rounded-xl text-xs focus:outline-none focus:ring-1 focus:ring-rose-500"
-                    />
-                  </div>
-
-                  <div className="md:col-span-2 mt-2">
-                    <label className="block text-[11px] font-bold text-emerald-700 tracking-wide mb-1">Tədbirin Planlaması:</label>
-                    <select
-                      value={editTourScheduleFrequency}
-                      onChange={(e) => setEditTourScheduleFrequency(e.target.value)}
-                      className="w-full px-3.5 py-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-xs font-semibold text-emerald-800 focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                    >
-                      <option value="one-time">Bir dəfəlik (Göstərilən tarixlərdə)</option>
-                      <option value="daily">Hər gün (Mütəmadi)</option>
-                      <option value="every-monday">Hər bazar ertəsi</option>
-                      <option value="every-tuesday">Hər çərşənbə axşamı</option>
-                      <option value="every-wednesday">Hər çərşənbə</option>
-                      <option value="every-thursday">Hər cümə axşamı</option>
-                      <option value="every-friday">Hər cümə</option>
-                      <option value="every-saturday">Hər şənbə günü</option>
-                      <option value="every-sunday">Hər bazar günü</option>
-                      <option value="every-weekend">Hər həftəsonu (Şənbə və Bazar)</option>
-                    </select>
-                  </div>
-                </div>
-              )}
-
-              {/* Grid: Image URL, WhatsApp */}
-              <div className="space-y-3">
-                <label className="block text-[10px] font-extrabold text-[#111111]/70 tracking-widest">Kover Foto / Şəkil Seçimi:</label>
-                <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-3">
-                  <span className="text-[10px] text-slate-500 block font-bold">Cihazdan yeni kover şəkil faylı yükləyin:</span>
-                  <div className="relative">
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleEditTourImageChange}
-                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                    />
-                    <div className="w-full px-3 py-2.5 bg-white hover:bg-slate-50 border border-dashed border-emerald-300 hover:border-emerald-500 rounded-xl text-xs flex items-center justify-center gap-2 text-emerald-800 font-bold transition shadow-2xs">
-                      <Plus className="w-4 h-4 text-emerald-600" />
-                      <span>Kover Foto Seçin 📁</span>
-                    </div>
-                  </div>
-
-                  {editTourImage && (
-                    <div className="relative inline-block mt-1.5 rounded-xl overflow-hidden border border-slate-200 shadow-xs max-h-36 group">
-                      <img src={editTourImage || undefined} alt="Kover Şəkil" className="h-24 w-auto object-cover rounded-xl" />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setEditTourImage('');
-                          if (onShowNotification) onShowNotification('Şəkil təmizləndi', 'info');
-                        }}
-                        className="absolute top-1 right-1 bg-red-600 hover:bg-red-700 text-white p-1 rounded-full shadow-md transition cursor-pointer"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Multiple Gallery Images for Editing */}
-              <div className="space-y-3 pt-3 border-t border-slate-100">
-                <label className="block text-[10px] font-extrabold text-slate-500 tracking-wide">Qalereya Şəkilləri (Çoxlu şəkil yükləyin):</label>
-                <div className="relative">
-                  <input
-                    type="file"
-                    multiple
-                    accept="image/*"
-                    onChange={handleEditMultipleImagesChange}
-                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-                  />
-                  <div className="w-full px-4 py-3 bg-slate-50 hover:bg-slate-100 border border-dashed border-emerald-350 hover:border-emerald-500 rounded-xl text-xs flex items-center justify-center gap-2 text-emerald-800 font-bold transition">
-                    <Plus className="w-4 h-4 text-emerald-600" />
-                    <span>Cihazdan çoxlu şəkil seçin (Multi-upload) 📁📸</span>
-                  </div>
-                </div>
-
-                {editTourImages.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mt-2">
-                    {editTourImages.map((img, idx) => (
-                      <div key={idx} className="relative rounded-xl overflow-hidden border border-slate-200 shadow-xs h-16 w-24 flex-shrink-0 group">
-                        <img src={img || undefined} alt={`Gallery Preview ${idx}`} className="h-full w-full object-cover rounded-xl" />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEditTourImages(prev => prev.filter((_, i) => i !== idx));
-                          }}
-                          className="absolute top-1 right-1 bg-red-650 hover:bg-red-750 text-white p-0.5 rounded-full shadow-xs transition cursor-pointer"
-                        >
-                          <X className="w-2.5 h-2.5" />
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-extrabold text-slate-500 tracking-wide mb-1">WhatsApp Əlaqə Nömrəsi:</label>
-                <input
-                  type="text"
-                  value={editTourWhatsApp}
-                  onChange={(e) => setEditTourWhatsApp(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:bg-white font-bold font-mono text-xs"
-                  placeholder="+994XXXXXXXXX"
-                />
-              </div>
-
-              <div>
-                <label className="block text-[10px] font-extrabold text-emerald-850 tracking-wide mb-1">
-                  Back-Office Reytinq Təyini (Manual Ulduz Override):
-                </label>
-                <select
-                  value={editTourRating}
-                  onChange={(e) => setEditTourRating(Number(e.target.value))}
-                  className="w-full px-3.5 py-2.5 bg-emerald-50 border border-emerald-205 rounded-xl text-xs font-extrabold text-slate-800 cursor-pointer focus:outline-none focus:ring-1 focus:ring-emerald-500"
-                >
-                  <option value="5">⭐⭐⭐⭐⭐ 5.0 (Təşviq edilən / Sponsorlu / 5-Ulduz)</option>
-                  <option value="4.8">⭐⭐⭐⭐⭐ 4.8 (Çox Yüksək Satışlı)</option>
-                  <option value="4.5">⭐⭐⭐⭐☆ 4.5 (Yüksək Tövsiyəli)</option>
-                  <option value="4">⭐⭐⭐⭐☆ 4.0 (Yaxşı Qiymətləndirilən)</option>
-                  <option value="3">⭐⭐⭐☆☆ 3.0 (Orta dərəcə)</option>
-                  <option value="2">⭐⭐☆☆☆ 2.0 (Zəif və Deaktiv öncəsi)</option>
-                </select>
-                <p className="text-[9px] text-slate-400 mt-1 italic font-medium">
-                  * Zəif satılan, yeni və ya sponsorlu turları filtr siyahısında və ana səhifədə 5 ulduzla önə çıxarır.
-                </p>
-              </div>
-
-              {/* Inclusions */}
-              <div>
-                <label className="block text-[10px] font-extrabold text-slate-500 tracking-wide mb-1">Təminatlar / Daxil olanlar (Vergüllə ayırın):</label>
-                <textarea
-                  rows={2}
-                  value={editTourIncludes}
-                  onChange={(e) => setEditTourIncludes(e.target.value)}
-                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:bg-white font-bold text-xs"
-                  placeholder="Komfort Nəqliyyat, Səhər Yeməyi, Dağ bələdçisi, Milli Parka giriş"
-                />
-              </div>
-
-              {/* Description */}
-              <div>
-                <label className="block text-[10px] font-extrabold text-slate-500 tracking-wide mb-1">Turun Detallı Reqlamenti və Təsviri:</label>
-                <textarea
-                  rows={6}
-                  value={editTourDescription}
-                  onChange={(e) => setEditTourDescription(e.target.value)}
-                  className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:bg-white text-xs font-medium"
-                  placeholder="Tur haqqında tam ətraflı məlumat mətni"
-                />
-              </div>
-
-            </div>
-
-            {/* Footer Buttons */}
-            <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-3 flex-shrink-0">
-              <button
-                type="button"
-                className="px-4 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 font-extrabold text-xs rounded-xl cursor-pointer transition"
-                onClick={() => setEditingTour(null)}
-              >
-                Ləğv Et
-              </button>
-              
-              <button
-                type="button"
-                disabled={isSavingEditedTour}
-                className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs rounded-xl cursor-pointer transition flex items-center gap-1.5 shadow-sm disabled:opacity-50"
-                onClick={async () => {
-                  if (onEditTour && editingTour) {
-                    const cleanIncludes = editTourIncludes.split(',').map(s => s.trim()).filter(Boolean);
-                    setIsSavingEditedTour(true);
-                    setEditTourError(null);
+            {/* Admin quick actions — approve/reject the tour as-is, without touching field values */}
+            <div className="p-4 bg-amber-50/60 border-b border-amber-100 flex flex-wrap items-center justify-between gap-3 flex-shrink-0">
+              <p className="text-[10px] text-amber-800 font-semibold max-w-md">
+                Sahələri dəyişmədən birbaşa qərar qəbul edə, ya da aşağıdakı formada düzəliş edib "Dəyişiklikləri Saxla" düyməsini basa bilərsiniz.
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled={isDecidingInModal}
+                  onClick={async () => {
+                    if (!editingTour) return;
+                    setIsDecidingInModal(true);
+                    setModalActionError(null);
                     try {
-                      await onEditTour({
-                        ...editingTour,
-                        name: editTourName,
-                        category: editTourCategory,
-                        difficulty: editTourDifficulty,
-                        region: editTourRegion,
-                        durationDays: Number(editTourDays),
-                        description: editTourDescription,
-                        includes: cleanIncludes.length > 0 ? cleanIncludes : ['Müşayiət bələdçisi'],
-                        image: editTourImage,
-                        images: editTourImages,
-                        videos: editingTour.videos,
-                        whatsapp_number: editTourWhatsApp || '+994706717804',
-                        rating: editTourRating
-                      });
-                      if (onShowNotification) {
-                        onShowNotification('Tur məlumatları uğurla yadda saxlanıldı! 📝', 'success');
-                      }
-                      setEditingTour(null);
-                    } catch (err: any) {
-                      setEditTourError(err?.message || 'Tur yenilənərkən xəta baş verdi.');
-                    } finally {
-                      setIsSavingEditedTour(false);
-                    }
-                  }
-                }}
-              >
-                <Check className="w-4 h-4 text-white" />
-                {isSavingEditedTour ? 'Saxlanılır...' : 'Dəyişiklikləri Saxla'}
-              </button>
-
-              <button
-                type="button"
-                disabled={isSavingEditedTour}
-                className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl cursor-pointer transition flex items-center gap-1.5 shadow-sm disabled:opacity-50"
-                onClick={async () => {
-                  if (editingTour) {
-                    const cleanIncludes = editTourIncludes.split(',').map(s => s.trim()).filter(Boolean);
-                    const updated: Tour = {
-                      ...editingTour,
-                      name: editTourName,
-                      category: editTourCategory,
-                      difficulty: editTourDifficulty,
-                      region: editTourRegion,
-                      durationDays: Number(editTourDays),
-                      description: editTourDescription,
-                      includes: cleanIncludes.length > 0 ? cleanIncludes : ['Müşayiət bələdçisi'],
-                      image: editTourImage,
-                      images: editTourImages,
-                      videos: editingTour.videos,
-                      whatsapp_number: editTourWhatsApp || '+994706717804',
-                      rating: editTourRating,
-
-                      // Active Lifestyle specifics
-                      isActiveLife: editTourCategory === 'active',
-                      activityType: editTourCategory === 'active' ? editTourActivityType : undefined,
-                      activeDifficulty: editTourCategory === 'active' ? (editTourActiveDifficulty as 'beginner' | 'medium' | 'professional') : undefined,
-                      ageLimit: editTourCategory === 'active' ? editTourAgeLimit : undefined,
-                      meetingPoint: editTourCategory === 'active' ? editTourMeetingPoint : undefined,
-                      requiredEquipment: editTourCategory === 'active' ? editTourRequiredEquipment : undefined,
-                      equipmentIncluded: editTourCategory === 'active' ? editTourEquipmentIncluded : undefined,
-                      equipmentRentalPrice: editTourCategory === 'active' ? editTourEquipmentRentalPrice : undefined,
-                      safetyInstructions: editTourCategory === 'active' ? editTourSafetyInstructions : undefined,
-                      allowTeamRegistration: editTourCategory === 'active' ? editTourAllowTeamRegistration : undefined,
-                      scheduleFrequency: editTourCategory === 'active' ? editTourScheduleFrequency : undefined,
-                    };
-                    setIsSavingEditedTour(true);
-                    setEditTourError(null);
-                    try {
-                      if (onEditTour) {
-                        await onEditTour(updated);
-                      }
                       await onApproveTour(editingTour.id);
-                      if (onShowNotification) {
-                        onShowNotification('Tur uğurla redaktə edildi və dərhal TƏSDİQLƏNDİ! 🚀✨', 'success');
-                      }
                       setEditingTour(null);
                     } catch (err: any) {
-                      setEditTourError(err?.message || 'Tur yenilənərkən xəta baş verdi.');
+                      setModalActionError(err?.message || 'Tur təsdiqlənərkən xəta baş verdi.');
                     } finally {
-                      setIsSavingEditedTour(false);
+                      setIsDecidingInModal(false);
                     }
-                  }
-                }}
-              >
-                <ThumbsUp className="w-4 h-4 text-white" />
-                {isSavingEditedTour ? 'Saxlanılır...' : 'Saxla və Təsdiqlə'}
-              </button>
+                  }}
+                  className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-[10px] px-3 py-1.5 rounded-lg cursor-pointer transition flex items-center gap-1 shadow-xs disabled:opacity-50"
+                >
+                  <ThumbsUp className="w-3.5 h-3.5" /> Təsdiqlə
+                </button>
+                {onRejectTour && editingTour.status === 'pending_approval' && (
+                  <button
+                    type="button"
+                    disabled={isDecidingInModal}
+                    onClick={async () => {
+                      if (!editingTour) return;
+                      setIsDecidingInModal(true);
+                      setModalActionError(null);
+                      try {
+                        await onRejectTour(editingTour.id);
+                        setEditingTour(null);
+                      } catch (err: any) {
+                        setModalActionError(err?.message || 'Tur rədd edilərkən xəta baş verdi.');
+                      } finally {
+                        setIsDecidingInModal(false);
+                      }
+                    }}
+                    className="bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 font-bold text-[10px] px-3 py-1.5 rounded-lg cursor-pointer transition flex items-center gap-1 disabled:opacity-50"
+                  >
+                    <X className="w-3.5 h-3.5" /> Rədd Et
+                  </button>
+                )}
+              </div>
             </div>
 
-            {editTourError && (
-              <div className="px-4 pb-4 -mt-2">
+            {modalActionError && (
+              <div className="px-4 pt-3 flex-shrink-0">
                 <div className="bg-red-50 border border-red-200 text-red-700 text-xs font-semibold rounded-lg px-3 py-2">
-                  ⚠️ {editTourError}
+                  ⚠️ {modalActionError}
                 </div>
               </div>
             )}
+
+            <div className="overflow-y-auto">
+              {reviewTour && (isTourInternational(reviewTour) ? (
+                <InternationalTourForm
+                  currentUser={currentUser}
+                  tour={reviewTour}
+                  slots={slots}
+                  onAddTour={async () => {}}
+                  onEditTour={onEditTour}
+                  onDeleteTour={onDeleteTour}
+                  onAddSlot={onAddSlot}
+                  onDeleteSlot={onDeleteSlot}
+                  onShowNotification={onShowNotification}
+                  onNavigateBack={() => setEditingTour(null)}
+                />
+              ) : (
+                <TourForm
+                  currentUser={currentUser}
+                  tour={reviewTour}
+                  slots={slots}
+                  category={reviewTour.category as 'peak' | 'camp' | 'hiking' | 'active'}
+                  onCategoryChange={() => {}}
+                  onAddTour={async () => {}}
+                  onEditTour={onEditTour}
+                  onDeleteTour={onDeleteTour}
+                  onAddSlot={onAddSlot}
+                  onDeleteSlot={onDeleteSlot}
+                  onShowNotification={onShowNotification}
+                  onNavigateBack={() => setEditingTour(null)}
+                />
+              ))}
+            </div>
 
           </div>
         </div>

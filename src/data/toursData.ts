@@ -93,7 +93,7 @@ export const seedTours: Tour[] = [
     image: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=800&auto=format&fit=crop&q=80',
     rating: 4.8,
     reviewsCount: 15,
-    isApproved: true
+    isApproved: true, status: 'approved'
   },
   {
     id: 'tour-heydar-ataturk',
@@ -109,7 +109,7 @@ export const seedTours: Tour[] = [
     image: 'https://images.unsplash.com/photo-1501555088652-021faa106b9b?w=800&auto=format&fit=crop&q=80',
     rating: 4.9,
     reviewsCount: 22,
-    isApproved: true
+    isApproved: true, status: 'approved'
   },
   {
     id: 'tour-sulut',
@@ -125,7 +125,7 @@ export const seedTours: Tour[] = [
     image: 'https://images.unsplash.com/photo-1454496522488-7a8e488e8606?w=800&auto=format&fit=crop&q=80',
     rating: 4.6,
     reviewsCount: 8,
-    isApproved: true
+    isApproved: true, status: 'approved'
   },
   {
     id: 'tour-kepez',
@@ -141,7 +141,7 @@ export const seedTours: Tour[] = [
     image: 'https://images.unsplash.com/photo-1519681393784-d120267933ba?w=800&auto=format&fit=crop&q=80',
     rating: 4.9,
     reviewsCount: 41,
-    isApproved: true,
+    isApproved: true, status: 'approved',
     gpxFileName: 'kepez_zirve_yurusu.gpx',
     gpxData: '{"fileName":"kepez_zirve_yurusu.gpx","points":[[40.4180,46.3220,1500],[40.4120,46.3200,1520],[40.4040,46.3160,1560],[40.3960,46.3150,1630],[40.3890,46.3190,1720],[40.3840,46.3280,1850],[40.3810,46.3350,1960],[40.3780,46.3420,2080],[40.3750,46.3500,2180],[40.3710,46.3540,2270],[40.3670,46.3560,2380],[40.3640,46.3590,2480],[40.3610,46.3620,2580],[40.3580,46.3650,2690],[40.3560,46.3680,2780],[40.3540,46.3710,2870],[40.3525,46.3740,2950],[40.3515,46.3760,3010],[40.3511,46.3780,3066]],"stats":{"distanceKm":15.4,"highestPointM":3066,"lowestPointM":1500,"elevationGainM":1566,"elevationLossM":0}}'
   },
@@ -159,7 +159,7 @@ export const seedTours: Tour[] = [
     image: 'https://images.unsplash.com/photo-1486915309851-b0cc1f8a0084?w=800&auto=format&fit=crop&q=80',
     rating: 5.0,
     reviewsCount: 19,
-    isApproved: true
+    isApproved: true, status: 'approved'
   },
   {
     id: 'tour-tufandag',
@@ -175,7 +175,7 @@ export const seedTours: Tour[] = [
     image: 'https://images.unsplash.com/photo-1544829099-b9a0c07fad1a?w=800&auto=format&fit=crop&q=80',
     rating: 4.7,
     reviewsCount: 11,
-    isApproved: true
+    isApproved: true, status: 'approved'
   },
 
   // 2️⃣ Camp Tours (Camp Turları)
@@ -193,7 +193,7 @@ export const seedTours: Tour[] = [
     image: 'https://images.unsplash.com/photo-1470246973918-29a93221c455?w=800&auto=format&fit=crop&q=80',
     rating: 4.5,
     reviewsCount: 14,
-    isApproved: true
+    isApproved: true, status: 'approved'
   },
   {
     id: 'tour-cenub-camp',
@@ -209,7 +209,7 @@ export const seedTours: Tour[] = [
     image: 'https://images.unsplash.com/photo-1526772662000-3f88f10405ff?w=800&auto=format&fit=crop&q=80',
     rating: 4.8,
     reviewsCount: 23,
-    isApproved: true
+    isApproved: true, status: 'approved'
   },
   {
     id: 'tour-hamosam',
@@ -225,7 +225,7 @@ export const seedTours: Tour[] = [
     image: 'https://images.unsplash.com/photo-1504280390367-361c6d9f38f4?w=800&auto=format&fit=crop&q=80',
     rating: 4.7,
     reviewsCount: 9,
-    isApproved: true
+    isApproved: true, status: 'approved'
   },
   {
     id: 'tour-qusar-lazy',
@@ -241,7 +241,7 @@ export const seedTours: Tour[] = [
     image: 'https://images.unsplash.com/photo-1496545672447-f699b503d270?w=800&auto=format&fit=crop&q=80',
     rating: 4.6,
     reviewsCount: 31,
-    isApproved: true
+    isApproved: true, status: 'approved'
   },
   {
     id: 'tour-qax-qocyataq-camp',
@@ -257,7 +257,7 @@ export const seedTours: Tour[] = [
     image: 'https://images.unsplash.com/photo-1510312305653-8ed496efae75?w=800&auto=format&fit=crop&q=80',
     rating: 4.9,
     reviewsCount: 16,
-    isApproved: true
+    isApproved: true, status: 'approved'
   },
   {
     id: 'tour-deniz-camp',
@@ -273,7 +273,7 @@ export const seedTours: Tour[] = [
     image: 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800&auto=format&fit=crop&q=80',
     rating: 4.4,
     reviewsCount: 28,
-    isApproved: true
+    isApproved: true, status: 'approved'
   },
   {
     id: 'tour-naxcivan-ev',
@@ -289,7 +289,7 @@ export const seedTours: Tour[] = [
     image: 'https://images.unsplash.com/photo-1561542320-9a18cd340469?w=800&auto=format&fit=crop&q=80',
     rating: 4.9,
     reviewsCount: 12,
-    isApproved: true
+    isApproved: true, status: 'approved'
   },
 
   // 3️⃣ Hiking Tours (Hiking Turları)
@@ -307,7 +307,7 @@ export const seedTours: Tour[] = [
     image: 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=800&auto=format&fit=crop&q=80',
     rating: 4.5,
     reviewsCount: 7,
-    isApproved: true
+    isApproved: true, status: 'approved'
   },
   {
     id: 'tour-sahdili',
@@ -323,7 +323,7 @@ export const seedTours: Tour[] = [
     image: 'https://images.unsplash.com/photo-1505118380757-91f5f5632de0?w=800&auto=format&fit=crop&q=80',
     rating: 4.7,
     reviewsCount: 18,
-    isApproved: true
+    isApproved: true, status: 'approved'
   },
   {
     id: 'tour-sim-dustaqxana',
@@ -339,7 +339,7 @@ export const seedTours: Tour[] = [
     image: 'https://images.unsplash.com/photo-1448375240586-882707db888b?w=800&auto=format&fit=crop&q=80',
     rating: 4.9,
     reviewsCount: 36,
-    isApproved: true
+    isApproved: true, status: 'approved'
   },
   {
     id: 'tour-yardimli',
@@ -355,7 +355,7 @@ export const seedTours: Tour[] = [
     image: 'https://images.unsplash.com/photo-1473448912268-2022ce9509d8?w=800&auto=format&fit=crop&q=80',
     rating: 4.6,
     reviewsCount: 12,
-    isApproved: true
+    isApproved: true, status: 'approved'
   },
   {
     id: 'tour-embil',
@@ -371,7 +371,7 @@ export const seedTours: Tour[] = [
     image: 'https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=800&auto=format&fit=crop&q=80',
     rating: 4.8,
     reviewsCount: 22,
-    isApproved: true
+    isApproved: true, status: 'approved'
   },
   {
     id: 'tour-mucu-lahic',
@@ -387,7 +387,7 @@ export const seedTours: Tour[] = [
     image: 'https://images.unsplash.com/photo-1551836022-d5d88e9218df?w=800&auto=format&fit=crop&q=80',
     rating: 4.7,
     reviewsCount: 14,
-    isApproved: true
+    isApproved: true, status: 'approved'
   },
   {
     id: 'tour-kuzun-laza',
@@ -403,7 +403,7 @@ export const seedTours: Tour[] = [
     image: 'https://images.unsplash.com/photo-1426604966848-d7adac402bff?w=800&auto=format&fit=crop&q=80',
     rating: 4.9,
     reviewsCount: 78,
-    isApproved: true
+    isApproved: true, status: 'approved'
   },
   {
     id: 'tour-xanbulan',
@@ -419,7 +419,7 @@ export const seedTours: Tour[] = [
     image: 'https://images.unsplash.com/photo-1447752875215-b2761acb3c5d?w=800&auto=format&fit=crop&q=80',
     rating: 4.8,
     reviewsCount: 19,
-    isApproved: true
+    isApproved: true, status: 'approved'
   },
   {
     id: 'tour-qaranohur',
@@ -435,7 +435,7 @@ export const seedTours: Tour[] = [
     image: 'https://images.unsplash.com/photo-1511497584788-876760111969?w=800&auto=format&fit=crop&q=80',
     rating: 4.9,
     reviewsCount: 42,
-    isApproved: true
+    isApproved: true, status: 'approved'
   },
   {
     id: 'tour-sim-kendi-yurusu',
@@ -458,7 +458,7 @@ export const seedTours: Tour[] = [
     image: 'https://images.unsplash.com/photo-1473448912268-2022ce9509d8?w=800&auto=format&fit=crop&q=80',
     rating: 4.9,
     reviewsCount: 16,
-    isApproved: true
+    isApproved: true, status: 'approved'
   },
   {
     id: 'tour-sim-siyov-bendasar',
@@ -479,7 +479,7 @@ export const seedTours: Tour[] = [
     image: 'https://images.unsplash.com/photo-1511497584788-876760111969?w=800&auto=format&fit=crop&q=80',
     rating: 5.0,
     reviewsCount: 12,
-    isApproved: true
+    isApproved: true, status: 'approved'
   },
   {
     id: 'tour-si-salalesi',
@@ -501,7 +501,7 @@ export const seedTours: Tour[] = [
     image: 'https://images.unsplash.com/photo-1448375240586-882707db888b?w=800&auto=format&fit=crop&q=80',
     rating: 4.8,
     reviewsCount: 19,
-    isApproved: true
+    isApproved: true, status: 'approved'
   },
   {
     id: 'tour-xalit-yasil-nerimankend',
@@ -524,7 +524,7 @@ export const seedTours: Tour[] = [
     image: 'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=800&auto=format&fit=crop&q=80',
     rating: 4.9,
     reviewsCount: 15,
-    isApproved: true
+    isApproved: true, status: 'approved'
   },
   {
     id: 'tour-kapadokya-sehr',
@@ -547,7 +547,7 @@ export const seedTours: Tour[] = [
     image: 'https://images.unsplash.com/photo-1507608869274-d3177c8bb4c7?w=800&auto=format&fit=crop&q=80',
     rating: 5.0,
     reviewsCount: 24,
-    isApproved: true,
+    isApproved: true, status: 'approved',
     isInternational: true,
     destinationCountry: 'Türkiyə',
     destinationCity: 'Kapadokya',
@@ -618,7 +618,7 @@ export const seedTours: Tour[] = [
     image: 'https://images.unsplash.com/photo-1552832230-c0197dd311b5?w=800&auto=format&fit=crop&q=80',
     rating: 4.9,
     reviewsCount: 18,
-    isApproved: true,
+    isApproved: true, status: 'approved',
     isInternational: true,
     destinationCountry: 'İtaliya',
     destinationCity: 'Roma',
@@ -688,7 +688,7 @@ export const seedTours: Tour[] = [
     image: 'https://images.unsplash.com/photo-1547347298-4074fc3086f0?w=800&auto=format&fit=crop&q=80',
     rating: 4.9,
     reviewsCount: 64,
-    isApproved: true,
+    isApproved: true, status: 'approved',
     isActiveLife: true,
     activityType: 'volleyball',
     activeDifficulty: 'medium',
@@ -714,7 +714,7 @@ export const seedTours: Tour[] = [
     image: 'https://images.unsplash.com/photo-1530866495561-507c9faab2ed?w=800&auto=format&fit=crop&q=80',
     rating: 5.0,
     reviewsCount: 48,
-    isApproved: true,
+    isApproved: true, status: 'approved',
     isActiveLife: true,
     activityType: 'rafting',
     activeDifficulty: 'professional',

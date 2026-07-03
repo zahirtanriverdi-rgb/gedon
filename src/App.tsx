@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Tour, TourSlot, Booking, Review, User, PlatformConfig, UserRole } from './types';
 import { seedUsers } from './data/toursData';
-import ArchitectureView from './components/ArchitectureView';
 import CustomerPortal from './components/CustomerPortal';
 import VendorPortal from './components/VendorPortal';
 import AdminPortal from './components/AdminPortal';
@@ -9,15 +8,14 @@ import OperatorLogin from './components/OperatorLogin';
 import AdminLogin from './components/AdminLogin';
 import { SearchDropdown } from './components/SearchDropdown';
 import { getRecentSearches, addRecentSearch } from './utils/recentSearches';
-import { 
-  Compass, 
-  Layers, 
-  Database, 
-  DatabaseBackup, 
-  Map, 
-  Tv, 
+import {
+  Compass,
+  Layers,
+  Database,
+  Map,
+  Tv,
   Award,
-  BookOpen, 
+  BookOpen,
   ArrowRight,
   ShieldAlert,
   Download,
@@ -45,9 +43,6 @@ async function parseApiResponse(response: Response): Promise<any> {
 }
 
 export default function App() {
-  // Main Navigation Sections
-  const [currentSection, setCurrentSection] = useState<'marketplace' | 'architecture' | 'seeder'>('marketplace');
-
   // Custom notification state for elegant user feedback without browser alerts
   const [notification, setNotification] = useState<{
     message: string;
@@ -358,14 +353,21 @@ export default function App() {
     }));
   };
 
-  const handleUpdateUser = (userId: string, data: Partial<User>) => {
-    setUsers(prev => prev.map(u => {
-      if (u.id === userId) {
-        return { ...u, ...data };
-      }
-      return u;
-    }));
-    showNotification('İstifadəçi məlumatları (operator) uğurla yeniləndi!', 'success');
+  const handleUpdateUser = async (userId: string, data: Partial<User>) => {
+    try {
+      const response = await fetch(`/api/users/${userId}`, {
+        method: 'PUT',
+        headers: authHeaders(),
+        body: JSON.stringify(data),
+      });
+      const parsed = await parseApiResponse(response);
+      if (!response.ok) throw new Error(parsed.error || 'İstifadəçi yenilənə bilmədi.');
+
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, ...parsed.user } : u));
+      showNotification('İstifadəçi məlumatları (operator) uğurla yeniləndi!', 'success');
+    } catch (e: any) {
+      showNotification(e.message || 'İstifadəçi yenilənərkən xəta baş verdi.', 'error');
+    }
   };
 
   const handleAddSlot = async (newSlot: TourSlot) => {
@@ -382,6 +384,20 @@ export default function App() {
       showNotification('Yeni təqvim slotu (satış tərifi) uğurla daxil edildi!', 'success');
     } catch (e: any) {
       showNotification(e.message || 'Tarix əlavə edilərkən xəta baş verdi.', 'error');
+      throw e;
+    }
+  };
+
+  const handleDeleteSlot = async (slotId: string) => {
+    try {
+      const response = await fetch(`/api/slots/${slotId}`, { method: 'DELETE', headers: authHeaders() });
+      if (!response.ok) {
+        const data = await parseApiResponse(response);
+        throw new Error(data.error || 'Tarix silinə bilmədi.');
+      }
+      setSlots(prev => prev.filter(s => s.id !== slotId));
+    } catch (e: any) {
+      showNotification(e.message || 'Tarix silinərkən xəta baş verdi.', 'error');
       throw e;
     }
   };
@@ -414,7 +430,7 @@ export default function App() {
       const response = await fetch(`/api/tours/${tourId}`, {
         method: 'PUT',
         headers: authHeaders(),
-        body: JSON.stringify({ isApproved: true }),
+        body: JSON.stringify({ status: 'approved' }),
       });
       const data = await parseApiResponse(response);
       if (!response.ok) throw new Error(data.error || 'Tur təsdiqlənə bilmədi.');
@@ -423,6 +439,24 @@ export default function App() {
       showNotification('Tur marşrutu admin tərəfindən uğurla təsdiqləndi və satışa buraxıldı!', 'success');
     } catch (e: any) {
       showNotification(e.message || 'Tur təsdiqlənərkən xəta baş verdi.', 'error');
+      throw e;
+    }
+  };
+
+  const handleRejectTour = async (tourId: string) => {
+    try {
+      const response = await fetch(`/api/tours/${tourId}`, {
+        method: 'PUT',
+        headers: authHeaders(),
+        body: JSON.stringify({ status: 'rejected' }),
+      });
+      const data = await parseApiResponse(response);
+      if (!response.ok) throw new Error(data.error || 'Tur rədd edilə bilmədi.');
+
+      setTours(prev => prev.map(t => t.id === tourId ? data.tour : t));
+      showNotification('Tur rədd edildi.', 'info');
+    } catch (e: any) {
+      showNotification(e.message || 'Tur rədd edilərkən xəta baş verdi.', 'error');
       throw e;
     }
   };
@@ -538,7 +572,6 @@ export default function App() {
           
           {/* Logo Brand */}
           <div className="flex items-center gap-2 cursor-pointer order-1" onClick={() => {
-            setCurrentSection('marketplace');
             setGlobalSearchQuery('');
             setIsGlobalSearchFocused(false);
             window.dispatchEvent(new CustomEvent('nav-home'));
@@ -607,7 +640,10 @@ export default function App() {
           <div className="flex items-center gap-6 order-2 md:order-3">
             {selectedRole === 'customer' ? (
               <div className="flex items-center gap-5 text-slate-700">
-                <button className="flex flex-col items-center justify-center gap-1 hover:text-emerald-600 transition group cursor-pointer bg-transparent border-none p-0">
+                <button
+                  onClick={() => window.dispatchEvent(new CustomEvent('nav-wishlist'))}
+                  className="flex flex-col items-center justify-center gap-1 hover:text-emerald-600 transition group cursor-pointer bg-transparent border-none p-0"
+                >
                   <Heart className="w-5 h-5 stroke-[2px] transition-colors group-hover:fill-emerald-500 group-hover:stroke-emerald-500" />
                   <span className="text-[11px] font-semibold">İstəklər</span>
                 </button>
@@ -658,38 +694,6 @@ export default function App() {
               </div>
             ) : (
               <nav className="flex items-center gap-6">
-                <button
-                  onClick={() => setCurrentSection('marketplace')}
-                  className={`text-xs font-semibold py-1 transition-all border-b-2 ${
-                    currentSection === 'marketplace' 
-                      ? 'text-emerald-700 border-emerald-700 font-bold' 
-                      : 'text-slate-500 border-transparent hover:text-slate-900'
-                  }`}
-                >
-                  Demo Portal
-                </button>
-                
-                <button
-                  onClick={() => setCurrentSection('architecture')}
-                  className={`text-xs font-semibold py-1 transition-all border-b-2 ${
-                    currentSection === 'architecture' 
-                      ? 'text-emerald-700 border-emerald-700 font-bold' 
-                      : 'text-slate-500 border-transparent hover:text-slate-900'
-                  }`}
-                >
-                  System Architecture
-                </button>
-
-                <button
-                  onClick={() => setCurrentSection('seeder')}
-                  className={`text-xs font-semibold py-1 transition-all border-b-2 ${
-                    currentSection === 'seeder' 
-                      ? 'text-emerald-700 border-emerald-700 font-bold' 
-                      : 'text-slate-500 border-transparent hover:text-slate-900'
-                  }`}
-                >
-                  JSON Seeder
-                </button>
                 {loggedInVendor && (
                   <button
                     onClick={handleOperatorLogout}
@@ -715,9 +719,7 @@ export default function App() {
       {/* Main Workspace Frame */}
       <main className="max-w-7xl mx-auto px-6 sm:px-8 py-8 flex-1 w-full space-y-6">
         
-        {/* SECTION 1: THE DEMO MARKETPLACE PORTAL */}
-        {currentSection === 'marketplace' && (
-          <div className="space-y-6 animate-fadeIn">
+        <div className="space-y-6 animate-fadeIn">
 
             {isMarketplaceDataLoading && (
               <div className="flex flex-col items-center justify-center py-24 gap-4">
@@ -776,6 +778,7 @@ export default function App() {
                 currentUser={activeUser}
                 operatorToken={operatorToken}
                 onAddSlot={handleAddSlot}
+                onDeleteSlot={handleDeleteSlot}
                 onAddTour={handleAddTour}
                 onEditTour={handleEditTour}
                 onDeleteTour={handleDeleteTour}
@@ -797,12 +800,18 @@ export default function App() {
             {selectedRole === 'admin' && loggedInAdmin && (
               <AdminPortal
                 tours={tours}
+                slots={slots}
                 bookings={bookings}
                 users={users}
+                currentUser={activeUser}
                 platformConfig={platformConfig}
                 onUpdateCommissionPercent={handleUpdateCommissionPercent}
                 onApproveTour={handleApproveTour}
+                onRejectTour={handleRejectTour}
                 onEditTour={handleEditTour}
+                onDeleteTour={handleDeleteTour}
+                onAddSlot={handleAddSlot}
+                onDeleteSlot={handleDeleteSlot}
                 onShowNotification={showNotification}
                 exchangeRates={exchangeRates}
                 onUpdateExchangeRates={handleUpdateExchangeRates}
@@ -815,74 +824,6 @@ export default function App() {
             )}
 
           </div>
-        )}
-
-        {/* SECTION 2: SYSTEM ARCHITECTURE & DDL SCREEN */}
-        {currentSection === 'architecture' && (
-          <ArchitectureView />
-        )}
-
-        {/* SECTION 3: THE PARSED JSON DATA SEEDER WORKSPACE */}
-        {currentSection === 'seeder' && (
-          <div className="bg-white rounded-2xl border p-6 md:p-8 space-y-6 shadow-xs animate-fadeIn">
-            <div>
-              <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                <DatabaseBackup className="text-blue-500 w-5 h-5" />
-                Dəniz, Zirvə və Hiking Turlarının Strukturlaşdırılmış Seeder JSON-u
-              </h2>
-              <p className="text-xs text-slate-500 mt-1">
-                Təqdim etdiyiniz aylıq tur cədvəllərini analitik olaraq emal etdim, relational arxitekturaya (One-to-Many - Tours & Slots) uyğun olaraq aşağıdakı təmiz, rəsmi seeder verilənlər bazası halına saldım:
-              </p>
-            </div>
-
-            {/* Structured JSON code block viewer */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between flex-wrap gap-2">
-                <span className="text-xs font-mono text-slate-400 bg-slate-100 px-2.5 py-1 rounded">
-                  database_seeds.json
-                </span>
-                
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold text-emerald-600 flex items-center gap-1">
-                    ✓ Turlar normalizasiya edildi
-                  </span>
-                </div>
-              </div>
-
-              <div className="bg-slate-950 p-5 rounded-xl border border-slate-850 font-mono text-xs text-slate-300 h-[500px] overflow-y-auto select-all">
-                <pre>{JSON.stringify({
-                  Tours: tours.map(t => ({
-                    id: t.id,
-                    vendor_id: t.vendorId,
-                    name: t.name,
-                    category: t.category,
-                    difficulty: t.difficulty,
-                    region: t.region,
-                    duration_days: t.durationDays,
-                    includes_list: t.includes,
-                    rating: t.rating
-                  })),
-                  Tour_Slots: slots.map(s => ({
-                    id: s.id,
-                    tour_id: s.tourId,
-                    start_date: s.startDate,
-                    end_date: s.endDate,
-                    price_azn: s.price,
-                    capacity_persons: s.capacity
-                  }))
-                }, null, 2)}</pre>
-              </div>
-
-              <div className="bg-slate-50 p-4 rounded-xl border text-xs text-slate-600 flex gap-2">
-                <ShieldAlert className="w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5" />
-                <div>
-                  <strong className="text-slate-700 block mb-0.5">Memarlıq Qeydi:</strong>
-                  Baza səviyyəsində redundansiyanı (təkrarlanmanı) aradan qaldırmaq üçün <code>tours</code> və <code>tour_slots</code> ayrı cədvəllərdir. Eyni tur adı fərqli tarixlərdə (slots) müxtəlif yer limitləri və dəyişkən mövsümi qiymətlərlə təmsil oluna bilər. Məsələn, <i>Kuzun-Laza</i> turuna aid 9 fərqli slot var, lakin tək bir əsas marşrut idarə panelindən bütün detalları oxunur.
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
 
       </main>
 
