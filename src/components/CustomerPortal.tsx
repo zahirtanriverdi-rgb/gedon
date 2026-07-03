@@ -2015,9 +2015,7 @@ export default function CustomerPortal({
             {/* Header Section */}
             <div className="mb-8 space-y-4">
               <div className="flex space-x-2 text-xs text-slate-500 font-medium">
-                <span className="uppercase tracking-wider">{selectedTour.category}</span>
-                <span>•</span>
-                <span>Fəaliyyət provayderi: <strong className="text-slate-800 cursor-pointer pointer-events-auto hover:underline" onClick={(e) => { e.stopPropagation(); const org = users.find(u => u.id === selectedTour.vendorId); if (org) { setSelectedOrganizer(org); setActiveView('organizer'); setSelectedTour(null); } }}>{selectedTour.vendorName}</strong></span>
+                <span><strong className="text-slate-800 cursor-pointer pointer-events-auto hover:underline" onClick={(e) => { e.stopPropagation(); const org = users.find(u => u.id === selectedTour.vendorId); if (org) { setSelectedOrganizer(org); setActiveView('organizer'); setSelectedTour(null); } }}>{selectedTour.vendorName}</strong> tərəfindən</span>
               </div>
               <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-slate-900 tracking-tight leading-tight">
                 {selectedTour.name}
