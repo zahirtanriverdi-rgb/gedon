@@ -48,7 +48,14 @@ export interface Tour {
   description: string;
   region: string;
   durationDays: number;
+  durationHours?: number;
   includes: string[];
+  highlights?: string[];
+  languages?: string[];
+  importantInfo?: {
+    bring?: string[];
+    notAllowed?: string[];
+  };
   vendorId: string;
   vendorName: string;
   image: string;

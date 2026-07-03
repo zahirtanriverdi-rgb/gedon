@@ -22,6 +22,11 @@ export function EditTourModal({ tour, slots, onEditTour, onDeleteTour, onShowNot
   const [editTourDays, setEditTourDays] = useState<number>(1);
   const [editTourDescription, setEditTourDescription] = useState<string>('');
   const [editTourIncludes, setEditTourIncludes] = useState<string>('');
+  const [editTourHighlights, setEditTourHighlights] = useState<string>('');
+  const [editTourLanguages, setEditTourLanguages] = useState<string>('');
+  const [editTourDurationHours, setEditTourDurationHours] = useState<number>(8);
+  const [editTourBringItems, setEditTourBringItems] = useState<string>('');
+  const [editTourNotAllowedItems, setEditTourNotAllowedItems] = useState<string>('');
   const [editTourImage, setEditTourImage] = useState<string>('');
   const [editTourWhatsApp, setEditTourWhatsApp] = useState<string>('');
   const [editTourImages, setEditTourImages] = useState<string[]>([]);
@@ -74,6 +79,11 @@ export function EditTourModal({ tour, slots, onEditTour, onDeleteTour, onShowNot
     setEditTourDays(tour.durationDays);
     setEditTourDescription(tour.description || '');
     setEditTourIncludes(Array.isArray(tour.includes) ? tour.includes.join(', ') : '');
+    setEditTourHighlights(Array.isArray(tour.highlights) ? tour.highlights.join(', ') : '');
+    setEditTourLanguages(Array.isArray(tour.languages) ? tour.languages.join(', ') : '');
+    setEditTourDurationHours(tour.durationHours || (tour.durationDays ? tour.durationDays * 8 : 8));
+    setEditTourBringItems(Array.isArray(tour.importantInfo?.bring) ? tour.importantInfo!.bring!.join(', ') : '');
+    setEditTourNotAllowedItems(Array.isArray(tour.importantInfo?.notAllowed) ? tour.importantInfo!.notAllowed!.join(', ') : '');
     setEditTourImage(tour.image || '');
     setEditTourWhatsApp(tour.whatsapp_number || '');
     setEditTourGpxData(tour.gpxData || '');
@@ -704,6 +714,52 @@ export function EditTourModal({ tour, slots, onEditTour, onDeleteTour, onShowNot
                         </div>
                       </div>
 
+                      {/* Highlights, Languages & Important Info */}
+                      <div className="space-y-3 pt-3 border-t border-slate-100">
+                        <div>
+                          <label className="block text-xs font-bold text-emerald-800 mb-1">Önə çıxanlar (Vergüllə ayırın):</label>
+                          <input
+                            type="text"
+                            value={editTourHighlights}
+                            onChange={(e) => setEditTourHighlights(e.target.value)}
+                            placeholder="Panoram mənzərəli marşrut, Peşəkar bələdçi müşayiəti"
+                            className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-700"
+                          />
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-xs font-bold text-emerald-800 mb-1">Danışılan dillər (Vergüllə ayırın):</label>
+                            <input
+                              type="text"
+                              value={editTourLanguages}
+                              onChange={(e) => setEditTourLanguages(e.target.value)}
+                              placeholder="Azərbaycanca, Rusca, İngiliscə"
+                              className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-700"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-bold text-emerald-800 mb-1">Özünüzlə gətirin (Vergüllə ayırın):</label>
+                            <input
+                              type="text"
+                              value={editTourBringItems}
+                              onChange={(e) => setEditTourBringItems(e.target.value)}
+                              placeholder="Pasport, Hava şəraitinə uyğun geyim"
+                              className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-700"
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-red-800 mb-1">İcazə verilmir (Vergüllə ayırın):</label>
+                          <input
+                            type="text"
+                            value={editTourNotAllowedItems}
+                            onChange={(e) => setEditTourNotAllowedItems(e.target.value)}
+                            placeholder="Böyük çamadanlar, Müşayiətsiz yetkinlik yaşına çatmayanlar"
+                            className="w-full px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-700"
+                          />
+                        </div>
+                      </div>
+
                       {/* Itinerary */}
                       <div className="space-y-4 pt-3 border-t border-slate-100">
                         <div className="flex items-center justify-between">
@@ -1195,6 +1251,64 @@ export function EditTourModal({ tour, slots, onEditTour, onDeleteTour, onShowNot
                         />
                       </div>
 
+                      {/* Highlights */}
+                      <div>
+                        <label className="block text-[10px] font-extrabold text-slate-500 tracking-wide mb-1">Önə çıxanlar (Vergüllə ayırın):</label>
+                        <textarea
+                          rows={2}
+                          value={editTourHighlights}
+                          onChange={(e) => setEditTourHighlights(e.target.value)}
+                          className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:bg-white font-bold text-xs"
+                          placeholder="Panoram mənzərəli marşrut, Peşəkar bələdçi müşayiəti"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-[10px] font-extrabold text-slate-500 tracking-wide mb-1">Danışılan dillər (Vergüllə ayırın):</label>
+                          <input
+                            type="text"
+                            value={editTourLanguages}
+                            onChange={(e) => setEditTourLanguages(e.target.value)}
+                            placeholder="Azərbaycanca, Rusca, İngiliscə"
+                            className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:bg-white font-bold text-xs"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-extrabold text-slate-500 tracking-wide mb-1">Tam müddət (saat):</label>
+                          <input
+                            type="number"
+                            min={1}
+                            value={editTourDurationHours}
+                            onChange={(e) => setEditTourDurationHours(Number(e.target.value))}
+                            className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:bg-white font-bold text-xs"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-[10px] font-extrabold text-slate-500 tracking-wide mb-1">Özünüzlə gətirin (Vergüllə ayırın):</label>
+                          <input
+                            type="text"
+                            value={editTourBringItems}
+                            onChange={(e) => setEditTourBringItems(e.target.value)}
+                            placeholder="Rahat ayaqqabı, Pasport, Hava şəraitinə uyğun geyim"
+                            className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:bg-white font-bold text-xs"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-extrabold text-slate-500 tracking-wide mb-1">İcazə verilmir (Vergüllə ayırın):</label>
+                          <input
+                            type="text"
+                            value={editTourNotAllowedItems}
+                            onChange={(e) => setEditTourNotAllowedItems(e.target.value)}
+                            placeholder="Böyük çamadanlar, Müşayiətsiz yetkinlik yaşına çatmayanlar"
+                            className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-1 focus:ring-emerald-500 focus:bg-white font-bold text-xs"
+                          />
+                        </div>
+                      </div>
+
                       {/* GPX Track Uploader (Edit Mode) */}
                       <div className="bg-slate-50 border border-slate-205 p-4 rounded-xl space-y-3">
                         <div className="flex items-center justify-between">
@@ -1388,7 +1502,15 @@ export function EditTourModal({ tour, slots, onEditTour, onDeleteTour, onShowNot
                   if (onEditTour && tour) {
                     const isIntl = tour.isInternational || tour.category === 'international';
                     const cleanIncludes = isIntl ? editIntlIncludes : editTourIncludes.split(',').map(s => s.trim()).filter(Boolean);
-                    
+                    const cleanHighlights = editTourHighlights.split(',').map(s => s.trim()).filter(Boolean);
+                    const cleanLanguages = editTourLanguages.split(',').map(s => s.trim()).filter(Boolean);
+                    const cleanBringItems = editTourBringItems.split(',').map(s => s.trim()).filter(Boolean);
+                    const cleanNotAllowedItems = editTourNotAllowedItems.split(',').map(s => s.trim()).filter(Boolean);
+                    const cleanImportantInfo = (cleanBringItems.length > 0 || cleanNotAllowedItems.length > 0) ? {
+                      bring: cleanBringItems.length > 0 ? cleanBringItems : undefined,
+                      notAllowed: cleanNotAllowedItems.length > 0 ? cleanNotAllowedItems : undefined,
+                    } : undefined;
+
                     // Track edited fields for Admin notification
                     const changes: string[] = [];
                     if (tour.name !== editTourName) changes.push(`Ad (${tour.name} ➡️ ${editTourName})`);
@@ -1443,7 +1565,11 @@ export function EditTourModal({ tour, slots, onEditTour, onDeleteTour, onShowNot
                         ],
                         mealType: editIntlTourMealType,
                         priceCurrency: editIntlTourCurrency,
-                        itinerary: editIntlItinerary
+                        itinerary: editIntlItinerary,
+                        durationHours: editTourDurationHours ? Number(editTourDurationHours) : undefined,
+                        highlights: cleanHighlights.length > 0 ? cleanHighlights : undefined,
+                        languages: cleanLanguages.length > 0 ? cleanLanguages : undefined,
+                        importantInfo: cleanImportantInfo
                       };
                     } else {
                       if (tour.category !== editTourCategory) changes.push(`Kateqoriya (${tour.category} ➡️ ${editTourCategory})`);
@@ -1480,8 +1606,12 @@ export function EditTourModal({ tour, slots, onEditTour, onDeleteTour, onShowNot
                         difficulty: editTourDifficulty,
                         region: editTourRegion,
                         durationDays: Number(editTourDays),
+                        durationHours: editTourDurationHours ? Number(editTourDurationHours) : undefined,
                         description: editTourDescription,
                         includes: cleanIncludes.length > 0 ? cleanIncludes : ['Müşayiət bələdçisi'],
+                        highlights: cleanHighlights.length > 0 ? cleanHighlights : undefined,
+                        languages: cleanLanguages.length > 0 ? cleanLanguages : undefined,
+                        importantInfo: cleanImportantInfo,
                         image: editTourImage,
                         images: editTourImages,
                         videos: editTourVideos,

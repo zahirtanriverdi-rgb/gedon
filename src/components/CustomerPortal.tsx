@@ -1989,13 +1989,15 @@ export default function CustomerPortal({
                   </div>
                   <div className="flex flex-col gap-1.5">
                     <Clock className="w-6 h-6 text-slate-700 mb-1" />
-                    <span className="text-sm font-extrabold text-slate-900">Müddət: {selectedTour.durationDays * 8} saat</span>
+                    <span className="text-sm font-extrabold text-slate-900">Müddət: {selectedTour.durationHours ?? (selectedTour.durationDays * 8)} saat</span>
                     <span className="text-xs text-slate-500 leading-snug">Başlama vaxtlarını görmək üçün yoxlayın.</span>
                   </div>
                   <div className="flex flex-col gap-1.5">
                     <Globe className="w-6 h-6 text-slate-700 mb-1" />
                     <span className="text-sm font-extrabold text-slate-900">Canlı tur bələdçisi</span>
-                    <span className="text-xs text-slate-500 leading-snug">Azərbaycanca, Rusca, İngiliscə</span>
+                    <span className="text-xs text-slate-500 leading-snug">
+                      {selectedTour.languages && selectedTour.languages.length > 0 ? selectedTour.languages.join(', ') : 'Azərbaycanca'}
+                    </span>
                   </div>
                   <div className="flex flex-col gap-1.5">
                     <Users className="w-6 h-6 text-slate-700 mb-1" />
@@ -2634,20 +2636,19 @@ export default function CustomerPortal({
                 <div className="space-y-4 py-4">
                   <h2 className="text-xl font-extrabold text-slate-900">Önə Çıxanlar</h2>
                   <div className="flex flex-col gap-4">
-                    <div className="flex items-start gap-4">
-                      <div className="mt-0.5"><Check className="w-5 h-5 text-emerald-600" /></div>
-                      <span className="text-slate-700 leading-relaxed font-medium">Peşəkar bələdçilərlə {selectedTour.region} regionunun nəfəskəsici təbiətini kəşf edin.</span>
-                    </div>
-                    <div className="flex items-start gap-4">
-                      <div className="mt-0.5"><Check className="w-5 h-5 text-emerald-600" /></div>
-                      <span className="text-slate-700 leading-relaxed font-medium">Seçilmiş səviyyənizə uyğun {selectedTour.difficulty} çətinlikdə macəra yaşayın.</span>
-                    </div>
-                    {selectedTour.isInternational && (
-                      <div className="flex items-start gap-4">
+                    {(selectedTour.highlights && selectedTour.highlights.length > 0
+                      ? selectedTour.highlights
+                      : [
+                          `Peşəkar bələdçilərlə ${selectedTour.region} regionunun nəfəskəsici təbiətini kəşf edin.`,
+                          `Seçilmiş səviyyənizə uyğun ${selectedTour.difficulty} çətinlikdə macəra yaşayın.`,
+                          ...(selectedTour.isInternational ? [`${selectedTour.destinationCity} şəhərində gündəlik istiqamətinizi izləyən ağıllı marşrut proqramı.`] : [])
+                        ]
+                    ).map((highlight, idx) => (
+                      <div key={idx} className="flex items-start gap-4">
                         <div className="mt-0.5"><Check className="w-5 h-5 text-emerald-600" /></div>
-                        <span className="text-slate-700 leading-relaxed font-medium">{selectedTour.destinationCity} şəhərində gündəlik istiqamətinizi izləyən ağıllı marşrut proqramı.</span>
+                        <span className="text-slate-700 leading-relaxed font-medium">{highlight}</span>
                       </div>
-                    )}
+                    ))}
                   </div>
                 </div>
                 
@@ -2674,10 +2675,15 @@ export default function CustomerPortal({
                 <div className="space-y-4 py-4 border-t border-slate-200">
                   <h2 className="text-xl font-extrabold text-slate-900">Qiymətə daxildir</h2>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                   <div className="flex items-start gap-3">
-                     <Check className="w-5 h-5 text-emerald-600 shrink-0" />
-                     <span className="text-slate-700 text-sm font-medium">Peşəkar canlı tur bələdçisi</span>
-                   </div>
+                   {(selectedTour.includes && selectedTour.includes.length > 0
+                     ? selectedTour.includes
+                     : ['Peşəkar canlı tur bələdçisi', 'Yerli vergilər və xərclər']
+                   ).map((item, idx) => (
+                     <div key={`inc-${idx}`} className="flex items-start gap-3">
+                       <Check className="w-5 h-5 text-emerald-600 shrink-0" />
+                       <span className="text-slate-700 text-sm font-medium">{item}</span>
+                     </div>
+                   ))}
                    {selectedTour.mealType && (
                      <div className="flex items-start gap-3">
                        <Check className="w-5 h-5 text-emerald-600 shrink-0" />
@@ -2690,14 +2696,15 @@ export default function CustomerPortal({
                        <span className="text-slate-700 text-sm font-medium">Aviabilet və transfer daxildir</span>
                      </div>
                    )}
-                   <div className="flex items-start gap-3">
-                     <Check className="w-5 h-5 text-emerald-600 shrink-0" />
-                     <span className="text-slate-700 text-sm font-medium">Yerli vergilər və xərclər</span>
-                   </div>
-                   <div className="flex items-start gap-3 opacity-60">
-                     <X className="w-5 h-5 text-red-500 shrink-0" />
-                     <span className="text-slate-700 text-sm font-medium line-through decoration-slate-300">Şəxsi suvenirlər (Daxil deyil)</span>
-                   </div>
+                   {(selectedTour.notIncluded && selectedTour.notIncluded.length > 0
+                     ? selectedTour.notIncluded
+                     : ['Şəxsi suvenirlər']
+                   ).map((item, idx) => (
+                     <div key={`exc-${idx}`} className="flex items-start gap-3 opacity-60">
+                       <X className="w-5 h-5 text-red-500 shrink-0" />
+                       <span className="text-slate-700 text-sm font-medium line-through decoration-slate-300">{item}</span>
+                     </div>
+                   ))}
                    {!selectedTour.flightIncluded && selectedTour.isInternational && (
                      <div className="flex items-start gap-3 opacity-60">
                        <X className="w-5 h-5 text-red-500 shrink-0" />
@@ -2746,26 +2753,27 @@ export default function CustomerPortal({
                     <div>
                       <h3 className="font-bold text-slate-800 text-sm mb-3">Özünüzlə gətirin</h3>
                       <ul className="space-y-2">
-                        <li className="flex items-start gap-3 text-sm text-slate-700 font-medium">
-                          <Check className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" /> {selectedTour.requiredEquipment || 'Rahat ayaqqabı'}
-                        </li>
-                        <li className="flex items-start gap-3 text-sm text-slate-700 font-medium">
-                          <Check className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" /> Pasport və ya şəxsiyyət vəsiqəsi
-                        </li>
-                        <li className="flex items-start gap-3 text-sm text-slate-700 font-medium">
-                          <Check className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" /> Hava şəraitinə uyğun geyim
-                        </li>
+                        {(selectedTour.importantInfo?.bring && selectedTour.importantInfo.bring.length > 0
+                          ? selectedTour.importantInfo.bring
+                          : [selectedTour.requiredEquipment || 'Rahat ayaqqabı', 'Pasport və ya şəxsiyyət vəsiqəsi', 'Hava şəraitinə uyğun geyim']
+                        ).map((item, idx) => (
+                          <li key={idx} className="flex items-start gap-3 text-sm text-slate-700 font-medium">
+                            <Check className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" /> {item}
+                          </li>
+                        ))}
                       </ul>
                     </div>
                     <div>
                       <h3 className="font-bold text-slate-800 text-sm mb-3">İcazə verilmir</h3>
                       <ul className="space-y-2">
-                        <li className="flex items-start gap-3 text-sm text-slate-700 font-medium">
-                          <X className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" /> Böyük çamadanlar və çantalar
-                        </li>
-                        <li className="flex items-start gap-3 text-sm text-slate-700 font-medium">
-                          <X className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" /> Müşayiətsiz yetkinlik yaşına çatmayanlar
-                        </li>
+                        {(selectedTour.importantInfo?.notAllowed && selectedTour.importantInfo.notAllowed.length > 0
+                          ? selectedTour.importantInfo.notAllowed
+                          : ['Böyük çamadanlar və çantalar', 'Müşayiətsiz yetkinlik yaşına çatmayanlar']
+                        ).map((item, idx) => (
+                          <li key={idx} className="flex items-start gap-3 text-sm text-slate-700 font-medium">
+                            <X className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" /> {item}
+                          </li>
+                        ))}
                       </ul>
                     </div>
                   </div>
@@ -3497,7 +3505,7 @@ export default function CustomerPortal({
                           )}
 
                           <div className="mt-auto pt-4 border-t border-slate-100 flex items-end justify-between">
-                            <span className="text-xs text-slate-500 font-medium">{tour.durationDays * 8} saat</span>
+                            <span className="text-xs text-slate-500 font-medium">{tour.durationHours ?? (tour.durationDays * 8)} saat</span>
                             {minPrice ? (
                               <div className="flex flex-col items-end">
                                 <span className="text-[10px] text-slate-500 font-medium">Başlayan qiymətlər</span>

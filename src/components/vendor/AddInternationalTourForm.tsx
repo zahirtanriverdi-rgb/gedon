@@ -45,6 +45,12 @@ export function AddInternationalTourForm({ currentUser, onAddTour, onAddSlot, on
   const [intlNotIncludes, setIntlNotIncludes] = useState<string[]>(['Muzey və tarixi yerlərə giriş biletləri', 'Nahar və şam yeməkləri']);
   const [newNotInclInput, setNewNotInclInput] = useState<string>('');
 
+  // Highlights, languages & important info
+  const [intlHighlights, setIntlHighlights] = useState<string>('');
+  const [intlLanguages, setIntlLanguages] = useState<string>('Azərbaycanca');
+  const [intlBringItems, setIntlBringItems] = useState<string>('');
+  const [intlNotAllowedItems, setIntlNotAllowedItems] = useState<string>('');
+
   // Itinerary (Day-by-day)
   const [intlItinerary, setIntlItinerary] = useState<Array<{ day: number; title: string; description: string; image?: string }>>([
     { day: 1, title: 'Bakıdan Uçuş və Qarşılanma', description: 'Göstərilən saatda hava limanında toplaşırıq. Təyyarə ilə təyinat nöqtəsinə uçuş. Qarşılanma və otelə transfer.' }
@@ -165,6 +171,11 @@ export function AddInternationalTourForm({ currentUser, onAddTour, onAddSlot, on
     const finalImage = intlTourImage || getPremiumStockImageForDestination(intlTourCountry, intlTourCity);
     const tourId = 'tour-' + Math.floor(Math.random() * 90000 + 10000);
 
+    const cleanHighlights = intlHighlights.split(',').map(s => s.trim()).filter(Boolean);
+    const cleanLanguages = intlLanguages.split(',').map(s => s.trim()).filter(Boolean);
+    const cleanBringItems = intlBringItems.split(',').map(s => s.trim()).filter(Boolean);
+    const cleanNotAllowedItems = intlNotAllowedItems.split(',').map(s => s.trim()).filter(Boolean);
+
     const newTour: Tour = {
       id: tourId,
       name: intlTourName,
@@ -200,7 +211,13 @@ export function AddInternationalTourForm({ currentUser, onAddTour, onAddSlot, on
       mealType: intlTourMealType,
       priceCurrency: intlTourCurrency,
       notIncluded: intlNotIncludes,
-      itinerary: intlItinerary
+      itinerary: intlItinerary,
+      highlights: cleanHighlights.length > 0 ? cleanHighlights : undefined,
+      languages: cleanLanguages.length > 0 ? cleanLanguages : undefined,
+      importantInfo: (cleanBringItems.length > 0 || cleanNotAllowedItems.length > 0) ? {
+        bring: cleanBringItems.length > 0 ? cleanBringItems : undefined,
+        notAllowed: cleanNotAllowedItems.length > 0 ? cleanNotAllowedItems : undefined,
+      } : undefined
     };
 
     setIsSavingForm(true);
@@ -240,6 +257,10 @@ export function AddInternationalTourForm({ currentUser, onAddTour, onAddSlot, on
       setIntlItinerary([
         { day: 1, title: 'Bakıdan Uçuş və Qarşılanma', description: 'Göstərilən saatda hava limanında toplaşırıq. Təyyarə ilə təyinat nöqtəsinə uçuş. Qarşılanma və otelə transfer.' }
       ]);
+      setIntlHighlights('');
+      setIntlLanguages('Azərbaycanca');
+      setIntlBringItems('');
+      setIntlNotAllowedItems('');
     } catch (err: any) {
       setFormSubmitError(err?.message || 'Xarici tur yaradılarkən xəta baş verdi.');
     } finally {
@@ -665,6 +686,52 @@ export function AddInternationalTourForm({ currentUser, onAddTour, onAddSlot, on
                       </span>
                     ))}
                   </div>
+                </div>
+              </div>
+
+              {/* Highlights, Languages & Important Info */}
+              <div className="space-y-3 pt-3 border-t border-slate-100">
+                <div>
+                  <label className="block text-xs font-bold text-emerald-800 mb-1">Önə çıxanlar (Vergüllə ayırın):</label>
+                  <input
+                    type="text"
+                    value={intlHighlights}
+                    onChange={(e) => setIntlHighlights(e.target.value)}
+                    placeholder="Məs: Şəhər turu bələdçi ilə, Panoram mənzərəli marşrut"
+                    className="w-full px-3 py-2 border border-slate-250 rounded-lg text-xs text-slate-800 focus:ring-1 focus:ring-emerald-700 focus:outline-none"
+                  />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-emerald-800 mb-1">Danışılan dillər (Vergüllə ayırın):</label>
+                    <input
+                      type="text"
+                      value={intlLanguages}
+                      onChange={(e) => setIntlLanguages(e.target.value)}
+                      placeholder="Azərbaycanca, Rusca, İngiliscə"
+                      className="w-full px-3 py-2 border border-slate-250 rounded-lg text-xs text-slate-800 focus:ring-1 focus:ring-emerald-700 focus:outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-emerald-800 mb-1">Özünüzlə gətirin (Vergüllə ayırın):</label>
+                    <input
+                      type="text"
+                      value={intlBringItems}
+                      onChange={(e) => setIntlBringItems(e.target.value)}
+                      placeholder="Pasport, Hava şəraitinə uyğun geyim"
+                      className="w-full px-3 py-2 border border-slate-250 rounded-lg text-xs text-slate-800 focus:ring-1 focus:ring-emerald-700 focus:outline-none"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-red-800 mb-1">İcazə verilmir (Vergüllə ayırın):</label>
+                  <input
+                    type="text"
+                    value={intlNotAllowedItems}
+                    onChange={(e) => setIntlNotAllowedItems(e.target.value)}
+                    placeholder="Böyük çamadanlar, Müşayiətsiz yetkinlik yaşına çatmayanlar"
+                    className="w-full px-3 py-2 border border-slate-250 rounded-lg text-xs text-slate-800 focus:ring-1 focus:ring-red-600 focus:outline-none"
+                  />
                 </div>
               </div>
             </div>

@@ -20,6 +20,11 @@ export function AddTourForm({ currentUser, category: newTourCategory, onCategory
   const [newTourDays, setNewTourDays] = useState<number>(1);
   const [newTourDescription, setNewTourDescription] = useState<string>('');
   const [newTourIncludes, setNewTourIncludes] = useState<string>('Professional Bələdçi, Komfort Transit, Səhər yeməyi, Yol Sığortası');
+  const [newTourHighlights, setNewTourHighlights] = useState<string>('');
+  const [newTourLanguages, setNewTourLanguages] = useState<string>('Azərbaycanca');
+  const [newTourDurationHours, setNewTourDurationHours] = useState<number>(8);
+  const [newTourBringItems, setNewTourBringItems] = useState<string>('');
+  const [newTourNotAllowedItems, setNewTourNotAllowedItems] = useState<string>('');
   const [newTourImage, setNewTourImage] = useState<string>('');
   const [newTourImages, setNewTourImages] = useState<string[]>([]);
   const [newTourVideos, setNewTourVideos] = useState<string[]>([]);
@@ -70,6 +75,10 @@ export function AddTourForm({ currentUser, category: newTourCategory, onCategory
       : 'https://images.unsplash.com/photo-1426604966848-d7adac402bff?w=800';
 
     const cleanIncludes = newTourIncludes.split(',').map(s => s.trim()).filter(Boolean);
+    const cleanHighlights = newTourHighlights.split(',').map(s => s.trim()).filter(Boolean);
+    const cleanLanguages = newTourLanguages.split(',').map(s => s.trim()).filter(Boolean);
+    const cleanBringItems = newTourBringItems.split(',').map(s => s.trim()).filter(Boolean);
+    const cleanNotAllowedItems = newTourNotAllowedItems.split(',').map(s => s.trim()).filter(Boolean);
 
     const newTour: Tour = {
       id: 'tour-' + Math.floor(Math.random() * 90000 + 10000),
@@ -79,7 +88,14 @@ export function AddTourForm({ currentUser, category: newTourCategory, onCategory
       description: newTourDescription,
       region: newTourRegion,
       durationDays: Number(newTourDays),
+      durationHours: newTourDurationHours ? Number(newTourDurationHours) : undefined,
       includes: cleanIncludes.length > 0 ? cleanIncludes : ['Müşayiət bələdçisi'],
+      highlights: cleanHighlights.length > 0 ? cleanHighlights : undefined,
+      languages: cleanLanguages.length > 0 ? cleanLanguages : undefined,
+      importantInfo: (cleanBringItems.length > 0 || cleanNotAllowedItems.length > 0) ? {
+        bring: cleanBringItems.length > 0 ? cleanBringItems : undefined,
+        notAllowed: cleanNotAllowedItems.length > 0 ? cleanNotAllowedItems : undefined,
+      } : undefined,
       vendorId: currentUser.id,
       vendorName: currentUser.name,
       image: newTourImage || defaultImg,
@@ -146,6 +162,11 @@ export function AddTourForm({ currentUser, category: newTourCategory, onCategory
       setNewTourEquipmentRentalPrice(0);
       setNewTourSafetyInstructions('');
       setNewTourAllowTeamRegistration(true);
+      setNewTourHighlights('');
+      setNewTourLanguages('Azərbaycanca');
+      setNewTourDurationHours(8);
+      setNewTourBringItems('');
+      setNewTourNotAllowedItems('');
     } catch (err: any) {
       setFormSubmitError(err?.message || 'Tur yaradılarkən xəta baş verdi.');
     } finally {
@@ -965,6 +986,63 @@ Daxildir: Səhər yeməyi, Komfortlu Sprinter, Dağ bələdçisi, Fotoçəkiliş
                 placeholder="Səhər yeməyi, Giriş bileti, Professional Bələdçi, Komfort Transfer"
                 className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800"
               />
+            </div>
+
+            <div>
+              <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">Önə çıxanlar (Vergüllə ayırın):</label>
+              <input
+                type="text"
+                value={newTourHighlights}
+                onChange={(e) => setNewTourHighlights(e.target.value)}
+                placeholder="Məs: Panoram mənzərəli marşrut, Peşəkar bələdçi müşayiəti"
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">Danışılan dillər (Vergüllə ayırın):</label>
+                <input
+                  type="text"
+                  value={newTourLanguages}
+                  onChange={(e) => setNewTourLanguages(e.target.value)}
+                  placeholder="Azərbaycanca, Rusca, İngiliscə"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">Tam müddət (saat):</label>
+                <input
+                  type="number"
+                  min={1}
+                  value={newTourDurationHours}
+                  onChange={(e) => setNewTourDurationHours(Number(e.target.value))}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">Özünüzlə gətirin (Vergüllə ayırın):</label>
+                <input
+                  type="text"
+                  value={newTourBringItems}
+                  onChange={(e) => setNewTourBringItems(e.target.value)}
+                  placeholder="Rahat ayaqqabı, Pasport, Hava şəraitinə uyğun geyim"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">İcazə verilmir (Vergüllə ayırın):</label>
+                <input
+                  type="text"
+                  value={newTourNotAllowedItems}
+                  onChange={(e) => setNewTourNotAllowedItems(e.target.value)}
+                  placeholder="Böyük çamadanlar, Müşayiətsiz yetkinlik yaşına çatmayanlar"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800"
+                />
+              </div>
             </div>
 
             {/* GPX Track Uploader */}
