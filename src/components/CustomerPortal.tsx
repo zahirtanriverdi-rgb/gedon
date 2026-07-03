@@ -34,7 +34,8 @@ import {
   Users,
   Grid2X2,
   ChevronDown,
-  Globe
+  Globe,
+  Minus
 } from 'lucide-react';
 
 interface CustomerPortalProps {
@@ -2632,8 +2633,64 @@ export default function CustomerPortal({
                 </div>
                 )}
 
-                {/* Highlights */}
+                {/* Qiymətə daxildir / daxil deyil (Modern Grid) — turun dəyərini istifadəçi ilk açılışda görsün deyə ən yuxarıda */}
                 <div className="space-y-4 py-4">
+                  <h2 className="text-xl font-extrabold text-slate-900">Qiymətə daxildir</h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Daxildir */}
+                    <div className="bg-emerald-50/40 border border-emerald-100 rounded-2xl p-5 space-y-3.5">
+                      <h3 className="text-xs font-black text-emerald-700 tracking-wider uppercase">Daxildir</h3>
+                      <div className="space-y-3">
+                        {(selectedTour.includes && selectedTour.includes.length > 0
+                          ? selectedTour.includes
+                          : ['Peşəkar canlı tur bələdçisi', 'Yerli vergilər və xərclər']
+                        ).map((item, idx) => (
+                          <div key={`inc-${idx}`} className="flex items-start gap-3">
+                            <CheckCircle className="w-5 h-5 text-green-500 shrink-0" />
+                            <span className="text-slate-700 text-sm font-medium">{item}</span>
+                          </div>
+                        ))}
+                        {selectedTour.mealType && (
+                          <div className="flex items-start gap-3">
+                            <CheckCircle className="w-5 h-5 text-green-500 shrink-0" />
+                            <span className="text-slate-700 text-sm font-medium">Qida: {selectedTour.mealType}</span>
+                          </div>
+                        )}
+                        {selectedTour.flightIncluded && (
+                          <div className="flex items-start gap-3">
+                            <CheckCircle className="w-5 h-5 text-green-500 shrink-0" />
+                            <span className="text-slate-700 text-sm font-medium">Aviabilet və transfer daxildir</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Daxil deyil */}
+                    <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 space-y-3.5">
+                      <h3 className="text-xs font-black text-slate-400 tracking-wider uppercase">Daxil deyil</h3>
+                      <div className="space-y-3">
+                        {(selectedTour.notIncluded && selectedTour.notIncluded.length > 0
+                          ? selectedTour.notIncluded
+                          : ['Şəxsi suvenirlər']
+                        ).map((item, idx) => (
+                          <div key={`exc-${idx}`} className="flex items-start gap-3">
+                            <Minus className="w-5 h-5 text-slate-300 shrink-0" />
+                            <span className="text-slate-500 text-sm font-medium">{item}</span>
+                          </div>
+                        ))}
+                        {!selectedTour.flightIncluded && selectedTour.isInternational && (
+                          <div className="flex items-start gap-3">
+                            <Minus className="w-5 h-5 text-slate-300 shrink-0" />
+                            <span className="text-slate-500 text-sm font-medium">Aviabiletlər (Ayrı alınmalıdır)</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Highlights */}
+                <div className="space-y-4 py-4 border-t border-slate-200">
                   <h2 className="text-xl font-extrabold text-slate-900">Önə Çıxanlar</h2>
                   <div className="flex flex-col gap-4">
                     {(selectedTour.highlights && selectedTour.highlights.length > 0
@@ -2651,7 +2708,7 @@ export default function CustomerPortal({
                     ))}
                   </div>
                 </div>
-                
+
                 {/* Full description */}
                 <div className="space-y-4 py-4 border-t border-slate-200">
                   <h2 className="text-xl font-extrabold text-slate-900">Tam təsvir</h2>
@@ -2669,49 +2726,6 @@ export default function CustomerPortal({
                       {isDescExpanded ? 'Daha az göstər' : 'Daha çox göstər'}
                     </button>
                   )}
-                </div>
-
-                {/* Includes / Excludes */}
-                <div className="space-y-4 py-4 border-t border-slate-200">
-                  <h2 className="text-xl font-extrabold text-slate-900">Qiymətə daxildir</h2>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                   {(selectedTour.includes && selectedTour.includes.length > 0
-                     ? selectedTour.includes
-                     : ['Peşəkar canlı tur bələdçisi', 'Yerli vergilər və xərclər']
-                   ).map((item, idx) => (
-                     <div key={`inc-${idx}`} className="flex items-start gap-3">
-                       <Check className="w-5 h-5 text-emerald-600 shrink-0" />
-                       <span className="text-slate-700 text-sm font-medium">{item}</span>
-                     </div>
-                   ))}
-                   {selectedTour.mealType && (
-                     <div className="flex items-start gap-3">
-                       <Check className="w-5 h-5 text-emerald-600 shrink-0" />
-                       <span className="text-slate-700 text-sm font-medium">Qida: {selectedTour.mealType}</span>
-                     </div>
-                   )}
-                   {selectedTour.flightIncluded && (
-                     <div className="flex items-start gap-3">
-                       <Check className="w-5 h-5 text-emerald-600 shrink-0" />
-                       <span className="text-slate-700 text-sm font-medium">Aviabilet və transfer daxildir</span>
-                     </div>
-                   )}
-                   {(selectedTour.notIncluded && selectedTour.notIncluded.length > 0
-                     ? selectedTour.notIncluded
-                     : ['Şəxsi suvenirlər']
-                   ).map((item, idx) => (
-                     <div key={`exc-${idx}`} className="flex items-start gap-3 opacity-60">
-                       <X className="w-5 h-5 text-red-500 shrink-0" />
-                       <span className="text-slate-700 text-sm font-medium line-through decoration-slate-300">{item}</span>
-                     </div>
-                   ))}
-                   {!selectedTour.flightIncluded && selectedTour.isInternational && (
-                     <div className="flex items-start gap-3 opacity-60">
-                       <X className="w-5 h-5 text-red-500 shrink-0" />
-                       <span className="text-slate-700 text-sm font-medium line-through decoration-slate-300">Aviabiletlər (Ayrı alınmalıdır)</span>
-                     </div>
-                   )}
-                  </div>
                 </div>
 
                 {/* Meeting Point */}
@@ -3155,21 +3169,6 @@ export default function CustomerPortal({
                     </div>
                   )}
 
-                  {/* Program Exclusions (Not Included) for Outbound Tours */}
-                  {selectedTour.isInternational && selectedTour.notIncluded && selectedTour.notIncluded.length > 0 && (
-                    <div className="border border-red-150 bg-red-500/5 p-4 rounded-xl">
-                      <h4 className="text-xs font-bold text-red-900 tracking-wider mb-2 border-b border-red-200/50 pb-1">❌ QİYMƏTƏ DAXİL OLMAYANLAR</h4>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                        {selectedTour.notIncluded.map((exc, i) => (
-                          <div key={i} className="flex items-center gap-2 text-xs text-slate-650">
-                            <span className="text-red-500 font-black">×</span>
-                            <span>{exc}</span>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
                   {/* Gündəlik Səyahət Proqramı (Itinerary Map) */}
                   {selectedTour.isInternational && selectedTour.itinerary && selectedTour.itinerary.length > 0 && (
                     <div className="space-y-4">
@@ -3211,19 +3210,6 @@ export default function CustomerPortal({
                       </div>
                     </div>
                   )}
-
-                  {/* Program Inclusions */}
-                  <div>
-                    <h4 className="text-sm font-bold text-slate-800 tracking-wide">Qiymətə nələr daxildir?</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2">
-                      {selectedTour.includes.map((inc, i) => (
-                        <div key={i} className="flex items-center gap-2 text-xs text-slate-600">
-                          <Check className="w-4 h-4 text-emerald-500 flex-shrink-0" />
-                          <span>{inc}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
 
                   {/* Historical verified feedbacks inside detailed modals */}
                   {/* Ödəniş sistemi olmadığı üçün müvəqqəti söndürülüb, bax: REVIEWS_ENABLED */}
