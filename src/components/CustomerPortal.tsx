@@ -35,7 +35,8 @@ import {
   Grid2X2,
   ChevronDown,
   Globe,
-  Minus
+  Minus,
+  Loader2
 } from 'lucide-react';
 
 interface CustomerPortalProps {
@@ -56,6 +57,26 @@ interface CustomerPortalProps {
   displayCurrency?: 'AZN' | 'USD' | 'EUR';
   appLanguage?: 'az' | 'en' | 'ru';
 }
+
+// Curated packing lists shown after the simulated AI "thinking" delay, keyed by hiking experience level
+const PACKING_LISTS: Record<'beginner' | 'pro', string[]> = {
+  beginner: [
+    'Yoxuş və enişlərdə dizlərə düşən yükü azaltmaq üçün teleskopik yürüş çubuqları',
+    'Relyefə uyğun, topuğu tutan və sürüşməyən Gore-Tex membranlı peşəkar yürüş botları',
+    'Cığır kənarlarındakı tikanlardan, kiçik daşlardan və nəm otlardan qorunmaq üçün yürüş qamaşları',
+    'Tərləmənin qarşısını alan və tez quruyan sintetik idman geyimləri və ya yüngül termal alt paltarı',
+    'Hər ehtimala qarşı, yürüşün gec saatlara qalma ehtimalı üçün alın fənəri (ehtiyat batareyaları ilə)',
+    'Zirvə küləyinə qarşı boyunluq (buff) və yüngül küləkkeçirməz membran əlcəklər'
+  ],
+  pro: [
+    'Eniş və yoxuşlarda dizləri qorumaq üçün cüt teleskopik yürüş çubuqları (baston).',
+    'Daşlıq və torpaq relyefdə ayaq biləyini möhkəm saxlayan, sukeçirməyən yarımboğaz trekking botları.',
+    'Zirvədəki güclü küləyə qarşı nəfəs ala bilən membran materialdan (Windstopper və ya Gore-Tex) küləklik.',
+    'Nəmi bədədndən uzaqlaşdıran sürətlə quruyan sintetik idman köynəkləri və ya termal altlıq.',
+    'Hər ehtimala qarşı qəfil duman və ya ləngimələr üçün ehtiyat batareyalı alın fənəri.',
+    'Boynu və üzü küləkdən qorumaq üçün yüngül baf (buff) və fərdi ilk yardım dəsti.'
+  ]
+};
 
 export default function CustomerPortal({
   tours,
@@ -473,9 +494,9 @@ export default function CustomerPortal({
   const [reviewSubmitError, setReviewSubmitError] = useState<string | null>(null);
 
   // AI Smart packing states
-  const [packingAdviceMap, setPackingAdviceMap] = useState<Record<string, { packing_advice?: { basics: string[]; pro_gear: string[] } }>>({});
-  const [packingLoading, setPackingLoading] = useState<boolean>(false);
   const [packingExperienceMap, setPackingExperienceMap] = useState<Record<string, 'beginner' | 'pro' | null>>({});
+  const [packingAnalyzingMap, setPackingAnalyzingMap] = useState<Record<string, boolean>>({});
+  const [checkedPackingItems, setCheckedPackingItems] = useState<Record<string, boolean>>({});
 
   // Quick WhatsApp opening helper
   const handleQuickWhatsApp = (tour: Tour, e: React.MouseEvent) => {
@@ -502,33 +523,17 @@ export default function CustomerPortal({
     window.open(whatsappUrl, '_blank');
   };
 
-  // Fetch beginner and experienced packing list recommendations
-  const fetchPackingAdvice = async (tour: Tour) => {
-    if (packingLoading) return;
-    setPackingLoading(true);
-    try {
-      const resp = await fetch('/api/gemini/packing', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tourDetails: {
-            name: tour.name,
-            region: tour.region,
-            category: tour.category,
-            difficulty: tour.difficulty,
-            durationDays: tour.durationDays
-          }
-        })
-      });
-      if (resp.ok) {
-        const data = await resp.json();
-        setPackingAdviceMap(prev => ({ ...prev, [tour.id]: data }));
-      }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setPackingLoading(false);
-    }
+  // Simulate an AI "thinking" delay before revealing the packing list for the chosen experience level
+  const handlePackingExperienceSelect = (tourId: string, choice: 'beginner' | 'pro') => {
+    setPackingExperienceMap(prev => ({ ...prev, [tourId]: choice }));
+    setPackingAnalyzingMap(prev => ({ ...prev, [tourId]: true }));
+    setTimeout(() => {
+      setPackingAnalyzingMap(prev => ({ ...prev, [tourId]: false }));
+    }, 1200);
+  };
+
+  const togglePackingItemChecked = (key: string) => {
+    setCheckedPackingItems(prev => ({ ...prev, [key]: !prev[key] }));
   };
 
   // Extract unique regions for the filter dropdown
@@ -3055,17 +3060,6 @@ export default function CustomerPortal({
                             </p>
                           </div>
                         </div>
-
-                        {packingAdviceMap[selectedTour.id] && (
-                          <button
-                            type="button"
-                            onClick={() => fetchPackingAdvice(selectedTour)}
-                            disabled={packingLoading}
-                            className="bg-amber-100/80 hover:bg-amber-150 text-amber-955 font-extrabold text-[9px] px-2.5 py-1.5 rounded-lg tracking-wider transition-all cursor-pointer flex items-center gap-1 shrink-0"
-                          >
-                            {packingLoading ? "Yenilənir..." : "🔄 Yenilə"}
-                          </button>
-                        )}
                       </div>
 
                       {/* INTERACTIVE QUESTION SECTION */}
@@ -3077,12 +3071,7 @@ export default function CustomerPortal({
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                           <button
                             type="button"
-                            onClick={() => {
-                              setPackingExperienceMap(prev => ({ ...prev, [selectedTour.id]: 'beginner' }));
-                              if (!packingAdviceMap[selectedTour.id]) {
-                                fetchPackingAdvice(selectedTour);
-                              }
-                            }}
+                            onClick={() => handlePackingExperienceSelect(selectedTour.id, 'beginner')}
                             className={`p-3.5 rounded-xl border text-left transition duration-200 cursor-pointer flex flex-col justify-between ${
                               packingExperienceMap[selectedTour.id] === 'beginner'
                                 ? 'border-emerald-500 bg-emerald-50/30 ring-1 ring-emerald-500'
@@ -3099,12 +3088,7 @@ export default function CustomerPortal({
 
                           <button
                             type="button"
-                            onClick={() => {
-                              setPackingExperienceMap(prev => ({ ...prev, [selectedTour.id]: 'pro' }));
-                              if (!packingAdviceMap[selectedTour.id]) {
-                                fetchPackingAdvice(selectedTour);
-                              }
-                            }}
+                            onClick={() => handlePackingExperienceSelect(selectedTour.id, 'pro')}
                             className={`p-3.5 rounded-xl border text-left transition duration-200 cursor-pointer flex flex-col justify-between ${
                               packingExperienceMap[selectedTour.id] === 'pro'
                                 ? 'border-indigo-500 bg-indigo-50/10 ring-1 ring-indigo-500'
@@ -3122,19 +3106,19 @@ export default function CustomerPortal({
                       </div>
 
                       {/* PACKING LIST DISPLAY AREA */}
-                      {packingLoading ? (
+                      {packingAnalyzingMap[selectedTour.id] ? (
                         <div className="bg-white border border-amber-200/60 p-6 rounded-xl text-center space-y-2.5 shadow-5xs">
-                          <div className="w-5 h-5 border-2 border-amber-600 border-t-transparent rounded-full animate-spin mx-auto" />
-                          <p className="text-[10px] text-slate-500 font-bold tracking-wider">
-                            Sizin təcrübə səviyyənizə uyğun hazırlıq planı tərtib edilir...
-                          </p>
+                          <div className="flex items-center justify-center gap-2">
+                            <Loader2 className="w-4 h-4 text-amber-600 animate-spin" />
+                            <p className="text-[10px] text-slate-500 font-bold tracking-wider">
+                              Təcrübəniz analiz edilir və sizə özəl çanta siyahısı hazırlanır...
+                            </p>
+                          </div>
                         </div>
-                      ) : packingAdviceMap[selectedTour.id] ? (
+                      ) : packingExperienceMap[selectedTour.id] ? (
                         (() => {
-                          const adviceObj = packingAdviceMap[selectedTour.id].packing_advice;
-                          const basics = adviceObj?.basics || [];
-                          const proGear = adviceObj?.pro_gear || [];
-                          const userChoice = packingExperienceMap[selectedTour.id] || 'beginner';
+                          const userChoice = packingExperienceMap[selectedTour.id] as 'beginner' | 'pro';
+                          const items = PACKING_LISTS[userChoice];
 
                           return (
                             <div className="bg-white border border-amber-200/80 p-4.5 rounded-xl text-xs space-y-3 shadow-xs text-slate-850 animate-fadeIn">
@@ -3148,18 +3132,23 @@ export default function CustomerPortal({
                                       Məsləhət Görülür
                                     </span>
                                   </div>
-                                  {basics.length > 0 ? (
-                                    <ul className="space-y-1.5">
-                                      {basics.map((item, index) => (
-                                        <li key={index} className="flex items-start gap-2 text-[11px] text-slate-700 font-medium">
-                                          <input type="checkbox" className="mt-0.5 accent-emerald-600 rounded cursor-pointer shrink-0" />
-                                          <span>{item}</span>
+                                  <ul className="space-y-1.5">
+                                    {items.map((item, index) => {
+                                      const key = `${selectedTour.id}:beginner:${index}`;
+                                      const checked = !!checkedPackingItems[key];
+                                      return (
+                                        <li key={index} className="flex items-start gap-2 text-[11px] font-medium">
+                                          <input
+                                            type="checkbox"
+                                            checked={checked}
+                                            onChange={() => togglePackingItemChecked(key)}
+                                            className="mt-0.5 accent-emerald-600 rounded cursor-pointer shrink-0"
+                                          />
+                                          <span className={checked ? 'line-through text-gray-400' : 'text-slate-700'}>{item}</span>
                                         </li>
-                                      ))}
-                                    </ul>
-                                  ) : (
-                                    <span className="text-[10px] text-slate-400 font-bold block">Bu səviyyə üçün xüsusi təklif yoxdur.</span>
-                                  )}
+                                      );
+                                    })}
+                                  </ul>
                                 </div>
                               ) : (
                                 <div className="space-y-3 bg-indigo-50/15 border border-indigo-100/60 p-4 rounded-lg">
@@ -3168,18 +3157,23 @@ export default function CustomerPortal({
                                       <span>⚡</span> Sizə Uyğun: Texniki Peşəkar Siyahı
                                     </span>
                                   </div>
-                                  {proGear.length > 0 ? (
-                                    <ul className="space-y-1.5">
-                                      {proGear.map((item, index) => (
-                                        <li key={index} className="flex items-start gap-2 text-[11px] text-slate-700 font-medium">
-                                          <input type="checkbox" className="mt-0.5 accent-indigo-600 rounded cursor-pointer shrink-0" />
-                                          <span>{item}</span>
+                                  <ul className="space-y-1.5">
+                                    {items.map((item, index) => {
+                                      const key = `${selectedTour.id}:pro:${index}`;
+                                      const checked = !!checkedPackingItems[key];
+                                      return (
+                                        <li key={index} className="flex items-start gap-2 text-[11px] font-medium">
+                                          <input
+                                            type="checkbox"
+                                            checked={checked}
+                                            onChange={() => togglePackingItemChecked(key)}
+                                            className="mt-0.5 accent-indigo-600 rounded cursor-pointer shrink-0"
+                                          />
+                                          <span className={checked ? 'line-through text-gray-400' : 'text-slate-700'}>{item}</span>
                                         </li>
-                                      ))}
-                                    </ul>
-                                  ) : (
-                                    <span className="text-[10px] text-slate-400 font-bold block">Bu səviyyə üçün xüsusi təklif yoxdur.</span>
-                                  )}
+                                      );
+                                    })}
+                                  </ul>
                                 </div>
                               )}
 
@@ -3187,12 +3181,7 @@ export default function CustomerPortal({
                                 <span>💚 <strong>Bələdçi Rəyi:</strong> Sizə hər zaman rahat olacaq geyim və ayaqqabılar seçin; yürüşün, fəslin ləzzətini hiss edin!</span>
                                 <button
                                   type="button"
-                                  onClick={() => {
-                                    setPackingExperienceMap(prev => ({
-                                      ...prev,
-                                      [selectedTour.id]: userChoice === 'beginner' ? 'pro' : 'beginner'
-                                    }));
-                                  }}
+                                  onClick={() => handlePackingExperienceSelect(selectedTour.id, userChoice === 'beginner' ? 'pro' : 'beginner')}
                                   className="text-[9px] text-indigo-700 font-black underline hover:text-indigo-800 cursor-pointer select-none whitespace-nowrap"
                                 >
                                   {userChoice === 'beginner' ? "Təcrübəli siyahısına keç" : "Başlayanlar üçün keç"}
