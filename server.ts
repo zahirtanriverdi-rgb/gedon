@@ -11,7 +11,7 @@ import { initializeDatabase } from "./server/db";
 import dbClient from "./server/db";
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
 // Lazy initialize GoogleGenAI client
 let aiClient: GoogleGenAI | null = null;
