@@ -92,8 +92,13 @@ export function MyToursTab({ tours, slots, myTours, myTourIds, tourSearchTerm, o
                         Aktiv Satış Slotu: <strong className="text-slate-700 font-mono">{tourSlots.length} ədəd</strong>
                       </div>
                       {tour.status === 'rejected' && (
-                        <div className="text-[10px] text-red-700 font-semibold">
-                          ⚠️ Admin tərəfindən rədd edildi — düzəliş edib yenidən göndərməlisiniz. Təsdiqlənənə qədər müştərilərə görünməyəcək.
+                        <div className="text-[10px] text-red-700 font-semibold bg-red-50 border border-red-100 rounded-lg px-2 py-1.5 max-w-md">
+                          <span className="block">⚠️ Admin tərəfindən rədd edildi — düzəliş edib yenidən göndərməlisiniz. Təsdiqlənənə qədər müştərilərə görünməyəcək.</span>
+                          {tour.rejectionReason && (
+                            <span className="block mt-1 text-red-800">
+                              <strong>Səbəb:</strong> {tour.rejectionReason}
+                            </span>
+                          )}
                         </div>
                       )}
                     </div>

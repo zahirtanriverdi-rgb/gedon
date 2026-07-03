@@ -24,6 +24,57 @@ function isTourInternational(t: Tour): boolean {
   return !!t.isInternational || t.category === 'international';
 }
 
+// Human-readable labels for the fields most likely to show up in a vendor's edit proposal.
+// Anything not listed here falls back to the raw field key so nothing silently disappears.
+const DIFF_FIELD_LABELS: Record<string, string> = {
+  name: 'Ad', description: 'Təsvir', region: 'Region', category: 'Kateqoriya',
+  difficulty: 'Çətinlik', durationDays: 'Müddət (gün)', durationHours: 'Müddət (saat)',
+  price: 'Qiymət', discountPrice: 'Endirimli qiymət', priceCurrency: 'Valyuta',
+  image: 'Kover şəkil', images: 'Qalereya şəkilləri', videos: 'Videolar',
+  includes: 'Daxildir', notIncluded: 'Daxil deyil', highlights: 'Xüsusiyyətlər',
+  languages: 'Dillər', whatsapp_number: 'WhatsApp nömrəsi', meetingPoint: 'Görüş yeri',
+  isActive: 'Aktivlik statusu', gpxData: 'GPX marşrut faylı', gpxFileName: 'GPX fayl adı',
+  activityType: 'Fəaliyyət növü', activeDifficulty: 'Fiziki hazırlıq səviyyəsi',
+  ageLimit: 'Yaş limiti', requiredEquipment: 'Zəruri avadanlıq',
+  equipmentIncluded: 'Avadanlıq daxildir', equipmentRentalPrice: 'Kirayə haqqı',
+  safetyInstructions: 'Təhlükəsizlik təlimatı', allowTeamRegistration: 'Komanda qeydiyyatı',
+  scheduleFrequency: 'Təkrarlanma tezliyi', destinationCountry: 'İstiqamət ölkə',
+  destinationCity: 'İstiqamət şəhər', durationNights: 'Gecə sayı',
+  flightIncluded: 'Aviabilet daxildir', flightDetails: 'Uçuş təfərrüatları',
+  transferDetails: 'Transfer təfərrüatları', hotelName: 'Otel adı', hotelStars: 'Otel ulduz sayı',
+  roomTypes: 'Otaq növləri', mealType: 'Qidalanma', itinerary: 'Gündəlik marşrut',
+  importantInfo: 'Mühüm məlumatlar',
+};
+
+// Fields that are bookkeeping/derived, never a meaningful "vendor changed this" fact.
+const DIFF_IGNORE_KEYS = new Set([
+  'id', 'vendorId', 'vendorName', 'status', 'isApproved', 'pendingData', 'createdAt',
+  'rejectionReason', 'lastChangeLog', 'rating', 'reviewsCount',
+]);
+
+function formatDiffValue(v: any): string {
+  if (v === undefined || v === null || v === '') return '(boş)';
+  if (typeof v === 'boolean') return v ? 'Bəli' : 'Xeyr';
+  if (Array.isArray(v)) return v.length ? v.join(', ') : '(boş)';
+  if (typeof v === 'object') return JSON.stringify(v);
+  return String(v);
+}
+
+// Compares the tour's currently-live fields against a vendor's proposed edit (pendingData) and
+// returns only the fields that actually changed — far more reliable than trusting the vendor's
+// self-reported lastChangeLog, which only ever tracked name/isActive/image.
+function computeTourDiff(live: Tour, proposed: Record<string, any>): { label: string; from: string; to: string }[] {
+  const diffs: { label: string; from: string; to: string }[] = [];
+  for (const key of Object.keys(proposed)) {
+    if (DIFF_IGNORE_KEYS.has(key)) continue;
+    const fromVal = (live as any)[key];
+    const toVal = proposed[key];
+    if (JSON.stringify(fromVal ?? null) === JSON.stringify(toVal ?? null)) continue;
+    diffs.push({ label: DIFF_FIELD_LABELS[key] || key, from: formatDiffValue(fromVal), to: formatDiffValue(toVal) });
+  }
+  return diffs;
+}
+
 interface AdminPortalProps {
   tours: Tour[];
   slots: TourSlot[];
@@ -33,7 +84,7 @@ interface AdminPortalProps {
   platformConfig: PlatformConfig;
   onUpdateCommissionPercent: (newValue: number) => void;
   onApproveTour: (tourId: string) => Promise<void>;
-  onRejectTour?: (tourId: string) => Promise<void>;
+  onRejectTour?: (tourId: string, rejectionReason: string) => Promise<void>;
   onEditTour?: (updatedTour: Tour) => Promise<void>;
   onDeleteTour?: (tourId: string) => Promise<void>;
   onAddSlot: (newSlot: TourSlot) => Promise<void>;
@@ -103,6 +154,13 @@ export default function AdminPortal({
   const [isDecidingInModal, setIsDecidingInModal] = useState(false);
   const [modalActionError, setModalActionError] = useState<string | null>(null);
 
+  // Rejection always requires a stated reason — these track the inline reason box shown by
+  // the "Rədd Et" button before the actual API call fires, both in the queue list and modal.
+  const [rejectingTourId, setRejectingTourId] = useState<string | null>(null);
+  const [rejectionReasonDraft, setRejectionReasonDraft] = useState('');
+  const [showModalRejectReason, setShowModalRejectReason] = useState(false);
+  const [modalRejectionReason, setModalRejectionReason] = useState('');
+
   // Stats calculate
   const totalVolume = bookings.reduce((sum, b) => b.status === 'paid' ? sum + b.totalAmount : sum, 0);
   const platformEarnings = bookings.reduce((sum, b) => {
@@ -116,6 +174,8 @@ export default function AdminPortal({
 
   const openTourForReview = (t: Tour) => {
     setModalActionError(null);
+    setShowModalRejectReason(false);
+    setModalRejectionReason('');
     setEditingTour(t);
   };
 
@@ -477,12 +537,26 @@ export default function AdminPortal({
               </div>
             ) : (
               <div className="space-y-3">
-                {pendingTours.map((t) => (
+                {pendingTours.map((t) => {
+                  const diffs = t.pendingData ? computeTourDiff(t, t.pendingData) : [];
+                  const isRejectingThis = rejectingTourId === t.id;
+                  return (
                   <div key={t.id} className="p-4 bg-slate-50 rounded-lg border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
                     <div className="space-y-1">
                       <strong className="text-slate-800 font-bold block">{t.name}</strong>
                       <span className="text-slate-400 block">Təşkilatçı: {t.vendorName} • Region: {t.region}</span>
-                      {t.lastChangeLog && (
+                      {diffs.length > 0 ? (
+                        <div className="mt-1.5 bg-amber-50/75 border border-amber-200 text-amber-850 px-2 py-1.5 rounded-lg text-[10px] space-y-1 max-w-xl">
+                          <span className="font-extrabold tracking-widest text-[8px] text-amber-700 block">📝 VENDORUN ETDİYİ DƏYİŞİKLİKLƏR:</span>
+                          <ul className="space-y-0.5">
+                            {diffs.map((d, i) => (
+                              <li key={i} className="font-medium text-slate-700">
+                                <strong>{d.label}:</strong> {d.from} → {d.to}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      ) : t.lastChangeLog && (
                         <div className="mt-1.5 bg-amber-50/75 border border-amber-200 text-amber-850 px-2 py-1.5 rounded-lg text-[10px] space-y-0.5 max-w-xl">
                           <span className="font-extrabold tracking-widest text-[8px] text-amber-700 block">📝 EDİT BİLDİRİŞİ (YENİLƏNƏN BÖLMƏLƏR):</span>
                           <p className="font-medium text-slate-700">{t.lastChangeLog}</p>
@@ -490,44 +564,67 @@ export default function AdminPortal({
                       )}
                     </div>
 
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => openTourForReview(t)}
-                        className="bg-amber-600 hover:bg-amber-700 text-white text-[10px] font-bold px-3 py-1.5 rounded cursor-pointer transition flex items-center gap-1 shadow-xs"
-                      >
-                        <Edit className="w-3 h-3" /> Yoxla & Düzəliş Et
-                      </button>
+                    {isRejectingThis ? (
+                      <div className="flex flex-col gap-2 w-full md:w-96">
+                        <textarea
+                          autoFocus
+                          rows={2}
+                          value={rejectionReasonDraft}
+                          onChange={(e) => setRejectionReasonDraft(e.target.value)}
+                          placeholder="Rədd səbəbini yazın (vendor bunu görəcək)..."
+                          className="w-full px-2.5 py-1.5 bg-white border border-red-200 rounded-lg text-[11px] focus:outline-none focus:ring-1 focus:ring-red-400"
+                        />
+                        <div className="flex items-center gap-2 justify-end">
+                          <button
+                            type="button"
+                            onClick={() => { setRejectingTourId(null); setRejectionReasonDraft(''); }}
+                            className="text-slate-500 hover:text-slate-700 text-[10px] font-bold px-2 py-1.5 rounded cursor-pointer transition"
+                          >
+                            İmtina et
+                          </button>
+                          <button
+                            type="button"
+                            disabled={!rejectionReasonDraft.trim() || approvingTourIds.has(t.id)}
+                            onClick={async () => {
+                              if (!onRejectTour) return;
+                              setApprovingTourIds(prev => new Set(prev).add(t.id));
+                              try {
+                                await onRejectTour(t.id, rejectionReasonDraft.trim());
+                                setRejectingTourId(null);
+                                setRejectionReasonDraft('');
+                              } catch {
+                                // App.tsx's handleRejectTour already showed an error toast
+                              } finally {
+                                setApprovingTourIds(prev => {
+                                  const next = new Set(prev);
+                                  next.delete(t.id);
+                                  return next;
+                                });
+                              }
+                            }}
+                            className="bg-red-600 hover:bg-red-700 text-white text-[10px] font-bold px-3 py-1.5 rounded cursor-pointer transition flex items-center gap-1 shadow-xs disabled:opacity-50"
+                          >
+                            <X className="w-3 h-3" /> Rəddi Təsdiqlə
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => openTourForReview(t)}
+                          className="bg-amber-600 hover:bg-amber-700 text-white text-[10px] font-bold px-3 py-1.5 rounded cursor-pointer transition flex items-center gap-1 shadow-xs"
+                        >
+                          <Edit className="w-3 h-3" /> Yoxla & Düzəliş Et
+                        </button>
 
-                      <button
-                        disabled={approvingTourIds.has(t.id)}
-                        onClick={async () => {
-                          setApprovingTourIds(prev => new Set(prev).add(t.id));
-                          try {
-                            await onApproveTour(t.id);
-                          } catch {
-                            // App.tsx's handleApproveTour already showed an error toast
-                          } finally {
-                            setApprovingTourIds(prev => {
-                              const next = new Set(prev);
-                              next.delete(t.id);
-                              return next;
-                            });
-                          }
-                        }}
-                        className="bg-emerald-700 hover:bg-emerald-850 text-white text-[10px] font-bold px-3 py-1.5 rounded cursor-pointer transition flex items-center gap-1 shadow-xs disabled:opacity-50"
-                      >
-                        <ThumbsUp className="w-3 h-3" /> {approvingTourIds.has(t.id) ? 'Təsdiqlənir...' : 'Təsdiqlə'}
-                      </button>
-
-                      {onRejectTour && (
                         <button
                           disabled={approvingTourIds.has(t.id)}
                           onClick={async () => {
                             setApprovingTourIds(prev => new Set(prev).add(t.id));
                             try {
-                              await onRejectTour(t.id);
+                              await onApproveTour(t.id);
                             } catch {
-                              // App.tsx's handleRejectTour already showed an error toast
+                              // App.tsx's handleApproveTour already showed an error toast
                             } finally {
                               setApprovingTourIds(prev => {
                                 const next = new Set(prev);
@@ -536,14 +633,25 @@ export default function AdminPortal({
                               });
                             }
                           }}
-                          className="bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 text-[10px] font-bold px-3 py-1.5 rounded cursor-pointer transition flex items-center gap-1 shadow-xs disabled:opacity-50"
+                          className="bg-emerald-700 hover:bg-emerald-850 text-white text-[10px] font-bold px-3 py-1.5 rounded cursor-pointer transition flex items-center gap-1 shadow-xs disabled:opacity-50"
                         >
-                          <X className="w-3 h-3" /> Rədd Et
+                          <ThumbsUp className="w-3 h-3" /> {approvingTourIds.has(t.id) ? 'Təsdiqlənir...' : 'Təsdiqlə'}
                         </button>
-                      )}
-                    </div>
+
+                        {onRejectTour && (
+                          <button
+                            disabled={approvingTourIds.has(t.id)}
+                            onClick={() => { setRejectingTourId(t.id); setRejectionReasonDraft(''); }}
+                            className="bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 text-[10px] font-bold px-3 py-1.5 rounded cursor-pointer transition flex items-center gap-1 shadow-xs disabled:opacity-50"
+                          >
+                            <X className="w-3 h-3" /> Rədd Et
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -665,23 +773,11 @@ export default function AdminPortal({
                 >
                   <ThumbsUp className="w-3.5 h-3.5" /> Təsdiqlə
                 </button>
-                {onRejectTour && editingTour.status === 'pending_approval' && (
+                {onRejectTour && editingTour.status === 'pending_approval' && !showModalRejectReason && (
                   <button
                     type="button"
                     disabled={isDecidingInModal}
-                    onClick={async () => {
-                      if (!editingTour) return;
-                      setIsDecidingInModal(true);
-                      setModalActionError(null);
-                      try {
-                        await onRejectTour(editingTour.id);
-                        setEditingTour(null);
-                      } catch (err: any) {
-                        setModalActionError(err?.message || 'Tur rədd edilərkən xəta baş verdi.');
-                      } finally {
-                        setIsDecidingInModal(false);
-                      }
-                    }}
+                    onClick={() => { setShowModalRejectReason(true); setModalRejectionReason(''); }}
                     className="bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 font-bold text-[10px] px-3 py-1.5 rounded-lg cursor-pointer transition flex items-center gap-1 disabled:opacity-50"
                   >
                     <X className="w-3.5 h-3.5" /> Rədd Et
@@ -690,6 +786,51 @@ export default function AdminPortal({
               </div>
             </div>
 
+            {showModalRejectReason && (
+              <div className="p-4 bg-red-50/60 border-b border-red-100 flex-shrink-0 space-y-2">
+                <label className="block text-[10px] font-bold text-red-800">Rədd səbəbi (vendor bunu görəcək):</label>
+                <textarea
+                  autoFocus
+                  rows={2}
+                  value={modalRejectionReason}
+                  onChange={(e) => setModalRejectionReason(e.target.value)}
+                  placeholder="Məs: Şəkillər aşağı keyfiyyətlidir, qiymət bazar səviyyəsindən uzaqdır..."
+                  className="w-full px-2.5 py-1.5 bg-white border border-red-200 rounded-lg text-[11px] focus:outline-none focus:ring-1 focus:ring-red-400"
+                />
+                <div className="flex items-center gap-2 justify-end">
+                  <button
+                    type="button"
+                    onClick={() => { setShowModalRejectReason(false); setModalRejectionReason(''); }}
+                    className="text-slate-500 hover:text-slate-700 text-[10px] font-bold px-2 py-1.5 rounded cursor-pointer transition"
+                  >
+                    İmtina et
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isDecidingInModal || !modalRejectionReason.trim()}
+                    onClick={async () => {
+                      if (!editingTour || !onRejectTour) return;
+                      setIsDecidingInModal(true);
+                      setModalActionError(null);
+                      try {
+                        await onRejectTour(editingTour.id, modalRejectionReason.trim());
+                        setShowModalRejectReason(false);
+                        setModalRejectionReason('');
+                        setEditingTour(null);
+                      } catch (err: any) {
+                        setModalActionError(err?.message || 'Tur rədd edilərkən xəta baş verdi.');
+                      } finally {
+                        setIsDecidingInModal(false);
+                      }
+                    }}
+                    className="bg-red-600 hover:bg-red-700 text-white font-bold text-[10px] px-3 py-1.5 rounded-lg cursor-pointer transition flex items-center gap-1 disabled:opacity-50"
+                  >
+                    <X className="w-3.5 h-3.5" /> Rəddi Təsdiqlə
+                  </button>
+                </div>
+              </div>
+            )}
+
             {modalActionError && (
               <div className="px-4 pt-3 flex-shrink-0">
                 <div className="bg-red-50 border border-red-200 text-red-700 text-xs font-semibold rounded-lg px-3 py-2">
@@ -697,6 +838,24 @@ export default function AdminPortal({
                 </div>
               </div>
             )}
+
+            {editingTour.pendingData && (() => {
+              const diffs = computeTourDiff(editingTour, editingTour.pendingData);
+              return diffs.length > 0 ? (
+                <div className="px-4 pt-3 flex-shrink-0">
+                  <div className="bg-amber-50/75 border border-amber-200 text-amber-850 px-3 py-2 rounded-lg text-[11px] space-y-1">
+                    <span className="font-extrabold tracking-widest text-[9px] text-amber-700 block">📝 VENDORUN ETDİYİ DƏYİŞİKLİKLƏR:</span>
+                    <ul className="space-y-0.5">
+                      {diffs.map((d, i) => (
+                        <li key={i} className="font-medium text-slate-700">
+                          <strong>{d.label}:</strong> {d.from} → {d.to}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              ) : null;
+            })()}
 
             <div className="overflow-y-auto">
               {reviewTour && (isTourInternational(reviewTour) ? (

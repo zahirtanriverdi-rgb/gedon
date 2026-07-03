@@ -430,12 +430,12 @@ export default function App() {
     }
   };
 
-  const handleRejectTour = async (tourId: string) => {
+  const handleRejectTour = async (tourId: string, rejectionReason: string) => {
     try {
       const response = await fetch(`/api/tours/${tourId}`, {
         method: 'PUT',
         headers: authHeaders(),
-        body: JSON.stringify({ status: 'rejected' }),
+        body: JSON.stringify({ status: 'rejected', rejectionReason }),
       });
       const data = await parseApiResponse(response);
       if (!response.ok) throw new Error(data.error || 'Tur rədd edilə bilmədi.');

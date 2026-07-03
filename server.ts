@@ -570,6 +570,7 @@ app.put("/api/tours/:id", authenticateUser, async (req: any, res) => {
         const source = { ...(existing.pendingData || {}), ...body };
         delete source.status;
         const merged = { ...existing, ...source, id: req.params.id };
+        delete merged.rejectionReason; // clear any stale reason from a past reject/resubmit cycle
         await writeLiveTourRow(req.params.id, merged, 'approved', null);
       } else if (body.status === 'rejected') {
         // Reject always lands on 'rejected' — it never silently reverts to 'approved'. Applies
@@ -577,7 +578,11 @@ app.put("/api/tours/:id", authenticateUser, async (req: any, res) => {
         // tour; either way the pending proposal is discarded and the tour stays hidden from
         // customers (GET /api/tours only returns status = 'approved') until the vendor edits it
         // again (which resubmits it as 'pending_approval') and an admin approves it.
-        const merged = { ...existing, ...body, id: req.params.id };
+        const reason = typeof body.rejectionReason === 'string' ? body.rejectionReason.trim() : '';
+        if (!reason) {
+          return res.status(400).json({ error: "Rədd etmək üçün səbəb qeyd edilməlidir." });
+        }
+        const merged = { ...existing, ...body, id: req.params.id, rejectionReason: reason };
         delete merged.status;
         await writeLiveTourRow(req.params.id, merged, 'rejected', null);
       } else {
@@ -602,6 +607,7 @@ app.put("/api/tours/:id", authenticateUser, async (req: any, res) => {
       const merged = { ...existing, ...body, id: req.params.id, vendorId: existing.vendorId };
       delete merged.status;
       delete merged.isApproved;
+      delete merged.rejectionReason; // resubmitting clears the old reason — it no longer applies
       await writeLiveTourRow(req.params.id, merged, 'pending_approval', null);
     }
 

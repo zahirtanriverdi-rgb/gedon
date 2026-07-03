@@ -66,6 +66,7 @@ export interface Tour {
   isApproved: boolean; // Derived from status === 'approved' (kept for backward compat)
   status: 'approved' | 'pending_approval' | 'rejected';
   pendingData?: Record<string, any>; // Proposed edit awaiting admin approval; live fields stay unchanged until merged
+  rejectionReason?: string; // Admin's stated reason the last time this tour (or its pending edit) was rejected
   isActive?: boolean;
   whatsapp_number?: string; // Tour specific direct WhatsApp number
   lastChangeLog?: string; // Log of edited fields
