@@ -245,6 +245,10 @@ export default function App() {
   const [recentSearches, setRecentSearches] = useState<string[]>(() => getRecentSearches());
   const recordSearch = (term: string) => setRecentSearches(addRecentSearch(term));
   const [isScrolled, setIsScrolled] = useState(false);
+  // Tracks whether the page has scrolled at all (vs. isScrolled's 300px threshold for the
+  // sticky search bar) — drives the header's border/shadow so it stays flush with the page
+  // background at the very top and only separates once the user starts scrolling.
+  const [isHeaderScrolled, setIsHeaderScrolled] = useState(false);
   const [displayCurrency, setDisplayCurrency] = useState<'AZN' | 'USD' | 'EUR'>('AZN');
   const [appLanguage, setAppLanguage] = useState<'az' | 'en' | 'ru'>('az');
   const [isLangMenuOpen, setIsLangMenuOpen] = useState(false);
@@ -275,6 +279,7 @@ export default function App() {
   React.useEffect(() => {
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 300);
+      setIsHeaderScrolled(window.scrollY > 0);
     };
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
@@ -655,9 +660,20 @@ export default function App() {
   // and neither was wired up to any button in the UI.
 
   return (
-    <div className="min-h-screen bg-ink-50 font-sans text-slate-700 flex flex-col justify-between" id="app_root">
-      {/* Main Elegant Header — flush with the page background, no floating-card shadow */}
-      <header className="bg-white border-b border-border-primary sticky top-0 z-40 h-[var(--header-height)]">
+    <div
+      className="min-h-screen font-sans text-slate-700 flex flex-col justify-between"
+      id="app_root"
+      style={{
+        // Flat, uniform ~2% Capri Blue tint over ink-50 (#f9fbfb) — same color everywhere,
+        // not a gradient.
+        backgroundColor: '#f4f8fb',
+      }}
+    >
+      {/* Main Elegant Header — flush with the page background at scrollY 0, gains a
+          border/shadow only once the user scrolls (sticky/scrolled state) */}
+      <header className={`bg-white sticky top-0 z-40 h-[var(--header-height)] border-b transition-shadow duration-200 ${
+        isHeaderScrolled ? 'border-border-primary shadow-sm' : 'border-transparent'
+      }`}>
         <div className="relative max-w-[var(--global-max-width)] mx-auto h-full px-8 flex flex-nowrap items-center justify-between gap-4">
 
           {/* Logo Brand */}
@@ -694,7 +710,7 @@ export default function App() {
                          window.scrollTo({ top: 300, behavior: 'smooth' });
                        }
                      }}
-                     className="w-full py-2 bg-transparent text-slate-800 text-sm focus:outline-none placeholder-slate-500 font-medium"
+                     className="w-full py-2 bg-transparent text-brand-text-main text-sm focus:outline-none placeholder-brand-text-muted font-medium"
                    />
                 </div>
                 <button
@@ -703,7 +719,7 @@ export default function App() {
                     setIsGlobalSearchFocused(false);
                     window.scrollTo({ top: 300, behavior: 'smooth' });
                   }}
-                  className="bg-primary-500 hover:bg-primary-600 text-white font-bold py-2 px-5 rounded-full transition-colors flex-shrink-0 text-sm shadow-sm cursor-pointer"
+                  className="bg-brand-cta hover:bg-brand-cta-hover text-white font-bold py-2 px-5 rounded-full transition-colors flex-shrink-0 text-sm shadow-sm cursor-pointer"
                 >
                   Axtar
                 </button>

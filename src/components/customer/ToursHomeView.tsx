@@ -156,14 +156,14 @@ export function ToursHomeView({
           {/* z-30 (not z-10): this wrapper's z-index caps the stacking context for the
               suggestions dropdown inside it, so it must outrank the tour cards' own
               z-10 share buttons below or the dropdown gets painted underneath them. */}
-          <div className="flex flex-col items-center justify-center pt-[38px] pb-[88px] min-h-[294px] relative z-30 w-full animate-fadeIn">
-            <h2 className="text-[28px] md:text-[40px] font-extrabold text-label-primary mb-6 tracking-tight text-center leading-[1.2]">{t('discoverTours')}</h2>
+          <div className="flex flex-col items-center justify-center pt-[38px] pb-[88px] min-h-[294px] mb-3 relative z-30 w-full animate-fadeIn">
+            <h2 className="text-3xl md:text-4xl font-extrabold text-brand-text-main mb-6 tracking-tight text-center">{t('discoverTours')}</h2>
 
             {/* Main Pill Search Box */}
-            <div className="w-full max-w-[1208px] min-h-[68px] mx-auto mt-8 flex items-center justify-center relative">
-              <div ref={searchContainerRef} className="relative w-full max-w-[706px] h-14 bg-white border border-border-primary rounded-lg p-1 flex items-center">
+            <div className="w-full max-w-3xl mx-auto mt-8 flex items-center justify-center relative">
+              <div ref={searchContainerRef} className="relative w-full bg-white shadow-md rounded-full p-1 border border-slate-200 flex items-center">
                 <div className="pl-4 pr-2 flex items-center flex-1">
-                   <Search className="text-slate-400 w-4 h-4 mr-3 flex-shrink-0" />
+                   <Search className="text-brand-text-muted w-4 h-4 mr-3 flex-shrink-0" />
                    <input
                      type="text"
                      placeholder={t('searchPlaceholder')}
@@ -176,7 +176,7 @@ export function ToursHomeView({
                          setIsSearchFocused(false);
                        }
                      }}
-                     className="w-full py-2.5 bg-transparent text-slate-700 text-[13px] focus:outline-none font-medium placeholder-slate-400"
+                     className="w-full py-2.5 bg-transparent text-brand-text-main text-[13px] focus:outline-none font-medium placeholder-brand-text-muted"
                    />
                 </div>
                 <button
@@ -190,7 +190,7 @@ export function ToursHomeView({
                       window.scrollTo({top: y, behavior: 'smooth'});
                     }
                   }}
-                  className="h-11 bg-interactive-primary hover:opacity-90 text-white font-bold px-6 rounded-md transition-colors flex-shrink-0 text-xs cursor-pointer"
+                  className="bg-brand-cta hover:bg-brand-cta-hover text-white font-bold py-2.5 px-6 rounded-full transition-colors flex-shrink-0 text-xs shadow-md cursor-pointer"
                 >
                   {t('searchButton')}
                 </button>
@@ -216,50 +216,50 @@ export function ToursHomeView({
             <div className="flex flex-wrap justify-center items-center gap-2 max-w-3xl mt-6 mb-4">
               <button
                 onClick={() => setSelectedCategory('all')}
-                className={`px-4 py-2 rounded-full text-xs font-bold transition-all border ${
+                className={`px-4 py-2.5 rounded-full text-xs font-bold transition-all border ${
                   selectedCategory === 'all' 
-                    ? 'bg-primary-500 text-white border-primary-500 shadow-sm' 
-                    : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                    ? 'bg-brand-primary text-white border-brand-primary shadow-sm' 
+                    : 'bg-white text-brand-text-main border-slate-200 hover:border-slate-300 hover:bg-slate-50'
                 }`}
               >
                 🌍 Bütün Turlar
               </button>
               <button
                 onClick={() => setSelectedCategory('peak')}
-                className={`px-4 py-2 rounded-full text-xs font-bold transition-all border flex items-center gap-1.5 ${
+                className={`px-4 py-2.5 rounded-full text-xs font-bold transition-all border flex items-center gap-1.5 ${
                   selectedCategory === 'peak' 
-                    ? 'bg-primary-500 text-white border-primary-500 shadow-sm' 
-                    : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                    ? 'bg-brand-primary text-white border-brand-primary shadow-sm' 
+                    : 'bg-white text-brand-text-main border-slate-200 hover:border-slate-300 hover:bg-slate-50'
                 }`}
               >
                 🏔️ Zirvə
               </button>
               <button
                 onClick={() => setSelectedCategory('camp')}
-                className={`px-4 py-2 rounded-full text-xs font-bold transition-all border flex items-center gap-1.5 ${
+                className={`px-4 py-2.5 rounded-full text-xs font-bold transition-all border flex items-center gap-1.5 ${
                   selectedCategory === 'camp' 
-                    ? 'bg-primary-500 text-white border-primary-500 shadow-sm' 
-                    : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                    ? 'bg-brand-primary text-white border-brand-primary shadow-sm' 
+                    : 'bg-white text-brand-text-main border-slate-200 hover:border-slate-300 hover:bg-slate-50'
                 }`}
               >
                 ⛺ Kamp
               </button>
               <button
                 onClick={() => setSelectedCategory('hiking')}
-                className={`px-4 py-2 rounded-full text-xs font-bold transition-all border flex items-center gap-1.5 ${
+                className={`px-4 py-2.5 rounded-full text-xs font-bold transition-all border flex items-center gap-1.5 ${
                   selectedCategory === 'hiking' 
-                    ? 'bg-primary-500 text-white border-primary-500 shadow-sm' 
-                    : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                    ? 'bg-brand-primary text-white border-brand-primary shadow-sm' 
+                    : 'bg-white text-brand-text-main border-slate-200 hover:border-slate-300 hover:bg-slate-50'
                 }`}
               >
                 🥾 Hiking
               </button>
               <button
                 onClick={() => setSelectedCategory('active')}
-                className={`px-4 py-2 rounded-full text-xs font-bold transition-all border relative flex items-center gap-1.5 ${
+                className={`px-4 py-2.5 rounded-full text-xs font-bold transition-all border relative flex items-center gap-1.5 ${
                   selectedCategory === 'active' 
-                    ? 'bg-primary-500 text-white border-primary-500 shadow-sm' 
-                    : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                    ? 'bg-brand-primary text-white border-brand-primary shadow-sm' 
+                    : 'bg-white text-brand-text-main border-slate-200 hover:border-slate-300 hover:bg-slate-50'
                 }`}
               >
                 🏃‍♂️ Aktiv Həyat
@@ -267,10 +267,10 @@ export function ToursHomeView({
               </button>
               <button
                 onClick={() => setSelectedCategory('international')}
-                className={`px-4 py-2 rounded-full text-xs font-bold transition-all border relative flex items-center gap-1.5 ${
+                className={`px-4 py-2.5 rounded-full text-xs font-bold transition-all border relative flex items-center gap-1.5 ${
                   selectedCategory === 'international' 
-                    ? 'bg-primary-500 text-white border-primary-500 shadow-sm' 
-                    : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                    ? 'bg-brand-primary text-white border-brand-primary shadow-sm' 
+                    : 'bg-white text-brand-text-main border-slate-200 hover:border-slate-300 hover:bg-slate-50'
                 }`}
               >
                 ✈️ Xarici Turlar
@@ -279,9 +279,9 @@ export function ToursHomeView({
             </div>
 
             {/* Expandable Advanced Filters Toggle Button */}
-            <button 
+            <button
               onClick={() => setIsFiltersExpanded(!isFiltersExpanded)}
-              className="mt-2 text-xs font-bold text-label-secondary hover:text-label-primary flex items-center gap-1 transition-colors"
+              className="mt-0 mb-1 text-[11px] font-bold text-brand-text-muted hover:text-brand-cta flex items-center gap-1 transition-colors"
             >
               {isFiltersExpanded ? 'Gizlət' : 'Geniş Axtarış Filtrləri'} 
               <svg className={`w-3 h-3 transition-transform ${isFiltersExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -291,14 +291,14 @@ export function ToursHomeView({
 
             {/* Expandable Extra Filters */}
             {isFiltersExpanded && (
-              <div className="w-full max-w-4xl bg-white p-5 rounded-2xl border border-slate-200 shadow-lg mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 animate-fadeIn">
+              <div className="w-full max-w-4xl bg-white p-10 rounded-2xl border border-slate-200 shadow-lg mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6 animate-fadeIn">
                 {/* Difficulty Filter */}
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-400 mb-1">Çətinlik dərəcəsi</label>
+                  <label className="block text-[10px] font-bold text-brand-text-muted mb-1">Çətinlik dərəcəsi</label>
                   <select
                     value={selectedDifficulty}
                     onChange={(e) => setSelectedDifficulty(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-600 cursor-pointer"
+                    className="w-full px-3 py-2 bg-brand-bg-light border border-slate-200 rounded-lg text-xs font-medium text-brand-text-main focus:outline-none focus:ring-1 focus:ring-brand-cta cursor-pointer"
                   >
                     <option value="all">{t('allLevels')}</option>
                     <option value="easy">Asan (Easy)</option>
@@ -310,11 +310,11 @@ export function ToursHomeView({
 
                 {/* Region Filter */}
                 <div>
-                  <label className="block text-[10px] font-bold text-slate-400 mb-1">Regionlar</label>
+                  <label className="block text-[10px] font-bold text-brand-text-muted mb-1">Regionlar</label>
                   <select
                     value={selectedRegion}
                     onChange={(e) => setSelectedRegion(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-600 cursor-pointer"
+                    className="w-full px-3 py-2 bg-brand-bg-light border border-slate-200 rounded-lg text-xs font-medium text-brand-text-main focus:outline-none focus:ring-1 focus:ring-brand-cta cursor-pointer"
                   >
                     <option value="all">{t('everywhere')}</option>
                     {uniqueRegions.map(reg => (
@@ -325,15 +325,15 @@ export function ToursHomeView({
 
                 {/* Tarix Filtri (Təqvim) */}
                 <div className="relative">
-                  <label className="block text-[10px] font-bold text-slate-400 mb-1">Tarix seçimi (Təqvim)</label>
+                  <label className="block text-[10px] font-bold text-brand-text-muted mb-1">Tarix seçimi (Təqvim)</label>
                   <button
                     type="button"
                     id="calendar-toggle-btn"
                     onClick={() => setShowCalendarWidget(!showCalendarWidget)}
-                    className={`w-full px-3 py-2 border rounded-lg text-xs font-semibold text-left flex items-center justify-between transition-colors focus:outline-none focus:ring-1 focus:ring-blue-600 cursor-pointer ${
-                      showCalendarWidget || calendarDateStart 
-                        ? 'bg-emerald-50 text-emerald-800 border-emerald-300 ring-1 ring-emerald-300' 
-                        : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                    className={`w-full px-3 py-2 border rounded-lg text-xs font-semibold text-left flex items-center justify-between transition-colors focus:outline-none focus:ring-1 focus:ring-brand-cta cursor-pointer ${
+                      showCalendarWidget || calendarDateStart
+                        ? 'bg-emerald-50 text-brand-primary border-brand-primary ring-1 ring-brand-primary'
+                        : 'bg-brand-bg-light text-brand-text-main border-slate-200 hover:bg-slate-100'
                     }`}
                   >
                     <span className="truncate">
@@ -349,31 +349,31 @@ export function ToursHomeView({
                   {showCalendarWidget && (
                     <div ref={calendarContainerRef} className="absolute z-50 left-0 mt-1 top-full bg-white px-5 py-4 rounded-xl border border-slate-200 shadow-xl w-72 animate-fade-in font-sans">
                       <div className="flex items-center justify-between mb-4">
-                        <button 
+                        <button
                           type="button"
                           onClick={handleCalendarPrevMonth}
-                          className="p-1 px-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition cursor-pointer"
+                          className="p-1 px-2.5 bg-slate-100 hover:bg-slate-200 text-brand-text-main rounded-lg text-xs font-bold transition cursor-pointer"
                         >
                           &larr;
                         </button>
-                        <h4 className="text-xs font-extrabold text-slate-850 tracking-wider">
+                        <h4 className="text-xs font-extrabold text-brand-text-main tracking-wider">
                           {(() => {
                             const [y, m] = currentMonthView.split('-');
                             return `${AZ_MONTHS[m] || m} ${y}`;
                           })()}
                         </h4>
                         <div className="flex items-center gap-1.5">
-                          <button 
+                          <button
                             type="button"
                             onClick={handleCalendarNextMonth}
-                            className="p-1 px-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition cursor-pointer"
+                            className="p-1 px-2.5 bg-slate-100 hover:bg-slate-200 text-brand-text-main rounded-lg text-xs font-bold transition cursor-pointer"
                           >
                             &rarr;
                           </button>
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-7 gap-1 mb-2 text-center text-[10px] font-bold text-slate-400">
+                      <div className="grid grid-cols-7 gap-1 mb-2 text-center text-[10px] font-bold text-brand-text-muted">
                         {['B.e','Ç.a','Ç','C.a','C','Ş','B'].map(day => (
                           <div key={day}>{day}</div>
                         ))}
@@ -387,7 +387,7 @@ export function ToursHomeView({
 
                           const firstDayOfMonth = new Date(year, month, 1);
                           let startOffset = firstDayOfMonth.getDay() - 1;
-                          if (startOffset < 0) startOffset = 6; 
+                          if (startOffset < 0) startOffset = 6;
 
                           const lastDayOfMonth = new Date(year, month + 1, 0);
                           const totalDays = lastDayOfMonth.getDate();
@@ -406,18 +406,18 @@ export function ToursHomeView({
 
                             let cellClass = "py-1.5 rounded-lg cursor-pointer transition select-none ";
                             if (isStart || isEnd) {
-                              cellClass += "bg-emerald-600 text-white font-bold scale-102 shadow-xs";
+                              cellClass += "bg-brand-primary text-white font-bold scale-102 shadow-xs";
                             } else if (isWithinRange) {
-                              cellClass += "bg-emerald-100 text-emerald-800 font-bold";
+                              cellClass += "bg-emerald-100 text-brand-primary font-bold";
                             } else if (hasActiveSlots) {
-                              cellClass += "bg-emerald-50 hover:bg-emerald-100 text-slate-800 border border-emerald-250 font-bold";
+                              cellClass += "bg-emerald-50 hover:bg-emerald-100 text-brand-text-main border border-emerald-250 font-bold";
                             } else {
-                              cellClass += "text-slate-400 hover:bg-slate-50";
+                              cellClass += "text-brand-text-muted hover:bg-slate-50";
                             }
 
                             totalCells.push(
-                              <div 
-                                key={fullDayStr} 
+                              <div
+                                key={fullDayStr}
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   handleCalendarDayClick(fullDayStr);
@@ -428,7 +428,7 @@ export function ToursHomeView({
                                 <div className="relative flex flex-col items-center">
                                   <span>{d}</span>
                                   {hasActiveSlots && !isStart && !isEnd && !isWithinRange && (
-                                    <span className="w-1 h-1 bg-emerald-600 rounded-full mt-0.5 animate-pulse"></span>
+                                    <span className="w-1 h-1 bg-brand-primary rounded-full mt-0.5 animate-pulse"></span>
                                   )}
                                 </div>
                               </div>
@@ -437,7 +437,7 @@ export function ToursHomeView({
                           return totalCells;
                         })()}
                       </div>
-                      
+
                       {calendarDateStart && (
                         <button
                            type="button"
@@ -457,11 +457,11 @@ export function ToursHomeView({
 
                 {/* Sıralama Dropdown Menu */}
                 <div>
-                  <label className="block text-[10px] font-black text-slate-500 tracking-wider mb-1">SIRALAMA</label>
+                  <label className="block text-[10px] font-black text-brand-text-muted tracking-wider mb-1">SIRALAMA</label>
                   <select
                     value={sortBy}
                     onChange={(e) => setSortBy(e.target.value)}
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-600 cursor-pointer"
+                    className="w-full px-3 py-2 bg-brand-bg-light border border-slate-200 rounded-lg text-xs font-bold text-brand-text-main focus:outline-none focus:ring-1 focus:ring-brand-cta cursor-pointer"
                   >
                     <option value="default">Varsayılan Sıralama</option>
                     <option value="price-asc">Qiymətə: Ucuzdan bahaya</option>
@@ -475,18 +475,18 @@ export function ToursHomeView({
 
                 {/* Max Price Range Slider */}
                 <div className="flex flex-col justify-end">
-                  <div className="flex justify-between text-[10px] font-bold text-slate-400 mb-1.5">
+                  <div className="flex justify-between text-[10px] font-bold text-brand-text-muted mb-1.5">
                     <span>Maksimum Qiymət</span>
-                    <span className="text-blue-700 font-extrabold">{maxPrice} ₼</span>
+                    <span className="text-brand-cta font-extrabold">{maxPrice} ₼</span>
                   </div>
                   <div className="py-1">
-                    <input 
-                      type="range" 
-                      min="20" 
-                      max={maxPriceLimit} 
-                      value={maxPrice} 
+                    <input
+                      type="range"
+                      min="20"
+                      max={maxPriceLimit}
+                      value={maxPrice}
                       onChange={(e) => setMaxPrice(Number(e.target.value))}
-                      className="w-full accent-blue-600 cursor-pointer h-1 bg-slate-200 rounded-lg"
+                      className="w-full accent-brand-cta cursor-pointer h-1 bg-slate-200 rounded-lg"
                     />
                   </div>
                 </div>
@@ -496,10 +496,10 @@ export function ToursHomeView({
 
           {/* Horizontal Slider for Upcoming Tours (Minimal) */}
           {uniqueUpcomingTours.length > 0 && (
-              <div className="mb-14 w-full max-w-[var(--global-max-width)] mx-auto animate-fadeIn relative">
-                <div className="flex items-center justify-between mb-6 px-1">
-                  <h3 className="text-sm font-extrabold text-slate-800 tracking-tight flex items-center gap-1.5">
-                    <Calendar className="w-4 h-4 text-emerald-600" />
+              <div className="mb-3 mt-3 w-full max-w-[1400px] mx-auto animate-fadeIn relative">
+                <div className="flex items-center justify-between mb-2 px-1">
+                  <h3 className="text-sm font-extrabold text-brand-text-main tracking-tight flex items-center gap-1.5">
+                    <Calendar className="w-4 h-4 text-brand-primary" />
                     {t('upcomingTours')}
                   </h3>
                 </div>
@@ -512,7 +512,7 @@ export function ToursHomeView({
                         const slider = document.getElementById('upcoming-tours-slider');
                         if(slider) slider.scrollBy({ left: -300, behavior: 'smooth' });
                       }}
-                      className="absolute left-0 top-1/2 -translate-y-1/2 -ml-3 md:-ml-4 z-10 w-11 h-11 bg-white text-label-secondary rounded-full shadow-sm hover:bg-slate-50 transition-colors flex items-center justify-center border border-border-primary"
+                      className="absolute left-0 top-1/2 -translate-y-1/2 -ml-3 md:-ml-4 z-10 bg-brand-cta text-white p-2.5 rounded-full shadow-lg hover:bg-brand-cta-hover transition-colors flex items-center justify-center border-2 border-white"
                     >
                       <ChevronLeft className="w-5 h-5" />
                     </button>
@@ -526,13 +526,9 @@ export function ToursHomeView({
                       <div
                         key={tour.id}
                         onClick={() => onSelectTour(tour)}
-                        // 384px (not a wider value): at the 1248px content width this container
-                        // gets on 1440-1920px screens (main's 1440 cap + our 96px padding), 3
-                        // cards at 384px + gaps fill ~1188px, leaving a ~60px peek of the 4th
-                        // card to signal the row scrolls — a wider card would only fit 2 full.
-                        className="w-[280px] sm:w-[384px] h-[150px] flex-shrink-0 bg-white border border-border-primary rounded-[var(--card-radius)] p-3 flex items-center gap-4 snap-start cursor-pointer hover:shadow-lg transition-all duration-300 group"
+                        className="w-[85%] sm:w-[calc(50%-8px)] md:w-[calc(33.333%-12px)] h-[150px] flex-shrink-0 bg-white border border-slate-200 rounded-[20px] p-3 flex items-center gap-4 snap-start cursor-pointer hover:border-emerald-300 hover:shadow-xl transition-all duration-300 group shadow-sm hover:-translate-y-1"
                       >
-                        <div className="w-[84px] h-[84px] rounded-xl overflow-hidden flex-shrink-0 relative shadow-sm border border-slate-100">
+                        <div className="w-[110px] h-[110px] rounded-xl overflow-hidden flex-shrink-0 relative shadow-sm border border-slate-100">
                           <img
                             src={tour.image || `https://images.unsplash.com/photo-1542224566-6e85f2e6772f?auto=format&fit=crop&q=80&w=200`}
                             className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
@@ -544,17 +540,17 @@ export function ToursHomeView({
                             className="absolute top-1 right-1 bg-white/90 hover:bg-white p-1 rounded-full shadow-sm transition cursor-pointer"
                             title={wishlist.includes(tour.id) ? 'İstəklərdən çıxar' : 'İstəklərə əlavə et'}
                           >
-                            <Heart className={`w-2.5 h-2.5 ${wishlist.includes(tour.id) ? 'fill-rose-600 text-rose-600' : 'text-slate-600'}`} />
+                            <Heart className={`w-2.5 h-2.5 ${wishlist.includes(tour.id) ? 'fill-rose-600 text-rose-600' : 'text-brand-text-main'}`} />
                           </button>
                         </div>
                         <div className="flex flex-col flex-1 justify-center overflow-hidden h-full py-1">
-                          <h4 className="text-[14px] font-black text-label-primary truncate mb-1" title={tour.name}>{tour.name}</h4>
-                          <div className="text-[12px] font-bold text-label-secondary mb-2 flex items-center gap-1.5">
-                            <MapPin className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                          <h4 className="text-[14px] font-black text-brand-text-main truncate mb-1" title={tour.name}>{tour.name}</h4>
+                          <div className="text-[12px] font-bold text-brand-text-muted mb-2 flex items-center gap-1.5">
+                            <MapPin className="w-3.5 h-3.5 text-brand-primary shrink-0" />
                             <span className="truncate">{tour.region}</span>
                           </div>
                           <div className="flex items-center justify-between mt-auto">
-                            <span className="text-[11px] font-black text-label-secondary bg-emerald-50 border border-emerald-100 px-2 py-1 rounded-md tracking-tight">
+                            <span className="text-[11px] font-black text-brand-primary bg-emerald-50 border border-emerald-100 px-2 py-1 rounded-md tracking-tight">
                               {slot.startDate}
                           </span>
                           {tour.discountPrice && tour.discountPrice > 0 && tour.discountPrice < (tour.price ?? slot.price) ? (
@@ -567,7 +563,7 @@ export function ToursHomeView({
                               </span>
                             </span>
                           ) : (
-                            <span className="text-[13px] font-black text-label-primary tracking-tight">
+                            <span className="text-[13px] font-black text-brand-text-main tracking-tight">
                               {getConvertedPriceInfo(slot.price, tour.priceCurrency).both}
                             </span>
                           )}
@@ -577,13 +573,13 @@ export function ToursHomeView({
                   ))}
                 </div>
                   {uniqueUpcomingTours.length > 3 && (
-                    <button 
+                    <button
                       onClick={(e) => {
                         e.stopPropagation();
                         const slider = document.getElementById('upcoming-tours-slider');
                         if(slider) slider.scrollBy({ left: 300, behavior: 'smooth' });
                       }}
-                      className="absolute right-0 top-1/2 -translate-y-1/2 -mr-3 md:-mr-4 z-10 w-11 h-11 bg-white text-label-secondary rounded-full shadow-sm hover:bg-slate-50 transition-colors flex items-center justify-center border border-border-primary"
+                      className="absolute right-0 top-1/2 -translate-y-1/2 -mr-3 md:-mr-4 z-10 bg-brand-cta text-white p-2.5 rounded-full shadow-lg hover:bg-brand-cta-hover transition-colors flex items-center justify-center border-2 border-white"
                     >
                       <ChevronRight className="w-5 h-5" />
                     </button>
@@ -602,8 +598,8 @@ export function ToursHomeView({
       {sortedAndFilteredTours.length === 0 ? (
         <div className="text-center py-16 bg-white rounded-xl border border-slate-200 p-8 space-y-3 shadow-xs">
           <AlertCircle className="w-8 h-8 text-slate-300 mx-auto" />
-          <h3 className="text-sm font-bold text-slate-700">{t('noToursFound')}</h3>
-          <p className="text-xs text-slate-400 max-w-md mx-auto">
+          <h3 className="text-sm font-bold text-brand-text-main">{t('noToursFound')}</h3>
+          <p className="text-xs text-brand-text-muted max-w-md mx-auto">
             {t('noToursDesc')}
           </p>
         </div>
@@ -616,7 +612,7 @@ export function ToursHomeView({
             const isSportActive = tour.category === 'active' || tour.isActiveLife;
             const diffColors: Record<TourDifficulty, { bg: string, text: string, label: string }> = {
               easy: { bg: 'bg-emerald-50 text-emerald-850 border border-emerald-100', text: 'text-emerald-800', label: 'Asan' },
-              medium: { bg: 'bg-slate-100 text-slate-800 border border-slate-200', text: 'text-slate-800', label: 'Orta' },
+              medium: { bg: 'bg-brand-bg-light text-brand-text-main border border-slate-200', text: 'text-brand-text-main', label: 'Orta' },
               hard: { bg: 'bg-orange-50 text-orange-850 border border-orange-100', text: 'text-orange-800', label: 'Çətin' },
               extreme: { bg: 'bg-red-50 text-red-850 border border-red-100', text: 'text-red-800', label: 'Ekstremal' }
             };
@@ -630,13 +626,13 @@ export function ToursHomeView({
             };
 
             // Dynamic Active Lifestyle Difficulty override with color codes
-            let difficultyBg = diffColors[tour.difficulty]?.bg || 'bg-slate-100 text-slate-800';
+            let difficultyBg = diffColors[tour.difficulty]?.bg || 'bg-slate-100 text-brand-text-main';
             let difficultyLabel = diffColors[tour.difficulty]?.label || 'Orta';
 
             if (isSportActive) {
               const activeDiff = tour.activeDifficulty || (tour.difficulty === 'easy' ? 'beginner' : tour.difficulty === 'hard' || tour.difficulty === 'extreme' ? 'professional' : 'medium');
               if (activeDiff === 'beginner' || activeDiff === 'easy') {
-                difficultyBg = 'bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold';
+                difficultyBg = 'bg-emerald-100 text-brand-primary border border-emerald-300 font-bold';
                 difficultyLabel = '🟢 Başlanğıc';
               } else if (activeDiff === 'medium') {
                 difficultyBg = 'bg-yellow-100 text-amber-800 border border-yellow-300 font-bold';
@@ -663,11 +659,11 @@ export function ToursHomeView({
             return (
               <div
                 key={tour.id}
-                className={`bg-white rounded-2xl border min-h-[398.5px] overflow-hidden hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] transition-all flex flex-col group cursor-pointer ${tour.isInternational ? 'border-amber-200 ring-1 ring-amber-100/50 bg-gradient-to-b from-amber-500/2 to-transparent' : 'border-[#E4E6E9]'} ${isSportActive ? 'border-amber-300 bg-gradient-to-tr from-amber-50/10 to-transparent' : ''}`}
+                className={`bg-white rounded-xl border overflow-hidden shadow-sm hover:shadow-md transition-all flex flex-col group cursor-pointer ${tour.isInternational ? 'border-amber-200 ring-1 ring-amber-100/50 bg-gradient-to-b from-amber-500/2 to-transparent' : 'border-slate-200'} ${isSportActive ? 'border-amber-300 bg-gradient-to-tr from-amber-50/10 to-transparent' : ''}`}
                 onClick={() => onSelectTour(tour)}
               >
                 {/* Tour Image */}
-                <div className="relative aspect-[4/3] overflow-hidden bg-slate-100">
+                <div className="relative h-52 overflow-hidden bg-slate-100">
                   <img
                     src={tour.image || undefined}
                     alt={tour.name}
@@ -676,11 +672,11 @@ export function ToursHomeView({
                   />
                   <div className="absolute top-3 left-3 flex gap-1.5 flex-wrap">
                     {featuredTourIds.has(tour.id) && (
-                      <span className="text-[10px] font-extrabold tracking-tight px-2 py-0.5 rounded-md shadow-xs bg-amber-500 text-white">
+                      <span className="text-[10px] font-extrabold tracking-tight px-2 py-0.5 rounded-md shadow-xs bg-brand-accent text-white">
                         🔥 Ayın Ən Çox Satılanı
                       </span>
                     )}
-                    <span className={`text-[10px] font-bold tracking-tight px-2 py-0.5 rounded-md shadow-xs ${tour.isInternational ? 'bg-accent-orange-100 text-accent-orange-800' : 'bg-slate-900/90 text-white'}`}>
+                    <span className={`text-[10px] font-bold tracking-tight px-2 py-0.5 rounded-md shadow-xs ${tour.isInternational ? 'bg-brand-accent text-white' : 'bg-brand-text-main/90 text-white'}`}>
                       {badges[tour.category]?.emoji || '✈️'} {badges[tour.category]?.label || 'Xarici'}
                     </span>
                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md shadow-xs ${difficultyBg}`}>
@@ -695,23 +691,23 @@ export function ToursHomeView({
                       className="bg-white hover:bg-slate-50 p-1.5 rounded-full shadow-md transition-all hover:scale-110 flex items-center justify-center border border-slate-100 cursor-pointer"
                       title={wishlist.includes(tour.id) ? 'İstəklərdən çıxar' : 'İstəklərə əlavə et'}
                     >
-                      <Heart className={`w-3.5 h-3.5 ${wishlist.includes(tour.id) ? 'fill-rose-600 text-rose-600' : 'text-slate-700'}`} />
+                      <Heart className={`w-3.5 h-3.5 ${wishlist.includes(tour.id) ? 'fill-rose-600 text-rose-600' : 'text-brand-text-main'}`} />
                     </button>
                     <button
                       type="button"
                       onClick={(e) => handleShareTour(tour, e)}
-                      className="bg-white hover:bg-slate-50 text-slate-700 hover:text-emerald-700 p-1.5 rounded-full shadow-md transition-all hover:scale-110 flex items-center justify-center border border-slate-100 cursor-pointer"
+                      className="bg-white hover:bg-slate-50 text-brand-text-main hover:text-brand-primary p-1.5 rounded-full shadow-md transition-all hover:scale-110 flex items-center justify-center border border-slate-100 cursor-pointer"
                       title="Dostlarınla Paylaş"
                     >
                       <Share2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
                   {tour.isInternational && (
-                    <div className="absolute bottom-10 right-3 bg-amber-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow-sm">
+                    <div className="absolute bottom-10 right-3 bg-brand-accent text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow-sm">
                       ✈️ Aviabilet {tour.flightIncluded ? 'Daxildir' : 'Daxil deyil'}
                     </div>
                   )}
-                  <div className="absolute bottom-3 right-3 bg-white/90 backdrop-blur-xs text-label-secondary px-2 py-0.5 rounded border border-slate-250 text-[10px] font-semibold">
+                  <div className="absolute bottom-3 right-3 bg-white/90 backdrop-blur-xs text-brand-text-main px-2 py-0.5 rounded border border-slate-250 text-[10px] font-semibold">
                     📍 {tour.region.split(',')[0]}
                   </div>
                 </div>
@@ -719,7 +715,7 @@ export function ToursHomeView({
                 {/* Tour Card Body */}
                 <div className="p-4 flex-1 flex flex-col justify-between">
                   <div className="space-y-2">
-                    <div className="flex items-center gap-1.5 text-[14px] text-slate-700 font-normal">
+                    <div className="flex items-center gap-1.5 text-[10px] text-brand-text-muted font-bold tracking-wider">
                       {isSportActive ? (
                         <>
                           <span className="text-amber-600 font-bold">🏅</span>
@@ -732,7 +728,7 @@ export function ToursHomeView({
                         </>
                       ) : (
                         <>
-                          <Compass className="w-3 h-3 text-emerald-700" />
+                          <Compass className="w-3 h-3 text-brand-primary" />
                           <span>{tour.durationDays} Günlük yürüş</span>
                         </>
                       )}
@@ -740,7 +736,7 @@ export function ToursHomeView({
                       <span>{tourSlots.length} Aktiv Tarix</span>
                     </div>
 
-                    <h3 className="font-bold text-label-primary text-[16px] leading-[1.4] group-hover:text-emerald-700 transition tracking-tight flex items-center gap-1">
+                    <h3 className="font-bold text-brand-text-main text-sm leading-snug group-hover:text-brand-primary transition tracking-tight flex items-center gap-1">
                       {isSportActive && (
                         <span className="text-base shrink-0 select-none">
                           {tour.activityType === 'volleyball' ? '🏐' : tour.activityType === 'ski' ? '⛷️' : tour.activityType === 'rafting' ? '🚣‍♂️' : tour.activityType === 'running' ? '🏃‍♂️' : tour.activityType === 'bike' ? '🚴‍♂️' : '🏆'}
@@ -750,40 +746,40 @@ export function ToursHomeView({
                     </h3>
 
                     {isSportActive && (
-                      <div className="bg-amber-50/60 border border-amber-100 p-2.5 rounded-xl text-[10px] text-slate-700 flex flex-col gap-1 my-1">
-                        <div className="flex justify-between font-bold text-slate-800">
+                      <div className="bg-amber-50/60 border border-amber-100 p-2.5 rounded-xl text-[10px] text-brand-text-main flex flex-col gap-1 my-1">
+                        <div className="flex justify-between font-bold text-brand-text-main">
                           <span>🔞 Yaş: <span className="text-amber-800 font-black">{tour.ageLimit || '18-45 yaş'}</span></span>
-                          <span className="text-emerald-800 font-extrabold">{tour.equipmentIncluded ? '🎒 Təchizat pulsuz' : '🎒 Təchizat kirayəsi'}</span>
+                          <span className="text-brand-primary font-extrabold">{tour.equipmentIncluded ? '🎒 Təchizat pulsuz' : '🎒 Təchizat kirayəsi'}</span>
                         </div>
                         {tour.requiredEquipment && (
-                          <div className="text-[9px] text-slate-500 truncate">
-                            🎒 Lazımdır: <strong className="text-slate-700 font-semibold">{tour.requiredEquipment}</strong>
+                          <div className="text-[9px] text-brand-text-muted truncate">
+                            🎒 Lazımdır: <strong className="text-brand-text-main font-semibold">{tour.requiredEquipment}</strong>
                           </div>
                         )}
                         {tour.meetingPoint && (
-                          <div className="text-[9px] text-slate-500 truncate">
-                            📍 Görüş: <strong className="text-slate-700 font-semibold">{tour.meetingPoint}</strong>
+                          <div className="text-[9px] text-brand-text-muted truncate">
+                            📍 Görüş: <strong className="text-brand-text-main font-semibold">{tour.meetingPoint}</strong>
                           </div>
                         )}
                       </div>
                     )}
 
                     {tour.isInternational && (
-                      <div className="bg-gradient-to-r from-amber-50/70 to-teal-50/50 border border-amber-200/50 p-2.5 rounded-lg text-[10px] text-slate-650 flex flex-col gap-1 my-1 shadow-4xs">
-                        <div className="flex items-center gap-1 leading-none font-bold text-slate-800">
-                          🏨 <span className="text-emerald-900 font-black">{tour.hotelName}</span> 
-                          <span className="text-amber-500 font-black text-[10px]">
+                      <div className="bg-gradient-to-r from-amber-50/70 to-teal-50/50 border border-amber-200/50 p-2.5 rounded-xl text-[10px] text-brand-text-main flex flex-col gap-1 my-1 shadow-4xs">
+                        <div className="flex items-center gap-1 leading-none font-bold text-brand-text-main">
+                          🏨 <span className="text-emerald-900 font-black">{tour.hotelName}</span>
+                          <span className="text-brand-accent font-black text-[10px]">
                             {Array(Number(tour.hotelStars || 5)).fill('★').join('')}
                           </span>
                         </div>
-                        <div className="flex justify-between text-[9px] text-slate-500 font-bold">
+                        <div className="flex justify-between text-[9px] text-brand-text-muted font-bold">
                           <span>🍽️ Qidalanma: {tour.mealType || 'Səhər yeməyi'}</span>
-                          <span className="text-emerald-800">✈️ {tour.flightIncluded ? 'Uçuş daxildir' : 'Uçuş daxil deyil'}</span>
+                          <span className="text-brand-primary">✈️ {tour.flightIncluded ? 'Uçuş daxildir' : 'Uçuş daxil deyil'}</span>
                         </div>
                       </div>
                     )}
 
-                    <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed">
+                    <p className="text-xs text-brand-text-muted line-clamp-2 leading-relaxed">
                       {tour.description}
                     </p>
 
@@ -817,12 +813,12 @@ export function ToursHomeView({
                                   />
                                 );
                               })}
-                              <span className="text-xs font-bold text-slate-700 ml-1">{getAverageRating(tour.id)}</span>
-                              <span className="text-slate-400 text-[10px] font-medium">({getReviewsCount(tour.id)} rəy)</span>
+                              <span className="text-xs font-bold text-brand-text-main ml-1">{getAverageRating(tour.id)}</span>
+                              <span className="text-brand-text-muted text-[10px] font-medium">({getReviewsCount(tour.id)} rəy)</span>
                             </div>
                           )}
                           {isTopSeller && (
-                            <span className="bg-amber-50/70 text-amber-700 border border-amber-100 text-[9px] font-semibold px-1.5 py-0.5 rounded flex items-center gap-0.5 w-fit" title="Bu ayın ən çox bilet satılan turu!">
+                            <span className="bg-amber-50/70 text-brand-accent border border-amber-100 text-[9px] font-semibold px-1.5 py-0.5 rounded-md flex items-center gap-0.5 w-fit" title="Bu ayın ən çox bilet satılan turu!">
                               🔥 {selectedMonth} ayının ən çox satılanı
                             </span>
                           )}
@@ -837,7 +833,7 @@ export function ToursHomeView({
                           <span className="line-through text-label-tertiary text-xs">
                             {getConvertedPriceInfo(tour.price ?? minPrice, tour.priceCurrency).both}
                           </span>
-                          <span className="text-2xl font-extrabold text-label-critical bg-surface-critical-weak px-1.5 rounded-md leading-tight">
+                          <span className="text-2xl font-extrabold text-label-critical bg-surface-critical-weak px-1.5 rounded leading-tight">
                             {getConvertedPriceInfo(tour.discountPrice, tour.priceCurrency).both}
                           </span>
                         </div>
@@ -889,17 +885,17 @@ export function ToursHomeView({
       {/* Info Banner at the bottom of the page */}
       <div className="bg-emerald-50 rounded-xl p-4 border border-emerald-100 flex items-center justify-between mt-8">
         <div className="flex items-center gap-3">
-          <div className="p-2 bg-emerald-100 text-emerald-700 rounded-lg">
+          <div className="p-2 bg-emerald-100 text-brand-primary rounded-lg">
             <AlertCircle className="w-5 h-5" />
           </div>
           <div>
-            <h4 className="font-bold text-emerald-800 text-sm">Turdan əvvəl bilməli olduqlarınız</h4>
-            <p className="text-emerald-700 text-xs mt-0.5">Avadanlıq, geyim və çətinlik dərəcələri haqqında tam bələdçi</p>
+            <h4 className="font-bold text-brand-primary text-sm">Turdan əvvəl bilməli olduqlarınız</h4>
+            <p className="text-brand-primary text-xs mt-0.5">Avadanlıq, geyim və çətinlik dərəcələri haqqında tam bələdçi</p>
           </div>
         </div>
-        <button 
+        <button
           onClick={() => setActiveView('faq')}
-          className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg transition"
+          className="px-4 py-2 bg-brand-primary hover:opacity-90 text-white font-bold text-xs rounded-lg transition"
         >
           Oxu
         </button>

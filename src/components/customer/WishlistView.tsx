@@ -31,15 +31,15 @@ export function WishlistView({ wishlistTours, onBack, onSelectTour, onToggleWish
           <p className="text-sm text-slate-500 font-medium">Hələ heç bir tur istəklərinizə əlavə etməmisiniz.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {wishlistTours.map(tour => (
             <div
               key={tour.id}
               onClick={() => onSelectTour(tour)}
-              className="bg-white rounded-2xl border border-slate-200 overflow-hidden cursor-pointer hover:shadow-lg hover:-translate-y-0.5 transition-all group"
+              className="bg-white rounded-2xl border border-[#E4E6E9] overflow-hidden cursor-pointer hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] transition-all group"
             >
-              <div className="relative h-40">
-                <img src={tour.image || undefined} className="w-full h-full object-cover" alt={tour.name} referrerPolicy="no-referrer" />
+              <div className="relative aspect-[4/3] overflow-hidden bg-slate-100">
+                <img src={tour.image || undefined} className="w-full h-full object-cover group-hover:scale-102 transition duration-500" alt={tour.name} referrerPolicy="no-referrer" />
                 <button
                   type="button"
                   onClick={(e) => onToggleWishlist(tour.id, e)}
@@ -49,9 +49,9 @@ export function WishlistView({ wishlistTours, onBack, onSelectTour, onToggleWish
                   <Heart className="w-4 h-4 fill-rose-600 text-rose-600" />
                 </button>
               </div>
-              <div className="p-4 space-y-1">
-                <h4 className="font-bold text-sm text-label-primary truncate">{tour.name}</h4>
-                <p className="text-xs text-label-secondary flex items-center gap-1">
+              <div className="p-4 space-y-2">
+                <h4 className="text-[16px] font-bold leading-[1.4] text-label-primary truncate">{tour.name}</h4>
+                <p className="text-[14px] font-normal text-label-secondary flex items-center gap-1">
                   <MapPin className="w-3 h-3 text-emerald-500" /> {tour.region}
                 </p>
               </div>

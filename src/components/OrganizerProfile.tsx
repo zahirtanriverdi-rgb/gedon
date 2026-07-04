@@ -103,24 +103,24 @@ export default function OrganizerProfile({ organizer, tours, onBack, onTourClick
           {/* Active Tours */}
           <div>
             <h2 className="text-2xl font-extrabold text-label-primary mb-6">Təşkilatçının Turları</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {activeTours.length > 0 ? (
                 activeTours.map((tour) => (
-                  <div 
-                    key={tour.id} 
-                    className="group bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md cursor-pointer transition"
+                  <div
+                    key={tour.id}
+                    className="group bg-white rounded-2xl border border-[#E4E6E9] overflow-hidden hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] cursor-pointer transition-all"
                     onClick={() => onTourClick(tour)}
                   >
-                    <div className="h-40 bg-slate-200 relative overflow-hidden">
+                    <div className="relative aspect-[4/3] overflow-hidden bg-slate-100">
                       {tour.image && (
-                        <img src={tour.image} alt={tour.name} className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
+                        <img src={tour.image} alt={tour.name} className="w-full h-full object-cover group-hover:scale-102 transition duration-500" />
                       )}
                       <div className="absolute top-3 left-3 bg-white/90 backdrop-blur text-slate-900 px-2 py-1 text-xs font-bold rounded">
                         {tour.durationDays} Gün
                       </div>
                     </div>
-                    <div className="p-4">
-                      <div className="flex items-center justify-between mb-1">
+                    <div className="p-4 space-y-2">
+                      <div className="flex items-center justify-between">
                         <span className="text-xs font-bold text-emerald-600 uppercase tracking-wider">{tour.category}</span>
                         {REVIEWS_ENABLED && (
                           <div className="flex items-center gap-1 text-amber-500">
@@ -129,8 +129,8 @@ export default function OrganizerProfile({ organizer, tours, onBack, onTourClick
                           </div>
                         )}
                       </div>
-                      <h3 className="font-bold text-label-primary mb-2">{tour.name}</h3>
-                      <div className="flex items-center text-label-secondary text-xs font-medium gap-1">
+                      <h3 className="text-[16px] font-bold leading-[1.4] text-label-primary">{tour.name}</h3>
+                      <div className="flex items-center text-label-secondary text-[14px] font-normal gap-1">
                         <MapPin className="w-3.5 h-3.5" />
                         {tour.region}
                       </div>
