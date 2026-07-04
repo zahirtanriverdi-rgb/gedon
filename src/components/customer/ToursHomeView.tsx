@@ -152,11 +152,11 @@ export function ToursHomeView({
           {/* z-30 (not z-10): this wrapper's z-index caps the stacking context for the
               suggestions dropdown inside it, so it must outrank the tour cards' own
               z-10 share buttons below or the dropdown gets painted underneath them. */}
-          <div className="flex flex-col items-center justify-center -mx-5 px-5 lg:px-24 pt-[38px] pb-[88px] min-h-[294px] relative z-30 w-full animate-fadeIn">
+          <div className="flex flex-col items-center justify-center pt-[38px] pb-[88px] min-h-[294px] relative z-30 w-full animate-fadeIn">
             <h2 className="text-[36px] font-bold text-label-primary mb-6 tracking-tight text-center">{t('discoverTours')}</h2>
 
             {/* Main Pill Search Box */}
-            <div className="w-full max-w-[1208px] h-[68px] mx-auto mt-8 flex items-center justify-center relative">
+            <div className="w-full max-w-[1208px] min-h-[68px] mx-auto mt-8 flex items-center justify-center relative">
               <div ref={searchContainerRef} className="relative w-full max-w-[706px] h-14 bg-white border border-border-primary rounded-lg p-1 flex items-center">
                 <div className="pl-4 pr-2 flex items-center flex-1">
                    <Search className="text-slate-400 w-4 h-4 mr-3 flex-shrink-0" />
