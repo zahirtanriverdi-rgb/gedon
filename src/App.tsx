@@ -373,6 +373,24 @@ export default function App() {
     }
   };
 
+  const handleDeleteVendor = async (vendorId: string, adminPassword: string) => {
+    try {
+      const response = await fetch(`/api/admin/vendors/${vendorId}`, {
+        method: 'DELETE',
+        headers: authHeaders(),
+        body: JSON.stringify({ adminPassword }),
+      });
+      const parsed = await parseApiResponse(response);
+      if (!response.ok) throw new Error(parsed.error || 'Operator arxivləşdirilə bilmədi.');
+
+      setUsers(prev => prev.map(u => u.id === vendorId ? { ...u, isArchived: true } : u));
+      showNotification('Operator hesabı arxivləşdirildi. Turları və rezervasiyaları qorunub, amma artıq platformada görünməyəcək.', 'success');
+    } catch (e: any) {
+      showNotification(e.message || 'Operator arxivləşdirilərkən xəta baş verdi.', 'error');
+      throw e;
+    }
+  };
+
   const handleUpdateUser = async (userId: string, data: Partial<User>) => {
     try {
       const response = await fetch(`/api/users/${userId}`, {
@@ -855,6 +873,7 @@ export default function App() {
                 onUpdateExchangeRates={handleUpdateExchangeRates}
                 onUpdateUser={handleUpdateUser}
                 onCreateVendor={handleCreateVendor}
+                onDeleteVendor={handleDeleteVendor}
                 onUpdateTourStatus={handleUpdateTourStatus}
               />
             )}

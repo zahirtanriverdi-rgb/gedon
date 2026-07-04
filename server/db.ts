@@ -82,9 +82,18 @@ export async function initializeDatabase() {
       about TEXT,
       subscription_valid_until TIMESTAMP,
       extra_data TEXT,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      deleted_at TIMESTAMP
     );
   `);
+
+  // Migration for databases created before `deleted_at` existed (soft-delete support for
+  // admin-archived vendor accounts — see DELETE /api/admin/vendors/:id).
+  try {
+    await dbClient.execute(`ALTER TABLE users ADD COLUMN deleted_at TIMESTAMP`);
+  } catch {
+    // column already exists — safe to ignore
+  }
 
   // Migration for databases created before `username`/`extra_data` existed (fresh installs
   // already get them from the CREATE TABLE above, so these are no-ops there).

@@ -101,6 +101,7 @@ function rowToUser(row: any) {
     guides: extra.guides || undefined,
     subscriptionValidUntil: row.subscription_valid_until || undefined,
     createdAt: row.created_at,
+    isArchived: !!row.deleted_at,
   };
 }
 
@@ -145,7 +146,7 @@ app.post("/api/auth/operator/login", async (req, res) => {
 
   try {
     const rows = await dbClient.query(
-      `SELECT * FROM users WHERE (email = ? OR username = ?) AND role = 'vendor'`,
+      `SELECT * FROM users WHERE (email = ? OR username = ?) AND role = 'vendor' AND deleted_at IS NULL`,
       [identifier, identifier]
     );
     const user = rows[0];
@@ -214,6 +215,48 @@ app.post("/api/admin/vendors", authenticateUser, async (req: any, res) => {
   } catch (error: any) {
     console.error("[POST /api/admin/vendors] error:", error);
     return res.status(500).json({ error: "Vendor hesabı yaradıla bilmədi: " + error.message });
+  }
+});
+
+// DELETE /api/admin/vendors/:id — soft-deletes (archives) a vendor account. Requires the
+// admin to confirm with their OWN password (checked twice client-side as a "type it again"
+// confirmation, then sent once here and verified server-side against the admin's real hash —
+// this isn't the vendor's password, since an admin has no legitimate way to know that).
+// This is a soft delete: the user row is only stamped with deleted_at, never removed, so all
+// of the vendor's tours/slots/bookings stay intact for records. The vendor can no longer log
+// in (see /api/auth/operator/login's deleted_at IS NULL check) and disappears from the
+// customer-facing marketplace (see GET /api/tours), but nothing about their history is lost.
+app.delete("/api/admin/vendors/:id", authenticateUser, async (req: any, res) => {
+  if (req.operator.role !== 'admin') {
+    return res.status(403).json({ error: "Yalnız adminlər operator hesabını silə bilər." });
+  }
+
+  try {
+    const { adminPassword } = req.body || {};
+    if (!adminPassword) {
+      return res.status(400).json({ error: "Təsdiq üçün öz parolunuzu daxil edin." });
+    }
+
+    const adminRows = await dbClient.query('SELECT * FROM users WHERE id = ?', [req.operator.id]);
+    const adminRow = adminRows[0];
+    if (!adminRow || !bcrypt.compareSync(String(adminPassword), adminRow.password_hash)) {
+      return res.status(401).json({ error: "Daxil etdiyiniz parol yanlışdır." });
+    }
+
+    const vendorRows = await dbClient.query('SELECT * FROM users WHERE id = ?', [req.params.id]);
+    const vendorRow = vendorRows[0];
+    if (!vendorRow || vendorRow.role !== 'vendor') {
+      return res.status(404).json({ error: "Operator tapılmadı." });
+    }
+    if (vendorRow.deleted_at) {
+      return res.status(409).json({ error: "Bu operator artıq arxivləşdirilib." });
+    }
+
+    await dbClient.execute('UPDATE users SET deleted_at = CURRENT_TIMESTAMP WHERE id = ?', [req.params.id]);
+    return res.json({ success: true });
+  } catch (error: any) {
+    console.error("[DELETE /api/admin/vendors/:id] error:", error);
+    return res.status(500).json({ error: "Operator arxivləşdirilə bilmədi: " + error.message });
   }
 });
 
@@ -494,6 +537,7 @@ app.get("/api/tours", async (req, res) => {
       // or an admin rejects one, it disappears from the marketplace immediately — no exceptions,
       // and no "keep showing the stale approved version while a proposal is under review".
       conditions.push("status = 'approved'");
+      conditions.push("vendor_id NOT IN (SELECT id FROM users WHERE deleted_at IS NOT NULL)");
       if (req.query.vendorId) {
         conditions.push('vendor_id = ?');
         params.push(String(req.query.vendorId));

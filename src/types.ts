@@ -24,6 +24,7 @@ export interface User {
   guides?: Guide[];      // Team members/guides
   subscriptionValidUntil?: string; // ISO date string. Vendor's subscription end date.
   createdAt: string;
+  isArchived?: boolean; // Soft-deleted by an admin — account can no longer log in, but its tours/slots/bookings are preserved for records
 }
 
 export type TourCategory = 'peak' | 'camp' | 'hiking' | 'international' | 'active';

@@ -94,6 +94,7 @@ interface AdminPortalProps {
   onUpdateExchangeRates: (newRates: { USD: number; EUR: number }) => void;
   onUpdateUser?: (userId: string, data: Partial<User>) => void;
   onCreateVendor?: (data: { companyName: string; login: string; password: string }) => Promise<void>;
+  onDeleteVendor?: (vendorId: string, adminPassword: string) => Promise<void>;
   onUpdateTourStatus?: (tourId: string, isActive: boolean) => Promise<void>;
 }
 
@@ -116,6 +117,7 @@ export default function AdminPortal({
   onUpdateExchangeRates,
   onUpdateUser,
   onCreateVendor,
+  onDeleteVendor,
   onUpdateTourStatus
 }: AdminPortalProps) {
   const [commissionInput, setCommissionInput] = useState<string | number>(platformConfig.commissionPercentage);
@@ -210,7 +212,7 @@ export default function AdminPortal({
     return editingTour.pendingData ? ({ ...editingTour, ...editingTour.pendingData } as Tour) : editingTour;
   }, [editingTour]);
 
-  const totalVendors = users.filter(u => u.role === 'vendor').length;
+  const totalVendors = users.filter(u => u.role === 'vendor' && !u.isArchived).length;
   const totalCustomers = users.filter(u => u.role === 'customer').length;
 
   // Password management states
@@ -257,6 +259,40 @@ export default function AdminPortal({
       // onCreateVendor already surfaces the error via onShowNotification
     } finally {
       setIsCreatingVendor(false);
+    }
+  };
+
+  // Vendor deletion (soft-delete / archive) — admin confirms with their own password, typed
+  // twice, before the request is sent.
+  const [deletingVendor, setDeletingVendor] = useState<{ id: string; name: string } | null>(null);
+  const [deleteAdminPassword, setDeleteAdminPassword] = useState<string>('');
+  const [deleteAdminPasswordConfirm, setDeleteAdminPasswordConfirm] = useState<string>('');
+  const [isDeletingVendor, setIsDeletingVendor] = useState<boolean>(false);
+
+  const closeDeleteVendorModal = () => {
+    setDeletingVendor(null);
+    setDeleteAdminPassword('');
+    setDeleteAdminPasswordConfirm('');
+  };
+
+  const handleConfirmDeleteVendor = async () => {
+    if (!deletingVendor || !onDeleteVendor) return;
+    if (!deleteAdminPassword || !deleteAdminPasswordConfirm) {
+      if (onShowNotification) onShowNotification('Zəhmət olmasa parolu iki dəfə daxil edin.', 'error');
+      return;
+    }
+    if (deleteAdminPassword !== deleteAdminPasswordConfirm) {
+      if (onShowNotification) onShowNotification('Daxil etdiyiniz iki parol uyğun gəlmir.', 'error');
+      return;
+    }
+    setIsDeletingVendor(true);
+    try {
+      await onDeleteVendor(deletingVendor.id, deleteAdminPassword);
+      closeDeleteVendorModal();
+    } catch {
+      // onDeleteVendor already surfaces the error via onShowNotification
+    } finally {
+      setIsDeletingVendor(false);
     }
   };
 
@@ -458,7 +494,7 @@ export default function AdminPortal({
               Buradan operatorların platformadan istifadə müddətini təyin edə bilərsiniz. Vaxt bitdikdən 3 gün sonra müvafiq operatorun bütün turları müştərilər üçün gizlədiləcək (deaktiv olacaq).
             </p>
             <div className="space-y-3">
-              {users.filter(u => u.role === 'vendor').map(vendor => {
+              {users.filter(u => u.role === 'vendor' && !u.isArchived).map(vendor => {
                 const subDate = vendor.subscriptionValidUntil ? new Date(vendor.subscriptionValidUntil) : null;
                 const isWarning = subDate ? (subDate.getTime() - Date.now() < 3 * 24 * 60 * 60 * 1000) : true;
                 const isExpired = subDate ? (Date.now() > subDate.getTime()) : true;
@@ -507,6 +543,15 @@ export default function AdminPortal({
                       >
                         +1 Ay
                       </button>
+                      {onDeleteVendor && (
+                        <button
+                          type="button"
+                          onClick={() => setDeletingVendor({ id: vendor.id, name: vendor.name })}
+                          className="bg-red-50 hover:bg-red-100 text-red-700 font-bold p-1.5 px-3 rounded text-xs transition border border-red-200"
+                        >
+                          Sil
+                        </button>
+                      )}
                     </div>
                   </div>
                 );
@@ -580,7 +625,7 @@ export default function AdminPortal({
                Operatorlar üçün fərdi istifadəçi adı (və ya e-poçt) və panel giriş şifrəsi təyin edin və ya mövcud şifrəni yeniləyin. 
             </p>
             <div className="space-y-3">
-              {users.filter(u => u.role === 'vendor').map(vendor => (
+              {users.filter(u => u.role === 'vendor' && !u.isArchived).map(vendor => (
                 <div key={`auth-${vendor.id}`} className="flex flex-col gap-2 p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs">
                   <div className="flex justify-between items-center">
                     <div>
@@ -999,6 +1044,59 @@ export default function AdminPortal({
               ))}
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {deletingVendor && (
+        <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-50 p-4" onClick={closeDeleteVendorModal}>
+          <div className="bg-white rounded-xl shadow-xl max-w-sm w-full p-5 space-y-4" onClick={(e) => e.stopPropagation()}>
+            <div>
+              <h3 className="text-sm font-extrabold text-slate-900">Operatoru arxivləşdir</h3>
+              <p className="text-xs text-slate-500 mt-1">
+                <strong className="text-slate-800">{deletingVendor.name}</strong> hesabını arxivləşdirmək istədiyinizə əminsiniz?
+                Turları, slotları və rezervasiyaları qorunacaq, amma hesab artıq platformaya daxil ola bilməyəcək və müştərilərə görünməyəcək.
+              </p>
+            </div>
+            <p className="text-[11px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+              Təsdiq üçün öz parolunuzu iki dəfə daxil edin.
+            </p>
+            <div>
+              <label className="block text-[10px] font-bold text-slate-400 mb-1">Parolunuz:</label>
+              <input
+                type="password"
+                value={deleteAdminPassword}
+                onChange={(e) => setDeleteAdminPassword(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+                autoFocus
+              />
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold text-slate-400 mb-1">Parolunuzu təkrar daxil edin:</label>
+              <input
+                type="password"
+                value={deleteAdminPasswordConfirm}
+                onChange={(e) => setDeleteAdminPasswordConfirm(e.target.value)}
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+              />
+            </div>
+            <div className="flex gap-2 pt-1">
+              <button
+                type="button"
+                onClick={handleConfirmDeleteVendor}
+                disabled={isDeletingVendor}
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold text-xs py-2.5 rounded-lg transition disabled:opacity-50"
+              >
+                {isDeletingVendor ? 'Arxivləşdirilir...' : 'Arxivləşdirməyi Təsdiqlə'}
+              </button>
+              <button
+                type="button"
+                onClick={closeDeleteVendorModal}
+                className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs py-2.5 rounded-lg transition"
+              >
+                Ləğv et
+              </button>
+            </div>
           </div>
         </div>
       )}
