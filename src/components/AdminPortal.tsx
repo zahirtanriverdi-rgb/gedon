@@ -5,12 +5,10 @@ import { InternationalTourForm } from './vendor/InternationalTourForm';
 import {
   Building,
   Calculator,
-  Settings,
   TrendingUp,
   UserCheck,
   Briefcase,
   ShieldAlert,
-  Percent,
   DollarSign,
   Activity,
   CheckCircle,
@@ -83,7 +81,6 @@ interface AdminPortalProps {
   users: User[];
   currentUser: User;
   platformConfig: PlatformConfig;
-  onUpdateCommissionPercent: (newValue: number) => void;
   onUpdatePriceCalculatorConfig?: (newConfig: PriceCalculatorConfig) => void;
   onApproveTour: (tourId: string) => Promise<void>;
   onRejectTour?: (tourId: string, rejectionReason: string) => Promise<void>;
@@ -107,7 +104,6 @@ export default function AdminPortal({
   users,
   currentUser,
   platformConfig,
-  onUpdateCommissionPercent,
   onUpdatePriceCalculatorConfig,
   onApproveTour,
   onRejectTour,
@@ -123,8 +119,6 @@ export default function AdminPortal({
   onDeleteVendor,
   onUpdateTourStatus
 }: AdminPortalProps) {
-  const [commissionInput, setCommissionInput] = useState<string | number>(platformConfig.commissionPercentage);
-
   // Price calculator cost elements (destinations + rates) — editable draft, synced from
   // platformConfig whenever it changes elsewhere, saved explicitly via the button below.
   const [pcConfig, setPcConfig] = useState<PriceCalculatorConfig>(platformConfig.priceCalculatorConfig);
@@ -227,12 +221,7 @@ export default function AdminPortal({
 
   // Stats calculate
   const totalVolume = bookings.reduce((sum, b) => b.status === 'paid' ? sum + b.totalAmount : sum, 0);
-  const platformEarnings = bookings.reduce((sum, b) => {
-    if (b.status === 'paid') {
-      return sum + (b.totalAmount * (platformConfig.commissionPercentage / 100));
-    }
-    return sum;
-  }, 0);
+  const totalPaidBookingsCount = bookings.filter(b => b.status === 'paid').length;
 
   const pendingTours = tours.filter(t => t.status === 'pending_approval');
 
@@ -336,30 +325,18 @@ export default function AdminPortal({
     }
   };
 
-  const handleUpdateCommissionSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const parsedVal = Number(commissionInput);
-    if (isNaN(parsedVal) || parsedVal < 1 || parsedVal > 50) {
-      if (onShowNotification) {
-        onShowNotification('Zəhmət olmasa 1 ilə 50 arasında düzgün bir faiz dərəcəsi daxil edin!', 'error');
-      }
-      return;
-    }
-    onUpdateCommissionPercent(parsedVal);
-  };
-
   return (
     <div className="space-y-6">
       
       {/* Metrics board */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         
-        {/* Metric 1: Platform Earned */}
+        {/* Metric 1: Successful Bookings */}
         <div className="bg-white p-5 rounded-xl border border-slate-200 text-slate-900 flex items-center justify-between shadow-xs">
           <div className="space-y-1 bg-transparent">
-            <span className="text-[10px] text-slate-400 font-bold tracking-widest">Komissiya Gəliri</span>
-            <h4 className="text-lg font-extrabold text-slate-900">{platformEarnings.toFixed(2)} AZN</h4>
-            <p className="text-[10px] text-slate-500">Mövcud faiz: {platformConfig.commissionPercentage}%</p>
+            <span className="text-[10px] text-slate-400 font-bold tracking-widest">Uğurlu Rezervasiyalar</span>
+            <h4 className="text-lg font-extrabold text-slate-900">{totalPaidBookingsCount} Bilet</h4>
+            <p className="text-[10px] text-slate-500">Ödənişi təsdiqlənən bütün biletlər</p>
           </div>
           <div className="p-2.5 bg-emerald-50 border border-emerald-105 text-emerald-800 rounded-lg">
             <DollarSign className="w-4 h-4" />
@@ -409,42 +386,6 @@ export default function AdminPortal({
         {/* Left Column: Platform settings & approvals */}
         <div className="lg:col-span-2 space-y-6">
           
-          {/* Section: Dynamic Config Settings */}
-          <div className="bg-white p-5 rounded-xl border border-slate-200 space-y-4 shadow-xs">
-            <h3 className="text-xs font-bold text-slate-400 tracking-widest flex items-center gap-1.5">
-              <Settings className="w-4 h-4 text-emerald-700" />
-              SaaS Komissiya Nizamlanması
-            </h3>
-            <p className="text-xs text-slate-500 leading-normal">
-              GetYourGuide tipli bələdçi bazarlarında gəlir payı bələdçidən çıxılır. Mərkəzi idarəetmədən bu faiz dərəcəsini istənilən vaxt aşağı-yuxarı dəyişdirə bilərsiniz.
-            </p>
-
-            <form onSubmit={handleUpdateCommissionSubmit} className="flex items-end gap-3 max-w-sm">
-              <div className="flex-1">
-                <label className="block text-[10px] font-bold text-slate-400 mb-1">Yeni Bazar Komissiyası (%):</label>
-                <div className="relative">
-                  <input
-                    type="number"
-                    min="1"
-                    max="50"
-                    required
-                    value={commissionInput}
-                    onChange={(e) => setCommissionInput(e.target.value)}
-                    className="w-full pl-3 pr-8 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold font-mono focus:outline-none focus:ring-1 focus:ring-emerald-750"
-                  />
-                  <Percent className="absolute right-3 top-2.5 w-3 h-3 text-slate-400" />
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                className="bg-slate-950 hover:bg-slate-900 text-white font-bold text-xs px-4 py-2 rounded-lg transition-all"
-              >
-                Tətbiq Et
-              </button>
-            </form>
-          </div>
-
           {/* Section: Price Calculator Cost Elements */}
           <div className="bg-white p-5 rounded-xl border border-slate-200 space-y-4 shadow-xs">
             <h3 className="text-xs font-bold text-slate-400 tracking-widest flex items-center gap-1.5">
@@ -994,19 +935,16 @@ export default function AdminPortal({
             </h4>
             
             <p className="text-[11px] text-slate-400 leading-normal">
-              Aşağıda real-time paylaşılan komissiyaların hər bir rezervasiya üzrə necə tutulduğunu nümayiş etdirən daxili SQL ticarət jurnalı göstərilir:
+              Aşağıda ödənişi təsdiqlənən hər bir rezervasiyanın real-time daxili SQL ticarət jurnalı göstərilir:
             </p>
 
             <div className="space-y-2.5 font-mono text-[9px] max-h-96 overflow-y-auto scrollbar-none">
               {bookings.filter(b => b.status === 'paid').map((b, i) => {
-                const commissionVal = b.totalAmount * (platformConfig.commissionPercentage / 100);
-                const vendorPay = b.totalAmount - commissionVal;
                 return (
                   <div key={b.id || i} className="p-2.5 bg-slate-900/60 border border-slate-800/80 rounded text-slate-400 space-y-1">
                     <span className="text-amber-500 tracking-wider font-bold">LOG_TRANSACT_#{b.id} OK</span>
                     <div className="text-slate-300">Gross Amount: {b.totalAmount.toFixed(2)} AZN</div>
-                    <div className="text-emerald-400">Platform Share ({platformConfig.commissionPercentage}%): +{commissionVal.toFixed(2)} AZN</div>
-                    <div className="text-sky-400">Vendor Income: {vendorPay.toFixed(2)} AZN</div>
+                    <div className="text-sky-400">Vendor Income: {b.totalAmount.toFixed(2)} AZN</div>
                   </div>
                 );
               })}

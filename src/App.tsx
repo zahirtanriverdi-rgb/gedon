@@ -194,11 +194,10 @@ export default function App() {
       const saved = localStorage.getItem('turlar_platform_config');
       const parsed = saved ? JSON.parse(saved) : {};
       return {
-        commissionPercentage: parsed.commissionPercentage ?? 15,
         priceCalculatorConfig: { ...DEFAULT_PRICE_CALCULATOR_CONFIG, ...(parsed.priceCalculatorConfig || {}) },
       };
     } catch (e) {
-      return { commissionPercentage: 15, priceCalculatorConfig: DEFAULT_PRICE_CALCULATOR_CONFIG };
+      return { priceCalculatorConfig: DEFAULT_PRICE_CALCULATOR_CONFIG };
     }
   });
 
@@ -509,11 +508,6 @@ export default function App() {
       showNotification(e.message || 'Tur yaradılarkən xəta baş verdi.', 'error');
       throw e;
     }
-  };
-
-  const handleUpdateCommissionPercent = (newValue: number) => {
-    setPlatformConfig(prev => ({ ...prev, commissionPercentage: newValue }));
-    showNotification(`SaaS Komissiyası ${newValue}% olaraq tənzimləndi!`, 'info');
   };
 
   const handleUpdatePriceCalculatorConfig = (newConfig: PriceCalculatorConfig) => {
@@ -897,7 +891,6 @@ export default function App() {
                 onAddTour={handleAddTour}
                 onEditTour={handleEditTour}
                 onDeleteTour={handleDeleteTour}
-                platformCommission={platformConfig.commissionPercentage}
                 onShowNotification={showNotification}
                 onApproveBooking={handleApproveBooking}
                 onEditBooking={handleEditBooking}
@@ -921,7 +914,6 @@ export default function App() {
                 users={users}
                 currentUser={activeUser}
                 platformConfig={platformConfig}
-                onUpdateCommissionPercent={handleUpdateCommissionPercent}
                 onUpdatePriceCalculatorConfig={handleUpdatePriceCalculatorConfig}
                 onApproveTour={handleApproveTour}
                 onRejectTour={handleRejectTour}

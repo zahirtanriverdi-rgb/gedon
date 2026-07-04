@@ -183,6 +183,5 @@ export interface PriceCalculatorConfig {
 }
 
 export interface PlatformConfig {
-  commissionPercentage: number; // e.g., 10 or 15%
   priceCalculatorConfig: PriceCalculatorConfig;
 }

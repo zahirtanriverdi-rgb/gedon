@@ -25,7 +25,6 @@ interface VendorPortalProps {
   onAddTour: (newTour: Tour) => Promise<void>;
   onEditTour?: (updatedTour: Tour) => Promise<void>;
   onDeleteTour?: (tourId: string) => Promise<void>;
-  platformCommission: number; // e.g., 10%
   onShowNotification?: (message: string, type?: 'success' | 'info' | 'error' | 'warning') => void;
   onApproveBooking?: (bookingId: string) => Promise<void>;
   onEditBooking?: (updatedBooking: Booking) => Promise<void>;
@@ -47,7 +46,6 @@ export default function VendorPortal({
   onAddTour,
   onEditTour,
   onDeleteTour,
-  platformCommission,
   onShowNotification,
   onApproveBooking,
   onEditBooking,
@@ -130,11 +128,8 @@ export default function VendorPortal({
   const allMyTourIds = tours.map(t => t.id);
   const myTourIds = myTours.map(t => t.id);
   const myBookings = bookings.filter(b => allMyTourIds.includes(b.tourId));
-  const myTotalRevenue = myBookings.reduce((sum, b) => {
-    if (b.status === 'paid') {
-      const platformFee = b.totalAmount * (platformCommission / 100);
-      return sum + (b.totalAmount - platformFee);
-    }
+  const myTotalGrossRevenue = myBookings.reduce((sum, b) => {
+    if (b.status === 'paid') return sum + b.totalAmount;
     return sum;
   }, 0);
 
@@ -182,9 +177,9 @@ export default function VendorPortal({
         {/* Metric 2 */}
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs flex items-center justify-between">
           <div className="space-y-1">
-            <span className="text-[10px] text-slate-400 font-bold tracking-widest">Net Gəlir (AZN)</span>
-            <h4 className="text-xl font-extrabold text-emerald-750">{myTotalRevenue.toFixed(2)} AZN</h4>
-            <p className="text-[10px] text-slate-500">Komissiya (-{platformCommission}%) çıxılmaqla</p>
+            <span className="text-[10px] text-slate-400 font-bold tracking-widest">Ümumi Satış Gəliri (AZN)</span>
+            <h4 className="text-xl font-extrabold text-emerald-750">{myTotalGrossRevenue.toFixed(2)} AZN</h4>
+            <p className="text-[10px] text-slate-500">Platformada satılan bütün turların cəmi</p>
           </div>
           <div className="p-2.5 bg-emerald-50 border border-emerald-100 text-emerald-700 rounded-lg">
             <DollarSign className="w-5 h-5" />
