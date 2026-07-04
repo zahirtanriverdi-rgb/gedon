@@ -1751,7 +1751,7 @@ export function TourDetailPage({
           {/* YOU MIGHT ALSO LIKE SECTION */}
           <div className="mt-16 pt-16 border-t border-slate-200">
             <h2 className="text-2xl font-extrabold text-label-primary mb-8">Bunlar da maraqlı ola bilər...</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 w-full">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 w-full">
                 {tours
                   .filter(t => t.id !== selectedTour.id)
                   .sort(() => 0.5 - Math.random()) // Randomize for varied suggestions
@@ -1760,9 +1760,9 @@ export function TourDetailPage({
                     const priceList = slots.filter(s => s.tourId === tour.id).map(s => s.price);
                     const minPrice = priceList.length > 0 ? Math.min(...priceList) : null;
                     return (
-                      <div 
-                        key={tour.id} 
-                        className="group flex flex-col bg-white border border-border-primary rounded-[var(--card-radius)] overflow-hidden hover:shadow-lg transition-all duration-300 cursor-pointer h-full"
+                      <div
+                        key={tour.id}
+                        className="group flex flex-col bg-white border border-[#E4E6E9] rounded-2xl overflow-hidden hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] transition-all duration-300 cursor-pointer h-full"
                         onClick={() => {
                           window.scrollTo({ top: 0, behavior: 'smooth' });
                           setSelectedTour(tour);
@@ -1771,10 +1771,10 @@ export function TourDetailPage({
                           setSelectedSlot(null);
                         }}
                       >
-                        <div className="relative h-48 sm:h-56 overflow-hidden">
-                          <img 
-                            src={tour.image} 
-                            alt={tour.name} 
+                        <div className="relative aspect-[4/3] overflow-hidden">
+                          <img
+                            src={tour.image}
+                            alt={tour.name}
                             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                             referrerPolicy="no-referrer"
                           />
@@ -1783,12 +1783,12 @@ export function TourDetailPage({
                           </button>
                         </div>
                         <div className="p-4 flex flex-col flex-grow">
-                          <div className="flex items-center gap-1.5 text-xs text-label-secondary font-bold uppercase tracking-wider mb-2">
+                          <div className="flex items-center gap-1.5 text-[14px] text-label-secondary font-normal mb-2">
                             <span>{tour.category}</span>
                             <span>•</span>
                             <span>{tour.region}</span>
                           </div>
-                          <h3 className="font-extrabold text-label-primary text-sm mb-3 line-clamp-2 leading-snug group-hover:text-emerald-700 transition">
+                          <h3 className="font-bold text-label-primary text-[16px] mb-3 line-clamp-2 leading-[1.4] group-hover:text-emerald-700 transition">
                             {tour.name}
                           </h3>
                           {REVIEWS_ENABLED && (
