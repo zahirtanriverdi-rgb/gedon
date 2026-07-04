@@ -157,7 +157,7 @@ export function ToursHomeView({
               suggestions dropdown inside it, so it must outrank the tour cards' own
               z-10 share buttons below or the dropdown gets painted underneath them. */}
           <div className="flex flex-col items-center justify-center pt-[38px] pb-[88px] min-h-[294px] relative z-30 w-full animate-fadeIn">
-            <h2 className="text-[36px] font-bold text-label-primary mb-6 tracking-tight text-center">{t('discoverTours')}</h2>
+            <h2 className="text-[28px] md:text-[40px] font-extrabold text-label-primary mb-6 tracking-tight text-center leading-[1.2]">{t('discoverTours')}</h2>
 
             {/* Main Pill Search Box */}
             <div className="w-full max-w-[1208px] min-h-[68px] mx-auto mt-8 flex items-center justify-center relative">
@@ -496,7 +496,7 @@ export function ToursHomeView({
 
           {/* Horizontal Slider for Upcoming Tours (Minimal) */}
           {uniqueUpcomingTours.length > 0 && (
-              <div className="mb-8 w-full max-w-[var(--global-max-width)] mx-auto animate-fadeIn relative">
+              <div className="mb-14 w-full max-w-[var(--global-max-width)] mx-auto animate-fadeIn relative">
                 <div className="flex items-center justify-between mb-6 px-1">
                   <h3 className="text-sm font-extrabold text-slate-800 tracking-tight flex items-center gap-1.5">
                     <Calendar className="w-4 h-4 text-emerald-600" />
@@ -523,10 +523,14 @@ export function ToursHomeView({
                     onScroll={(e) => setUpcomingScrollLeft(e.currentTarget.scrollLeft)}
                     className="flex overflow-x-auto gap-3 pb-2 snap-x snap-mandatory scroll-smooth w-full pr-4 md:pr-0" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
                     {uniqueUpcomingTours.map(({ tour, slot }) => (
-                      <div 
+                      <div
                         key={tour.id}
                         onClick={() => onSelectTour(tour)}
-                        className="w-[280px] sm:w-[410.66px] h-[150px] flex-shrink-0 bg-white border border-border-primary rounded-[var(--card-radius)] p-3 flex items-center gap-4 snap-start cursor-pointer hover:shadow-lg transition-all duration-300 group"
+                        // 384px (not a wider value): at the 1248px content width this container
+                        // gets on 1440-1920px screens (main's 1440 cap + our 96px padding), 3
+                        // cards at 384px + gaps fill ~1188px, leaving a ~60px peek of the 4th
+                        // card to signal the row scrolls — a wider card would only fit 2 full.
+                        className="w-[280px] sm:w-[384px] h-[150px] flex-shrink-0 bg-white border border-border-primary rounded-[var(--card-radius)] p-3 flex items-center gap-4 snap-start cursor-pointer hover:shadow-lg transition-all duration-300 group"
                       >
                         <div className="w-[84px] h-[84px] rounded-xl overflow-hidden flex-shrink-0 relative shadow-sm border border-slate-100">
                           <img
@@ -604,7 +608,7 @@ export function ToursHomeView({
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {sortedAndFilteredTours.map((tour) => {
             const tourSlots = slots.filter(s => s.tourId === tour.id);
             const priceList = tourSlots.map(s => s.price);
@@ -657,15 +661,15 @@ export function ToursHomeView({
             }
 
             return (
-              <div 
+              <div
                 key={tour.id}
-                className={`bg-white rounded-[var(--card-radius)] border min-h-[398.5px] overflow-hidden shadow-sm hover:shadow-md transition-all flex flex-col group cursor-pointer ${tour.isInternational ? 'border-amber-200 ring-1 ring-amber-100/50 bg-gradient-to-b from-amber-500/2 to-transparent' : 'border-border-primary'} ${isSportActive ? 'border-amber-300 bg-gradient-to-tr from-amber-50/10 to-transparent' : ''}`}
+                className={`bg-white rounded-2xl border min-h-[398.5px] overflow-hidden hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] transition-all flex flex-col group cursor-pointer ${tour.isInternational ? 'border-amber-200 ring-1 ring-amber-100/50 bg-gradient-to-b from-amber-500/2 to-transparent' : 'border-[#E4E6E9]'} ${isSportActive ? 'border-amber-300 bg-gradient-to-tr from-amber-50/10 to-transparent' : ''}`}
                 onClick={() => onSelectTour(tour)}
               >
                 {/* Tour Image */}
-                <div className="relative h-44 overflow-hidden bg-slate-100">
-                  <img 
-                    src={tour.image || undefined} 
+                <div className="relative aspect-[4/3] overflow-hidden bg-slate-100">
+                  <img
+                    src={tour.image || undefined}
                     alt={tour.name}
                     className="w-full h-full object-cover group-hover:scale-102 transition duration-500"
                     referrerPolicy="no-referrer"
@@ -715,7 +719,7 @@ export function ToursHomeView({
                 {/* Tour Card Body */}
                 <div className="p-4 flex-1 flex flex-col justify-between">
                   <div className="space-y-2">
-                    <div className="flex items-center gap-1.5 text-[10px] text-slate-700 font-medium tracking-wider">
+                    <div className="flex items-center gap-1.5 text-[14px] text-slate-700 font-normal">
                       {isSportActive ? (
                         <>
                           <span className="text-amber-600 font-bold">🏅</span>
@@ -736,7 +740,7 @@ export function ToursHomeView({
                       <span>{tourSlots.length} Aktiv Tarix</span>
                     </div>
 
-                    <h3 className="font-extrabold text-label-primary text-sm leading-snug group-hover:text-emerald-700 transition tracking-tight flex items-center gap-1">
+                    <h3 className="font-bold text-label-primary text-[16px] leading-[1.4] group-hover:text-emerald-700 transition tracking-tight flex items-center gap-1">
                       {isSportActive && (
                         <span className="text-base shrink-0 select-none">
                           {tour.activityType === 'volleyball' ? '🏐' : tour.activityType === 'ski' ? '⛷️' : tour.activityType === 'rafting' ? '🚣‍♂️' : tour.activityType === 'running' ? '🏃‍♂️' : tour.activityType === 'bike' ? '🚴‍♂️' : '🏆'}

@@ -17,11 +17,33 @@
   --header-height: 80px;
   --card-radius: 12px;
   --section-spacing-y: 32px;
+
+  /* New brand palette (design-system rollout, customer-facing UI first — see
+     ToursHomeView.tsx). Distinct from the turquoise --primary-* scale above,
+     which stays in place for existing screens until they're migrated. */
+  --color-primary: #317312;
+  --color-accent: #FF5903;
+  --color-bg-light: #FBFBFA;
+  --color-cta: #166EF3;
+  --color-cta-hover: #24BAEC;
+  --color-text-main: #091D36;
+  --color-text-muted: #626F7E;
 }
 
 @theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Inter", "Helvetica", "Arial", sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  /* Tailwind utilities for the new brand palette — "brand-" prefixed so they
+     don't collide with the pre-existing --color-primary-500 (turquoise)
+     scale and its generated bg-primary-500 / text-primary-500 utilities. */
+  --color-brand-primary: var(--color-primary);
+  --color-brand-accent: var(--color-accent);
+  --color-brand-bg-light: var(--color-bg-light);
+  --color-brand-cta: var(--color-cta);
+  --color-brand-cta-hover: var(--color-cta-hover);
+  --color-brand-text-main: var(--color-text-main);
+  --color-brand-text-muted: var(--color-text-muted);
 
   /* ---- Semantic UI tokens (text/surface/border) ----
      Generates text, bg, border utilities, e.g. text-label-primary, bg-surface-critical-weak.
