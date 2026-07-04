@@ -11,9 +11,9 @@ interface WishlistViewProps {
 
 export function WishlistView({ wishlistTours, onBack, onSelectTour, onToggleWishlist }: WishlistViewProps) {
   return (
-    <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+    <div className="max-w-[1400px] mx-auto px-4 lg:px-8 py-8 space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <h2 className="text-lg font-extrabold text-slate-800 flex items-center gap-2">
+        <h2 className="text-lg font-extrabold text-label-primary flex items-center gap-2">
           <Heart className="w-5 h-5 text-rose-600 fill-rose-600" /> İstəklərim
         </h2>
         <button
@@ -31,7 +31,7 @@ export function WishlistView({ wishlistTours, onBack, onSelectTour, onToggleWish
           <p className="text-sm text-slate-500 font-medium">Hələ heç bir tur istəklərinizə əlavə etməmisiniz.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {wishlistTours.map(tour => (
             <div
               key={tour.id}
@@ -50,8 +50,8 @@ export function WishlistView({ wishlistTours, onBack, onSelectTour, onToggleWish
                 </button>
               </div>
               <div className="p-4 space-y-1">
-                <h4 className="font-bold text-sm text-slate-800 truncate">{tour.name}</h4>
-                <p className="text-xs text-slate-500 flex items-center gap-1">
+                <h4 className="font-bold text-sm text-label-primary truncate">{tour.name}</h4>
+                <p className="text-xs text-label-secondary flex items-center gap-1">
                   <MapPin className="w-3 h-3 text-emerald-500" /> {tour.region}
                 </p>
               </div>

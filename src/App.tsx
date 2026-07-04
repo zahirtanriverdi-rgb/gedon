@@ -568,25 +568,25 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-ink-50 font-sans text-slate-700 flex flex-col justify-between" id="app_root">
-      {/* Main Elegant Header */}
-      <header className={`bg-white border-b border-slate-200 sticky top-0 z-40 transition-shadow ${isScrolled ? 'shadow-md' : ''}`}>
-        <div className="max-w-[1400px] mx-auto px-6 sm:px-8 py-3 flex flex-wrap md:flex-nowrap items-center justify-between gap-4">
-          
+      {/* Main Elegant Header — flush with the page background, no floating-card shadow */}
+      <header className="bg-white border-b border-border-primary sticky top-0 z-40 h-[var(--header-height)]">
+        <div className="relative max-w-[var(--global-max-width)] mx-auto h-full px-8 flex flex-nowrap items-center justify-between gap-4">
+
           {/* Logo Brand */}
-          <div className="flex items-center gap-2 cursor-pointer order-1" onClick={() => {
+          <div className="flex items-center gap-2 cursor-pointer" onClick={() => {
             setGlobalSearchQuery('');
             setIsGlobalSearchFocused(false);
             window.dispatchEvent(new CustomEvent('nav-home'));
           }}>
             <div className="flex flex-col font-black text-black leading-tight text-xl tracking-tight">
               <span>GedəkGörək</span>
-              <span className="text-[12px] uppercase tracking-widest text-slate-500 font-bold">Marketplace</span>
+              <span className="hidden sm:block text-[12px] uppercase tracking-widest text-slate-500 font-bold">Marketplace</span>
             </div>
           </div>
 
           {/* Sticky Search Bar (Only visible when scrolled in Customer mode) */}
           {selectedRole === 'customer' && isScrolled && (
-            <div ref={globalSearchRef} className="flex flex-1 w-full md:max-w-xl mx-auto md:mx-8 animate-fadeIn order-3 md:order-2 mt-2 md:mt-0 relative">
+            <div ref={globalSearchRef} className="flex absolute left-4 right-4 top-full mt-2 md:static md:left-auto md:right-auto md:top-auto md:mt-0 md:flex-1 md:max-w-xl md:mx-8 animate-fadeIn">
               <div className="relative w-full bg-white shadow-sm rounded-full p-1.5 border border-slate-200 flex items-center">
                 <div className="pl-4 pr-2 flex items-center flex-1">
                    <input
@@ -639,42 +639,46 @@ export default function App() {
           )}
 
           {/* Right Section */}
-          <div className="flex items-center gap-6 order-2 md:order-3">
+          <div className="flex items-center gap-4">
             {selectedRole === 'customer' ? (
-              <div className="flex items-center gap-5 text-slate-700">
+              <div className="flex items-center gap-4">
                 <button
                   onClick={() => window.dispatchEvent(new CustomEvent('nav-wishlist'))}
-                  className="relative flex flex-col items-center justify-center gap-1 hover:text-emerald-600 transition group cursor-pointer bg-transparent border-none p-0"
+                  className="relative w-16 sm:w-auto sm:min-w-16 h-16 flex flex-col items-center justify-center gap-0.5 hover:text-emerald-600 transition group cursor-pointer bg-transparent border-none p-0"
                 >
-                  <span className="relative">
-                    <Heart className="w-5 h-5 stroke-[2px] transition-colors group-hover:fill-emerald-500 group-hover:stroke-emerald-500" />
+                  <span className="relative w-11 h-8 flex items-center justify-center">
+                    <Heart className="w-6 h-6 stroke-[2px] transition-colors group-hover:fill-emerald-500 group-hover:stroke-emerald-500" />
                     {wishlistCount > 0 && (
-                      <span className="absolute -top-1.5 -right-2 bg-rose-600 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">
+                      <span className="absolute -top-1 right-1 bg-rose-600 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">
                         {wishlistCount}
                       </span>
                     )}
                   </span>
-                  <span className="text-[11px] font-semibold">İstəklər</span>
+                  <span className="hidden sm:block text-sm text-label-secondary font-semibold">İstəklər</span>
                 </button>
                 <button
                   onClick={() => window.dispatchEvent(new CustomEvent('nav-calculator'))}
-                  className="relative flex flex-col items-center justify-center gap-1 hover:text-emerald-600 transition group cursor-pointer bg-transparent border-none p-0"
+                  className="w-16 sm:w-auto sm:min-w-16 h-16 flex flex-col items-center justify-center gap-0.5 hover:text-emerald-600 transition group cursor-pointer bg-transparent border-none p-0"
                 >
-                  <Calculator className="w-5 h-5 stroke-[2px] transition-colors group-hover:stroke-emerald-500" />
-                  <span className="text-[11px] font-semibold whitespace-nowrap">Qrup hesabla</span>
+                  <span className="w-11 h-8 flex items-center justify-center">
+                    <Calculator className="w-6 h-6 stroke-[2px] transition-colors group-hover:stroke-emerald-500" />
+                  </span>
+                  <span className="hidden sm:block text-sm text-label-secondary font-semibold whitespace-nowrap">Qrup hesabla</span>
                 </button>
                 <div className="relative">
-                  <button 
+                  <button
                     onClick={() => setIsLangMenuOpen(!isLangMenuOpen)}
-                    className="flex flex-col items-center justify-center gap-1 hover:text-emerald-600 transition group cursor-pointer bg-transparent border-none p-0"
+                    className="w-16 sm:w-auto sm:min-w-16 h-16 flex flex-col items-center justify-center gap-0.5 hover:text-emerald-600 transition group cursor-pointer bg-transparent border-none p-0"
                     title="Valyutanı / Dilini dəyiş"
                   >
-                    <Globe className="w-5 h-5 stroke-[2px]" />
-                    <span className="text-[11px] font-semibold">
-                      {appLanguage === 'az' && displayCurrency === 'AZN' ? 'AZ / AZN ₼' : 
-                       appLanguage === 'ru' && displayCurrency === 'AZN' ? 'RU / AZN ₼' : 
-                       appLanguage === 'en' && displayCurrency === 'USD' ? 'EN / USD $' : 
-                       appLanguage === 'en' && displayCurrency === 'EUR' ? 'EN / EUR €' : 
+                    <span className="w-11 h-8 flex items-center justify-center">
+                      <Globe className="w-6 h-6 stroke-[2px]" />
+                    </span>
+                    <span className="hidden sm:block text-sm text-label-secondary font-semibold">
+                      {appLanguage === 'az' && displayCurrency === 'AZN' ? 'AZ / AZN ₼' :
+                       appLanguage === 'ru' && displayCurrency === 'AZN' ? 'RU / AZN ₼' :
+                       appLanguage === 'en' && displayCurrency === 'USD' ? 'EN / USD $' :
+                       appLanguage === 'en' && displayCurrency === 'EUR' ? 'EN / EUR €' :
                        `${appLanguage.toUpperCase()} / ${displayCurrency}`}
                     </span>
                   </button>
@@ -733,7 +737,7 @@ export default function App() {
       </header>
 
       {/* Main Workspace Frame */}
-      <main className="max-w-7xl mx-auto px-6 sm:px-8 py-8 flex-1 w-full space-y-6">
+      <main className="max-w-[var(--global-max-width)] mx-auto px-5 py-8 flex-1 w-full space-y-6">
         
         <div className="space-y-6 animate-fadeIn">
 
@@ -845,7 +849,7 @@ export default function App() {
 
       {/* Modern High Quality Footer */}
       <footer className="bg-slate-900 text-slate-400 py-8 border-t border-slate-850 text-xs">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-4">
+        <div className="max-w-[var(--global-max-width)] mx-auto px-5 flex flex-col md:flex-row items-center justify-between gap-4">
           <div>
             <p className="text-slate-500 mt-1">Azərbaycan daxili turlar ekosistemi SaaS arxitektura sənədləşməsi və simulyator paneli.</p>
           </div>

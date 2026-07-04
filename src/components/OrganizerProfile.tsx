@@ -17,7 +17,7 @@ export default function OrganizerProfile({ organizer, tours, onBack, onTourClick
   const activeTours = tours.filter(t => t.vendorId === organizer.id && t.status === 'approved');
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8 animate-fadeIn font-sans">
+    <div className="max-w-6xl mx-auto px-4 lg:px-8 py-8 animate-fadeIn font-sans">
       <button 
         onClick={onBack}
         className="mb-6 flex items-center text-emerald-600 font-bold hover:text-emerald-700 transition"
@@ -102,7 +102,7 @@ export default function OrganizerProfile({ organizer, tours, onBack, onTourClick
 
           {/* Active Tours */}
           <div>
-            <h2 className="text-2xl font-extrabold text-slate-900 mb-4">Təşkilatçının Turları</h2>
+            <h2 className="text-2xl font-extrabold text-label-primary mb-6">Təşkilatçının Turları</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {activeTours.length > 0 ? (
                 activeTours.map((tour) => (
@@ -125,12 +125,12 @@ export default function OrganizerProfile({ organizer, tours, onBack, onTourClick
                         {REVIEWS_ENABLED && (
                           <div className="flex items-center gap-1 text-amber-500">
                             <Star className="w-3.5 h-3.5 fill-current" />
-                            <span className="text-xs font-bold text-slate-700">{tour.rating}</span>
+                            <span className="text-xs font-bold text-label-primary">{tour.rating}</span>
                           </div>
                         )}
                       </div>
-                      <h3 className="font-bold text-slate-900 mb-2">{tour.name}</h3>
-                      <div className="flex items-center text-slate-500 text-xs font-medium gap-1">
+                      <h3 className="font-bold text-label-primary mb-2">{tour.name}</h3>
+                      <div className="flex items-center text-label-secondary text-xs font-medium gap-1">
                         <MapPin className="w-3.5 h-3.5" />
                         {tour.region}
                       </div>

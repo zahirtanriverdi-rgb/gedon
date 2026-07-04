@@ -150,12 +150,12 @@ export function ToursHomeView({
           {/* z-30 (not z-10): this wrapper's z-index caps the stacking context for the
               suggestions dropdown inside it, so it must outrank the tour cards' own
               z-10 share buttons below or the dropdown gets painted underneath them. */}
-          <div className="flex flex-col items-center justify-center py-2 mb-2 relative z-30 w-full animate-fadeIn">
-            <h2 className="text-xl md:text-2xl font-extrabold text-slate-800 mb-4 tracking-tight text-center">{t('discoverTours')}</h2>
-            
+          <div className="flex flex-col items-center justify-center -mx-5 px-5 lg:px-24 pt-[38px] pb-[88px] min-h-[294px] relative z-30 w-full animate-fadeIn">
+            <h2 className="text-[36px] font-bold text-label-primary mb-6 tracking-tight text-center">{t('discoverTours')}</h2>
+
             {/* Main Pill Search Box */}
-            <div className="flex flex-col sm:flex-row items-center w-full max-w-3xl gap-2 mb-4 relative">
-              <div ref={searchContainerRef} className="relative w-full bg-white shadow-md rounded-full p-1 border border-slate-200 flex items-center flex-1">
+            <div className="w-full max-w-[1208px] h-[68px] mx-auto mt-8 flex items-center justify-center relative">
+              <div ref={searchContainerRef} className="relative w-full max-w-[706px] h-14 bg-white border border-border-primary rounded-lg p-1 flex items-center">
                 <div className="pl-4 pr-2 flex items-center flex-1">
                    <Search className="text-slate-400 w-4 h-4 mr-3 flex-shrink-0" />
                    <input
@@ -184,7 +184,7 @@ export function ToursHomeView({
                       window.scrollTo({top: y, behavior: 'smooth'});
                     }
                   }}
-                  className="bg-primary-500 hover:bg-primary-600 text-white font-bold py-2.5 px-6 rounded-full transition-colors flex-shrink-0 text-xs shadow-md"
+                  className="h-11 bg-interactive-primary hover:opacity-90 text-white font-bold px-6 rounded-md transition-colors flex-shrink-0 text-xs cursor-pointer"
                 >
                   {t('searchButton')}
                 </button>
@@ -207,7 +207,7 @@ export function ToursHomeView({
             </div>
 
             {/* Segmented Category Pill Selectors directly below */}
-            <div className="flex flex-wrap justify-center items-center gap-2 max-w-3xl mb-4">
+            <div className="flex flex-wrap justify-center items-center gap-2 max-w-3xl mt-6 mb-4">
               <button
                 onClick={() => setSelectedCategory('all')}
                 className={`px-4 py-2 rounded-full text-xs font-bold transition-all border ${
@@ -257,7 +257,7 @@ export function ToursHomeView({
                 }`}
               >
                 🏃‍♂️ Aktiv Həyat
-                <span className="absolute -top-2 -right-1 bg-primary-100 text-primary-700 text-[9px] px-1.5 py-0.5 rounded-full font-black scale-90 shadow-sm">YENİ</span>
+                <span className="absolute -top-2 -right-1 bg-white border border-border-primary text-label-secondary text-[9px] px-1.5 py-0.5 rounded-full font-black scale-90 shadow-sm">YENİ</span>
               </button>
               <button
                 onClick={() => setSelectedCategory('international')}
@@ -275,7 +275,7 @@ export function ToursHomeView({
             {/* Expandable Advanced Filters Toggle Button */}
             <button 
               onClick={() => setIsFiltersExpanded(!isFiltersExpanded)}
-              className="mt-2 text-xs font-bold text-slate-500 hover:text-blue-600 flex items-center gap-1 transition-colors"
+              className="mt-2 text-xs font-bold text-label-secondary hover:text-label-primary flex items-center gap-1 transition-colors"
             >
               {isFiltersExpanded ? 'Gizlət' : 'Geniş Axtarış Filtrləri'} 
               <svg className={`w-3 h-3 transition-transform ${isFiltersExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -490,8 +490,8 @@ export function ToursHomeView({
 
           {/* Horizontal Slider for Upcoming Tours (Minimal) */}
           {uniqueUpcomingTours.length > 0 && (
-              <div className="mb-2 w-full max-w-[1400px] mx-auto animate-fadeIn relative">
-                <div className="flex items-center justify-between mb-2 px-1">
+              <div className="mb-8 w-full max-w-[var(--global-max-width)] mx-auto animate-fadeIn relative">
+                <div className="flex items-center justify-between mb-6 px-1">
                   <h3 className="text-sm font-extrabold text-slate-800 tracking-tight flex items-center gap-1.5">
                     <Calendar className="w-4 h-4 text-emerald-600" />
                     {t('upcomingTours')}
@@ -506,7 +506,7 @@ export function ToursHomeView({
                         const slider = document.getElementById('upcoming-tours-slider');
                         if(slider) slider.scrollBy({ left: -300, behavior: 'smooth' });
                       }}
-                      className="absolute left-0 top-1/2 -translate-y-1/2 -ml-3 md:-ml-4 z-10 bg-primary-500 text-white p-2.5 rounded-full shadow-lg hover:bg-primary-600 transition-colors flex items-center justify-center border-2 border-white"
+                      className="absolute left-0 top-1/2 -translate-y-1/2 -ml-3 md:-ml-4 z-10 w-11 h-11 bg-white text-label-secondary rounded-full shadow-sm hover:bg-slate-50 transition-colors flex items-center justify-center border border-border-primary"
                     >
                       <ChevronLeft className="w-5 h-5" />
                     </button>
@@ -520,7 +520,7 @@ export function ToursHomeView({
                       <div 
                         key={tour.id}
                         onClick={() => onSelectTour(tour)}
-                        className="w-[85%] sm:w-[calc(50%-8px)] md:w-[calc(33.333%-12px)] flex-shrink-0 bg-white border border-slate-200 rounded-[20px] p-3 flex items-center gap-4 snap-start cursor-pointer hover:border-emerald-300 hover:shadow-xl transition-all duration-300 group shadow-sm hover:-translate-y-1"
+                        className="w-[410.66px] h-[150px] flex-shrink-0 bg-white border border-border-primary rounded-[var(--card-radius)] p-3 flex items-center gap-4 snap-start cursor-pointer hover:shadow-lg transition-all duration-300 group"
                       >
                         <div className="w-[84px] h-[84px] rounded-xl overflow-hidden flex-shrink-0 relative shadow-sm border border-slate-100">
                           <img
@@ -538,26 +538,26 @@ export function ToursHomeView({
                           </button>
                         </div>
                         <div className="flex flex-col flex-1 justify-center overflow-hidden h-full py-1">
-                          <h4 className="text-[14px] font-black text-slate-800 truncate mb-1" title={tour.name}>{tour.name}</h4>
-                          <div className="text-[12px] font-bold text-slate-500 mb-2 flex items-center gap-1.5">
+                          <h4 className="text-[14px] font-black text-label-primary truncate mb-1" title={tour.name}>{tour.name}</h4>
+                          <div className="text-[12px] font-bold text-label-secondary mb-2 flex items-center gap-1.5">
                             <MapPin className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
                             <span className="truncate">{tour.region}</span>
                           </div>
                           <div className="flex items-center justify-between mt-auto">
-                            <span className="text-[11px] font-black text-emerald-800 bg-emerald-50 border border-emerald-100 px-2 py-1 rounded-md tracking-tight">
+                            <span className="text-[11px] font-black text-label-secondary bg-emerald-50 border border-emerald-100 px-2 py-1 rounded-md tracking-tight">
                               {slot.startDate}
                           </span>
                           {tour.discountPrice && tour.discountPrice > 0 && tour.discountPrice < (tour.price ?? slot.price) ? (
                             <span className="flex items-baseline gap-1">
-                              <span className="line-through text-gray-400 text-[10px]">
+                              <span className="line-through text-label-tertiary text-[10px]">
                                 {getConvertedPriceInfo(tour.price ?? slot.price, tour.priceCurrency).both}
                               </span>
-                              <span className="text-[13px] font-black text-rose-600 tracking-tight">
+                              <span className="text-[13px] font-black text-label-critical bg-surface-critical-weak px-1 rounded tracking-tight">
                                 {getConvertedPriceInfo(tour.discountPrice, tour.priceCurrency).both}
                               </span>
                             </span>
                           ) : (
-                            <span className="text-[13px] font-black text-slate-900 tracking-tight">
+                            <span className="text-[13px] font-black text-label-primary tracking-tight">
                               {getConvertedPriceInfo(slot.price, tour.priceCurrency).both}
                             </span>
                           )}
@@ -573,7 +573,7 @@ export function ToursHomeView({
                         const slider = document.getElementById('upcoming-tours-slider');
                         if(slider) slider.scrollBy({ left: 300, behavior: 'smooth' });
                       }}
-                      className="absolute right-0 top-1/2 -translate-y-1/2 -mr-3 md:-mr-4 z-10 bg-primary-500 text-white p-2.5 rounded-full shadow-lg hover:bg-primary-600 transition-colors flex items-center justify-center border-2 border-white"
+                      className="absolute right-0 top-1/2 -translate-y-1/2 -mr-3 md:-mr-4 z-10 w-11 h-11 bg-white text-label-secondary rounded-full shadow-sm hover:bg-slate-50 transition-colors flex items-center justify-center border border-border-primary"
                     >
                       <ChevronRight className="w-5 h-5" />
                     </button>
@@ -598,7 +598,7 @@ export function ToursHomeView({
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {sortedAndFilteredTours.map((tour) => {
             const tourSlots = slots.filter(s => s.tourId === tour.id);
             const priceList = tourSlots.map(s => s.price);
@@ -653,7 +653,7 @@ export function ToursHomeView({
             return (
               <div 
                 key={tour.id}
-                className={`bg-white rounded-xl border overflow-hidden shadow-sm hover:shadow-md transition-all flex flex-col group cursor-pointer ${tour.isInternational ? 'border-amber-200 ring-1 ring-amber-100/50 bg-gradient-to-b from-amber-500/2 to-transparent' : 'border-slate-200'} ${isSportActive ? 'border-amber-300 bg-gradient-to-tr from-amber-50/10 to-transparent' : ''}`}
+                className={`bg-white rounded-[var(--card-radius)] border min-h-[398.5px] overflow-hidden shadow-sm hover:shadow-md transition-all flex flex-col group cursor-pointer ${tour.isInternational ? 'border-amber-200 ring-1 ring-amber-100/50 bg-gradient-to-b from-amber-500/2 to-transparent' : 'border-border-primary'} ${isSportActive ? 'border-amber-300 bg-gradient-to-tr from-amber-50/10 to-transparent' : ''}`}
                 onClick={() => onSelectTour(tour)}
               >
                 {/* Tour Image */}
@@ -696,15 +696,15 @@ export function ToursHomeView({
                       ✈️ Aviabilet {tour.flightIncluded ? 'Daxildir' : 'Daxil deyil'}
                     </div>
                   )}
-                  <div className="absolute bottom-3 right-3 bg-white/90 backdrop-blur-xs text-slate-800 px-2 py-0.5 rounded border border-slate-250 text-[10px] font-semibold">
+                  <div className="absolute bottom-3 right-3 bg-white/90 backdrop-blur-xs text-label-secondary px-2 py-0.5 rounded border border-slate-250 text-[10px] font-semibold">
                     📍 {tour.region.split(',')[0]}
                   </div>
                 </div>
 
                 {/* Tour Card Body */}
-                <div className="p-5 flex-1 flex flex-col justify-between">
+                <div className="p-4 flex-1 flex flex-col justify-between">
                   <div className="space-y-2">
-                    <div className="flex items-center gap-1.5 text-[10px] text-slate-400 font-bold tracking-wider">
+                    <div className="flex items-center gap-1.5 text-[10px] text-label-tertiary font-bold tracking-wider">
                       {isSportActive ? (
                         <>
                           <span className="text-amber-600 font-bold">🏅</span>
@@ -725,7 +725,7 @@ export function ToursHomeView({
                       <span>{tourSlots.length} Aktiv Tarix</span>
                     </div>
 
-                    <h3 className="font-bold text-slate-900 text-sm leading-snug group-hover:text-emerald-700 transition tracking-tight flex items-center gap-1">
+                    <h3 className="font-bold text-label-primary text-sm leading-snug group-hover:text-emerald-700 transition tracking-tight flex items-center gap-1">
                       {isSportActive && (
                         <span className="text-base shrink-0 select-none">
                           {tour.activityType === 'volleyball' ? '🏐' : tour.activityType === 'ski' ? '⛷️' : tour.activityType === 'rafting' ? '🚣‍♂️' : tour.activityType === 'running' ? '🏃‍♂️' : tour.activityType === 'bike' ? '🚴‍♂️' : '🏆'}
@@ -816,22 +816,22 @@ export function ToursHomeView({
                     })()}
 
                     <div className="text-right shrink-0 border-l border-slate-100 pl-4 flex flex-col justify-center">
-                      <span className="text-[9px] text-slate-400 block tracking-wider font-semibold">QİYMƏT</span>
+                      <span className="text-[9px] text-label-tertiary block tracking-wider font-semibold">QİYMƏT</span>
                       {tour.discountPrice && tour.discountPrice > 0 && tour.discountPrice < (tour.price ?? minPrice) ? (
                         <div className="flex flex-col items-end">
-                          <span className="line-through text-gray-400 text-xs">
+                          <span className="line-through text-label-tertiary text-xs">
                             {getConvertedPriceInfo(tour.price ?? minPrice, tour.priceCurrency).both}
                           </span>
-                          <span className="text-2xl font-extrabold text-rose-600 leading-tight">
+                          <span className="text-2xl font-extrabold text-label-critical bg-surface-critical-weak px-1.5 rounded-md leading-tight">
                             {getConvertedPriceInfo(tour.discountPrice, tour.priceCurrency).both}
                           </span>
                         </div>
                       ) : (
                         <div className="flex flex-col items-end">
-                          <strong className="text-slate-900 text-2xl font-extrabold leading-tight">
+                          <strong className="text-label-primary text-2xl font-extrabold leading-tight">
                             {getConvertedPriceInfo(tour.price ?? minPrice, tour.priceCurrency).both}
                           </strong>
-                          <span className="text-slate-400 text-[10px] font-medium">/ nəfər</span>
+                          <span className="text-label-tertiary text-[10px] font-medium">/ nəfər</span>
                         </div>
                       )}
                     </div>

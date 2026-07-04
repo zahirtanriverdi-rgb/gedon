@@ -94,7 +94,7 @@ export const PriceCalculator: React.FC<PriceCalculatorProps> = ({ onBack }) => {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 animate-fadeIn">
+    <div className="max-w-7xl mx-auto px-4 lg:px-8 py-8 animate-fadeIn">
       {onBack && (
         <button 
           onClick={onBack}
@@ -105,7 +105,7 @@ export const PriceCalculator: React.FC<PriceCalculatorProps> = ({ onBack }) => {
       )}
       
       <div className="mb-8">
-        <h1 className="text-3xl font-extrabold text-slate-800 tracking-tight flex items-center gap-3">
+        <h1 className="text-3xl font-extrabold text-label-primary tracking-tight flex items-center gap-3">
           <span className="text-4xl">🧮</span>
           Qrup üçün qiymət hesabla
         </h1>
@@ -343,13 +343,13 @@ export const PriceCalculator: React.FC<PriceCalculatorProps> = ({ onBack }) => {
             <div className="mt-2 bg-primary-500/10 p-4 rounded-xl flex flex-col gap-2 border border-primary-500/20">
               <div className="flex justify-between items-center">
                 <span className="text-primary-500 font-bold">👤 Adam başı:</span>
-                <span className="font-extrabold text-primary-600 text-xl">{formatMoney(costs?.ppTotal)}</span>
+                <span className="font-extrabold text-label-primary text-xl">{formatMoney(costs?.ppTotal)}</span>
               </div>
               <div className="flex justify-between items-center mt-1">
                 <span className="text-slate-700 font-bold">👥 Qrup cəmi:</span>
-                <span className="font-extrabold text-slate-800 text-xl">{formatMoney(costs?.groupTotal)}</span>
+                <span className="font-extrabold text-label-primary text-xl">{formatMoney(costs?.groupTotal)}</span>
               </div>
-              <span className="text-xs text-slate-500 font-medium self-end">({participants} nəfər üçün)</span>
+              <span className="text-xs text-label-tertiary font-medium self-end">({participants} nəfər üçün)</span>
             </div>
 
             <div className="mt-4 flex items-start gap-2 bg-slate-50 p-3 rounded-lg text-xs text-slate-500 font-medium">

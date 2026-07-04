@@ -70,7 +70,7 @@ export default function FAQPage({ onBack }: { onBack: () => void }) {
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-8 animate-fadeIn font-sans">
+    <div className="max-w-4xl mx-auto px-4 lg:px-8 py-8 animate-fadeIn font-sans">
       <button 
         onClick={onBack}
         className="mb-6 flex items-center text-emerald-600 font-bold hover:text-emerald-700 transition"

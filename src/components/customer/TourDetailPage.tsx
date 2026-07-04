@@ -383,27 +383,27 @@ export function TourDetailPage({
 
   return (
         <div className="animate-fadeIn bg-white min-h-screen pb-20">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            
+          <div className="max-w-[var(--global-max-width)] mx-auto px-5 py-8">
+
             {/* Header Section */}
             <div className="mb-8 space-y-4">
-              <div className="flex space-x-2 text-xs text-slate-500 font-medium">
-                <span><strong className="text-slate-800 cursor-pointer pointer-events-auto hover:underline" onClick={(e) => { e.stopPropagation(); const org = users.find(u => u.id === selectedTour.vendorId); if (org) { setSelectedOrganizer(org); setActiveView('organizer'); setSelectedTour(null); } }}>{selectedTour.vendorName}</strong> tərəfindən</span>
+              <div className="flex space-x-2 text-xs text-label-tertiary font-medium">
+                <span><strong className="text-label-primary cursor-pointer pointer-events-auto hover:underline" onClick={(e) => { e.stopPropagation(); const org = users.find(u => u.id === selectedTour.vendorId); if (org) { setSelectedOrganizer(org); setActiveView('organizer'); setSelectedTour(null); } }}>{selectedTour.vendorName}</strong> tərəfindən</span>
               </div>
-              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-slate-900 tracking-tight leading-tight">
+              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-label-primary tracking-tight leading-tight">
                 {selectedTour.name}
               </h1>
               <div className="flex flex-wrap items-center justify-between gap-4 mt-2">
                 <div className="flex items-center gap-4">
                   <div className="bg-amber-100 text-amber-900 border border-amber-200 text-xs font-bold px-2 py-1 rounded shadow-sm shrink-0">Ən çox satılan</div>
                   {REVIEWS_ENABLED && (
-                    <div className="flex items-center gap-1 font-bold text-slate-800 text-sm shrink-0">
+                    <div className="flex items-center gap-1 font-bold text-label-primary text-sm shrink-0">
                       <Star className="w-4 h-4 fill-amber-500 text-amber-500" />
-                      4.9 <span className="text-slate-500 font-normal underline decoration-slate-300">({getReviewsCount(selectedTour.id)} rəy)</span>
+                      4.9 <span className="text-label-tertiary font-normal underline decoration-slate-300">({getReviewsCount(selectedTour.id)} rəy)</span>
                     </div>
                   )}
-                  <div className="flex items-center gap-1 font-bold text-slate-800 text-sm shrink-0">
-                     • <span className="text-slate-500 font-normal">{selectedTour.region}</span>
+                  <div className="flex items-center gap-1 font-bold text-label-primary text-sm shrink-0">
+                     • <span className="text-label-secondary font-normal">{selectedTour.region}</span>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
@@ -1549,22 +1549,22 @@ export function TourDetailPage({
                         const hasDiscount = !!selectedTour.discountPrice && selectedTour.discountPrice > 0 && selectedTour.discountPrice < basePrice;
                         return hasDiscount ? (
                           <>
-                            <span className="line-through text-gray-400 text-sm">
+                            <span className="line-through text-label-tertiary text-sm">
                               {getConvertedPriceInfo(basePrice, selectedTour.priceCurrency).both}
                             </span>
                             <div className="flex items-baseline gap-2">
-                              <span className="text-xl font-extrabold text-rose-600">
+                              <span className="text-xl font-extrabold text-label-critical bg-surface-critical-weak px-1.5 rounded-md">
                                 {getConvertedPriceInfo(selectedTour.discountPrice!, selectedTour.priceCurrency).both}
                               </span>
-                              <span className="text-slate-500 font-medium text-sm">adam başı</span>
+                              <span className="text-label-secondary font-medium text-sm">adam başı</span>
                             </div>
                           </>
                         ) : (
                           <div className="flex items-baseline gap-2">
-                            <span className="text-3xl font-extrabold text-slate-900">
+                            <span className="text-3xl font-extrabold text-label-primary">
                               {getConvertedPriceInfo(basePrice, selectedTour.priceCurrency).both}
                             </span>
-                            <span className="text-slate-500 font-medium text-sm">adam başı</span>
+                            <span className="text-label-secondary font-medium text-sm">adam başı</span>
                           </div>
                         );
                       })()
@@ -1746,8 +1746,8 @@ export function TourDetailPage({
             
           {/* YOU MIGHT ALSO LIKE SECTION */}
           <div className="mt-16 pt-16 border-t border-slate-200">
-            <h2 className="text-2xl font-extrabold text-slate-900 mb-8">Bunlar da maraqlı ola bilər...</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 w-full">
+            <h2 className="text-2xl font-extrabold text-label-primary mb-8">Bunlar da maraqlı ola bilər...</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 w-full">
                 {tours
                   .filter(t => t.id !== selectedTour.id)
                   .sort(() => 0.5 - Math.random()) // Randomize for varied suggestions
@@ -1758,7 +1758,7 @@ export function TourDetailPage({
                     return (
                       <div 
                         key={tour.id} 
-                        className="group flex flex-col bg-white border border-slate-200 rounded-2xl overflow-hidden hover:shadow-lg transition-all duration-300 cursor-pointer h-full"
+                        className="group flex flex-col bg-white border border-border-primary rounded-[var(--card-radius)] overflow-hidden hover:shadow-lg transition-all duration-300 cursor-pointer h-full"
                         onClick={() => {
                           window.scrollTo({ top: 0, behavior: 'smooth' });
                           setSelectedTour(tour);
@@ -1779,30 +1779,30 @@ export function TourDetailPage({
                           </button>
                         </div>
                         <div className="p-4 flex flex-col flex-grow">
-                          <div className="flex items-center gap-1.5 text-xs text-slate-500 font-bold uppercase tracking-wider mb-2">
+                          <div className="flex items-center gap-1.5 text-xs text-label-secondary font-bold uppercase tracking-wider mb-2">
                             <span>{tour.category}</span>
                             <span>•</span>
                             <span>{tour.region}</span>
                           </div>
-                          <h3 className="font-extrabold text-slate-900 text-sm mb-3 line-clamp-2 leading-snug group-hover:text-emerald-700 transition">
+                          <h3 className="font-extrabold text-label-primary text-sm mb-3 line-clamp-2 leading-snug group-hover:text-emerald-700 transition">
                             {tour.name}
                           </h3>
                           {REVIEWS_ENABLED && (
-                            <div className="flex items-center gap-1 text-xs font-bold text-slate-700 mb-4">
+                            <div className="flex items-center gap-1 text-xs font-bold text-label-primary mb-4">
                                <Star className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
-                               4.9 <span className="text-slate-500 font-normal">({getReviewsCount(tour.id)})</span>
+                               4.9 <span className="text-label-tertiary font-normal">({getReviewsCount(tour.id)})</span>
                             </div>
                           )}
 
                           <div className="mt-auto pt-4 border-t border-slate-100 flex items-end justify-between">
-                            <span className="text-xs text-slate-500 font-medium">{tour.durationHours ?? (tour.durationDays * 8)} saat</span>
+                            <span className="text-xs text-label-tertiary font-medium">{tour.durationHours ?? (tour.durationDays * 8)} saat</span>
                             {minPrice ? (
                               <div className="flex flex-col items-end">
-                                <span className="text-[10px] text-slate-500 font-medium">Başlayan qiymətlər</span>
-                                <span className="text-base font-extrabold text-slate-900">{getConvertedPriceInfo(minPrice, tour.priceCurrency).both}</span>
+                                <span className="text-[10px] text-label-tertiary font-medium">Başlayan qiymətlər</span>
+                                <span className="text-base font-extrabold text-label-primary">{getConvertedPriceInfo(minPrice, tour.priceCurrency).both}</span>
                               </div>
                             ) : (
-                               <span className="text-xs font-bold text-slate-400">Satılıb qurtarıb</span>
+                               <span className="text-xs font-bold text-label-tertiary">Satılıb qurtarıb</span>
                             )}
                           </div>
                         </div>

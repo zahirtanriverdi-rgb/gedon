@@ -2,9 +2,39 @@
 @import "tailwindcss";
 @import "maplibre-gl/dist/maplibre-gl.css";
 
+/* Exact design-token spec (single source of truth). Component classes below reference
+   these directly, e.g. h-[var(--header-height)], rounded-[var(--card-radius)]. */
+:root {
+  --label-primary: #0d1c1e;
+  --label-secondary: #63687a;
+  --label-tertiary: #858995;
+  --interactive-primary: #2dd4bf;
+  --label-critical: #ec003f;
+  --surface-critical-weak: #ffe8ed;
+  --border-primary: #dcdfe4;
+  --background-secondary: #cbe4e3;
+  --global-max-width: 1440px;
+  --header-height: 80px;
+  --card-radius: 12px;
+  --section-spacing-y: 32px;
+}
+
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  /* ---- Semantic UI tokens (text/surface/border) ----
+     Generates text, bg, border utilities, e.g. text-label-primary, bg-surface-critical-weak.
+     Values are aliases of the plain :root tokens below — kept in @theme too so Tailwind
+     generates utility classes from them. */
+  --color-label-primary: #0d1c1e;
+  --color-label-secondary: #63687a;
+  --color-label-tertiary: #858995;
+  --color-interactive-primary: #2dd4bf;
+  --color-label-critical: #ec003f;
+  --color-surface-critical-weak: #ffe8ed;
+  --color-border-primary: #dcdfe4;
+  --color-background-secondary: #cbe4e3;
 
   /* ---- Brand palette (single source of truth) ---- */
 

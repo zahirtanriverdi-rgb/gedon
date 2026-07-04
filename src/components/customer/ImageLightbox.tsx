@@ -52,7 +52,7 @@ export function ImageLightbox({ tour, lightboxIndex, onSetLightboxIndex }: Image
         </div>
         <button
           type="button"
-          className="bg-slate-800 hover:bg-slate-700 text-white p-2.5 rounded-full shadow-lg transition-transform active:scale-95 cursor-pointer flex items-center justify-center border border-white/10"
+          className="w-11 h-11 bg-slate-800 hover:bg-slate-700 text-white rounded-full shadow-lg transition-transform active:scale-95 cursor-pointer flex items-center justify-center border border-white/10"
           onClick={(e) => {
             e.stopPropagation();
             onSetLightboxIndex(null);
@@ -70,9 +70,9 @@ export function ImageLightbox({ tour, lightboxIndex, onSetLightboxIndex }: Image
           <button
             type="button"
             onClick={handlePrev}
-            className="absolute left-2 md:left-4 z-10 bg-black/60 hover:bg-black text-white p-3 rounded-full hover:scale-110 active:scale-95 transition-all border border-white/10 cursor-pointer"
+            className="absolute left-2 md:left-4 z-10 w-11 h-11 bg-black/60 hover:bg-black text-white rounded-full hover:scale-110 active:scale-95 transition-all border border-white/10 cursor-pointer flex items-center justify-center"
           >
-            <ChevronLeft className="w-6 h-6" />
+            <ChevronLeft className="w-5 h-5" />
           </button>
         )}
 
@@ -106,9 +106,9 @@ export function ImageLightbox({ tour, lightboxIndex, onSetLightboxIndex }: Image
           <button
             type="button"
             onClick={handleNext}
-            className="absolute right-2 md:right-4 z-10 bg-black/60 hover:bg-black text-white p-3 rounded-full hover:scale-110 active:scale-95 transition-all border border-white/10 cursor-pointer"
+            className="absolute right-2 md:right-4 z-10 w-11 h-11 bg-black/60 hover:bg-black text-white rounded-full hover:scale-110 active:scale-95 transition-all border border-white/10 cursor-pointer flex items-center justify-center"
           >
-            <ChevronRight className="w-6 h-6" />
+            <ChevronRight className="w-5 h-5" />
           </button>
         )}
 
