@@ -110,6 +110,7 @@ export interface Tour {
   guideIds?: string[]; // Which of the vendor's registered Guides are assigned to this specific tour
   isManuallyFeatured?: boolean; // Vendor override for the "Ayın Ən Çox Satılanı" badge — takes priority over the automatic monthly-bookings calculation, one tour per vendor at a time
   manuallyFeaturedAt?: string; // ISO timestamp of when the manual override was set
+  cancellationPolicy?: string; // Vendor-defined cancellation terms; not yet wired into any form or customer-facing display
   safetyInstructions?: string;
   allowTeamRegistration?: boolean;
   scheduleFrequency?: string; // e.g. 'one-time', 'daily', 'every-sunday', 'every-weekend'
