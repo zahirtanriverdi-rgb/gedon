@@ -477,7 +477,7 @@ export function TourDetailPage({
                   <div className="flex flex-col gap-1.5">
                     <Calendar className="w-6 h-6 text-slate-700 mb-1" />
                     <span className="text-sm font-extrabold text-slate-900">Ödənişsiz ləğv</span>
-                    <span className="text-xs text-slate-500 leading-snug">24 saat əvvələ qədər ləğv et</span>
+                    <span className="text-xs text-slate-500 leading-snug">48 saat əvvələ qədər ödənişsiz ləğv et</span>
                   </div>
                   <div className="flex flex-col gap-1.5">
                     <Clock className="w-6 h-6 text-slate-700 mb-1" />
@@ -486,7 +486,7 @@ export function TourDetailPage({
                   </div>
                   <div className="flex flex-col gap-1.5">
                     <Globe className="w-6 h-6 text-slate-700 mb-1" />
-                    <span className="text-sm font-extrabold text-slate-900">Canlı tur bələdçisi</span>
+                    <span className="text-sm font-extrabold text-slate-900">Peşəkar tur bələdçisi</span>
                     <span className="text-xs text-slate-500 leading-snug">
                       {selectedTour.languages && selectedTour.languages.length > 0 ? selectedTour.languages.join(', ') : 'Azərbaycanca'}
                     </span>
@@ -1725,7 +1725,7 @@ export function TourDetailPage({
                       </div>
                       <div className="space-y-0.5">
                         <h4 className="text-sm font-extrabold text-slate-800">Ödənişsiz ləğv</h4>
-                        <p className="text-xs text-slate-500 font-medium leading-snug">Tam geri ödəmə üçün 24 saat əvvələ qədər ləğv edin</p>
+                        <p className="text-xs text-slate-500 font-medium leading-snug">Tam geri ödəmə üçün 48 saat əvvələ qədər ləğv edin</p>
                       </div>
                     </div>
                     <div className="flex items-start gap-3">
