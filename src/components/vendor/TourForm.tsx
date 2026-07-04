@@ -3,6 +3,7 @@ import { Tour, TourSlot, User } from '../../types';
 import { parseGpsFile } from '../../utils/gpxParser';
 import { Plus, Sparkles, Instagram, X, Check } from 'lucide-react';
 import { DynamicStringListInput } from './DynamicStringListInput';
+import { LocationAutocompleteInput } from './LocationAutocompleteInput';
 import { MultiDateCalendar, toIsoDate } from './MultiDateCalendar';
 import { TourDangerZone } from './TourDangerZone';
 
@@ -70,6 +71,8 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
   const [tourActiveDifficulty, setTourActiveDifficulty] = useState<string>('medium');
   const [tourAgeLimit, setTourAgeLimit] = useState<string>('18-45 yaş');
   const [tourMeetingPoint, setTourMeetingPoint] = useState<string>('');
+  const [tourMeetingPointLat, setTourMeetingPointLat] = useState<number | undefined>(undefined);
+  const [tourMeetingPointLng, setTourMeetingPointLng] = useState<number | undefined>(undefined);
   const [tourRequiredEquipment, setTourRequiredEquipment] = useState<string>('');
   const [tourEquipmentIncluded, setTourEquipmentIncluded] = useState<boolean>(true);
   const [tourEquipmentRentalPrice, setTourEquipmentRentalPrice] = useState<number | ''>(0);
@@ -130,6 +133,8 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
     setTourActiveDifficulty(tour.activeDifficulty || 'medium');
     setTourAgeLimit(tour.ageLimit || '18-45 yaş');
     setTourMeetingPoint(tour.meetingPoint || '');
+    setTourMeetingPointLat(tour.meetingPointLat);
+    setTourMeetingPointLng(tour.meetingPointLng);
     setTourRequiredEquipment(tour.requiredEquipment || '');
     setTourEquipmentIncluded(tour.equipmentIncluded !== false);
     setTourEquipmentRentalPrice(tour.equipmentRentalPrice || 0);
@@ -203,6 +208,8 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
       activeDifficulty: tourCategory === 'active' ? (tourActiveDifficulty as 'beginner' | 'medium' | 'professional') : undefined,
       ageLimit: tourCategory === 'active' ? tourAgeLimit : undefined,
       meetingPoint: tourMeetingPoint || undefined,
+      meetingPointLat: tourMeetingPointLat,
+      meetingPointLng: tourMeetingPointLng,
       requiredEquipment: tourCategory === 'active' ? tourRequiredEquipment : undefined,
       equipmentIncluded: tourCategory === 'active' ? tourEquipmentIncluded : undefined,
       equipmentRentalPrice: tourCategory === 'active' ? (Number(tourEquipmentRentalPrice) || 0) : undefined,
@@ -671,13 +678,17 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
         {currentStep === 2 && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="md:col-span-2">
-            <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">Görüş Yeri (Mətn olaraq):</label>
-            <input
-              type="text"
+            <LocationAutocompleteInput
+              label="Görüş Yeri:"
               value={tourMeetingPoint}
-              onChange={(e) => setTourMeetingPoint(e.target.value)}
+              lat={tourMeetingPointLat}
+              lng={tourMeetingPointLng}
+              onChange={(address, lat, lng) => {
+                setTourMeetingPoint(address);
+                setTourMeetingPointLat(lat);
+                setTourMeetingPointLng(lng);
+              }}
               placeholder="Məsələn: Tofiq Bəhramov adına Respublika Stadionunun qarşısı..."
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800"
             />
           </div>
 

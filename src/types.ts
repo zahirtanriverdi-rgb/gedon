@@ -101,6 +101,8 @@ export interface Tour {
   equipmentIncluded?: boolean;
   equipmentRentalPrice?: number;
   meetingPoint?: string;
+  meetingPointLat?: number;
+  meetingPointLng?: number;
   safetyInstructions?: string;
   allowTeamRegistration?: boolean;
   scheduleFrequency?: string; // e.g. 'one-time', 'daily', 'every-sunday', 'every-weekend'
