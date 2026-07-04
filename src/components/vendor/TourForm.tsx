@@ -6,6 +6,12 @@ import { DynamicStringListInput } from './DynamicStringListInput';
 import { MultiDateCalendar, toIsoDate } from './MultiDateCalendar';
 import { TourDangerZone } from './TourDangerZone';
 
+const FORM_STEPS = [
+  { number: 1 as const, label: 'General Details' },
+  { number: 2 as const, label: 'Event Details' },
+  { number: 3 as const, label: 'Pricing and Submit' },
+];
+
 interface TourFormProps {
   currentUser: User;
   tour?: Tour | null; // undefined/null = create mode; provided = edit mode
@@ -71,6 +77,10 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
   const [isSavingForm, setIsSavingForm] = useState(false);
   const [formSubmitError, setFormSubmitError] = useState<string | null>(null);
 
+  const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
+  const goToNextStep = () => setCurrentStep((s) => (s < 3 ? ((s + 1) as 1 | 2 | 3) : s));
+  const goToPrevStep = () => setCurrentStep((s) => (s > 1 ? ((s - 1) as 1 | 2 | 3) : s));
+
   // Populate every field from the tour prop in edit mode.
   useEffect(() => {
     if (!tour) return;
@@ -116,6 +126,10 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
 
   const handleTourSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (currentStep !== 3) {
+      goToNextStep();
+      return;
+    }
     if (!tourName || !tourRegion || !tourDescription) {
       if (onShowNotification) {
         onShowNotification('Zəhmət olmasa bütün məcburi xanaları doldurun.', 'error');
