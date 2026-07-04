@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Tour, TourSlot, Booking, Review, User, PlatformConfig, UserRole } from './types';
+import { Tour, TourSlot, Booking, Review, User, PlatformConfig, PriceCalculatorConfig, UserRole } from './types';
 import { seedUsers } from './data/toursData';
 import CustomerPortal from './components/CustomerPortal';
 import VendorPortal from './components/VendorPortal';
@@ -168,13 +168,37 @@ export default function App() {
     }
   });
   
+  // Default "Qrup üçün qiymət hesabla" cost elements — matches the values that used to be
+  // hardcoded directly in PriceCalculator.tsx. Admins can now edit these from AdminPortal;
+  // existing localStorage data saved before this field existed gets backfilled with these
+  // defaults rather than crashing the calculator with an undefined config.
+  const DEFAULT_PRICE_CALCULATOR_CONFIG: PriceCalculatorConfig = {
+    destinations: { "İsmayıllı": 175, "Nabran": 220, "Şəki": 350, "Qəbələ": 225, "Şamaxı": 122, "Quba": 168, "Qusar": 185 },
+    busRatePerKm: 2.5,
+    busCampSurcharge: 100,
+    guideDailyBase: 50,
+    guideCampBase: 70,
+    guidePerParticipant: 1.5,
+    foodDailyKendPrice: 15,
+    foodDailySendvicPrice: 4,
+    campBreakfastPrice: 2,
+    campLunchPrice: 10,
+    tentRentalPrice: 9,
+    sleepingBagRentalPrice: 6,
+    matRentalPrice: 2,
+  };
+
   // Platform configuration state
   const [platformConfig, setPlatformConfig] = useState<PlatformConfig>(() => {
     try {
       const saved = localStorage.getItem('turlar_platform_config');
-      return saved ? JSON.parse(saved) : { commissionPercentage: 15 };
+      const parsed = saved ? JSON.parse(saved) : {};
+      return {
+        commissionPercentage: parsed.commissionPercentage ?? 15,
+        priceCalculatorConfig: { ...DEFAULT_PRICE_CALCULATOR_CONFIG, ...(parsed.priceCalculatorConfig || {}) },
+      };
     } catch (e) {
-      return { commissionPercentage: 15 };
+      return { commissionPercentage: 15, priceCalculatorConfig: DEFAULT_PRICE_CALCULATOR_CONFIG };
     }
   });
 
@@ -490,6 +514,11 @@ export default function App() {
   const handleUpdateCommissionPercent = (newValue: number) => {
     setPlatformConfig(prev => ({ ...prev, commissionPercentage: newValue }));
     showNotification(`SaaS Komissiyası ${newValue}% olaraq tənzimləndi!`, 'info');
+  };
+
+  const handleUpdatePriceCalculatorConfig = (newConfig: PriceCalculatorConfig) => {
+    setPlatformConfig(prev => ({ ...prev, priceCalculatorConfig: newConfig }));
+    showNotification('Qiymət hesablayıcısının xərc elementləri yeniləndi! 🧮', 'success');
   };
 
   const handleApproveTour = async (tourId: string) => {
@@ -848,6 +877,7 @@ export default function App() {
                 onSearchChange={setGlobalSearchQuery}
                 displayCurrency={displayCurrency}
                 appLanguage={appLanguage}
+                priceCalculatorConfig={platformConfig.priceCalculatorConfig}
               />
             )}
 
@@ -892,6 +922,7 @@ export default function App() {
                 currentUser={activeUser}
                 platformConfig={platformConfig}
                 onUpdateCommissionPercent={handleUpdateCommissionPercent}
+                onUpdatePriceCalculatorConfig={handleUpdatePriceCalculatorConfig}
                 onApproveTour={handleApproveTour}
                 onRejectTour={handleRejectTour}
                 onEditTour={handleEditTour}

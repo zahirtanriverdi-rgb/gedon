@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Tour, TourSlot, Booking, Review, User } from '../types';
+import { Tour, TourSlot, Booking, Review, User, PriceCalculatorConfig } from '../types';
 import FAQPage from './FAQPage';
 import OrganizerProfile from './OrganizerProfile';
 import { PriceCalculator } from './PriceCalculator';
@@ -30,6 +30,7 @@ interface CustomerPortalProps {
   onSearchChange?: (query: string) => void;
   displayCurrency?: 'AZN' | 'USD' | 'EUR';
   appLanguage?: 'az' | 'en' | 'ru';
+  priceCalculatorConfig?: PriceCalculatorConfig;
 }
 
 export default function CustomerPortal({
@@ -48,7 +49,8 @@ export default function CustomerPortal({
   searchQuery = '',
   onSearchChange,
   displayCurrency = 'AZN',
-  appLanguage = 'az'
+  appLanguage = 'az',
+  priceCalculatorConfig
 }: CustomerPortalProps) {
   // Helper for currency conversion based on central exchange rates
   const getConvertedPriceInfo = (price: number, currency?: 'AZN' | 'USD' | 'EUR') => {
@@ -668,7 +670,7 @@ export default function CustomerPortal({
     <>
       {activeView === 'calculator' && (
         <div className="bg-slate-50 min-h-screen">
-          <PriceCalculator onBack={() => setActiveView('home')} />
+          <PriceCalculator onBack={() => setActiveView('home')} config={priceCalculatorConfig} />
         </div>
       )}
 

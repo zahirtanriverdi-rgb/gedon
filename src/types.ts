@@ -166,6 +166,23 @@ export interface Review {
   verifiedAttendee: boolean; // Must be true in our anti-fake rating system
 }
 
+export interface PriceCalculatorConfig {
+  destinations: Record<string, number>; // destination name -> one-way distance in km, used for the bus cost estimate
+  busRatePerKm: number; // AZN per km for the round trip bus estimate
+  busCampSurcharge: number; // extra flat AZN added to the bus cost for multi-day camp tours
+  guideDailyBase: number; // flat AZN base fee for a guide on a single-day tour
+  guideCampBase: number; // flat AZN base fee for a guide on a camp tour
+  guidePerParticipant: number; // additional AZN per participant, added to the guide base fee
+  foodDailyKendPrice: number; // AZN/person for a "village house" lunch on a daily tour
+  foodDailySendvicPrice: number; // AZN/person for a sandwich lunch on a daily tour
+  campBreakfastPrice: number; // AZN/person for camp breakfast
+  campLunchPrice: number; // AZN/person for camp lunch
+  tentRentalPrice: number; // AZN/person for tent rental
+  sleepingBagRentalPrice: number; // AZN/person for sleeping bag rental
+  matRentalPrice: number; // AZN/person for sleeping mat rental
+}
+
 export interface PlatformConfig {
   commissionPercentage: number; // e.g., 10 or 15%
+  priceCalculatorConfig: PriceCalculatorConfig;
 }

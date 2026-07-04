@@ -1,9 +1,10 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Tour, TourSlot, Booking, User, PlatformConfig } from '../types';
+import { Tour, TourSlot, Booking, User, PlatformConfig, PriceCalculatorConfig } from '../types';
 import { TourForm } from './vendor/TourForm';
 import { InternationalTourForm } from './vendor/InternationalTourForm';
 import {
   Building,
+  Calculator,
   Settings,
   TrendingUp,
   UserCheck,
@@ -83,6 +84,7 @@ interface AdminPortalProps {
   currentUser: User;
   platformConfig: PlatformConfig;
   onUpdateCommissionPercent: (newValue: number) => void;
+  onUpdatePriceCalculatorConfig?: (newConfig: PriceCalculatorConfig) => void;
   onApproveTour: (tourId: string) => Promise<void>;
   onRejectTour?: (tourId: string, rejectionReason: string) => Promise<void>;
   onEditTour?: (updatedTour: Tour) => Promise<void>;
@@ -106,6 +108,7 @@ export default function AdminPortal({
   currentUser,
   platformConfig,
   onUpdateCommissionPercent,
+  onUpdatePriceCalculatorConfig,
   onApproveTour,
   onRejectTour,
   onEditTour,
@@ -121,6 +124,43 @@ export default function AdminPortal({
   onUpdateTourStatus
 }: AdminPortalProps) {
   const [commissionInput, setCommissionInput] = useState<string | number>(platformConfig.commissionPercentage);
+
+  // Price calculator cost elements (destinations + rates) — editable draft, synced from
+  // platformConfig whenever it changes elsewhere, saved explicitly via the button below.
+  const [pcConfig, setPcConfig] = useState<PriceCalculatorConfig>(platformConfig.priceCalculatorConfig);
+  const [newDestName, setNewDestName] = useState<string>('');
+  const [newDestKm, setNewDestKm] = useState<number | ''>('');
+
+  React.useEffect(() => {
+    setPcConfig(platformConfig.priceCalculatorConfig);
+  }, [platformConfig.priceCalculatorConfig]);
+
+  const handlePcNumberChange = (field: keyof Omit<PriceCalculatorConfig, 'destinations'>) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    setPcConfig(prev => ({ ...prev, [field]: raw === '' ? 0 : Number(raw) }));
+  };
+
+  const handleAddDestination = () => {
+    if (!newDestName.trim() || newDestKm === '' || Number(newDestKm) <= 0) {
+      if (onShowNotification) onShowNotification('Məkan adı və məsafə (km) tələb olunur.', 'error');
+      return;
+    }
+    setPcConfig(prev => ({ ...prev, destinations: { ...prev.destinations, [newDestName.trim()]: Number(newDestKm) } }));
+    setNewDestName('');
+    setNewDestKm('');
+  };
+
+  const handleRemoveDestination = (name: string) => {
+    setPcConfig(prev => {
+      const next = { ...prev.destinations };
+      delete next[name];
+      return { ...prev, destinations: next };
+    });
+  };
+
+  const handleSavePcConfig = () => {
+    if (onUpdatePriceCalculatorConfig) onUpdatePriceCalculatorConfig(pcConfig);
+  };
 
   const [cbarLoading, setCbarLoading] = useState<boolean>(false);
   const [approvingTourIds, setApprovingTourIds] = useState<Set<string>>(new Set());
@@ -403,6 +443,109 @@ export default function AdminPortal({
                 Tətbiq Et
               </button>
             </form>
+          </div>
+
+          {/* Section: Price Calculator Cost Elements */}
+          <div className="bg-white p-5 rounded-xl border border-slate-200 space-y-4 shadow-xs">
+            <h3 className="text-xs font-bold text-slate-400 tracking-widest flex items-center gap-1.5">
+              <Calculator className="w-4 h-4 text-emerald-700" />
+              QİYMƏT HESABLAYICISI — XƏRC ELEMENTLƏRİ
+            </h3>
+            <p className="text-xs text-slate-500 leading-normal">
+              Müştərilərin "Qrup üçün qiymət hesabla" alətində gördüyü avtobus, bələdçi, yemək və avadanlıq tariflərini buradan idarə edin. Dəyişiklik "Yadda saxla" ilə tətbiq olunan kimi hesablayıcıya dərhal təsir edir.
+            </p>
+
+            <div>
+              <h4 className="text-[10px] font-extrabold text-slate-400 tracking-wide mb-2">Məkanlar və məsafələr (km):</h4>
+              <div className="flex flex-wrap gap-2 mb-3">
+                {Object.entries(pcConfig.destinations).map(([name, km]) => (
+                  <span key={name} className="inline-flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-lg px-2 py-1 text-xs">
+                    <strong className="text-slate-800">{name}</strong>
+                    <span className="text-slate-400">({km} km)</span>
+                    <button type="button" onClick={() => handleRemoveDestination(name)} className="text-red-500 hover:text-red-700 font-bold ml-1">✕</button>
+                  </span>
+                ))}
+              </div>
+              <div className="flex gap-2 max-w-md">
+                <input
+                  type="text"
+                  value={newDestName}
+                  onChange={(e) => setNewDestName(e.target.value)}
+                  placeholder="Məkan adı (məs: Xınalıq)"
+                  className="flex-1 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+                />
+                <input
+                  type="number"
+                  min="1"
+                  value={newDestKm}
+                  onChange={(e) => setNewDestKm(e.target.value === '' ? '' : Number(e.target.value))}
+                  placeholder="km"
+                  className="w-20 px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+                />
+                <button type="button" onClick={handleAddDestination} className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-3 py-1.5 rounded-lg transition">
+                  Əlavə et
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-3 border-t border-slate-100">
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 mb-1">Avtobus (AZN/km):</label>
+                <input type="number" step="0.1" min="0" value={pcConfig.busRatePerKm} onChange={handlePcNumberChange('busRatePerKm')} className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 mb-1">Kamp üçün əlavə (AZN):</label>
+                <input type="number" min="0" value={pcConfig.busCampSurcharge} onChange={handlePcNumberChange('busCampSurcharge')} className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 mb-1">Bələdçi (gündəlik baza):</label>
+                <input type="number" min="0" value={pcConfig.guideDailyBase} onChange={handlePcNumberChange('guideDailyBase')} className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 mb-1">Bələdçi (kamp baza):</label>
+                <input type="number" min="0" value={pcConfig.guideCampBase} onChange={handlePcNumberChange('guideCampBase')} className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 mb-1">Bələdçi (adam başı əlavə):</label>
+                <input type="number" step="0.1" min="0" value={pcConfig.guidePerParticipant} onChange={handlePcNumberChange('guidePerParticipant')} className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 mb-1">Kənd evi naharı (AZN):</label>
+                <input type="number" min="0" value={pcConfig.foodDailyKendPrice} onChange={handlePcNumberChange('foodDailyKendPrice')} className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 mb-1">Sendviç (AZN):</label>
+                <input type="number" min="0" value={pcConfig.foodDailySendvicPrice} onChange={handlePcNumberChange('foodDailySendvicPrice')} className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 mb-1">Kamp səhər yeməyi (AZN/adam):</label>
+                <input type="number" min="0" value={pcConfig.campBreakfastPrice} onChange={handlePcNumberChange('campBreakfastPrice')} className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 mb-1">Kamp günorta yeməyi (AZN/adam):</label>
+                <input type="number" min="0" value={pcConfig.campLunchPrice} onChange={handlePcNumberChange('campLunchPrice')} className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 mb-1">Çadır kirayəsi (AZN/adam):</label>
+                <input type="number" min="0" value={pcConfig.tentRentalPrice} onChange={handlePcNumberChange('tentRentalPrice')} className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 mb-1">Yataq kisəsi (AZN/adam):</label>
+                <input type="number" min="0" value={pcConfig.sleepingBagRentalPrice} onChange={handlePcNumberChange('sleepingBagRentalPrice')} className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs" />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 mb-1">Mat (AZN/adam):</label>
+                <input type="number" min="0" value={pcConfig.matRentalPrice} onChange={handlePcNumberChange('matRentalPrice')} className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs" />
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleSavePcConfig}
+              className="bg-slate-950 hover:bg-slate-900 text-white font-bold text-xs px-4 py-2 rounded-lg transition-all"
+            >
+              Yadda saxla
+            </button>
           </div>
 
           {/* Section: Central Currency Exchange Rates */}

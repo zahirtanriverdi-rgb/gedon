@@ -1,21 +1,34 @@
 import React, { useState } from 'react';
 import { Calculator, Users, Map, Tent, Sun, Info } from 'lucide-react';
+import { PriceCalculatorConfig } from '../types';
 
-const distances: Record<string, number> = {
-  "İsmayıllı": 175,
-  "Nabran": 220,
-  "Şəki": 350,
-  "Qəbələ": 225,
-  "Şamaxı": 122,
-  "Quba": 168,
-  "Qusar": 185
+// Fallback used only if no config prop is passed in at all (defensive default, shouldn't
+// normally happen since App.tsx always provides platformConfig.priceCalculatorConfig).
+const FALLBACK_CONFIG: PriceCalculatorConfig = {
+  destinations: { "İsmayıllı": 175, "Nabran": 220, "Şəki": 350, "Qəbələ": 225, "Şamaxı": 122, "Quba": 168, "Qusar": 185 },
+  busRatePerKm: 2.5,
+  busCampSurcharge: 100,
+  guideDailyBase: 50,
+  guideCampBase: 70,
+  guidePerParticipant: 1.5,
+  foodDailyKendPrice: 15,
+  foodDailySendvicPrice: 4,
+  campBreakfastPrice: 2,
+  campLunchPrice: 10,
+  tentRentalPrice: 9,
+  sleepingBagRentalPrice: 6,
+  matRentalPrice: 2,
 };
 
 export interface PriceCalculatorProps {
   onBack?: () => void;
+  config?: PriceCalculatorConfig;
 }
 
-export const PriceCalculator: React.FC<PriceCalculatorProps> = ({ onBack }) => {
+export const PriceCalculator: React.FC<PriceCalculatorProps> = ({ onBack, config }) => {
+  const cfg = config || FALLBACK_CONFIG;
+  const distances = cfg.destinations;
+
   const [destination, setDestination] = useState<string>('');
   const [tourType, setTourType] = useState<'daily' | 'camp'>('daily');
   const [participants, setParticipants] = useState<number>(1);
@@ -33,44 +46,45 @@ export const PriceCalculator: React.FC<PriceCalculatorProps> = ({ onBack }) => {
   const [needSleepingBag, setNeedSleepingBag] = useState<boolean>(false);
   const [needMat, setNeedMat] = useState<boolean>(false);
 
-  // Calculations
+  // Calculations — every rate/fee here comes from `cfg` (admin-managed), not a hardcoded
+  // constant, so changes in AdminPortal take effect the next time this recalculates.
   const calculateCosts = () => {
     if (!destination || participants < 1) return null;
 
     const distance = distances[destination];
     
     // Bus
-    let totalBus = distance * 2.5;
+    let totalBus = distance * cfg.busRatePerKm;
     if (tourType === 'camp') {
-      totalBus += 100;
+      totalBus += cfg.busCampSurcharge;
     }
     const ppBus = totalBus / participants;
 
     // Guide
     let totalGuide = 0;
     if (tourType === 'daily') {
-      totalGuide = 50 + (participants * 1.5);
+      totalGuide = cfg.guideDailyBase + (participants * cfg.guidePerParticipant);
     } else {
-      totalGuide = 70 + (participants * 1.5);
+      totalGuide = cfg.guideCampBase + (participants * cfg.guidePerParticipant);
     }
     const ppGuide = totalGuide / participants;
 
     // Food
     let ppFood = 0;
     if (tourType === 'daily') {
-      if (dailyFood === 'kend') ppFood = 15;
-      else if (dailyFood === 'sendvic') ppFood = 4;
+      if (dailyFood === 'kend') ppFood = cfg.foodDailyKendPrice;
+      else if (dailyFood === 'sendvic') ppFood = cfg.foodDailySendvicPrice;
     } else {
-      if (campBreakfast) ppFood += 2;
-      if (campLunch) ppFood += 10;
+      if (campBreakfast) ppFood += cfg.campBreakfastPrice;
+      if (campLunch) ppFood += cfg.campLunchPrice;
     }
 
     // Equipment
     let ppEq = 0;
     if (tourType === 'camp') {
-      if (needTent && !hasOwnTent) ppEq += 9;
-      if (needSleepingBag) ppEq += 6;
-      if (needMat) ppEq += 2;
+      if (needTent && !hasOwnTent) ppEq += cfg.tentRentalPrice;
+      if (needSleepingBag) ppEq += cfg.sleepingBagRentalPrice;
+      if (needMat) ppEq += cfg.matRentalPrice;
     }
 
     const ppTotal = ppBus + ppGuide + ppFood + ppEq;
@@ -206,7 +220,7 @@ export const PriceCalculator: React.FC<PriceCalculatorProps> = ({ onBack }) => {
                   onChange={() => setDailyFood('kend')}
                   className="w-5 h-5 text-primary-500 focus:ring-primary-500" 
                 />
-                <span className="font-medium text-slate-700">🍱 Kənd evi naharı (15 AZN)</span>
+                <span className="font-medium text-slate-700">🍱 Kənd evi naharı ({cfg.foodDailyKendPrice} AZN)</span>
               </label>
               <label className="flex items-center gap-3 cursor-pointer">
                 <input 
@@ -216,7 +230,7 @@ export const PriceCalculator: React.FC<PriceCalculatorProps> = ({ onBack }) => {
                   onChange={() => setDailyFood('sendvic')}
                   className="w-5 h-5 text-primary-500 focus:ring-primary-500" 
                 />
-                <span className="font-medium text-slate-700">🥪 Sendviç (4 AZN)</span>
+                <span className="font-medium text-slate-700">🥪 Sendviç ({cfg.foodDailySendvicPrice} AZN)</span>
               </label>
               <label className="flex items-center gap-3 cursor-pointer">
                 <input 
@@ -238,7 +252,7 @@ export const PriceCalculator: React.FC<PriceCalculatorProps> = ({ onBack }) => {
                   onChange={(e) => setCampBreakfast(e.target.checked)}
                   className="w-5 h-5 rounded text-primary-500 focus:ring-primary-500" 
                 />
-                <span className="font-medium text-slate-700">🍳 Səhər yeməyi (2 AZN/adam)</span>
+                <span className="font-medium text-slate-700">🍳 Səhər yeməyi ({cfg.campBreakfastPrice} AZN/adam)</span>
               </label>
               <label className="flex items-center gap-3 cursor-pointer">
                 <input 
@@ -247,7 +261,7 @@ export const PriceCalculator: React.FC<PriceCalculatorProps> = ({ onBack }) => {
                   onChange={(e) => setCampLunch(e.target.checked)}
                   className="w-5 h-5 rounded text-primary-500 focus:ring-primary-500" 
                 />
-                <span className="font-medium text-slate-700">🍽️ Günorta yeməyi (10 AZN/adam)</span>
+                <span className="font-medium text-slate-700">🍽️ Günorta yeməyi ({cfg.campLunchPrice} AZN/adam)</span>
               </label>
             </div>
           )}
@@ -270,7 +284,7 @@ export const PriceCalculator: React.FC<PriceCalculatorProps> = ({ onBack }) => {
                     onChange={(e) => setNeedTent(e.target.checked)}
                     className="w-5 h-5 rounded text-primary-500 focus:ring-primary-500" 
                   />
-                  <span className="font-medium text-slate-700">⛺ Çadır (9 AZN/adam)</span>
+                  <span className="font-medium text-slate-700">⛺ Çadır ({cfg.tentRentalPrice} AZN/adam)</span>
                 </label>
                 
                 {needTent && (
@@ -296,7 +310,7 @@ export const PriceCalculator: React.FC<PriceCalculatorProps> = ({ onBack }) => {
                   onChange={(e) => setNeedSleepingBag(e.target.checked)}
                   className="w-5 h-5 rounded text-primary-500 focus:ring-primary-500" 
                 />
-                <span className="font-medium text-slate-700">🛏️ Tulum/Yataq kisəsi (6 AZN/adam)</span>
+                <span className="font-medium text-slate-700">🛏️ Tulum/Yataq kisəsi ({cfg.sleepingBagRentalPrice} AZN/adam)</span>
               </label>
 
               <label className="flex items-center gap-3 cursor-pointer">
@@ -306,7 +320,7 @@ export const PriceCalculator: React.FC<PriceCalculatorProps> = ({ onBack }) => {
                   onChange={(e) => setNeedMat(e.target.checked)}
                   className="w-5 h-5 rounded text-primary-500 focus:ring-primary-500" 
                 />
-                <span className="font-medium text-slate-700">🟫 Mat (2 AZN/adam)</span>
+                <span className="font-medium text-slate-700">🟫 Mat ({cfg.matRentalPrice} AZN/adam)</span>
               </label>
             </div>
           </div>
