@@ -97,7 +97,10 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
     setTourBringItems(Array.isArray(tour.importantInfo?.bring) ? tour.importantInfo!.bring!.join(', ') : '');
     setTourNotAllowedItems(Array.isArray(tour.importantInfo?.notAllowed) ? tour.importantInfo!.notAllowed!.join(', ') : '');
     setTourImage(tour.image || '');
-    setTourImages(tour.images || []);
+    // Legacy tours may have a cover (`image`) that isn't part of the gallery array yet —
+    // fold it in so the cover badge has something to highlight in the unified media grid.
+    const existingGallery = tour.images || [];
+    setTourImages(tour.image && !existingGallery.includes(tour.image) ? [tour.image, ...existingGallery] : existingGallery);
     setTourVideos(tour.videos || []);
     setTourWhatsApp(tour.whatsapp_number || '+994706717804');
     setTourGpxData(tour.gpxData || '');
@@ -261,18 +264,6 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
     }
   };
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setTourImage(reader.result as string);
-        if (onShowNotification) onShowNotification('Şəkil uğurla yükləndi və yadda saxlanıldı! 📸', 'success');
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
   const handleGpsFileUpload = (file: File) => {
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -291,33 +282,42 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
     reader.readAsText(file);
   };
 
-  const handleMultipleImagesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Unified media dropzone: routes each dropped/selected file into the images or videos
+  // gallery based on its MIME type. Replaces the old three separate upload fields
+  // (cover photo / gallery photos / gallery videos).
+  const handleMediaFilesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    if (files && files.length > 0) {
-      const promises = Array.from(files).map((file: File) => new Promise<string>((resolve) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result as string);
-        reader.readAsDataURL(file);
-      }));
-      Promise.all(promises).then(base64s => {
-        setTourImages(prev => [...prev, ...base64s]);
-        if (onShowNotification) onShowNotification(`${base64s.length} şəkil qalerayaya əlavə edildi! 📸`, 'success');
+    if (!files || files.length === 0) return;
+
+    const allFiles: File[] = Array.from(files);
+    const imageFiles = allFiles.filter((f) => f.type.startsWith('image/'));
+    const videoFiles = allFiles.filter((f) => f.type.startsWith('video/'));
+    const readAsDataUrl = (file: File) => new Promise<string>((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.readAsDataURL(file);
+    });
+
+    if (imageFiles.length > 0) {
+      Promise.all(imageFiles.map(readAsDataUrl)).then(base64s => {
+        setTourImages(prev => {
+          const next = [...prev, ...base64s];
+          // First images ever added automatically become the cover photo.
+          if (!tourImage && next.length > 0) setTourImage(next[0]);
+          return next;
+        });
       });
     }
-  };
-
-  const handleMultipleVideosChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (files && files.length > 0) {
-      const promises = Array.from(files).map((file: File) => new Promise<string>((resolve) => {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result as string);
-        reader.readAsDataURL(file);
-      }));
-      Promise.all(promises).then(base64s => {
+    if (videoFiles.length > 0) {
+      Promise.all(videoFiles.map(readAsDataUrl)).then(base64s => {
         setTourVideos(prev => [...prev, ...base64s]);
-        if (onShowNotification) onShowNotification(`${base64s.length} video qalerayaya əlavə edildi! 🎥`, 'success');
       });
+    }
+    if (onShowNotification && (imageFiles.length > 0 || videoFiles.length > 0)) {
+      const parts: string[] = [];
+      if (imageFiles.length > 0) parts.push(`${imageFiles.length} şəkil`);
+      if (videoFiles.length > 0) parts.push(`${videoFiles.length} video`);
+      onShowNotification(`${parts.join(' və ')} qalereyaya əlavə edildi! 📸🎥`, 'success');
     }
   };
 
@@ -721,61 +721,55 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
             />
           </div>
 
-          <div className="md:col-span-2 space-y-2">
-            <label className="block text-[11px] font-bold text-slate-400 tracking-wide">Turun Şəkli (İstənilən şəkli əlavə edin):</label>
-            <div className="relative">
-              <input type="file" accept="image/*" onChange={handleImageChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
-              <div className="w-full px-3 py-2 bg-slate-50 hover:bg-slate-100 border border-dashed border-emerald-350 hover:border-emerald-500 rounded-lg text-xs flex items-center justify-center gap-2 text-emerald-800 font-semibold transition">
-                <Plus className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Fayl Seçin 📁</span>
-              </div>
-            </div>
-            {tourImage && (
-              <div className="relative inline-block mt-2.5 rounded-xl overflow-hidden border border-slate-200 shadow-sm max-h-36 group">
-                <img src={tourImage || undefined} alt="Preview" className="h-28 w-auto object-cover rounded-xl" />
-                <button type="button" onClick={() => setTourImage('')} className="absolute top-1 right-1 bg-red-600 hover:bg-red-700 text-white p-1 rounded-full shadow-md transition">
-                  <X className="w-3 h-3" />
-                </button>
-              </div>
-            )}
-          </div>
-
           <div className="md:col-span-2 space-y-3 pt-3 border-t border-slate-100">
-            <label className="block text-[11px] font-bold text-slate-450 tracking-wide">Qalereya Şəkilləri (Çoxlu şəkil daxil edin):</label>
+            <div className="flex items-center justify-between">
+              <label className="block text-[11px] font-bold text-slate-450 tracking-wide">Media Qalereyası (Şəkil və Video):</label>
+              <span className="text-[9px] text-slate-400 font-semibold">Şəkillərdən birini "Ana səhifə şəkli" et</span>
+            </div>
             <div className="relative">
-              <input type="file" multiple accept="image/*" onChange={handleMultipleImagesChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+              <input type="file" multiple accept="image/*,video/*" onChange={handleMediaFilesChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
               <div className="w-full px-4 py-3 bg-slate-50 hover:bg-slate-100 border border-dashed border-emerald-300 hover:border-emerald-500 rounded-xl text-xs flex items-center justify-center gap-2 text-emerald-800 font-bold transition">
                 <Plus className="w-4 h-4 text-emerald-600" />
-                <span>Cihazdan çoxlu şəkil seçin (Multi-upload) 📁📸</span>
+                <span>Cihazdan şəkil və ya video seçin (Multi-upload) 📁📸🎥</span>
               </div>
             </div>
-            {tourImages.length > 0 && (
-              <div className="flex flex-wrap gap-2 mt-2">
-                {tourImages.map((img, idx) => (
-                  <div key={idx} className="relative rounded-xl overflow-hidden border border-slate-200 shadow-xs h-16 w-24 flex-shrink-0 group">
-                    <img src={img || undefined} alt={`Gallery Preview ${idx}`} className="h-full w-full object-cover rounded-xl" />
-                    <button type="button" onClick={() => setTourImages(prev => prev.filter((_, i) => i !== idx))} className="absolute top-1 right-1 bg-red-600 hover:bg-red-700 text-white p-0.5 rounded-full shadow-xs transition cursor-pointer">
-                      <X className="w-2.5 h-2.5" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
 
-          <div className="md:col-span-2 space-y-3 pt-3 border-t border-slate-100">
-            <label className="block text-[11px] font-bold text-slate-450 tracking-wide">Qalereya Videoları (Videolar daxil edin):</label>
-            <div className="relative">
-              <input type="file" multiple accept="video/*" onChange={handleMultipleVideosChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
-              <div className="w-full px-4 py-3 bg-slate-50 hover:bg-slate-100 border border-dashed border-sky-300 hover:border-sky-500 rounded-xl text-xs flex items-center justify-center gap-2 text-sky-800 font-bold transition">
-                <Plus className="w-4 h-4 text-sky-600" />
-                <span>Cihazdan çoxlu video seçin (Video-upload) 📁🎥</span>
-              </div>
-            </div>
-            {tourVideos.length > 0 && (
+            {(tourImages.length > 0 || tourVideos.length > 0) && (
               <div className="flex flex-wrap gap-2 mt-2">
+                {tourImages.map((img, idx) => {
+                  const isCover = img === tourImage;
+                  return (
+                    <div key={`img-${idx}`} className={`relative rounded-xl overflow-hidden border shadow-xs h-24 w-32 flex-shrink-0 group ${isCover ? 'border-emerald-500 ring-2 ring-emerald-400' : 'border-slate-200'}`}>
+                      <img src={img || undefined} alt={`Gallery Preview ${idx}`} className="h-full w-full object-cover" />
+                      {isCover ? (
+                        <div className="absolute bottom-1 left-1 right-1 bg-emerald-600 text-white text-[8px] font-extrabold px-1.5 py-0.5 rounded flex items-center justify-center gap-1">
+                          <Check className="w-2.5 h-2.5" />
+                          <span>ƏSAS ŞƏKİL</span>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setTourImage(img)}
+                          className="absolute bottom-1 left-1 right-1 bg-slate-900/80 hover:bg-emerald-600 text-white text-[8px] font-bold px-1.5 py-0.5 rounded transition opacity-0 group-hover:opacity-100"
+                        >
+                          Ana səhifə şəkli et
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setTourImages(prev => prev.filter((_, i) => i !== idx));
+                          if (isCover) setTourImage('');
+                        }}
+                        className="absolute top-1 right-1 bg-red-600 hover:bg-red-700 text-white p-0.5 rounded-full shadow-xs transition cursor-pointer z-10"
+                      >
+                        <X className="w-2.5 h-2.5" />
+                      </button>
+                    </div>
+                  );
+                })}
                 {tourVideos.map((vid, idx) => (
-                  <div key={idx} className="relative rounded-xl overflow-hidden border border-slate-200 shadow-xs h-20 w-32 flex-shrink-0 group bg-black">
+                  <div key={`vid-${idx}`} className="relative rounded-xl overflow-hidden border border-slate-200 shadow-xs h-24 w-32 flex-shrink-0 group bg-black">
                     <video src={vid || undefined} className="h-full w-full object-contain" muted playsInline />
                     <div className="absolute bottom-1 left-1 bg-slate-900/80 text-white font-bold text-[8px] px-1.5 py-0.5 rounded flex items-center gap-1">
                       <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-ping" />
@@ -787,6 +781,9 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
                   </div>
                 ))}
               </div>
+            )}
+            {tourImages.length === 0 && tourVideos.length === 0 && (
+              <p className="text-[10px] text-slate-400 italic">Hələ heç bir media əlavə edilməyib.</p>
             )}
           </div>
         </div>
