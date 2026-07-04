@@ -338,7 +338,7 @@ export default function AdminPortal({
             <h4 className="text-lg font-extrabold text-slate-900">{totalPaidBookingsCount} Bilet</h4>
             <p className="text-[10px] text-slate-500">Ödənişi təsdiqlənən bütün biletlər</p>
           </div>
-          <div className="p-2.5 bg-emerald-50 border border-emerald-105 text-emerald-800 rounded-lg">
+          <div className="p-2.5 bg-violet-50 border border-violet-100 text-violet-700 rounded-lg">
             <DollarSign className="w-4 h-4" />
           </div>
         </div>
@@ -350,7 +350,7 @@ export default function AdminPortal({
             <h4 className="text-lg font-extrabold text-slate-900">{totalVolume.toFixed(2)} AZN</h4>
             <p className="text-[10px] text-slate-500">Cəmi satılan bilet dövriyyəsi</p>
           </div>
-          <div className="p-2.5 bg-sky-50 border border-sky-105 text-sky-800 rounded-lg">
+          <div className="p-2.5 bg-emerald-50 border border-emerald-100 text-emerald-800 rounded-lg">
             <TrendingUp className="w-4 h-4" />
           </div>
         </div>
@@ -362,7 +362,7 @@ export default function AdminPortal({
             <h4 className="text-lg font-extrabold text-slate-900">{totalVendors} Operator</h4>
             <p className="text-[10px] text-slate-500">Taksi & Alpinist bələdçiləri</p>
           </div>
-          <div className="p-2.5 bg-amber-50 border border-amber-105 text-amber-800 rounded-lg">
+          <div className="p-2.5 bg-amber-50 border border-amber-100 text-amber-800 rounded-lg">
             <Building className="w-4 h-4" />
           </div>
         </div>
@@ -374,7 +374,7 @@ export default function AdminPortal({
             <h4 className="text-lg font-extrabold text-slate-900">{totalCustomers} Aktiv</h4>
             <p className="text-[10px] text-slate-500 font-semibold text-slate-400">Turları axtaran kəslər</p>
           </div>
-          <div className="p-2.5 bg-blue-50 border border-blue-105 text-blue-800 rounded-lg">
+          <div className="p-2.5 bg-[#eff6ff] border border-[#dbeafe] text-[#1d4ed8] rounded-lg">
             <UserCheck className="w-4 h-4" />
           </div>
         </div>

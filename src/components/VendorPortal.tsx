@@ -169,7 +169,7 @@ export default function VendorPortal({
             <h4 className="text-xl font-extrabold text-slate-900">{myTours.length} Marşrut</h4>
             <p className="text-[10px] text-slate-500">Platformada daxil edilən aktiv turlar</p>
           </div>
-          <div className="p-2.5 bg-slate-50 border border-slate-150 text-slate-700 rounded-lg">
+          <div className="p-2.5 bg-[#eff6ff] border border-[#dbeafe] text-[#1d4ed8] rounded-lg">
             <Briefcase className="w-5 h-5" />
           </div>
         </div>
@@ -193,7 +193,7 @@ export default function VendorPortal({
             <h4 className="text-xl font-extrabold text-primary-700">{myBookings.length} Bilet</h4>
             <p className="text-[10px] text-slate-500">Uğurlu iştirakçı qeydiyyatı</p>
           </div>
-          <div className="p-2.5 bg-sky-50 border border-sky-100 text-sky-700 rounded-lg">
+          <div className="p-2.5 bg-violet-50 border border-violet-100 text-violet-700 rounded-lg">
             <Users className="w-5 h-5" />
           </div>
         </div>
@@ -207,7 +207,7 @@ export default function VendorPortal({
           className={`px-5 py-3 border-b-2 text-xs font-bold transition whitespace-nowrap ${
             activeSubTab === 'my-tours' 
               ? 'border-emerald-700 text-emerald-800' 
-              : 'border-transparent text-slate-400 hover:text-slate-700'
+              : 'border-transparent text-zinc-500 hover:text-zinc-700'
           }`}
         >
           🗄️ Turlarım və Cari Rezervasiyalar
@@ -218,7 +218,7 @@ export default function VendorPortal({
           className={`px-5 py-3 border-b-2 text-xs font-bold transition whitespace-nowrap flex items-center gap-1.5 ${
             activeSubTab === 'crm' 
               ? 'border-emerald-700 text-emerald-800' 
-              : 'border-transparent text-slate-400 hover:text-slate-700'
+              : 'border-transparent text-zinc-500 hover:text-zinc-700'
           }`}
         >
           📊 CRM & İştirakçılar
@@ -234,7 +234,7 @@ export default function VendorPortal({
           className={`px-5 py-3 border-b-2 text-xs font-bold transition whitespace-nowrap ${
             activeSubTab === 'add-tour' && newTourCategory !== 'active'
               ? 'border-emerald-700 text-emerald-800' 
-              : 'border-transparent text-slate-400 hover:text-slate-700'
+              : 'border-transparent text-zinc-500 hover:text-zinc-700'
           }`}
         >
           ➕ Yeni Marşrut Yarat
@@ -248,7 +248,7 @@ export default function VendorPortal({
           className={`px-5 py-3 border-b-2 text-xs font-bold transition whitespace-nowrap flex items-center gap-1 ${
             activeSubTab === 'add-tour' && newTourCategory === 'active'
               ? 'border-emerald-700 text-emerald-800' 
-              : 'border-transparent text-slate-400 hover:text-slate-700'
+              : 'border-transparent text-zinc-500 hover:text-zinc-700'
           }`}
         >
           🏃‍♂️ Aktiv Həyat (İdman) Yarat
@@ -259,7 +259,7 @@ export default function VendorPortal({
           className={`px-5 py-3 border-b-2 text-xs font-bold transition whitespace-nowrap flex items-center gap-1 ${
             activeSubTab === 'add-intl-tour' 
               ? 'border-emerald-700 text-emerald-800' 
-              : 'border-transparent text-slate-400 hover:text-slate-700'
+              : 'border-transparent text-zinc-500 hover:text-zinc-700'
           }`}
         >
           ✈️ <span className="text-emerald-750 font-black animate-pulse">Yeni Xarici Tur Yarat</span>
@@ -270,7 +270,7 @@ export default function VendorPortal({
           className={`px-5 py-3 border-b-2 text-xs font-bold transition whitespace-nowrap ${
             activeSubTab === 'add-slot' 
               ? 'border-emerald-700 text-emerald-800' 
-              : 'border-transparent text-slate-400 hover:text-slate-700'
+              : 'border-transparent text-zinc-500 hover:text-zinc-700'
           }`}
         >
           📅 Cari Tura Təqvim Əlavə Et
@@ -281,7 +281,7 @@ export default function VendorPortal({
           className={`px-5 py-3 border-b-2 text-xs font-bold transition whitespace-nowrap ${
             activeSubTab === 'profile' 
               ? 'border-emerald-700 text-emerald-800' 
-              : 'border-transparent text-slate-400 hover:text-slate-700'
+              : 'border-transparent text-zinc-500 hover:text-zinc-700'
           }`}
         >
           👤 Profil Məlumatları
