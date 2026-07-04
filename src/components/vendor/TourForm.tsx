@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Tour, TourSlot, User, Guide } from '../../types';
 import { parseGpsFile } from '../../utils/gpxParser';
-import { Plus, Sparkles, Instagram, X, Check } from 'lucide-react';
+import { Plus, X, Check } from 'lucide-react';
 import { DynamicStringListInput } from './DynamicStringListInput';
 import { LocationAutocompleteInput } from './LocationAutocompleteInput';
 import { MultiDateCalendar, toIsoDate } from './MultiDateCalendar';
@@ -34,7 +34,7 @@ interface TourFormProps {
 
 // Unified create/edit form for domestic (peak/camp/hiking/active) tours. Same component is
 // used from VendorPortal's "add-tour" tab (tour=null) and from the edit modal (tour set) —
-// only the Danger Zone and Instagram quick-setup panel are mode-specific.
+// only the Danger Zone is mode-specific.
 export function TourForm({ currentUser, tour, slots, category: tourCategory, onCategoryChange: setTourCategory, onAddTour, onEditTour, onDeleteTour, onAddSlot, onDeleteSlot, onShowNotification, onNavigateBack }: TourFormProps) {
   const isEditMode = !!tour;
 
@@ -70,7 +70,6 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
   const [selectedDates, setSelectedDates] = useState<Date[]>([]);
   const [tourGpxData, setTourGpxData] = useState<string>('');
   const [tourGpxFileName, setTourGpxFileName] = useState<string>('');
-  const [tourRating, setTourRating] = useState<number>(5.0);
   const [tourIsActive, setTourIsActive] = useState<boolean>(true);
 
   // Active Lifestyle specifics
@@ -87,11 +86,6 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
   const [tourAllowTeamRegistration, setTourAllowTeamRegistration] = useState<boolean>(true);
   const [tourScheduleFrequency, setTourScheduleFrequency] = useState<string>('one-time');
   const [tourGuideIds, setTourGuideIds] = useState<string[]>([]);
-
-  const [tourCreationMethod, setTourCreationMethod] = useState<'instagram' | 'manual'>('manual');
-  const [instagramCaption, setInstagramCaption] = useState<string>('');
-  const [isParsingInstagram, setIsParsingInstagram] = useState<boolean>(false);
-  const [parsingStep, setParsingStep] = useState<string>('');
 
   const [isSavingForm, setIsSavingForm] = useState(false);
   const [formSubmitError, setFormSubmitError] = useState<string | null>(null);
@@ -154,7 +148,6 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
     setTourWhatsApp(tour.whatsapp_number || currentUser.whatsapp_number || currentUser.phone || '');
     setTourGpxData(tour.gpxData || '');
     setTourGpxFileName(tour.gpxFileName || '');
-    setTourRating(tour.rating !== undefined ? tour.rating : 5.0);
     setTourIsActive(tour.isActive !== false);
     setTourCategory(tour.category as any);
 
@@ -233,7 +226,6 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
       image: tourImage || defaultImg,
       images: tourImages.length > 0 ? tourImages : (tourImage ? [tourImage] : [defaultImg]),
       videos: tourVideos,
-      rating: tourRating,
       whatsapp_number: tourWhatsApp || currentUser.whatsapp_number || currentUser.phone || '',
       gpxData: tourGpxData || undefined,
       gpxFileName: tourGpxFileName || undefined,
@@ -281,7 +273,7 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
           ...sharedFields,
           vendorId: currentUser.id,
           vendorName: currentUser.name,
-          rating: tourRating,
+          rating: 0, // Real average will accumulate from customer reviews once payment verification ships — no more vendor/back-office self-assigned stars
           reviewsCount: 0,
           isApproved: false,
           status: 'pending_approval',
@@ -383,151 +375,8 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
     }
   };
 
-  const handleParseInstagram = async () => {
-    const captionText = instagramCaption.trim();
-    if (!captionText) {
-      if (onShowNotification) onShowNotification('Zəhmət olmasa kopyalanan postun mətnini daxil edin.', 'warning');
-      return;
-    }
-
-    setIsParsingInstagram(true);
-    setParsingStep('📖 Paylaşım mətni Gemini API vasitəsilə təhlil edilir...');
-
-    try {
-      const response = await fetch('/api/parse-caption', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ caption: captionText })
-      });
-      if (!response.ok) throw new Error('API serverindən səhv cavab alındı.');
-      const data = await response.json();
-
-      setParsingStep('⚙️ Çıxarılan məlumatlar form xanalarına doldurulur...');
-
-      setTourName(data.tour_title || '');
-      setTourRegion(data.location || '');
-
-      let parsedCategory: 'hiking' | 'camp' | 'peak' = 'hiking';
-      const combinedText = captionText.toLowerCase();
-      if (combinedText.includes('camp') || combinedText.includes('kamp') || combinedText.includes('çadır') || combinedText.includes('cadir') || combinedText.includes('düşərgə') || combinedText.includes('duserge')) {
-        parsedCategory = 'camp';
-      } else if (combinedText.includes('zirvə') || combinedText.includes('zirve') || combinedText.includes('peak') || combinedText.includes('alpinizm') || combinedText.includes('alpinist')) {
-        parsedCategory = 'peak';
-      }
-      setTourCategory(parsedCategory);
-
-      let mappedDiff: 'easy' | 'medium' | 'hard' | 'extreme' = 'medium';
-      if (data.difficulty === 'Asan' || data.difficulty === 'Asan-Orta') mappedDiff = 'easy';
-      else if (data.difficulty === 'Çətin' || data.difficulty === 'Orta-Çətin') mappedDiff = 'hard';
-      setTourDifficulty(mappedDiff);
-
-      setTourDays(data.duration_days || 1);
-      setTourPrice(data.price || 35);
-      setTourWhatsApp(data.guide_whatsapp || '+994706717804');
-
-      if (data.included_services && data.included_services.length > 0) {
-        setTourIncludes(data.included_services);
-      }
-
-      let finalDesc = captionText;
-      if (data.required_gear && data.required_gear.length > 0) {
-        finalDesc += `\n\n🎒 Lazımi ləvazimatlar:\n- ${data.required_gear.join('\n- ')}`;
-      }
-      if (data.important_note) finalDesc += `\n\n⚠️ Vacib qeyd:\n${data.important_note}`;
-      setTourDescription(finalDesc);
-
-      setIsParsingInstagram(false);
-      setParsingStep('');
-      if (onShowNotification) {
-        onShowNotification('🎉 AI uğurla paylaşım mətnini təhlil etdi! Form xanaları dolduruldu, tarixləri təqvimdən seçməyi unutmayın.', 'success');
-      }
-    } catch (error: any) {
-      console.error('API Error during parsing:', error);
-      setIsParsingInstagram(false);
-      setParsingStep('');
-      if (onShowNotification) onShowNotification('Xəta: Paylaşımın mətni analiz edilə bilmədi.', 'error');
-    }
-  };
-
   return (
     <div className="space-y-5">
-      {!isEditMode && (
-        <>
-          {/* Method Selector Tabs */}
-          <div className="bg-slate-50 p-1.5 rounded-xl border border-slate-200 flex gap-2">
-            <button
-              type="button"
-              onClick={() => setTourCreationMethod('instagram')}
-              className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-lg font-extrabold text-xs transition-all cursor-pointer ${
-                tourCreationMethod === 'instagram' ? 'bg-slate-900 text-white shadow-md' : 'bg-transparent text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <Sparkles className="w-4 h-4 text-amber-400 animate-pulse fill-amber-400" />
-              <span>Instagram Mətni ilə Sürətli Quraşdırma</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setTourCreationMethod('manual')}
-              className={`flex-1 flex items-center justify-center gap-2 py-3 px-4 rounded-lg font-extrabold text-xs transition-all cursor-pointer ${
-                tourCreationMethod === 'manual' ? 'bg-slate-900 text-white shadow-md' : 'bg-transparent text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <Plus className="w-4 h-4" />
-              <span>Sıfırdan Əl ilə Yerləşdirmək</span>
-            </button>
-          </div>
-
-          {tourCreationMethod === 'instagram' && (
-            <div className="bg-emerald-50/50 border border-emerald-150/80 p-5 rounded-2xl md:p-6 space-y-4">
-              <div className="flex items-center gap-2">
-                <div className="p-2 bg-pink-100 rounded-lg text-pink-600">
-                  <Instagram className="w-5 h-5 text-pink-600" />
-                </div>
-                <div>
-                  <h4 className="text-xs font-extrabold text-emerald-800 tracking-wide">Instagram AI ilə Avto-Doldurma Sistemi</h4>
-                  <p className="text-[11px] text-slate-500">Postunuzun mətnini kopyalayıb aşağıya yapışdırın — sistem qiyməti, çətinliyi, bələdçi nömrəsini və regionu təhlil edəcək.</p>
-                </div>
-              </div>
-              <div className="space-y-3">
-                <textarea
-                  rows={6}
-                  value={instagramCaption}
-                  onChange={(e) => setInstagramCaption(e.target.value)}
-                  placeholder="Instagram postunun mətnini bura yapışdırın..."
-                  className="w-full p-3 bg-white border border-slate-250 rounded-xl text-xs placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-emerald-500 font-sans"
-                />
-                <div className="flex justify-end pt-1">
-                  <button
-                    type="button"
-                    onClick={handleParseInstagram}
-                    disabled={isParsingInstagram}
-                    className="w-full sm:w-auto px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl shadow-md transition-all flex items-center gap-2 justify-center cursor-pointer disabled:opacity-50"
-                  >
-                    {isParsingInstagram ? (
-                      <>
-                        <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                        <span>Analiz edilir...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Sparkles className="w-3.5 h-3.5 text-white fill-current animate-bounce" />
-                        <span>Mətni Analiz Et və Avto-Doldur ✨</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-              {isParsingInstagram && (
-                <div className="bg-white/95 border border-slate-100 rounded-xl p-3.5 shadow-xs flex items-center gap-3">
-                  <div className="w-6 h-6 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
-                  <span className="text-xs font-bold text-slate-700 font-mono animate-pulse">{parsingStep}</span>
-                </div>
-              )}
-            </div>
-          )}
-        </>
-      )}
-
       <form onSubmit={handleTourSubmit} className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-5">
         <div>
           <span className="text-[10px] tracking-widest text-slate-400 font-bold block mb-1">
@@ -800,19 +649,6 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
                 })}
               </div>
             )}
-          </div>
-
-          <div>
-            <label className="block text-[11px] font-bold text-emerald-800 tracking-wide mb-1">Back-office Reytinq Təyini (1-5 Ulduz):</label>
-            <select value={tourRating} onChange={(e) => setTourRating(Number(e.target.value))} className="w-full px-3 py-2 bg-emerald-50/80 border border-emerald-205 rounded-lg text-xs font-bold text-slate-800 cursor-pointer">
-              <option value="5">⭐⭐⭐⭐⭐ 5.0 (Tövsiyə olunan / Sponsorlu)</option>
-              <option value="4.8">⭐⭐⭐⭐⭐ 4.8 (Əla satışlı)</option>
-              <option value="4.5">⭐⭐⭐⭐☆ 4.5 (Çox yaxşı)</option>
-              <option value="4">⭐⭐⭐⭐☆ 4.0 (Yaxşı)</option>
-              <option value="3">⭐⭐⭐☆☆ 3.0 (Orta)</option>
-              <option value="2">⭐⭐☆☆☆ 2.0 (Zəif)</option>
-            </select>
-
           </div>
 
           {/* GPX Track Uploader */}
