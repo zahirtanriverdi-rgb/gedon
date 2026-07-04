@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Tour, TourSlot } from '../../types';
-import { Calendar, Edit, Search } from 'lucide-react';
+import { Calendar, Edit, Search, Star } from 'lucide-react';
+import { computeFeaturedTourIds } from '../../utils/featuredTours';
 
 interface MyToursTabProps {
   tours: Tour[];
@@ -13,10 +14,23 @@ interface MyToursTabProps {
   onUpdateExchangeRates: (newRates: { USD: number; EUR: number }) => void;
   onShowNotification?: (message: string, type?: 'success' | 'info' | 'error' | 'warning') => void;
   onEditClick: (tour: Tour) => void;
+  onToggleFeatured?: (tourId: string, isManuallyFeatured: boolean) => Promise<void>;
 }
 
-export function MyToursTab({ tours, slots, myTours, myTourIds, tourSearchTerm, onTourSearchChange, exchangeRates, onUpdateExchangeRates, onShowNotification, onEditClick }: MyToursTabProps) {
+export function MyToursTab({ tours, slots, myTours, myTourIds, tourSearchTerm, onTourSearchChange, exchangeRates, onUpdateExchangeRates, onShowNotification, onEditClick, onToggleFeatured }: MyToursTabProps) {
   const [cbarLoading, setCbarLoading] = useState<boolean>(false);
+  const [togglingFeaturedId, setTogglingFeaturedId] = useState<string | null>(null);
+  const featuredTourIds = React.useMemo(() => computeFeaturedTourIds(tours, slots), [tours, slots]);
+
+  const handleFeaturedClick = async (tour: Tour) => {
+    if (!onToggleFeatured) return;
+    setTogglingFeaturedId(tour.id);
+    try {
+      await onToggleFeatured(tour.id, !tour.isManuallyFeatured);
+    } finally {
+      setTogglingFeaturedId(null);
+    }
+  };
 
   // exchangeRates is owned by the parent (plain numbers), so the input can't just bind
   // straight to it — clearing the field would send Number('') === 0 straight back in and
@@ -102,7 +116,14 @@ export function MyToursTab({ tours, slots, myTours, myTourIds, tourSearchTerm, o
                       referrerPolicy="no-referrer"
                     />
                     <div className="flex-1 space-y-1">
-                      <h4 className="font-bold text-slate-900 text-xs leading-tight">{tour.name}</h4>
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <h4 className="font-bold text-slate-900 text-xs leading-tight">{tour.name}</h4>
+                        {featuredTourIds.has(tour.id) && (
+                          <span className="inline-flex items-center gap-1 text-[9px] bg-amber-100 text-amber-800 border border-amber-200 font-extrabold px-1.5 py-0.5 rounded-full">
+                            🔥 Ayın Ən Çox Satılanı{tour.isManuallyFeatured ? ' (Seçilmiş)' : ''}
+                          </span>
+                        )}
+                      </div>
                       <div className="flex items-center gap-2 text-[10px] text-slate-400">
                         <span>📍 {tour.region}</span>
                         <span>•</span>
@@ -151,6 +172,21 @@ export function MyToursTab({ tours, slots, myTours, myTourIds, tourSearchTerm, o
                         <Edit className="w-2.5 h-2.5" />
                         <span>Düzəliş et</span>
                       </button>
+                      {onToggleFeatured && (
+                        <button
+                          type="button"
+                          onClick={() => handleFeaturedClick(tour)}
+                          disabled={togglingFeaturedId === tour.id}
+                          className={`flex items-center gap-1 py-1 px-2.5 font-extrabold text-[10px] rounded-md transition-all cursor-pointer shadow-xs disabled:opacity-50 ${
+                            tour.isManuallyFeatured
+                              ? 'bg-amber-100 hover:bg-amber-200 text-amber-800 border border-amber-300'
+                              : 'bg-white hover:bg-slate-50 text-slate-600 border border-slate-200'
+                          }`}
+                        >
+                          <Star className="w-2.5 h-2.5" />
+                          <span>{tour.isManuallyFeatured ? 'Seçimi ləğv et' : 'Seçilmiş et'}</span>
+                        </button>
+                      )}
                     </div>
                   </div>
                 );

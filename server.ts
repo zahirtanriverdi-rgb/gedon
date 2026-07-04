@@ -715,6 +715,57 @@ app.put("/api/tours/:id", authenticateUser, async (req: any, res) => {
   }
 });
 
+// PUT /api/tours/:id/featured — dedicated toggle for the "Ayın Ən Çox Satılanı" manual
+// override. Deliberately bypasses the whole approve/pending-approval dance above: flipping
+// this flag must never resubmit the tour for review or hide it from customers, so it writes
+// straight to `extra_data` on the live row instead of going through writeLiveTourRow/PUT
+// /api/tours/:id's pending_data logic. Only one tour per vendor may be manually featured at a
+// time — turning it on for a tour automatically turns it off on any other tour of the same
+// vendor that currently has it (the previous pick just silently drops out).
+app.put("/api/tours/:id/featured", authenticateUser, async (req: any, res) => {
+  try {
+    const rows = await dbClient.query('SELECT * FROM tours WHERE id = ?', [req.params.id]);
+    if (!rows.length) return res.status(404).json({ error: "Tur tapılmadı." });
+    const existingRow = rows[0];
+    const isAdmin = req.operator.role === 'admin';
+    if (!isAdmin && existingRow.vendor_id !== req.operator.id) {
+      return res.status(403).json({ error: "Bu tur sizin hesabınıza aid deyil." });
+    }
+
+    const isManuallyFeatured = !!(req.body || {}).isManuallyFeatured;
+    let extra: Record<string, any> = {};
+    try { extra = existingRow.extra_data ? JSON.parse(existingRow.extra_data) : {}; } catch { extra = {}; }
+
+    if (isManuallyFeatured) {
+      const siblingRows = await dbClient.query(
+        `SELECT id, extra_data FROM tours WHERE vendor_id = ? AND id != ?`,
+        [existingRow.vendor_id, req.params.id]
+      );
+      for (const sib of siblingRows) {
+        let sibExtra: Record<string, any> = {};
+        try { sibExtra = sib.extra_data ? JSON.parse(sib.extra_data) : {}; } catch { sibExtra = {}; }
+        if (sibExtra.isManuallyFeatured) {
+          delete sibExtra.isManuallyFeatured;
+          delete sibExtra.manuallyFeaturedAt;
+          await dbClient.execute(`UPDATE tours SET extra_data = ? WHERE id = ?`, [JSON.stringify(sibExtra), sib.id]);
+        }
+      }
+      extra.isManuallyFeatured = true;
+      extra.manuallyFeaturedAt = new Date().toISOString();
+    } else {
+      delete extra.isManuallyFeatured;
+      delete extra.manuallyFeaturedAt;
+    }
+
+    await dbClient.execute(`UPDATE tours SET extra_data = ? WHERE id = ?`, [JSON.stringify(extra), req.params.id]);
+    const updatedRows = await dbClient.query('SELECT * FROM tours WHERE id = ?', [req.params.id]);
+    return res.json({ tour: rowToTour(updatedRows[0]) });
+  } catch (error: any) {
+    console.error("[PUT /api/tours/:id/featured] error:", error);
+    return res.status(500).json({ error: "Seçim yenilənə bilmədi: " + error.message });
+  }
+});
+
 // DELETE /api/tours/:id — vendors may only delete their own tours; admins may delete any.
 app.delete("/api/tours/:id", authenticateUser, async (req: any, res) => {
   try {

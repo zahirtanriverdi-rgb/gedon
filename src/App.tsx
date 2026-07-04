@@ -391,6 +391,35 @@ export default function App() {
     }
   };
 
+  const handleToggleFeatured = async (tourId: string, isManuallyFeatured: boolean) => {
+    try {
+      const response = await fetch(`/api/tours/${tourId}/featured`, {
+        method: 'PUT',
+        headers: authHeaders(),
+        body: JSON.stringify({ isManuallyFeatured }),
+      });
+      const data = await parseApiResponse(response);
+      if (!response.ok) throw new Error(data.error || 'Seçim yenilənə bilmədi.');
+
+      const updatedTour: Tour = data.tour;
+      setTours(prev => prev.map(t => {
+        if (t.id === updatedTour.id) return updatedTour;
+        // Mirror the backend's "only one manually-featured tour per vendor" rule locally too,
+        // so the previous pick's badge disappears immediately without a second round-trip.
+        if (isManuallyFeatured && t.vendorId === updatedTour.vendorId && t.isManuallyFeatured) {
+          return { ...t, isManuallyFeatured: false, manuallyFeaturedAt: undefined };
+        }
+        return t;
+      }));
+      showNotification(
+        isManuallyFeatured ? '⭐ Tur "Ayın Ən Çox Satılanı" olaraq seçildi!' : 'Seçim ləğv edildi, sistem yenidən avtomatik hesablayacaq.',
+        'success'
+      );
+    } catch (e: any) {
+      showNotification(e.message || 'Seçim yenilənərkən xəta baş verdi.', 'error');
+    }
+  };
+
   const handleUpdateUser = async (userId: string, data: Partial<User>) => {
     try {
       const response = await fetch(`/api/users/${userId}`, {
@@ -846,6 +875,7 @@ export default function App() {
                 onUpdateSlotBookedCount={handleUpdateSlotBookedCount}
                 exchangeRates={exchangeRates}
                 onUpdateExchangeRates={handleUpdateExchangeRates}
+                onToggleFeatured={handleToggleFeatured}
               />
             )}
 

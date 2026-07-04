@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Tour, TourSlot, Booking, Review, User } from '../../types';
 import { REVIEWS_ENABLED } from '../../config/features';
+import { computeFeaturedTourIds } from '../../utils/featuredTours';
 import {
   Calendar,
   Check,
@@ -88,6 +89,7 @@ export function TourDetailPage({
   const [showParticipantsDropdown, setShowParticipantsDropdown] = useState<boolean>(false);
   const [showDateDropdown, setShowDateDropdown] = useState<boolean>(false);
   const [showTourSlots, setShowTourSlots] = useState<boolean>(false);
+  const isFeaturedThisMonth = React.useMemo(() => computeFeaturedTourIds(tours, slots).has(selectedTour.id), [tours, slots, selectedTour.id]);
 
   // Keep participant count within the capacity of whichever slot is currently selected,
   // so the sticky sidebar and the booking form below always agree on the same numbers.
@@ -395,7 +397,9 @@ export function TourDetailPage({
               </h1>
               <div className="flex flex-wrap items-center justify-between gap-4 mt-2">
                 <div className="flex items-center gap-4">
-                  <div className="bg-amber-100 text-amber-900 border border-amber-200 text-xs font-bold px-2 py-1 rounded shadow-sm shrink-0">Ən çox satılan</div>
+                  {isFeaturedThisMonth && (
+                    <div className="bg-amber-500 text-white border border-amber-600 text-xs font-extrabold px-2 py-1 rounded shadow-sm shrink-0">🔥 Ayın Ən Çox Satılanı</div>
+                  )}
                   {REVIEWS_ENABLED && (
                     <div className="flex items-center gap-1 font-bold text-label-primary text-sm shrink-0">
                       <Star className="w-4 h-4 fill-amber-500 text-amber-500" />

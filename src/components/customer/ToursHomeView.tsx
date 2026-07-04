@@ -18,6 +18,7 @@ import {
 import { SearchDropdown } from '../SearchDropdown';
 import { TourWeatherForecast } from '../TourWeatherForecast';
 import { ReviewSubmissionPanel } from './ReviewSubmissionPanel';
+import { computeFeaturedTourIds } from '../../utils/featuredTours';
 
 type ConvertedPriceInfo = {
   azn: number;
@@ -143,6 +144,7 @@ export function ToursHomeView({
   onSelectTour,
   setActiveView
 }: ToursHomeViewProps) {
+  const featuredTourIds = React.useMemo(() => computeFeaturedTourIds(tours, slots), [tours, slots]);
   return (
         <div className="space-y-4">
 
@@ -665,6 +667,11 @@ export function ToursHomeView({
                     referrerPolicy="no-referrer"
                   />
                   <div className="absolute top-3 left-3 flex gap-1.5 flex-wrap">
+                    {featuredTourIds.has(tour.id) && (
+                      <span className="text-[10px] font-extrabold tracking-tight px-2 py-0.5 rounded-md shadow-xs bg-amber-500 text-white">
+                        🔥 Ayın Ən Çox Satılanı
+                      </span>
+                    )}
                     <span className={`text-[10px] font-bold tracking-tight px-2 py-0.5 rounded-md shadow-xs ${tour.isInternational ? 'bg-accent-orange-100 text-accent-orange-800' : 'bg-slate-900/90 text-white'}`}>
                       {badges[tour.category]?.emoji || '✈️'} {badges[tour.category]?.label || 'Xarici'}
                     </span>
