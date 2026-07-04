@@ -146,7 +146,11 @@ export function ToursHomeView({
 }: ToursHomeViewProps) {
   const featuredTourIds = React.useMemo(() => computeFeaturedTourIds(tours, slots), [tours, slots]);
   return (
-        <div className="space-y-4">
+        // -mx-5 cancels the parent <main>'s fixed px-5 (20px) so this container can
+        // reapply the same 20px on mobile/tablet but widen to 96px at >=1440px,
+        // matching GetYourGuide's wide-screen side margins without touching the
+        // shared App.tsx <main> (which Vendor/Admin also render inside).
+        <div className="space-y-4 -mx-5 px-5 min-[1440px]:px-24">
 
           {/* Search & Filters (Clean Minimalism Style) */}
           {/* z-30 (not z-10): this wrapper's z-index caps the stacking context for the
