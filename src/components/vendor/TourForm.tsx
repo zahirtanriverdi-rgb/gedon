@@ -52,6 +52,9 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
   const [tourHighlights, setTourHighlights] = useState<string>('');
   const [tourLanguages, setTourLanguages] = useState<string>('Azərbaycanca');
   const [tourDurationHours, setTourDurationHours] = useState<number | ''>(8);
+  const [tourDepartureDateTime, setTourDepartureDateTime] = useState<string>('');
+  const [tourReturnDateTime, setTourReturnDateTime] = useState<string>('');
+  const [dateTimeError, setDateTimeError] = useState<string | null>(null);
   const [tourBringItems, setTourBringItems] = useState<string[]>([]);
   const [tourNotAllowedItems, setTourNotAllowedItems] = useState<string[]>([]);
   const [tourImage, setTourImage] = useState<string>('');
@@ -101,7 +104,26 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Populate every field from the tour prop in edit mode.
+  // Auto-calculate the trip's total duration (in hours) from departure/return date-time —
+  // the field is derived, not hand-typed, so it can't drift out of sync with the actual dates.
+  useEffect(() => {
+    if (!tourDepartureDateTime || !tourReturnDateTime) {
+      setDateTimeError(null);
+      return;
+    }
+    const departure = new Date(tourDepartureDateTime).getTime();
+    const returnTime = new Date(tourReturnDateTime).getTime();
+    if (isNaN(departure) || isNaN(returnTime)) return;
+    if (returnTime <= departure) {
+      setDateTimeError('Dönüş tarixi çıxış tarixindən sonra olmalıdır.');
+      return;
+    }
+    setDateTimeError(null);
+    const diffHours = Math.round(((returnTime - departure) / (1000 * 60 * 60)) * 10) / 10;
+    setTourDurationHours(diffHours);
+  }, [tourDepartureDateTime, tourReturnDateTime]);
+
+
   useEffect(() => {
     if (!tour) return;
     setTourName(tour.name);
@@ -114,6 +136,8 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
     setTourHighlights(Array.isArray(tour.highlights) ? tour.highlights.join(', ') : '');
     setTourLanguages(Array.isArray(tour.languages) ? tour.languages.join(', ') : '');
     setTourDurationHours(tour.durationHours || (tour.durationDays ? tour.durationDays * 8 : 8));
+    setTourDepartureDateTime(tour.departureDateTime || '');
+    setTourReturnDateTime(tour.returnDateTime || '');
     setTourBringItems(Array.isArray(tour.importantInfo?.bring) ? tour.importantInfo!.bring! : []);
     setTourNotAllowedItems(Array.isArray(tour.importantInfo?.notAllowed) ? tour.importantInfo!.notAllowed! : []);
     setTourImage(tour.image || '');
@@ -151,6 +175,11 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
 
   const handleTourSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (dateTimeError) {
+      if (onShowNotification) onShowNotification(dateTimeError, 'error');
+      else alert(dateTimeError);
+      return;
+    }
     if (currentStep !== 3) {
       goToNextStep();
       return;
@@ -185,6 +214,8 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
       region: tourRegion,
       durationDays: Number(tourDays),
       durationHours: tourDurationHours ? Number(tourDurationHours) : undefined,
+      departureDateTime: tourDepartureDateTime || undefined,
+      returnDateTime: tourReturnDateTime || undefined,
       includes: cleanIncludes.length > 0 ? cleanIncludes : ['Müşayiət bələdçisi'],
       notIncluded: cleanNotIncluded.length > 0 ? cleanNotIncluded : undefined,
       highlights: cleanHighlights.length > 0 ? cleanHighlights : undefined,
@@ -698,8 +729,41 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
           </div>
 
           <div>
-            <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">Tam müddət (saat):</label>
-            <input type="number" min={1} value={tourDurationHours} onChange={handleNumberInput(setTourDurationHours)} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800" />
+            <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">Çıxış tarixi və saatı:</label>
+            <input
+              type="datetime-local"
+              value={tourDepartureDateTime}
+              onChange={(e) => setTourDepartureDateTime(e.target.value)}
+              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800"
+            />
+          </div>
+          <div>
+            <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">Bakıya dönüş tarixi və saatı:</label>
+            <input
+              type="datetime-local"
+              value={tourReturnDateTime}
+              onChange={(e) => setTourReturnDateTime(e.target.value)}
+              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800"
+            />
+          </div>
+          {dateTimeError && (
+            <div className="md:col-span-2 text-[11px] font-semibold text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">⚠️ {dateTimeError}</div>
+          )}
+
+          <div>
+            <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">
+              Tam müddət (saat){tourDepartureDateTime && tourReturnDateTime ? ' — avtomatik hesablanır' : ''}:
+            </label>
+            <input
+              type="number"
+              min={1}
+              value={tourDurationHours}
+              onChange={handleNumberInput(setTourDurationHours)}
+              readOnly={!!(tourDepartureDateTime && tourReturnDateTime)}
+              className={`w-full px-3 py-2 border rounded-lg text-xs ${
+                tourDepartureDateTime && tourReturnDateTime ? 'bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed' : 'bg-slate-50 border-slate-200 text-slate-800'
+              }`}
+            />
           </div>
 
           <div>
@@ -712,6 +776,7 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
               <option value="3">⭐⭐⭐☆☆ 3.0 (Orta)</option>
               <option value="2">⭐⭐☆☆☆ 2.0 (Zəif)</option>
             </select>
+
           </div>
 
           {/* GPX Track Uploader */}

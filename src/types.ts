@@ -49,6 +49,8 @@ export interface Tour {
   region: string;
   durationDays: number;
   durationHours?: number;
+  departureDateTime?: string; // ISO datetime string — trip's departure date & time
+  returnDateTime?: string; // ISO datetime string — trip's return-to-Baku date & time; durationHours is derived from (returnDateTime - departureDateTime) when both are set
   includes: string[];
   highlights?: string[];
   languages?: string[];
