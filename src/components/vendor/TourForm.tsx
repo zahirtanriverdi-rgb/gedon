@@ -7,9 +7,9 @@ import { MultiDateCalendar, toIsoDate } from './MultiDateCalendar';
 import { TourDangerZone } from './TourDangerZone';
 
 const FORM_STEPS = [
-  { number: 1 as const, label: 'General Details' },
-  { number: 2 as const, label: 'Event Details' },
-  { number: 3 as const, label: 'Pricing and Submit' },
+  { number: 1 as const, label: 'Əsas Məlumatlar' },
+  { number: 2 as const, label: 'Logistika və Proqram' },
+  { number: 3 as const, label: 'Qiymət və Qaydalar' },
 ];
 
 interface TourFormProps {
@@ -476,6 +476,34 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
           </h3>
         </div>
 
+        {/* Step indicator */}
+        <div className="flex items-center justify-center gap-1.5 sm:gap-3 py-1">
+          {FORM_STEPS.map((step, idx) => (
+            <React.Fragment key={step.number}>
+              <div className="flex items-center gap-2">
+                <div
+                  className={`w-7 h-7 flex-shrink-0 rounded-full border-2 flex items-center justify-center text-[11px] font-extrabold transition-colors ${
+                    currentStep === step.number
+                      ? 'border-emerald-600 text-emerald-700 bg-emerald-50'
+                      : currentStep > step.number
+                      ? 'border-emerald-600 bg-emerald-600 text-white'
+                      : 'border-slate-300 text-slate-400'
+                  }`}
+                >
+                  {currentStep > step.number ? <Check className="w-3.5 h-3.5" /> : step.number}
+                </div>
+                <span className={`hidden sm:inline text-[11px] font-bold whitespace-nowrap ${currentStep === step.number ? 'text-emerald-700' : 'text-slate-400'}`}>
+                  {step.label}
+                </span>
+              </div>
+              {idx < FORM_STEPS.length - 1 && (
+                <div className={`w-6 sm:w-14 h-0.5 rounded-full transition-colors ${currentStep > step.number ? 'bg-emerald-600' : 'bg-slate-200'}`} />
+              )}
+            </React.Fragment>
+          ))}
+        </div>
+
+        {currentStep === 1 && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">Turun Başlığı:</label>
@@ -544,6 +572,11 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
             />
           </div>
 
+          <div>
+            <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">Danışılan dillər (Vergüllə ayırın):</label>
+            <input type="text" value={tourLanguages} onChange={(e) => setTourLanguages(e.target.value)} placeholder="Azərbaycanca, Rusca, İngiliscə" className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800" />
+          </div>
+
           {tourCategory === 'active' && (
             <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4 bg-amber-50/50 p-4 rounded-xl border border-amber-200 shadow-xs">
               <div className="md:col-span-2 pb-2 mb-2 border-b border-amber-200">
@@ -599,8 +632,37 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
           )}
 
           <div>
+            <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">Özünüzlə gətirin (Vergüllə ayırın):</label>
+            <input type="text" value={tourBringItems} onChange={(e) => setTourBringItems(e.target.value)} placeholder="Rahat ayaqqabı, Pasport" className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800" />
+          </div>
+          <div>
+            <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">İcazə verilmir (Vergüllə ayırın):</label>
+            <input type="text" value={tourNotAllowedItems} onChange={(e) => setTourNotAllowedItems(e.target.value)} placeholder="Böyük çamadanlar" className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800" />
+          </div>
+        </div>
+        )}
+
+        {currentStep === 2 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="md:col-span-2">
+            <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">Görüş Yeri (Mətn olaraq):</label>
+            <input
+              type="text"
+              value={tourMeetingPoint}
+              onChange={(e) => setTourMeetingPoint(e.target.value)}
+              placeholder="Məsələn: Tofiq Bəhramov adına Respublika Stadionunun qarşısı..."
+              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800"
+            />
+          </div>
+
+          <div>
             <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">WhatsApp Bələdçi Nömrəsi:</label>
             <input type="tel" required value={tourWhatsApp} onChange={(e) => setTourWhatsApp(e.target.value)} placeholder="+994706717804" className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 font-bold" />
+          </div>
+
+          <div>
+            <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">Tam müddət (saat):</label>
+            <input type="number" min={1} value={tourDurationHours} onChange={(e) => setTourDurationHours(Number(e.target.value))} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800" />
           </div>
 
           <div>
@@ -615,41 +677,48 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
             </select>
           </div>
 
-          <div className="md:col-span-2">
-            <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">Görüş Yeri (Mətn olaraq):</label>
-            <input
-              type="text"
-              value={tourMeetingPoint}
-              onChange={(e) => setTourMeetingPoint(e.target.value)}
-              placeholder="Məsələn: Tofiq Bəhramov adına Respublika Stadionunun qarşısı..."
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800"
-            />
-          </div>
-
-          {/* Multi-date calendar + price */}
-          <div className="md:col-span-2 bg-primary-50/60 p-4 rounded-xl border border-emerald-100 space-y-3">
-            <h4 className="text-[10px] font-extrabold text-emerald-800 tracking-widest">📅 Aktiv Olacağı Günlər və Bilet Qiyməti</h4>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:max-w-md">
-              <div>
-                <label className="block text-[11px] font-bold text-slate-500 tracking-wide mb-1">Qiymət (AZN):</label>
-                <input type="number" min="1" required value={tourPrice} onChange={(e) => setTourPrice(Number(e.target.value))} className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-800" />
-              </div>
-              <div>
-                <label className="block text-[11px] font-bold text-rose-600 tracking-wide mb-1">Endirimli Qiymət (opsional):</label>
-                <input type="number" min="0" placeholder="Məs: 25" value={tourDiscountPrice} onChange={(e) => setTourDiscountPrice(e.target.value)} className="w-full px-3 py-2 bg-white border border-rose-200 rounded-lg text-xs font-bold text-rose-700 placeholder-rose-300" />
-              </div>
+          {/* GPX Track Uploader */}
+          <div className="md:col-span-2 bg-slate-50 border border-slate-200 p-4 rounded-xl space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="block text-[11px] font-extrabold text-slate-400 tracking-wide">GPS Marşrut Faylı (GPX və ya KML)</label>
+              <span className="text-[9px] font-extrabold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded">3D XƏRİTƏ VİZUALİZASİYASI ⛰️</span>
             </div>
-            <MultiDateCalendar selectedDates={selectedDates} onChange={setSelectedDates} />
-            {tourCategory === 'active' && (
-              <div>
-                <label className="block text-[11px] font-bold text-emerald-700 tracking-wide mb-1">Tədbirin Planlaması:</label>
-                <select value={tourScheduleFrequency} onChange={(e) => setTourScheduleFrequency(e.target.value)} className="w-full sm:w-64 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-lg text-xs font-semibold text-emerald-800">
-                  <option value="one-time">Bir dəfəlik (Göstərilən tarixlərdə)</option>
-                  <option value="daily">Hər gün (Mütəmadi)</option>
-                  <option value="every-weekend">Hər həftəsonu (Şənbə və Bazar)</option>
-                </select>
+            {!tourGpxFileName ? (
+              <div className="border border-dashed border-slate-350 rounded-lg p-4 flex flex-col items-center justify-center bg-white hover:bg-slate-50 transition cursor-pointer relative group">
+                <input
+                  type="file"
+                  accept=".gpx,.kml"
+                  onChange={(e) => { const file = e.target.files?.[0]; if (file) handleGpsFileUpload(file); }}
+                  className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                />
+                <div className="text-center space-y-1">
+                  <p className="text-xs font-bold text-slate-700 group-hover:text-indigo-600 transition">Bura klikləyin və ya GPX / KML faylını dartın</p>
+                  <p className="text-[10px] text-slate-400">Operator GPX trek faylı yüklədikdə müştərilərə 3D hündürlük və real trek xəritəsi göstərilir</p>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-indigo-50 border border-indigo-100 p-3 rounded-lg flex flex-col space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="p-1 px-1.5 text-[10px] font-bold text-white bg-indigo-600 rounded animate-pulse">GPS</span>
+                    <span className="text-xs font-bold text-indigo-950 truncate max-w-[200px]" title={tourGpxFileName}>{tourGpxFileName}</span>
+                  </div>
+                  <button type="button" onClick={() => { setTourGpxData(''); setTourGpxFileName(''); }} className="text-[10px] font-black text-red-600 hover:text-red-700 tracking-wide cursor-pointer transition">Sil ✕</button>
+                </div>
               </div>
             )}
+          </div>
+
+          <div className="md:col-span-2">
+            <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">Əhatəli marşrut planı və açıqlama:</label>
+            <textarea
+              required
+              rows={4}
+              value={tourDescription}
+              onChange={(e) => setTourDescription(e.target.value)}
+              placeholder="Tur iştirakçılarını hansı inanılmaz fəaliyyətlər gözləyir?"
+              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-700"
+            />
           </div>
 
           <div className="md:col-span-2 space-y-2">
@@ -721,91 +790,55 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
             )}
           </div>
         </div>
+        )}
 
-        <DynamicStringListInput
-          label="Qiymətə daxildir:"
-          items={tourIncludes}
-          onChange={setTourIncludes}
-          placeholder="Məs: Səhər yeməyi, Giriş bileti, Professional Bələdçi"
-        />
-        <DynamicStringListInput
-          label="Qiymətə daxil deyil:"
-          items={tourNotIncluded}
-          onChange={setTourNotIncluded}
-          placeholder="Məs: Şəxsi xərclər, Nahar"
-          accent="red"
-        />
-
-        <div>
-          <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">Önə çıxanlar (Vergüllə ayırın):</label>
-          <input type="text" value={tourHighlights} onChange={(e) => setTourHighlights(e.target.value)} placeholder="Məs: Panoram mənzərəli marşrut" className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800" />
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">Danışılan dillər (Vergüllə ayırın):</label>
-            <input type="text" value={tourLanguages} onChange={(e) => setTourLanguages(e.target.value)} placeholder="Azərbaycanca, Rusca, İngiliscə" className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800" />
-          </div>
-          <div>
-            <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">Tam müddət (saat):</label>
-            <input type="number" min={1} value={tourDurationHours} onChange={(e) => setTourDurationHours(Number(e.target.value))} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800" />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">Özünüzlə gətirin (Vergüllə ayırın):</label>
-            <input type="text" value={tourBringItems} onChange={(e) => setTourBringItems(e.target.value)} placeholder="Rahat ayaqqabı, Pasport" className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800" />
-          </div>
-          <div>
-            <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">İcazə verilmir (Vergüllə ayırın):</label>
-            <input type="text" value={tourNotAllowedItems} onChange={(e) => setTourNotAllowedItems(e.target.value)} placeholder="Böyük çamadanlar" className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800" />
-          </div>
-        </div>
-
-        {/* GPX Track Uploader */}
-        <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl space-y-3">
-          <div className="flex items-center justify-between">
-            <label className="block text-[11px] font-extrabold text-slate-400 tracking-wide">GPS Marşrut Faylı (GPX və ya KML)</label>
-            <span className="text-[9px] font-extrabold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded">3D XƏRİTƏ VİZUALİZASİYASI ⛰️</span>
-          </div>
-          {!tourGpxFileName ? (
-            <div className="border border-dashed border-slate-350 rounded-lg p-4 flex flex-col items-center justify-center bg-white hover:bg-slate-50 transition cursor-pointer relative group">
-              <input
-                type="file"
-                accept=".gpx,.kml"
-                onChange={(e) => { const file = e.target.files?.[0]; if (file) handleGpsFileUpload(file); }}
-                className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-              />
-              <div className="text-center space-y-1">
-                <p className="text-xs font-bold text-slate-700 group-hover:text-indigo-600 transition">Bura klikləyin və ya GPX / KML faylını dartın</p>
-                <p className="text-[10px] text-slate-400">Operator GPX trek faylı yüklədikdə müştərilərə 3D hündürlük və real trek xəritəsi göstərilir</p>
+        {currentStep === 3 && (
+        <div className="space-y-5">
+          <div className="bg-primary-50/60 p-4 rounded-xl border border-emerald-100 space-y-3">
+            <h4 className="text-[10px] font-extrabold text-emerald-800 tracking-widest">📅 Aktiv Olacağı Günlər və Bilet Qiyməti</h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:max-w-md">
+              <div>
+                <label className="block text-[11px] font-bold text-slate-500 tracking-wide mb-1">Qiymət (AZN):</label>
+                <input type="number" min="1" required value={tourPrice} onChange={(e) => setTourPrice(Number(e.target.value))} className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-800" />
+              </div>
+              <div>
+                <label className="block text-[11px] font-bold text-rose-600 tracking-wide mb-1">Endirimli Qiymət (opsional):</label>
+                <input type="number" min="0" placeholder="Məs: 25" value={tourDiscountPrice} onChange={(e) => setTourDiscountPrice(e.target.value)} className="w-full px-3 py-2 bg-white border border-rose-200 rounded-lg text-xs font-bold text-rose-700 placeholder-rose-300" />
               </div>
             </div>
-          ) : (
-            <div className="bg-indigo-50 border border-indigo-100 p-3 rounded-lg flex flex-col space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="p-1 px-1.5 text-[10px] font-bold text-white bg-indigo-600 rounded animate-pulse">GPS</span>
-                  <span className="text-xs font-bold text-indigo-950 truncate max-w-[200px]" title={tourGpxFileName}>{tourGpxFileName}</span>
-                </div>
-                <button type="button" onClick={() => { setTourGpxData(''); setTourGpxFileName(''); }} className="text-[10px] font-black text-red-600 hover:text-red-700 tracking-wide cursor-pointer transition">Sil ✕</button>
+            <MultiDateCalendar selectedDates={selectedDates} onChange={setSelectedDates} />
+            {tourCategory === 'active' && (
+              <div>
+                <label className="block text-[11px] font-bold text-emerald-700 tracking-wide mb-1">Tədbirin Planlaması:</label>
+                <select value={tourScheduleFrequency} onChange={(e) => setTourScheduleFrequency(e.target.value)} className="w-full sm:w-64 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-lg text-xs font-semibold text-emerald-800">
+                  <option value="one-time">Bir dəfəlik (Göstərilən tarixlərdə)</option>
+                  <option value="daily">Hər gün (Mütəmadi)</option>
+                  <option value="every-weekend">Hər həftəsonu (Şənbə və Bazar)</option>
+                </select>
               </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
 
-        <div>
-          <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">Əhatəli marşrut planı və açıqlama:</label>
-          <textarea
-            required
-            rows={4}
-            value={tourDescription}
-            onChange={(e) => setTourDescription(e.target.value)}
-            placeholder="Tur iştirakçılarını hansı inanılmaz fəaliyyətlər gözləyir?"
-            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-700"
+          <DynamicStringListInput
+            label="Qiymətə daxildir:"
+            items={tourIncludes}
+            onChange={setTourIncludes}
+            placeholder="Məs: Səhər yeməyi, Giriş bileti, Professional Bələdçi"
           />
+          <DynamicStringListInput
+            label="Qiymətə daxil deyil:"
+            items={tourNotIncluded}
+            onChange={setTourNotIncluded}
+            placeholder="Məs: Şəxsi xərclər, Nahar"
+            accent="red"
+          />
+
+          <div>
+            <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">Önə çıxanlar (Vergüllə ayırın):</label>
+            <input type="text" value={tourHighlights} onChange={(e) => setTourHighlights(e.target.value)} placeholder="Məs: Panoram mənzərəli marşrut" className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800" />
+          </div>
         </div>
+        )}
 
         {isEditMode && tour && (
           <TourDangerZone
@@ -825,17 +858,36 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
         )}
 
         <div className="flex items-center gap-3">
+          {currentStep > 1 && (
+            <button
+              type="button"
+              onClick={goToPrevStep}
+              className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-lg transition-all cursor-pointer"
+            >
+              ← Geri
+            </button>
+          )}
+
           <button
             type="submit"
             disabled={isSavingForm}
             className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-lg transition-all cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
           >
-            {isEditMode && <Check className="w-3.5 h-3.5" />}
-            {isSavingForm ? 'Göndərilir...' : isEditMode ? 'Dəyişiklikləri Saxla' : (tourCategory === 'active' ? 'Tədbiri Platformaya Göndər' : 'Marşrutu Platformaya Göndər')}
+            {currentStep < 3 ? (
+              <>İrəli →</>
+            ) : (
+              <>
+                {isEditMode && <Check className="w-3.5 h-3.5" />}
+                {isSavingForm ? 'Göndərilir...' : isEditMode ? 'Dəyişiklikləri Saxla' : (tourCategory === 'active' ? 'Tədbiri Platformaya Göndər' : 'Marşrutu Platformaya Göndər')}
+              </>
+            )}
           </button>
-          <button type="button" onClick={onNavigateBack} className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-lg transition-all cursor-pointer">
-            Ləğv et
-          </button>
+
+          {currentStep === 1 && (
+            <button type="button" onClick={onNavigateBack} className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-lg transition-all cursor-pointer">
+              Ləğv et
+            </button>
+          )}
         </div>
       </form>
     </div>
