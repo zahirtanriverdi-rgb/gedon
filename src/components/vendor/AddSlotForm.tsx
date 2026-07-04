@@ -1,4 +1,4 @@
-import { useState, FormEvent } from 'react';
+import { useState, FormEvent, ChangeEvent } from 'react';
 import { Tour, TourSlot } from '../../types';
 
 interface AddSlotFormProps {
@@ -12,10 +12,17 @@ export function AddSlotForm({ myTours, onAddSlot, onShowNotification, onSuccess 
   const [slotTourId, setSlotTourId] = useState<string>('');
   const [slotStartDate, setSlotStartDate] = useState<string>('');
   const [slotEndDate, setSlotEndDate] = useState<string>('');
-  const [slotPrice, setSlotPrice] = useState<number>(35);
-  const [slotCapacity, setSlotCapacity] = useState<number>(20);
+  const [slotPrice, setSlotPrice] = useState<number | ''>(35);
+  const [slotCapacity, setSlotCapacity] = useState<number | ''>(20);
   const [isSavingForm, setIsSavingForm] = useState(false);
   const [formSubmitError, setFormSubmitError] = useState<string | null>(null);
+
+  // See TourForm.tsx for the same fix and rationale: keeps the field fully clearable
+  // instead of forcing a "0" back in when the user deletes all digits.
+  const handleNumberInput = (setter: (v: number | '') => void) => (e: ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    setter(raw === '' ? '' : Number(raw));
+  };
 
   const handleSlotSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -88,7 +95,7 @@ export function AddSlotForm({ myTours, onAddSlot, onShowNotification, onSuccess 
             max="1000"
             required
             value={slotPrice}
-            onChange={(e) => setSlotPrice(Number(e.target.value))}
+            onChange={handleNumberInput(setSlotPrice)}
             className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800"
           />
         </div>
@@ -123,7 +130,7 @@ export function AddSlotForm({ myTours, onAddSlot, onShowNotification, onSuccess 
             max="50"
             required
             value={slotCapacity}
-            onChange={(e) => setSlotCapacity(Number(e.target.value))}
+            onChange={handleNumberInput(setSlotCapacity)}
             className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800"
           />
         </div>

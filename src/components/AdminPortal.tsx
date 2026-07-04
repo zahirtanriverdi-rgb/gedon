@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Tour, TourSlot, Booking, User, PlatformConfig } from '../types';
 import { TourForm } from './vendor/TourForm';
 import { InternationalTourForm } from './vendor/InternationalTourForm';
@@ -120,6 +120,26 @@ export default function AdminPortal({
 
   const [cbarLoading, setCbarLoading] = useState<boolean>(false);
   const [approvingTourIds, setApprovingTourIds] = useState<Set<string>>(new Set());
+
+  // Same fix as MyToursTab.tsx: exchangeRates is a plain-number prop, so the field can't be
+  // fully cleared without an intermediate empty-string draft — otherwise Number('') === 0
+  // gets pushed straight back into the input and it looks "stuck".
+  const [usdRateDraft, setUsdRateDraft] = useState<string>(String(exchangeRates.USD));
+  const [eurRateDraft, setEurRateDraft] = useState<string>(String(exchangeRates.EUR));
+  useEffect(() => { setUsdRateDraft(String(exchangeRates.USD)); }, [exchangeRates.USD]);
+  useEffect(() => { setEurRateDraft(String(exchangeRates.EUR)); }, [exchangeRates.EUR]);
+
+  const handleRateChange = (currency: 'USD' | 'EUR') => (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    if (currency === 'USD') setUsdRateDraft(raw); else setEurRateDraft(raw);
+    if (raw !== '' && !isNaN(Number(raw))) {
+      onUpdateExchangeRates({ ...exchangeRates, [currency]: Number(raw) });
+    }
+  };
+  const handleRateBlur = (currency: 'USD' | 'EUR') => () => {
+    if (currency === 'USD' && usdRateDraft === '') setUsdRateDraft(String(exchangeRates.USD));
+    if (currency === 'EUR' && eurRateDraft === '') setEurRateDraft(String(exchangeRates.EUR));
+  };
 
   const fetchCbarRates = async () => {
     setCbarLoading(true);
@@ -336,8 +356,9 @@ export default function AdminPortal({
                     step="0.01"
                     min="0.1"
                     required
-                    value={exchangeRates.USD}
-                    onChange={(e) => onUpdateExchangeRates({ ...exchangeRates, USD: Number(e.target.value) })}
+                    value={usdRateDraft}
+                    onChange={handleRateChange('USD')}
+                    onBlur={handleRateBlur('USD')}
                     className="w-full pl-3 pr-8 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold font-mono focus:outline-none focus:ring-1 focus:ring-emerald-750"
                   />
                   <span className="absolute right-3 top-2.5 text-[9px] font-bold text-slate-400 font-mono">₼</span>
@@ -352,8 +373,9 @@ export default function AdminPortal({
                     step="0.01"
                     min="0.1"
                     required
-                    value={exchangeRates.EUR}
-                    onChange={(e) => onUpdateExchangeRates({ ...exchangeRates, EUR: Number(e.target.value) })}
+                    value={eurRateDraft}
+                    onChange={handleRateChange('EUR')}
+                    onBlur={handleRateBlur('EUR')}
                     className="w-full pl-3 pr-8 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold font-mono focus:outline-none focus:ring-1 focus:ring-emerald-750"
                   />
                   <span className="absolute right-3 top-2.5 text-[9px] font-bold text-slate-400 font-mono">₼</span>

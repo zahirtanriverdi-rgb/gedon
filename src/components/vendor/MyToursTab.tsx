@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Tour, TourSlot } from '../../types';
 import { Calendar, Edit, Search } from 'lucide-react';
 
@@ -17,6 +17,28 @@ interface MyToursTabProps {
 
 export function MyToursTab({ tours, slots, myTours, myTourIds, tourSearchTerm, onTourSearchChange, exchangeRates, onUpdateExchangeRates, onShowNotification, onEditClick }: MyToursTabProps) {
   const [cbarLoading, setCbarLoading] = useState<boolean>(false);
+
+  // exchangeRates is owned by the parent (plain numbers), so the input can't just bind
+  // straight to it — clearing the field would send Number('') === 0 straight back in and
+  // the box would look "stuck". These local string drafts let the field go empty while
+  // typing; a valid number is pushed up to the parent on every keystroke, and an empty
+  // field snaps back to the last known-good rate on blur instead of silently becoming 0.
+  const [usdDraft, setUsdDraft] = useState<string>(String(exchangeRates.USD));
+  const [eurDraft, setEurDraft] = useState<string>(String(exchangeRates.EUR));
+  useEffect(() => { setUsdDraft(String(exchangeRates.USD)); }, [exchangeRates.USD]);
+  useEffect(() => { setEurDraft(String(exchangeRates.EUR)); }, [exchangeRates.EUR]);
+
+  const handleRateChange = (currency: 'USD' | 'EUR') => (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    if (currency === 'USD') setUsdDraft(raw); else setEurDraft(raw);
+    if (raw !== '' && !isNaN(Number(raw))) {
+      onUpdateExchangeRates({ ...exchangeRates, [currency]: Number(raw) });
+    }
+  };
+  const handleRateBlur = (currency: 'USD' | 'EUR') => () => {
+    if (currency === 'USD' && usdDraft === '') setUsdDraft(String(exchangeRates.USD));
+    if (currency === 'EUR' && eurDraft === '') setEurDraft(String(exchangeRates.EUR));
+  };
 
   const fetchCbarRates = async () => {
     setCbarLoading(true);
@@ -157,8 +179,9 @@ export function MyToursTab({ tours, slots, myTours, myTourIds, tourSearchTerm, o
                       type="number"
                       step="0.01"
                       min="0.1"
-                      value={exchangeRates.USD}
-                      onChange={(e) => onUpdateExchangeRates({ ...exchangeRates, USD: Number(e.target.value) })}
+                      value={usdDraft}
+                      onChange={handleRateChange('USD')}
+                      onBlur={handleRateBlur('USD')}
                       className="w-full bg-white border border-slate-200 text-slate-900 font-bold p-1 text-center text-xs rounded focus:outline-none focus:border-amber-500"
                     />
                     <span className="text-[10px] text-slate-500 font-bold">₼</span>
@@ -172,8 +195,9 @@ export function MyToursTab({ tours, slots, myTours, myTourIds, tourSearchTerm, o
                       type="number"
                       step="0.01"
                       min="0.1"
-                      value={exchangeRates.EUR}
-                      onChange={(e) => onUpdateExchangeRates({ ...exchangeRates, EUR: Number(e.target.value) })}
+                      value={eurDraft}
+                      onChange={handleRateChange('EUR')}
+                      onBlur={handleRateBlur('EUR')}
                       className="w-full bg-white border border-slate-200 text-slate-900 font-bold p-1 text-center text-xs rounded focus:outline-none focus:border-amber-500"
                     />
                     <span className="text-[10px] text-slate-500 font-bold">₼</span>

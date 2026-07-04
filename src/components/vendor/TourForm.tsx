@@ -33,23 +33,31 @@ interface TourFormProps {
 export function TourForm({ currentUser, tour, slots, category: tourCategory, onCategoryChange: setTourCategory, onAddTour, onEditTour, onDeleteTour, onAddSlot, onDeleteSlot, onShowNotification, onNavigateBack }: TourFormProps) {
   const isEditMode = !!tour;
 
+  // Number inputs are bound to `number | ''` state (not plain `number`) so the field can be
+  // fully cleared: clearing the input sets state to '' instead of forcing a "0" back into the
+  // box. Number(tourX || 0)-style fallbacks elsewhere already treat '' like a missing value.
+  const handleNumberInput = (setter: (v: number | '') => void) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    setter(raw === '' ? '' : Number(raw));
+  };
+
   const [tourName, setTourName] = useState<string>('');
   const [tourDifficulty, setTourDifficulty] = useState<'easy' | 'medium' | 'hard' | 'extreme'>('medium');
   const [tourRegion, setTourRegion] = useState<string>('');
-  const [tourDays, setTourDays] = useState<number>(1);
+  const [tourDays, setTourDays] = useState<number | ''>(1);
   const [tourDescription, setTourDescription] = useState<string>('');
   const [tourIncludes, setTourIncludes] = useState<string[]>(['Professional Bələdçi', 'Komfort Transit', 'Səhər yeməyi', 'Yol Sığortası']);
   const [tourNotIncluded, setTourNotIncluded] = useState<string[]>([]);
   const [tourHighlights, setTourHighlights] = useState<string>('');
   const [tourLanguages, setTourLanguages] = useState<string>('Azərbaycanca');
-  const [tourDurationHours, setTourDurationHours] = useState<number>(8);
+  const [tourDurationHours, setTourDurationHours] = useState<number | ''>(8);
   const [tourBringItems, setTourBringItems] = useState<string[]>([]);
   const [tourNotAllowedItems, setTourNotAllowedItems] = useState<string[]>([]);
   const [tourImage, setTourImage] = useState<string>('');
   const [tourImages, setTourImages] = useState<string[]>([]);
   const [tourVideos, setTourVideos] = useState<string[]>([]);
   const [tourWhatsApp, setTourWhatsApp] = useState<string>('+994706717804');
-  const [tourPrice, setTourPrice] = useState<number>(35);
+  const [tourPrice, setTourPrice] = useState<number | ''>(35);
   const [tourDiscountPrice, setTourDiscountPrice] = useState<string>('');
   const [selectedDates, setSelectedDates] = useState<Date[]>([]);
   const [tourGpxData, setTourGpxData] = useState<string>('');
@@ -64,7 +72,7 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
   const [tourMeetingPoint, setTourMeetingPoint] = useState<string>('');
   const [tourRequiredEquipment, setTourRequiredEquipment] = useState<string>('');
   const [tourEquipmentIncluded, setTourEquipmentIncluded] = useState<boolean>(true);
-  const [tourEquipmentRentalPrice, setTourEquipmentRentalPrice] = useState<number>(0);
+  const [tourEquipmentRentalPrice, setTourEquipmentRentalPrice] = useState<number | ''>(0);
   const [tourSafetyInstructions, setTourSafetyInstructions] = useState<string>('');
   const [tourAllowTeamRegistration, setTourAllowTeamRegistration] = useState<boolean>(true);
   const [tourScheduleFrequency, setTourScheduleFrequency] = useState<string>('one-time');
@@ -188,7 +196,7 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
       meetingPoint: tourMeetingPoint || undefined,
       requiredEquipment: tourCategory === 'active' ? tourRequiredEquipment : undefined,
       equipmentIncluded: tourCategory === 'active' ? tourEquipmentIncluded : undefined,
-      equipmentRentalPrice: tourCategory === 'active' ? tourEquipmentRentalPrice : undefined,
+      equipmentRentalPrice: tourCategory === 'active' ? (Number(tourEquipmentRentalPrice) || 0) : undefined,
       safetyInstructions: tourCategory === 'active' ? tourSafetyInstructions : undefined,
       allowTeamRegistration: tourCategory === 'active' ? tourAllowTeamRegistration : undefined,
       scheduleFrequency: tourCategory === 'active' ? tourScheduleFrequency : undefined,
@@ -567,7 +575,7 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
               max="14"
               required
               value={tourDays}
-              onChange={(e) => setTourDays(Number(e.target.value))}
+              onChange={handleNumberInput(setTourDays)}
               className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800"
             />
           </div>
@@ -617,7 +625,7 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
               {!tourEquipmentIncluded ? (
                 <div>
                   <label className="block text-[11px] font-bold text-amber-700 tracking-wide mb-1">Kirayə Haqqı (+AZN):</label>
-                  <input type="number" min="0" value={tourEquipmentRentalPrice} onChange={(e) => setTourEquipmentRentalPrice(Number(e.target.value))} className="w-full px-3 py-2 bg-white border border-amber-200 rounded-lg text-xs" placeholder="Məs: 15 AZN" />
+                  <input type="number" min="0" value={tourEquipmentRentalPrice} onChange={handleNumberInput(setTourEquipmentRentalPrice)} className="w-full px-3 py-2 bg-white border border-amber-200 rounded-lg text-xs" placeholder="Məs: 15 AZN" />
                 </div>
               ) : <div />}
               <div className="flex items-center gap-2">
@@ -671,7 +679,7 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
 
           <div>
             <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">Tam müddət (saat):</label>
-            <input type="number" min={1} value={tourDurationHours} onChange={(e) => setTourDurationHours(Number(e.target.value))} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800" />
+            <input type="number" min={1} value={tourDurationHours} onChange={handleNumberInput(setTourDurationHours)} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800" />
           </div>
 
           <div>
@@ -805,7 +813,7 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:max-w-md">
               <div>
                 <label className="block text-[11px] font-bold text-slate-500 tracking-wide mb-1">Qiymət (AZN):</label>
-                <input type="number" min="1" required value={tourPrice} onChange={(e) => setTourPrice(Number(e.target.value))} className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-800" />
+                <input type="number" min="1" required value={tourPrice} onChange={handleNumberInput(setTourPrice)} className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-800" />
               </div>
               <div>
                 <label className="block text-[11px] font-bold text-rose-600 tracking-wide mb-1">Endirimli Qiymət (opsional):</label>

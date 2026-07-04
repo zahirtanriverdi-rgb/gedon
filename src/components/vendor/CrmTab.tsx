@@ -28,7 +28,7 @@ export function CrmTab({ tours, slots, bookings, currentUser, operatorToken, onE
   const [isQrScannerOpen, setIsQrScannerOpen] = useState(false);
   const [manualName, setManualName] = useState('');
   const [manualPhone, setManualPhone] = useState('');
-  const [manualParticipantsCount, setManualParticipantsCount] = useState(1);
+  const [manualParticipantsCount, setManualParticipantsCount] = useState<number | ''>(1);
   const [manualPaymentStatus, setManualPaymentStatus] = useState<'Ödənilib' | 'Ödənilməyib'>('Ödənilməyib');
   const [manualOperatorNote, setManualOperatorNote] = useState('');
   const [isSubmittingManualBooking, setIsSubmittingManualBooking] = useState(false);
@@ -671,7 +671,7 @@ export function CrmTab({ tours, slots, bookings, currentUser, operatorToken, onE
                           min="1"
                           placeholder="Yer sayı"
                           value={manualParticipantsCount}
-                          onChange={(e) => setManualParticipantsCount(Math.max(1, Number(e.target.value)))}
+                          onChange={(e) => { const raw = e.target.value; setManualParticipantsCount(raw === '' ? '' : Math.max(1, Number(raw))); }}
                           className="w-full bg-slate-50 border border-slate-200 p-2.5 text-xs rounded-xl focus:outline-none focus:border-emerald-600 focus:bg-white font-mono font-semibold transition"
                         />
                       </div>

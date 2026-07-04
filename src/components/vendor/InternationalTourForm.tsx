@@ -50,12 +50,19 @@ function getPremiumStockImageForDestination(country: string, city: string): stri
 export function InternationalTourForm({ currentUser, tour, slots, onAddTour, onEditTour, onDeleteTour, onAddSlot, onDeleteSlot, onShowNotification, onNavigateBack }: InternationalTourFormProps) {
   const isEditMode = !!tour;
 
+  // Number inputs are bound to `number | ''` state so clearing the field doesn't force a
+  // "0" back in — see the domestic TourForm.tsx for the same fix and rationale.
+  const handleNumberInput = (setter: (v: number | '') => void) => (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    setter(raw === '' ? '' : Number(raw));
+  };
+
   const [intlTourName, setIntlTourName] = useState<string>('');
   const [intlTourCountry, setIntlTourCountry] = useState<string>('Türkiyə');
   const [intlTourCity, setIntlTourCity] = useState<string>('');
-  const [intlTourNights, setIntlTourNights] = useState<number>(3);
-  const [intlTourDays, setIntlTourDays] = useState<number>(4);
-  const [intlTourCapacity, setIntlTourCapacity] = useState<number>(20);
+  const [intlTourNights, setIntlTourNights] = useState<number | ''>(3);
+  const [intlTourDays, setIntlTourDays] = useState<number | ''>(4);
+  const [intlTourCapacity, setIntlTourCapacity] = useState<number | ''>(20);
   const [selectedDates, setSelectedDates] = useState<Date[]>([]);
   const [intlMeetingPoint, setIntlMeetingPoint] = useState<string>('');
   const [intlIsActive, setIntlIsActive] = useState<boolean>(true);
@@ -68,11 +75,11 @@ export function InternationalTourForm({ currentUser, tour, slots, onAddTour, onE
   const [intlTourHotelStars, setIntlTourHotelStars] = useState<number>(4);
   const [intlTourMealType, setIntlTourMealType] = useState<string>('Səhər yeməyi');
 
-  const [intlRoomDoubleDiff, setIntlRoomDoubleDiff] = useState<number>(0);
-  const [intlRoomTwinDiff, setIntlRoomTwinDiff] = useState<number>(25);
-  const [intlRoomSingleDiff, setIntlRoomSingleDiff] = useState<number>(75);
+  const [intlRoomDoubleDiff, setIntlRoomDoubleDiff] = useState<number | ''>(0);
+  const [intlRoomTwinDiff, setIntlRoomTwinDiff] = useState<number | ''>(25);
+  const [intlRoomSingleDiff, setIntlRoomSingleDiff] = useState<number | ''>(75);
 
-  const [intlTourPrice, setIntlTourPrice] = useState<number>(499);
+  const [intlTourPrice, setIntlTourPrice] = useState<number | ''>(499);
   const [intlTourDiscountPrice, setIntlTourDiscountPrice] = useState<string>('');
   const [intlTourCurrency, setIntlTourCurrency] = useState<'AZN' | 'USD' | 'EUR'>('USD');
   const [intlTourImage, setIntlTourImage] = useState<string>('');
@@ -308,16 +315,16 @@ export function InternationalTourForm({ currentUser, tour, slots, onAddTour, onE
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">Gecə sayısı *</label>
-                <input type="number" required min={1} value={intlTourNights} onChange={(e) => setIntlTourNights(Number(e.target.value))} className="w-full px-3 py-2 border border-slate-250 rounded-lg text-xs text-slate-800 focus:ring-1 focus:ring-emerald-700 focus:outline-none" />
+                <input type="number" required min={1} value={intlTourNights} onChange={handleNumberInput(setIntlTourNights)} className="w-full px-3 py-2 border border-slate-250 rounded-lg text-xs text-slate-800 focus:ring-1 focus:ring-emerald-700 focus:outline-none" />
               </div>
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">Gündüz sayısı *</label>
-                <input type="number" required min={1} value={intlTourDays} onChange={(e) => setIntlTourDays(Number(e.target.value))} className="w-full px-3 py-2 border border-slate-250 rounded-lg text-xs text-slate-800 focus:ring-1 focus:ring-emerald-700 focus:outline-none" />
+                <input type="number" required min={1} value={intlTourDays} onChange={handleNumberInput(setIntlTourDays)} className="w-full px-3 py-2 border border-slate-250 rounded-lg text-xs text-slate-800 focus:ring-1 focus:ring-emerald-700 focus:outline-none" />
               </div>
             </div>
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">Maksimum Qrup Tutumu *</label>
-              <input type="number" required min={1} value={intlTourCapacity} onChange={(e) => setIntlTourCapacity(Number(e.target.value))} className="w-full px-3 py-2 border border-slate-250 rounded-lg text-xs text-slate-800 focus:ring-1 focus:ring-emerald-700 focus:outline-none" />
+              <input type="number" required min={1} value={intlTourCapacity} onChange={handleNumberInput(setIntlTourCapacity)} className="w-full px-3 py-2 border border-slate-250 rounded-lg text-xs text-slate-800 focus:ring-1 focus:ring-emerald-700 focus:outline-none" />
             </div>
           </div>
           <div>
@@ -388,15 +395,15 @@ export function InternationalTourForm({ currentUser, tour, slots, onAddTour, onE
             <div className="grid grid-cols-3 gap-3 bg-slate-50 p-3.5 rounded-xl border border-slate-150">
               <div>
                 <label className="block text-[10px] text-slate-500 font-bold mb-1">Double Otaq fərqi</label>
-                <input type="number" value={intlRoomDoubleDiff} onChange={(e) => setIntlRoomDoubleDiff(Number(e.target.value))} className="w-full px-2 py-1 border border-slate-200 rounded-md text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-700" />
+                <input type="number" value={intlRoomDoubleDiff} onChange={handleNumberInput(setIntlRoomDoubleDiff)} className="w-full px-2 py-1 border border-slate-200 rounded-md text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-700" />
               </div>
               <div>
                 <label className="block text-[10px] text-slate-500 font-bold mb-1">Twin otaq fərqi</label>
-                <input type="number" value={intlRoomTwinDiff} onChange={(e) => setIntlRoomTwinDiff(Number(e.target.value))} className="w-full px-2 py-1 border border-slate-200 rounded-md text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-700" />
+                <input type="number" value={intlRoomTwinDiff} onChange={handleNumberInput(setIntlRoomTwinDiff)} className="w-full px-2 py-1 border border-slate-200 rounded-md text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-700" />
               </div>
               <div>
                 <label className="block text-[10px] text-slate-500 font-bold mb-1">Single otaq fərqi</label>
-                <input type="number" value={intlRoomSingleDiff} onChange={(e) => setIntlRoomSingleDiff(Number(e.target.value))} className="w-full px-2 py-1 border border-slate-200 rounded-md text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-700" />
+                <input type="number" value={intlRoomSingleDiff} onChange={handleNumberInput(setIntlRoomSingleDiff)} className="w-full px-2 py-1 border border-slate-200 rounded-md text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-700" />
               </div>
             </div>
           </div>
@@ -408,7 +415,7 @@ export function InternationalTourForm({ currentUser, tour, slots, onAddTour, onE
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">Baza Paket Qiyməti *</label>
-              <input type="number" required min={1} value={intlTourPrice} onChange={(e) => setIntlTourPrice(Number(e.target.value))} className="w-full px-3 py-2 border border-slate-250 rounded-lg text-xs text-slate-800 focus:ring-1 focus:ring-emerald-700" />
+              <input type="number" required min={1} value={intlTourPrice} onChange={handleNumberInput(setIntlTourPrice)} className="w-full px-3 py-2 border border-slate-250 rounded-lg text-xs text-slate-800 focus:ring-1 focus:ring-emerald-700" />
             </div>
             <div>
               <label className="block text-xs font-bold text-rose-600 mb-1">Endirimli Qiymət (opsional):</label>
