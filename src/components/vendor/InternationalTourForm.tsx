@@ -186,7 +186,7 @@ export function InternationalTourForm({ currentUser, tour, slots, onAddTour, onE
       image: finalImage,
       images: [finalImage],
       isActive: intlIsActive,
-      whatsapp_number: '+994706717804',
+      whatsapp_number: currentUser.whatsapp_number || currentUser.phone || '',
       isInternational: true,
       destinationCountry: intlTourCountry,
       destinationCity: intlTourCity,

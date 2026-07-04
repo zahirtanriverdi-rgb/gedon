@@ -56,7 +56,7 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
   const [tourImage, setTourImage] = useState<string>('');
   const [tourImages, setTourImages] = useState<string[]>([]);
   const [tourVideos, setTourVideos] = useState<string[]>([]);
-  const [tourWhatsApp, setTourWhatsApp] = useState<string>('+994706717804');
+  const [tourWhatsApp, setTourWhatsApp] = useState<string>('');
   const [tourPrice, setTourPrice] = useState<number | ''>(35);
   const [tourDiscountPrice, setTourDiscountPrice] = useState<string>('');
   const [selectedDates, setSelectedDates] = useState<Date[]>([]);
@@ -89,6 +89,15 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
   const goToNextStep = () => setCurrentStep((s) => (s < 3 ? ((s + 1) as 1 | 2 | 3) : s));
   const goToPrevStep = () => setCurrentStep((s) => (s > 1 ? ((s - 1) as 1 | 2 | 3) : s));
 
+  // New tour (create mode): pre-fill the WhatsApp guide number with the vendor's own official
+  // contact number instead of a hardcoded placeholder. Still editable — a vendor may want a
+  // different guide's number for a specific tour.
+  useEffect(() => {
+    if (tour) return; // edit mode is populated separately below, from the tour itself
+    setTourWhatsApp(currentUser.whatsapp_number || currentUser.phone || '');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Populate every field from the tour prop in edit mode.
   useEffect(() => {
     if (!tour) return;
@@ -110,7 +119,7 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
     const existingGallery = tour.images || [];
     setTourImages(tour.image && !existingGallery.includes(tour.image) ? [tour.image, ...existingGallery] : existingGallery);
     setTourVideos(tour.videos || []);
-    setTourWhatsApp(tour.whatsapp_number || '+994706717804');
+    setTourWhatsApp(tour.whatsapp_number || currentUser.whatsapp_number || currentUser.phone || '');
     setTourGpxData(tour.gpxData || '');
     setTourGpxFileName(tour.gpxFileName || '');
     setTourRating(tour.rating !== undefined ? tour.rating : 5.0);
@@ -183,7 +192,7 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
       images: tourImages.length > 0 ? tourImages : (tourImage ? [tourImage] : [defaultImg]),
       videos: tourVideos,
       rating: tourRating,
-      whatsapp_number: tourWhatsApp || '+994706717804',
+      whatsapp_number: tourWhatsApp || currentUser.whatsapp_number || currentUser.phone || '',
       gpxData: tourGpxData || undefined,
       gpxFileName: tourGpxFileName || undefined,
       price: Number(tourPrice) || 0,
@@ -674,7 +683,7 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
 
           <div>
             <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">WhatsApp Bələdçi Nömrəsi:</label>
-            <input type="tel" required value={tourWhatsApp} onChange={(e) => setTourWhatsApp(e.target.value)} placeholder="+994706717804" className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 font-bold" />
+            <input type="tel" required value={tourWhatsApp} onChange={(e) => setTourWhatsApp(e.target.value)} placeholder="Məs: +994 XX XXX XX XX" className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 font-bold" />
           </div>
 
           <div>
