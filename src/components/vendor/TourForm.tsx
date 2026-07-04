@@ -43,8 +43,8 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
   const [tourHighlights, setTourHighlights] = useState<string>('');
   const [tourLanguages, setTourLanguages] = useState<string>('Azərbaycanca');
   const [tourDurationHours, setTourDurationHours] = useState<number>(8);
-  const [tourBringItems, setTourBringItems] = useState<string>('');
-  const [tourNotAllowedItems, setTourNotAllowedItems] = useState<string>('');
+  const [tourBringItems, setTourBringItems] = useState<string[]>([]);
+  const [tourNotAllowedItems, setTourNotAllowedItems] = useState<string[]>([]);
   const [tourImage, setTourImage] = useState<string>('');
   const [tourImages, setTourImages] = useState<string[]>([]);
   const [tourVideos, setTourVideos] = useState<string[]>([]);
@@ -94,8 +94,8 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
     setTourHighlights(Array.isArray(tour.highlights) ? tour.highlights.join(', ') : '');
     setTourLanguages(Array.isArray(tour.languages) ? tour.languages.join(', ') : '');
     setTourDurationHours(tour.durationHours || (tour.durationDays ? tour.durationDays * 8 : 8));
-    setTourBringItems(Array.isArray(tour.importantInfo?.bring) ? tour.importantInfo!.bring!.join(', ') : '');
-    setTourNotAllowedItems(Array.isArray(tour.importantInfo?.notAllowed) ? tour.importantInfo!.notAllowed!.join(', ') : '');
+    setTourBringItems(Array.isArray(tour.importantInfo?.bring) ? tour.importantInfo!.bring! : []);
+    setTourNotAllowedItems(Array.isArray(tour.importantInfo?.notAllowed) ? tour.importantInfo!.notAllowed! : []);
     setTourImage(tour.image || '');
     // Legacy tours may have a cover (`image`) that isn't part of the gallery array yet —
     // fold it in so the cover badge has something to highlight in the unified media grid.
@@ -150,8 +150,8 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
 
     const cleanHighlights = tourHighlights.split(',').map(s => s.trim()).filter(Boolean);
     const cleanLanguages = tourLanguages.split(',').map(s => s.trim()).filter(Boolean);
-    const cleanBringItems = tourBringItems.split(',').map(s => s.trim()).filter(Boolean);
-    const cleanNotAllowedItems = tourNotAllowedItems.split(',').map(s => s.trim()).filter(Boolean);
+    const cleanBringItems = tourBringItems.filter(Boolean);
+    const cleanNotAllowedItems = tourNotAllowedItems.filter(Boolean);
     const cleanIncludes = tourIncludes.filter(Boolean);
     const cleanNotIncluded = tourNotIncluded.filter(Boolean);
 
@@ -632,12 +632,21 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
           )}
 
           <div>
-            <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">Özünüzlə gətirin (Vergüllə ayırın):</label>
-            <input type="text" value={tourBringItems} onChange={(e) => setTourBringItems(e.target.value)} placeholder="Rahat ayaqqabı, Pasport" className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800" />
+            <DynamicStringListInput
+              label="Özünüzlə gətirin:"
+              items={tourBringItems}
+              onChange={setTourBringItems}
+              placeholder="Məs: Rahat ayaqqabı, Pasport"
+            />
           </div>
           <div>
-            <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">İcazə verilmir (Vergüllə ayırın):</label>
-            <input type="text" value={tourNotAllowedItems} onChange={(e) => setTourNotAllowedItems(e.target.value)} placeholder="Böyük çamadanlar" className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800" />
+            <DynamicStringListInput
+              label="İcazə verilmir:"
+              items={tourNotAllowedItems}
+              onChange={setTourNotAllowedItems}
+              placeholder="Məs: Böyük çamadanlar"
+              accent="red"
+            />
           </div>
         </div>
         )}

@@ -83,8 +83,8 @@ export function InternationalTourForm({ currentUser, tour, slots, onAddTour, onE
 
   const [intlHighlights, setIntlHighlights] = useState<string>('');
   const [intlLanguages, setIntlLanguages] = useState<string>('Azərbaycanca');
-  const [intlBringItems, setIntlBringItems] = useState<string>('');
-  const [intlNotAllowedItems, setIntlNotAllowedItems] = useState<string>('');
+  const [intlBringItems, setIntlBringItems] = useState<string[]>([]);
+  const [intlNotAllowedItems, setIntlNotAllowedItems] = useState<string[]>([]);
 
   const [intlItinerary, setIntlItinerary] = useState<Array<{ day: number; title: string; description: string; image?: string }>>([
     { day: 1, title: 'Bakıdan Uçuş və Qarşılanma', description: 'Göstərilən saatda hava limanında toplaşırıq. Təyyarə ilə təyinat nöqtəsinə uçuş. Qarşılanma və otelə transfer.' }
@@ -122,8 +122,8 @@ export function InternationalTourForm({ currentUser, tour, slots, onAddTour, onE
     setIntlItinerary(tour.itinerary || [{ day: 1, title: 'Bakıdan Uçuş', description: 'Uçuş və qarşılanma.' }]);
     setIntlHighlights(Array.isArray(tour.highlights) ? tour.highlights.join(', ') : '');
     setIntlLanguages(Array.isArray(tour.languages) ? tour.languages.join(', ') : '');
-    setIntlBringItems(Array.isArray(tour.importantInfo?.bring) ? tour.importantInfo!.bring!.join(', ') : '');
-    setIntlNotAllowedItems(Array.isArray(tour.importantInfo?.notAllowed) ? tour.importantInfo!.notAllowed!.join(', ') : '');
+    setIntlBringItems(Array.isArray(tour.importantInfo?.bring) ? tour.importantInfo!.bring! : []);
+    setIntlNotAllowedItems(Array.isArray(tour.importantInfo?.notAllowed) ? tour.importantInfo!.notAllowed! : []);
 
     const tourSlots = slots.filter(s => s.tourId === tour.id);
     setSelectedDates(tourSlots.map(s => new Date(s.startDate)));
@@ -165,8 +165,8 @@ export function InternationalTourForm({ currentUser, tour, slots, onAddTour, onE
     const finalImage = intlTourImage || getPremiumStockImageForDestination(intlTourCountry, intlTourCity);
     const cleanHighlights = intlHighlights.split(',').map(s => s.trim()).filter(Boolean);
     const cleanLanguages = intlLanguages.split(',').map(s => s.trim()).filter(Boolean);
-    const cleanBringItems = intlBringItems.split(',').map(s => s.trim()).filter(Boolean);
-    const cleanNotAllowedItems = intlNotAllowedItems.split(',').map(s => s.trim()).filter(Boolean);
+    const cleanBringItems = intlBringItems.filter(Boolean);
+    const cleanNotAllowedItems = intlNotAllowedItems.filter(Boolean);
 
     const sharedFields = {
       name: intlTourName,
@@ -495,13 +495,22 @@ export function InternationalTourForm({ currentUser, tour, slots, onAddTour, onE
                 <input type="text" value={intlLanguages} onChange={(e) => setIntlLanguages(e.target.value)} placeholder="Azərbaycanca, Rusca, İngiliscə" className="w-full px-3 py-2 border border-slate-250 rounded-lg text-xs text-slate-800 focus:ring-1 focus:ring-emerald-700 focus:outline-none" />
               </div>
               <div>
-                <label className="block text-xs font-bold text-emerald-800 mb-1">Özünüzlə gətirin (Vergüllə ayırın):</label>
-                <input type="text" value={intlBringItems} onChange={(e) => setIntlBringItems(e.target.value)} placeholder="Pasport, Hava şəraitinə uyğun geyim" className="w-full px-3 py-2 border border-slate-250 rounded-lg text-xs text-slate-800 focus:ring-1 focus:ring-emerald-700 focus:outline-none" />
+                <DynamicStringListInput
+                  label="Özünüzlə gətirin:"
+                  items={intlBringItems}
+                  onChange={setIntlBringItems}
+                  placeholder="Məs: Pasport, Hava şəraitinə uyğun geyim"
+                />
               </div>
             </div>
             <div>
-              <label className="block text-xs font-bold text-red-800 mb-1">İcazə verilmir (Vergüllə ayırın):</label>
-              <input type="text" value={intlNotAllowedItems} onChange={(e) => setIntlNotAllowedItems(e.target.value)} placeholder="Böyük çamadanlar" className="w-full px-3 py-2 border border-slate-250 rounded-lg text-xs text-slate-800 focus:ring-1 focus:ring-red-600 focus:outline-none" />
+              <DynamicStringListInput
+                label="İcazə verilmir:"
+                items={intlNotAllowedItems}
+                onChange={setIntlNotAllowedItems}
+                placeholder="Məs: Böyük çamadanlar"
+                accent="red"
+              />
             </div>
           </div>
         </div>
