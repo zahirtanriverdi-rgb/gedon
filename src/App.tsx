@@ -727,42 +727,42 @@ export default function App() {
           )}
 
           {/* Right Section */}
-          <div className="flex items-center gap-1 sm:gap-4">
+          <div className="flex items-center gap-1 sm:gap-2">
             {selectedRole === 'customer' ? (
-              <div className="flex items-center gap-1 sm:gap-4">
+              <div className="flex items-center gap-1 sm:gap-2">
                 <button
                   onClick={() => window.dispatchEvent(new CustomEvent('nav-wishlist'))}
-                  className="relative w-11 sm:w-auto sm:min-w-16 h-16 flex flex-col items-center justify-center gap-0.5 hover:text-emerald-600 transition group cursor-pointer bg-transparent border-none p-0"
+                  className="relative w-11 sm:w-auto sm:min-w-0 sm:px-2 h-16 sm:h-14 flex flex-col items-center justify-center gap-0.5 hover:text-emerald-600 transition group cursor-pointer bg-transparent border-none p-0"
                 >
-                  <span className="relative w-11 h-8 flex items-center justify-center">
-                    <Heart className="w-6 h-6 stroke-[2px] transition-colors group-hover:fill-emerald-500 group-hover:stroke-emerald-500" />
+                  <span className="relative w-11 h-8 sm:w-9 sm:h-7 flex items-center justify-center">
+                    <Heart className="w-6 h-6 sm:w-5 sm:h-5 stroke-[2px] transition-colors group-hover:fill-emerald-500 group-hover:stroke-emerald-500" />
                     {wishlistCount > 0 && (
                       <span className="absolute -top-1 right-1 bg-rose-600 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">
                         {wishlistCount}
                       </span>
                     )}
                   </span>
-                  <span className="hidden sm:block text-sm text-label-secondary font-semibold">İstəklər</span>
+                  <span className="hidden sm:block text-xs text-label-secondary font-semibold">İstəklər</span>
                 </button>
                 <button
                   onClick={() => window.dispatchEvent(new CustomEvent('nav-calculator'))}
-                  className="w-11 sm:w-auto sm:min-w-16 h-16 flex flex-col items-center justify-center gap-0.5 hover:text-emerald-600 transition group cursor-pointer bg-transparent border-none p-0"
+                  className="w-11 sm:w-auto sm:min-w-0 sm:px-2 h-16 sm:h-14 flex flex-col items-center justify-center gap-0.5 hover:text-emerald-600 transition group cursor-pointer bg-transparent border-none p-0"
                 >
-                  <span className="w-11 h-8 flex items-center justify-center">
-                    <Calculator className="w-6 h-6 stroke-[2px] transition-colors group-hover:stroke-emerald-500" />
+                  <span className="w-11 h-8 sm:w-9 sm:h-7 flex items-center justify-center">
+                    <Calculator className="w-6 h-6 sm:w-5 sm:h-5 stroke-[2px] transition-colors group-hover:stroke-emerald-500" />
                   </span>
-                  <span className="hidden sm:block text-sm text-label-secondary font-semibold whitespace-nowrap">Qrup hesabla</span>
+                  <span className="hidden sm:block text-xs text-label-secondary font-semibold whitespace-nowrap">Qrup hesabla</span>
                 </button>
                 <div className="relative">
                   <button
                     onClick={() => setIsLangMenuOpen(!isLangMenuOpen)}
-                    className="w-11 sm:w-auto sm:min-w-16 h-16 flex flex-col items-center justify-center gap-0.5 hover:text-emerald-600 transition group cursor-pointer bg-transparent border-none p-0"
+                    className="w-11 sm:w-auto sm:min-w-0 sm:px-2 h-16 sm:h-14 flex flex-col items-center justify-center gap-0.5 hover:text-emerald-600 transition group cursor-pointer bg-transparent border-none p-0"
                     title="Valyutanı / Dilini dəyiş"
                   >
-                    <span className="w-11 h-8 flex items-center justify-center">
-                      <Globe className="w-6 h-6 stroke-[2px]" />
+                    <span className="w-11 h-8 sm:w-9 sm:h-7 flex items-center justify-center">
+                      <Globe className="w-6 h-6 sm:w-5 sm:h-5 stroke-[2px]" />
                     </span>
-                    <span className="hidden sm:block text-sm text-label-secondary font-semibold">
+                    <span className="hidden sm:block text-xs text-label-secondary font-semibold">
                       {appLanguage === 'az' && displayCurrency === 'AZN' ? 'AZ / AZN ₼' :
                        appLanguage === 'ru' && displayCurrency === 'AZN' ? 'RU / AZN ₼' :
                        appLanguage === 'en' && displayCurrency === 'USD' ? 'EN / USD $' :
