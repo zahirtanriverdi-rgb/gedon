@@ -711,7 +711,7 @@ export function ToursHomeView({
                 {/* Tour Card Body */}
                 <div className="p-4 flex-1 flex flex-col justify-between">
                   <div className="space-y-2">
-                    <div className="flex items-center gap-1.5 text-[10px] text-label-tertiary font-bold tracking-wider">
+                    <div className="flex items-center gap-1.5 text-[10px] text-slate-700 font-medium tracking-wider">
                       {isSportActive ? (
                         <>
                           <span className="text-amber-600 font-bold">🏅</span>
@@ -732,7 +732,7 @@ export function ToursHomeView({
                       <span>{tourSlots.length} Aktiv Tarix</span>
                     </div>
 
-                    <h3 className="font-bold text-label-primary text-sm leading-snug group-hover:text-emerald-700 transition tracking-tight flex items-center gap-1">
+                    <h3 className="font-extrabold text-label-primary text-sm leading-snug group-hover:text-emerald-700 transition tracking-tight flex items-center gap-1">
                       {isSportActive && (
                         <span className="text-base shrink-0 select-none">
                           {tour.activityType === 'volleyball' ? '🏐' : tour.activityType === 'ski' ? '⛷️' : tour.activityType === 'rafting' ? '🚣‍♂️' : tour.activityType === 'running' ? '🏃‍♂️' : tour.activityType === 'bike' ? '🚴‍♂️' : '🏆'}
