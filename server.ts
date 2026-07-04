@@ -165,6 +165,58 @@ app.post("/api/auth/operator/login", async (req, res) => {
   }
 });
 
+// POST /api/admin/vendors — admin creates a new Tour Operator (vendor) account. Only the
+// company name, login (username or email), and an initial password are required; the vendor
+// fills in the rest of their own profile (phone, about, guides, etc.) after their first login.
+// The password is bcrypt-hashed before it ever reaches the database — the plaintext value is
+// never stored or logged, and the response never echoes the hash back.
+app.post("/api/admin/vendors", authenticateUser, async (req: any, res) => {
+  if (req.operator.role !== 'admin') {
+    return res.status(403).json({ error: "Yalnız adminlər yeni operator hesabı yarada bilər." });
+  }
+
+  try {
+    const { companyName, login, password } = req.body || {};
+    if (!companyName || !login || !password) {
+      return res.status(400).json({ error: "Şirkət adı, login və ilkin parol tələb olunur." });
+    }
+    if (String(password).length < 6) {
+      return res.status(400).json({ error: "Parol ən azı 6 simvol olmalıdır." });
+    }
+
+    const trimmedLogin = String(login).trim();
+    // The login doubles as either an email or a username. `email` is NOT NULL/UNIQUE in the
+    // schema, so if the admin typed a plain username we derive a private placeholder email —
+    // it's never shown to anyone and login still works via the username itself.
+    const isEmailLogin = trimmedLogin.includes('@');
+    const email = isEmailLogin ? trimmedLogin : `${trimmedLogin.toLowerCase().replace(/[^a-z0-9._-]/g, '')}@vendor.gedekgorek.local`;
+    const username = isEmailLogin ? null : trimmedLogin;
+
+    const existing = await dbClient.query(
+      `SELECT id FROM users WHERE email = ? OR (username IS NOT NULL AND username = ?)`,
+      [email, trimmedLogin]
+    );
+    if (existing.length > 0) {
+      return res.status(409).json({ error: "Bu login artıq istifadə olunur. Zəhmət olmasa başqa login seçin." });
+    }
+
+    const passwordHash = await bcrypt.hash(String(password), 10);
+    const id = `user-${randomUUID()}`;
+
+    await dbClient.execute(
+      `INSERT INTO users (id, name, email, username, password_hash, role, phone, company_name, balance, created_at)
+       VALUES (?, ?, ?, ?, ?, 'vendor', '', ?, 0, CURRENT_TIMESTAMP)`,
+      [id, companyName, email, username, passwordHash, companyName]
+    );
+
+    const rows = await dbClient.query('SELECT * FROM users WHERE id = ?', [id]);
+    return res.status(201).json({ success: true, user: rowToUser(rows[0]) });
+  } catch (error: any) {
+    console.error("[POST /api/admin/vendors] error:", error);
+    return res.status(500).json({ error: "Vendor hesabı yaradıla bilmədi: " + error.message });
+  }
+});
+
 // PUT /api/users/:id — update a user's profile. An admin can update any user, including
 // login credentials (username/password) and subscription; a vendor/customer can only update
 // their own profile fields (name, email, phone, companyName, avatar, about, guides) — never

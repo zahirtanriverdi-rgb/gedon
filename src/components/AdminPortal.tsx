@@ -93,6 +93,7 @@ interface AdminPortalProps {
   exchangeRates: { USD: number; EUR: number };
   onUpdateExchangeRates: (newRates: { USD: number; EUR: number }) => void;
   onUpdateUser?: (userId: string, data: Partial<User>) => void;
+  onCreateVendor?: (data: { companyName: string; login: string; password: string }) => Promise<void>;
   onUpdateTourStatus?: (tourId: string, isActive: boolean) => Promise<void>;
 }
 
@@ -114,6 +115,7 @@ export default function AdminPortal({
   exchangeRates,
   onUpdateExchangeRates,
   onUpdateUser,
+  onCreateVendor,
   onUpdateTourStatus
 }: AdminPortalProps) {
   const [commissionInput, setCommissionInput] = useState<string | number>(platformConfig.commissionPercentage);
@@ -225,6 +227,36 @@ export default function AdminPortal({
       onUpdateUser(vendorId, { username: vendorUsername, password: vendorPassword });
       setEditingVendorAuth(null);
       if (onShowNotification) onShowNotification('Operator giriş məlumatları uğurla yeniləndi! 🔐', 'success');
+    }
+  };
+
+  // New vendor/operator account creation
+  const [newVendorCompanyName, setNewVendorCompanyName] = useState<string>('');
+  const [newVendorLogin, setNewVendorLogin] = useState<string>('');
+  const [newVendorPassword, setNewVendorPassword] = useState<string>('');
+  const [isCreatingVendor, setIsCreatingVendor] = useState<boolean>(false);
+
+  const handleCreateVendorSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newVendorCompanyName || !newVendorLogin || !newVendorPassword) {
+      if (onShowNotification) onShowNotification('Şirkət adı, login və ilkin parol tələb olunur.', 'error');
+      return;
+    }
+    if (newVendorPassword.length < 6) {
+      if (onShowNotification) onShowNotification('Parol ən azı 6 simvol olmalıdır.', 'error');
+      return;
+    }
+    if (!onCreateVendor) return;
+    setIsCreatingVendor(true);
+    try {
+      await onCreateVendor({ companyName: newVendorCompanyName, login: newVendorLogin, password: newVendorPassword });
+      setNewVendorCompanyName('');
+      setNewVendorLogin('');
+      setNewVendorPassword('');
+    } catch {
+      // onCreateVendor already surfaces the error via onShowNotification
+    } finally {
+      setIsCreatingVendor(false);
     }
   };
 
@@ -480,6 +512,62 @@ export default function AdminPortal({
                 );
               })}
             </div>
+          </div>
+
+          {/* Section: Create New Vendor/Operator Account */}
+          <div className="bg-white p-5 rounded-xl border border-slate-200 space-y-4 shadow-xs">
+            <h3 className="text-xs font-bold text-slate-400 tracking-widest flex items-center gap-1.5">
+              <ShieldAlert className="w-4 h-4 text-emerald-700" />
+              YENİ VENDOR / OPERATOR HESABI YARAT
+            </h3>
+            <p className="text-[10px] text-slate-500 mb-2">
+              Yeni tur operatoru üçün hesap açın. Şirkət qalan profil məlumatlarını (telefon, haqqında, bələdçilər) ilk girişdən sonra özü tamamlayacaq.
+            </p>
+            <form onSubmit={handleCreateVendorSubmit} className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 mb-1">Şirkət adı:</label>
+                <input
+                  type="text"
+                  required
+                  value={newVendorCompanyName}
+                  onChange={(e) => setNewVendorCompanyName(e.target.value)}
+                  placeholder="Məs: Qafqaz Adventure MMC"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 mb-1">Login (istifadəçi adı və ya e-poçt):</label>
+                <input
+                  type="text"
+                  required
+                  value={newVendorLogin}
+                  onChange={(e) => setNewVendorLogin(e.target.value)}
+                  placeholder="Məs: qafqaz_adventure"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold text-slate-400 mb-1">İlkin parol:</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    required
+                    minLength={6}
+                    value={newVendorPassword}
+                    onChange={(e) => setNewVendorPassword(e.target.value)}
+                    placeholder="Ən azı 6 simvol"
+                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono"
+                  />
+                  <button
+                    type="submit"
+                    disabled={isCreatingVendor}
+                    className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-lg transition-all disabled:opacity-50 whitespace-nowrap"
+                  >
+                    {isCreatingVendor ? 'Yaradılır...' : 'Hesabı Yarat'}
+                  </button>
+                </div>
+              </div>
+            </form>
           </div>
 
           {/* Section: Operator Login Credentials Management */}

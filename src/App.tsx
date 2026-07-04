@@ -355,6 +355,24 @@ export default function App() {
     }));
   };
 
+  const handleCreateVendor = async (data: { companyName: string; login: string; password: string }) => {
+    try {
+      const response = await fetch('/api/admin/vendors', {
+        method: 'POST',
+        headers: authHeaders(),
+        body: JSON.stringify(data),
+      });
+      const parsed = await parseApiResponse(response);
+      if (!response.ok) throw new Error(parsed.error || 'Vendor hesabı yaradıla bilmədi.');
+
+      setUsers(prev => [...prev, parsed.user]);
+      showNotification(`🎉 "${data.companyName}" üçün yeni operator hesabı yaradıldı!`, 'success');
+    } catch (e: any) {
+      showNotification(e.message || 'Vendor hesabı yaradılarkən xəta baş verdi.', 'error');
+      throw e;
+    }
+  };
+
   const handleUpdateUser = async (userId: string, data: Partial<User>) => {
     try {
       const response = await fetch(`/api/users/${userId}`, {
@@ -836,6 +854,7 @@ export default function App() {
                 exchangeRates={exchangeRates}
                 onUpdateExchangeRates={handleUpdateExchangeRates}
                 onUpdateUser={handleUpdateUser}
+                onCreateVendor={handleCreateVendor}
                 onUpdateTourStatus={handleUpdateTourStatus}
               />
             )}
