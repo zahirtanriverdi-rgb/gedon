@@ -727,12 +727,12 @@ export default function App() {
           )}
 
           {/* Right Section */}
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-1 sm:gap-4">
             {selectedRole === 'customer' ? (
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-1 sm:gap-4">
                 <button
                   onClick={() => window.dispatchEvent(new CustomEvent('nav-wishlist'))}
-                  className="relative w-16 sm:w-auto sm:min-w-16 h-16 flex flex-col items-center justify-center gap-0.5 hover:text-emerald-600 transition group cursor-pointer bg-transparent border-none p-0"
+                  className="relative w-11 sm:w-auto sm:min-w-16 h-16 flex flex-col items-center justify-center gap-0.5 hover:text-emerald-600 transition group cursor-pointer bg-transparent border-none p-0"
                 >
                   <span className="relative w-11 h-8 flex items-center justify-center">
                     <Heart className="w-6 h-6 stroke-[2px] transition-colors group-hover:fill-emerald-500 group-hover:stroke-emerald-500" />
@@ -746,7 +746,7 @@ export default function App() {
                 </button>
                 <button
                   onClick={() => window.dispatchEvent(new CustomEvent('nav-calculator'))}
-                  className="w-16 sm:w-auto sm:min-w-16 h-16 flex flex-col items-center justify-center gap-0.5 hover:text-emerald-600 transition group cursor-pointer bg-transparent border-none p-0"
+                  className="w-11 sm:w-auto sm:min-w-16 h-16 flex flex-col items-center justify-center gap-0.5 hover:text-emerald-600 transition group cursor-pointer bg-transparent border-none p-0"
                 >
                   <span className="w-11 h-8 flex items-center justify-center">
                     <Calculator className="w-6 h-6 stroke-[2px] transition-colors group-hover:stroke-emerald-500" />
@@ -756,7 +756,7 @@ export default function App() {
                 <div className="relative">
                   <button
                     onClick={() => setIsLangMenuOpen(!isLangMenuOpen)}
-                    className="w-16 sm:w-auto sm:min-w-16 h-16 flex flex-col items-center justify-center gap-0.5 hover:text-emerald-600 transition group cursor-pointer bg-transparent border-none p-0"
+                    className="w-11 sm:w-auto sm:min-w-16 h-16 flex flex-col items-center justify-center gap-0.5 hover:text-emerald-600 transition group cursor-pointer bg-transparent border-none p-0"
                     title="Valyutanı / Dilini dəyiş"
                   >
                     <span className="w-11 h-8 flex items-center justify-center">

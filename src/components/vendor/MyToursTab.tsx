@@ -115,9 +115,9 @@ export function MyToursTab({ tours, slots, myTours, myTourIds, tourSearchTerm, o
                       className="w-14 h-14 rounded object-cover border border-slate-150 flex-shrink-0"
                       referrerPolicy="no-referrer"
                     />
-                    <div className="flex-1 space-y-1">
+                    <div className="flex-1 space-y-1 min-w-0">
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <h4 className="font-bold text-slate-900 text-xs leading-tight">{tour.name}</h4>
+                        <h4 className="font-bold text-slate-900 text-xs leading-tight truncate max-w-full">{tour.name}</h4>
                         {featuredTourIds.has(tour.id) && (
                           <span className="inline-flex items-center gap-1 text-[9px] bg-amber-100 text-amber-800 border border-amber-200 font-extrabold px-1.5 py-0.5 rounded-full">
                             🔥 Ayın Ən Çox Satılanı{tour.isManuallyFeatured ? ' (Seçilmiş)' : ''}

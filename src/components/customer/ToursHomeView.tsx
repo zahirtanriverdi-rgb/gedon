@@ -522,7 +522,7 @@ export function ToursHomeView({
                       <div 
                         key={tour.id}
                         onClick={() => onSelectTour(tour)}
-                        className="w-[410.66px] h-[150px] flex-shrink-0 bg-white border border-border-primary rounded-[var(--card-radius)] p-3 flex items-center gap-4 snap-start cursor-pointer hover:shadow-lg transition-all duration-300 group"
+                        className="w-[280px] sm:w-[410.66px] h-[150px] flex-shrink-0 bg-white border border-border-primary rounded-[var(--card-radius)] p-3 flex items-center gap-4 snap-start cursor-pointer hover:shadow-lg transition-all duration-300 group"
                       >
                         <div className="w-[84px] h-[84px] rounded-xl overflow-hidden flex-shrink-0 relative shadow-sm border border-slate-100">
                           <img
