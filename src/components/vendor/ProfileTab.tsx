@@ -237,7 +237,7 @@ export function ProfileTab({ currentUser, operatorToken, onShowNotification, onC
               </div>
               <button
                 type="button"
-                onClick={() => setProfileGuides([...profileGuides, { name: '', bio: '', specialty: '', avatar: '' }])}
+                onClick={() => setProfileGuides([...profileGuides, { id: 'guide-' + Math.random().toString(36).slice(2, 10), name: '', bio: '', specialty: '', avatar: '' }])}
                 className="px-3 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-bold text-[10px] tracking-wider rounded-lg flex items-center gap-1 transition"
               >
                 <Plus className="w-3 h-3" />

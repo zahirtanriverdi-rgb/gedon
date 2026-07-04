@@ -1,6 +1,7 @@
 export type UserRole = 'customer' | 'vendor' | 'admin';
 
 export interface Guide {
+  id?: string; // Stable reference so tours can point at a specific guide even if their name/order changes later
   name: string;
   bio: string;
   avatar?: string;
@@ -105,6 +106,7 @@ export interface Tour {
   meetingPoint?: string;
   meetingPointLat?: number;
   meetingPointLng?: number;
+  guideIds?: string[]; // Which of the vendor's registered Guides are assigned to this specific tour
   safetyInstructions?: string;
   allowTeamRegistration?: boolean;
   scheduleFrequency?: string; // e.g. 'one-time', 'daily', 'every-sunday', 'every-weekend'

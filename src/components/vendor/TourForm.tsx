@@ -1,11 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Tour, TourSlot, User } from '../../types';
+import { Tour, TourSlot, User, Guide } from '../../types';
 import { parseGpsFile } from '../../utils/gpxParser';
 import { Plus, Sparkles, Instagram, X, Check } from 'lucide-react';
 import { DynamicStringListInput } from './DynamicStringListInput';
 import { LocationAutocompleteInput } from './LocationAutocompleteInput';
 import { MultiDateCalendar, toIsoDate } from './MultiDateCalendar';
 import { TourDangerZone } from './TourDangerZone';
+
+// Older guides saved before Guide.id existed have no stable identifier — fall back to their
+// name so tour-guide assignment still works for pre-existing profile data.
+const getGuideKey = (guide: Guide): string => guide.id || guide.name;
 
 const FORM_STEPS = [
   { number: 1 as const, label: 'Əsas Məlumatlar' },
@@ -82,6 +86,7 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
   const [tourSafetyInstructions, setTourSafetyInstructions] = useState<string>('');
   const [tourAllowTeamRegistration, setTourAllowTeamRegistration] = useState<boolean>(true);
   const [tourScheduleFrequency, setTourScheduleFrequency] = useState<string>('one-time');
+  const [tourGuideIds, setTourGuideIds] = useState<string[]>([]);
 
   const [tourCreationMethod, setTourCreationMethod] = useState<'instagram' | 'manual'>('manual');
   const [instagramCaption, setInstagramCaption] = useState<string>('');
@@ -165,6 +170,7 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
     setTourSafetyInstructions(tour.safetyInstructions || '');
     setTourAllowTeamRegistration(tour.allowTeamRegistration !== false);
     setTourScheduleFrequency(tour.scheduleFrequency || 'one-time');
+    setTourGuideIds(tour.guideIds || []);
 
     const tourSlots = slots.filter(s => s.tourId === tour.id);
     setSelectedDates(tourSlots.map(s => new Date(s.startDate)));
@@ -247,6 +253,7 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
       safetyInstructions: tourCategory === 'active' ? tourSafetyInstructions : undefined,
       allowTeamRegistration: tourCategory === 'active' ? tourAllowTeamRegistration : undefined,
       scheduleFrequency: tourCategory === 'active' ? tourScheduleFrequency : undefined,
+      guideIds: tourGuideIds.length > 0 ? tourGuideIds : undefined,
     };
 
     setIsSavingForm(true);
@@ -764,6 +771,35 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
                 tourDepartureDateTime && tourReturnDateTime ? 'bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed' : 'bg-slate-50 border-slate-200 text-slate-800'
               }`}
             />
+          </div>
+
+          <div className="md:col-span-2">
+            <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">Bu tur üçün bələdçilər:</label>
+            {(currentUser.guides || []).length === 0 ? (
+              <p className="text-[10px] text-slate-400 italic bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+                Hələ profilinizə bələdçi əlavə etməmisiniz. Əvvəlcə "Profil Məlumatları" bölməsindən bələdçi əlavə edin, sonra buradan bu tura təyin edə bilərsiniz.
+              </p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {(currentUser.guides || []).map((guide) => {
+                  const key = getGuideKey(guide);
+                  const isSelected = tourGuideIds.includes(key);
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setTourGuideIds(prev => isSelected ? prev.filter(id => id !== key) : [...prev, key])}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition flex items-center gap-1.5 ${
+                        isSelected ? 'bg-emerald-600 border-emerald-600 text-white' : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-emerald-300'
+                      }`}
+                    >
+                      {isSelected && <Check className="w-3 h-3" />}
+                      {guide.name || 'Adsız bələdçi'}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           <div>
