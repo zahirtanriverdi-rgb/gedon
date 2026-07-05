@@ -15,10 +15,9 @@ import {
   getWhatsAppStatus,
   logoutWhatsApp,
   isRegisteredOnWhatsApp,
-  sendWhatsAppText,
   checkAndConsumeRateLimit,
-  generateAndStoreOtp,
-  verifyStoredOtp
+  generateCaptchaChallenge,
+  verifyCaptchaChallenge
 } from "./server/whatsapp";
 
 const app = express();
@@ -468,9 +467,11 @@ app.get("/api/bookings/whatsapp-leads", (req, res) => {
 });
 
 // ============================================================================
-// WhatsApp verification — real phone-number check + OTP delivery through a
-// Baileys-driven WhatsApp Web session (see server/whatsapp.ts). The session
-// itself is connected/disconnected from the admin panel by scanning a QR code.
+// WhatsApp verification — checks whether a phone number actually has an active
+// WhatsApp account through a Baileys-driven WhatsApp Web session (see
+// server/whatsapp.ts). No code is sent/entered: a positive check is itself the
+// verification. The session is connected/disconnected from the admin panel by
+// scanning a QR code.
 // ============================================================================
 
 // GET/POST connection management — admin-only, mirrors the /api/admin/vendors role check.
@@ -502,13 +503,27 @@ app.post("/api/whatsapp/logout", authenticateUser, async (req: any, res) => {
   return res.json({ success: true });
 });
 
-// POST /api/whatsapp/send-otp — public (guest booking flow, same as whatsapp-click above).
-// Checks the number actually has WhatsApp before sending anything, and is rate-limited per
-// phone + globally so the connected number's traffic doesn't look like a spam bot.
-app.post("/api/whatsapp/send-otp", async (req, res) => {
-  const { phone, name } = req.body || {};
+// GET /api/whatsapp/captcha — public, issues a one-time math challenge that must accompany
+// the verify-number call below. Keeps a scripted loop from cheaply hammering the connected
+// number just by varying phone numbers (on top of the rate limits already in place).
+app.get("/api/whatsapp/captcha", (req, res) => {
+  return res.json(generateCaptchaChallenge());
+});
+
+// POST /api/whatsapp/verify-number — public (guest booking flow, same as whatsapp-click
+// above). Requires a valid captcha answer, is rate-limited per phone + globally, and simply
+// reports whether the number has an active WhatsApp account — that check result IS the
+// verification, no code is sent or entered.
+app.post("/api/whatsapp/verify-number", async (req, res) => {
+  const { phone, captchaId, captchaAnswer } = req.body || {};
   if (!phone || typeof phone !== "string" || phone.replace(/\D/g, "").length < 7) {
     return res.status(400).json({ error: "Zəhmət olmasa düzgün WhatsApp nömrəsi daxil edin." });
+  }
+  if (!captchaId || captchaAnswer === undefined || captchaAnswer === null || captchaAnswer === "") {
+    return res.status(400).json({ error: "Zəhmət olmasa təhlükəsizlik sualını cavablandırın." });
+  }
+  if (!verifyCaptchaChallenge(String(captchaId), Number(captchaAnswer))) {
+    return res.status(400).json({ error: "Təhlükəsizlik sualının cavabı yanlışdır. Zəhmət olmasa yenidən cəhd edin.", captchaFailed: true });
   }
 
   const rate = checkAndConsumeRateLimit(phone);
@@ -525,41 +540,14 @@ app.post("/api/whatsapp/send-otp", async (req, res) => {
     if (!hasWhatsapp) {
       return res.status(422).json({ error: "Bu nömrədə aktiv WhatsApp hesabı tapılmadı.", hasWhatsapp: false });
     }
-
-    const code = generateAndStoreOtp(phone);
-    const greeting = name && String(name).trim() ? String(name).trim() : "müştəri";
-    await sendWhatsAppText(phone, `Hörmətli ${greeting}, bilet sifarişi üçün WhatsApp təsdiq kodunuz: ${code}`);
-
     return res.json({ success: true, hasWhatsapp: true });
   } catch (error: any) {
     if (error.message === "WHATSAPP_NOT_CONNECTED") {
       return res.status(503).json({ error: "WhatsApp doğrulama sistemi hazırda əlçatan deyil. Zəhmət olmasa bir az sonra yenidən cəhd edin." });
     }
-    console.error("[POST /api/whatsapp/send-otp] error:", error);
-    return res.status(500).json({ error: "Təsdiq kodu göndərilə bilmədi." });
+    console.error("[POST /api/whatsapp/verify-number] error:", error);
+    return res.status(500).json({ error: "Nömrə yoxlanıla bilmədi." });
   }
-});
-
-// POST /api/whatsapp/verify-otp — public, checks the server-stored code (never trusts a
-// client-echoed value).
-app.post("/api/whatsapp/verify-otp", (req, res) => {
-  const { phone, code } = req.body || {};
-  if (!phone || !code) {
-    return res.status(400).json({ error: "Nömrə və kod tələb olunur." });
-  }
-
-  const result = verifyStoredOtp(phone, String(code));
-  if (!result.ok) {
-    const messages: Record<string, string> = {
-      NOT_FOUND: "Əvvəlcə təsdiq kodu göndərin.",
-      EXPIRED: "Kodun vaxtı bitib. Zəhmət olmasa yenidən göndərin.",
-      TOO_MANY_ATTEMPTS: "Çox sayda yanlış cəhd edildi. Zəhmət olmasa yenidən kod göndərin.",
-      WRONG_CODE: "Təsdiq kodu yanlışdır! Zəhmət olmasa yenidən yoxlayın."
-    };
-    return res.status(400).json({ error: messages[result.reason || ""] || "Kod doğrulanmadı.", reason: result.reason });
-  }
-
-  return res.json({ success: true, verified: true });
 });
 
 // ============================================================================

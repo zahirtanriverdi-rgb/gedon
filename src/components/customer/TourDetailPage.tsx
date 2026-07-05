@@ -4,6 +4,7 @@ import { REVIEWS_ENABLED } from '../../config/features';
 import { computeFeaturedTourIds } from '../../utils/featuredTours';
 import { useLanguage } from '../../i18n/LanguageContext';
 import { getLocalizedTourName, getLocalizedTourDescription } from '../../i18n/tourLocalization';
+import { DIAL_CODES, DEFAULT_DIAL_CODE, isoToFlagEmoji } from '../../data/dialCodes';
 import {
   Calendar,
   Check,
@@ -140,13 +141,60 @@ export function TourDetailPage({
 
   // Guest booking details (replacing previous registration requirement)
   const [bookingCustomerName, setBookingCustomerName] = useState<string>('');
+  // Local/national number only — the dial code lives separately in phoneCountryDialCode and
+  // is combined via getFullPhoneNumber() below, since customers commonly type the number with
+  // its domestic trunk "0" prefix (e.g. 0501234567) once a country is already selected.
   const [bookingCustomerPhone, setBookingCustomerPhone] = useState<string>('');
-  const [userInputOtp, setUserInputOtp] = useState<string>('');
-  const [isOtpSent, setIsOtpSent] = useState<boolean>(false);
+  const [phoneCountryDialCode, setPhoneCountryDialCode] = useState<string>(DEFAULT_DIAL_CODE);
   const [isPhoneVerified, setIsPhoneVerified] = useState<boolean>(false);
-  const [showIncomingOtpBanner, setShowIncomingOtpBanner] = useState<boolean>(false);
-  const [isSendingOtp, setIsSendingOtp] = useState<boolean>(false);
-  const [isVerifyingOtp, setIsVerifyingOtp] = useState<boolean>(false);
+  const [isCheckingNumber, setIsCheckingNumber] = useState<boolean>(false);
+
+  // Best-effort default dial code from the visitor's IP location — defaults to Azerbaijan
+  // (see DEFAULT_DIAL_CODE) if the lookup fails or is blocked, since most bookings are for
+  // Azerbaijan-based tours anyway. The customer can always override it via the selector.
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('https://ipapi.co/json/');
+        const data = await res.json();
+        const detected: string | undefined = data?.country_calling_code;
+        if (!cancelled && detected && DIAL_CODES.some(c => c.dialCode === detected)) {
+          setPhoneCountryDialCode(detected);
+        }
+      } catch {
+        // Keep the Azerbaijan default.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  // Domestic numbers are usually typed with their trunk "0" prefix (e.g. 0501234567) even
+  // after a country code has been selected — that 0 isn't part of the actual E.164 number,
+  // so it's stripped here rather than wherever this is called from.
+  const getFullPhoneNumber = () => {
+    const nationalDigits = bookingCustomerPhone.replace(/\D/g, '').replace(/^0+/, '');
+    return `${phoneCountryDialCode}${nationalDigits}`;
+  };
+
+  // Small math captcha gating the real WhatsApp lookup (see /api/whatsapp/captcha) — one-time
+  // use, so a fresh one is fetched after every attempt (success or failure).
+  const [captchaId, setCaptchaId] = useState<string | null>(null);
+  const [captchaQuestion, setCaptchaQuestion] = useState<string | null>(null);
+  const [captchaAnswer, setCaptchaAnswer] = useState<string>('');
+
+  const fetchCaptchaChallenge = async () => {
+    setCaptchaAnswer('');
+    try {
+      const res = await fetch('/api/whatsapp/captcha');
+      const data = await res.json();
+      setCaptchaId(data.id);
+      setCaptchaQuestion(data.question);
+    } catch {
+      setCaptchaId(null);
+      setCaptchaQuestion(null);
+    }
+  };
 
   // Active Lifestyle Booking States
   const [usingOwnEquipment, setUsingOwnEquipment] = useState<boolean>(false);
@@ -197,12 +245,9 @@ export function TourDetailPage({
     setIsBookingStep(true);
     setBookingCustomerName('');
     setBookingCustomerPhone('');
-    setUserInputOtp('');
-    setIsOtpSent(false);
     setIsPhoneVerified(false);
-    setShowIncomingOtpBanner(false);
-    setIsSendingOtp(false);
-    setIsVerifyingOtp(false);
+    setIsCheckingNumber(false);
+    fetchCaptchaChallenge();
 
     // Active Lifestyle States Reset
     setUsingOwnEquipment(false);
@@ -233,10 +278,10 @@ export function TourDetailPage({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoOpenBooking, selectedTour.id]);
 
-  // Sends the OTP through the real WhatsApp session (server/whatsapp.ts): the server checks
-  // the number actually has WhatsApp before generating/sending anything and stores the code
-  // itself, so the client never sees or echoes back the real code (see handleVerifyOtp).
-  const handleSendVerificationCode = async () => {
+  // Checks the number against the real WhatsApp session (server/whatsapp.ts) — no code is
+  // sent or entered, a positive result IS the verification. Gated by a small captcha answer
+  // so a scripted loop can't cheaply hammer the connected number by varying phone numbers.
+  const handleVerifyPhoneNumber = async () => {
     if (!bookingCustomerName.trim()) {
       if (onShowNotification) onShowNotification(t('tourDetailPage.booking.validation.nameRequired'), 'warning');
       return;
@@ -246,77 +291,52 @@ export function TourDetailPage({
       return;
     }
 
-    const cleanPhone = bookingCustomerPhone.replace(/\D/g, '');
-    if (cleanPhone.length < 7) {
+    const fullPhone = getFullPhoneNumber();
+    if (fullPhone.replace(/\D/g, '').length < 7) {
       if (onShowNotification) onShowNotification(t('tourDetailPage.booking.validation.phoneInvalid'), 'warning');
       return;
     }
-
-    setIsSendingOtp(true);
-    try {
-      const res = await fetch('/api/whatsapp/send-otp', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: cleanPhone, name: bookingCustomerName.trim() })
-      });
-      const data = await res.json().catch(() => ({}));
-
-      if (!res.ok) {
-        let message = data.error || t('tourDetailPage.booking.validation.otpSendFailed');
-        if (res.status === 422 && data.hasWhatsapp === false) {
-          message = t('tourDetailPage.booking.validation.otpNoWhatsapp');
-        } else if (res.status === 429) {
-          message = t('tourDetailPage.booking.validation.otpRateLimited');
-        } else if (res.status === 503) {
-          message = t('tourDetailPage.booking.validation.otpServiceUnavailable');
-        }
-        if (onShowNotification) onShowNotification(message, 'error');
-        return;
-      }
-
-      setIsOtpSent(true);
-      setUserInputOtp('');
-      setIsPhoneVerified(false);
-      setShowIncomingOtpBanner(true);
-      if (onShowNotification) onShowNotification(t('tourDetailPage.booking.validation.otpSent'), 'success');
-    } catch {
-      if (onShowNotification) onShowNotification(t('tourDetailPage.booking.validation.otpServiceUnavailable'), 'error');
-    } finally {
-      setIsSendingOtp(false);
-    }
-  };
-
-  // Verifies against the server-stored code (see /api/whatsapp/verify-otp) rather than a
-  // value the client generated itself.
-  const handleVerifyOtp = async () => {
-    if (!userInputOtp.trim()) {
-      if (onShowNotification) onShowNotification(t('tourDetailPage.booking.validation.otpEmpty'), 'warning');
+    if (!captchaAnswer.trim()) {
+      if (onShowNotification) onShowNotification(t('tourDetailPage.booking.validation.captchaRequired'), 'warning');
       return;
     }
 
-    const cleanPhone = bookingCustomerPhone.replace(/\D/g, '');
-    setIsVerifyingOtp(true);
+    setIsCheckingNumber(true);
     try {
-      const res = await fetch('/api/whatsapp/verify-otp', {
+      const res = await fetch('/api/whatsapp/verify-number', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: cleanPhone, code: userInputOtp.trim() })
+        body: JSON.stringify({ phone: fullPhone, captchaId, captchaAnswer: Number(captchaAnswer) })
       });
       const data = await res.json().catch(() => ({}));
 
-      if (res.ok && data.verified) {
+      if (res.ok && data.hasWhatsapp) {
         setIsPhoneVerified(true);
-        setShowIncomingOtpBanner(false);
         if (onShowNotification) onShowNotification(t('tourDetailPage.booking.validation.otpVerified'), 'success');
-      } else {
-        setIsPhoneVerified(false);
-        if (onShowNotification) onShowNotification(data.error || t('tourDetailPage.booking.validation.otpWrong'), 'error');
+        return;
       }
+
+      let message = data.error || t('tourDetailPage.booking.validation.otpSendFailed');
+      if (res.status === 422 && data.hasWhatsapp === false) {
+        message = t('tourDetailPage.booking.validation.otpNoWhatsapp');
+      } else if (data.captchaFailed) {
+        message = t('tourDetailPage.booking.validation.captchaWrong');
+      } else if (res.status === 429) {
+        message = t('tourDetailPage.booking.validation.otpRateLimited');
+      } else if (res.status === 503) {
+        message = t('tourDetailPage.booking.validation.otpServiceUnavailable');
+      }
+      setIsPhoneVerified(false);
+      if (onShowNotification) onShowNotification(message, 'error');
+      // The captcha was consumed server-side by this attempt (whatever the outcome), so the
+      // next retry needs a fresh one.
+      fetchCaptchaChallenge();
     } catch {
       setIsPhoneVerified(false);
-      if (onShowNotification) onShowNotification(t('tourDetailPage.booking.validation.otpWrong'), 'error');
+      if (onShowNotification) onShowNotification(t('tourDetailPage.booking.validation.otpServiceUnavailable'), 'error');
+      fetchCaptchaChallenge();
     } finally {
-      setIsVerifyingOtp(false);
+      setIsCheckingNumber(false);
     }
   };
 
@@ -368,7 +388,7 @@ export function TourDetailPage({
       tourId: selectedTour.id,
       customerId: 'guest-' + Math.floor(Math.random() * 90000 + 10000),
       customerName: bookingCustomerName.trim() || currentUser.name,
-      customerPhone: bookingCustomerPhone.trim() || currentUser.phone,
+      customerPhone: bookingCustomerPhone.trim() ? getFullPhoneNumber() : currentUser.phone,
       bookingDate: new Date().toISOString().split('T')[0],
       participantsCount: finalQty,
       totalAmount: totalCost,
@@ -411,7 +431,7 @@ export function TourDetailPage({
         qty: finalQty,
         bookingRef,
         customerName: bookingCustomerName.trim() || currentUser.name,
-        customerPhone: bookingCustomerPhone.trim() || currentUser.phone
+        customerPhone: bookingCustomerPhone.trim() ? getFullPhoneNumber() : currentUser.phone
       });
 
       if (selectedTour.category === 'active' || selectedTour.isActiveLife) {
@@ -1025,104 +1045,83 @@ export function TourDetailPage({
                             <label className="block text-xs font-semibold text-slate-600 mb-1">
                               {t('tourDetailPage.guestForm.phoneLabel')} <span className="text-red-500">*</span>
                             </label>
-                            <input
-                              type="tel"
-                              required
-                              placeholder={t('tourDetailPage.guestForm.phonePlaceholder')}
-                              value={bookingCustomerPhone}
-                              onChange={(e) => setBookingCustomerPhone(e.target.value)}
-                              disabled={isPhoneVerified}
-                              className="w-full px-3 py-2 text-xs border border-slate-250 bg-white rounded-lg text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-emerald-500 disabled:bg-slate-100 disabled:text-slate-500"
-                            />
+                            <div className="flex gap-1.5">
+                              <select
+                                value={phoneCountryDialCode}
+                                onChange={(e) => setPhoneCountryDialCode(e.target.value)}
+                                disabled={isPhoneVerified}
+                                className="w-[6.5rem] shrink-0 px-1.5 py-2 text-xs border border-slate-250 bg-white rounded-lg text-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-500 disabled:bg-slate-100 disabled:text-slate-500"
+                              >
+                                {DIAL_CODES.map((c) => (
+                                  <option key={c.iso2} value={c.dialCode}>
+                                    {isoToFlagEmoji(c.iso2)} {c.dialCode}
+                                  </option>
+                                ))}
+                              </select>
+                              <input
+                                type="tel"
+                                required
+                                placeholder={t('tourDetailPage.guestForm.phonePlaceholder')}
+                                value={bookingCustomerPhone}
+                                onChange={(e) => setBookingCustomerPhone(e.target.value)}
+                                disabled={isPhoneVerified}
+                                className="flex-1 min-w-0 px-3 py-2 text-xs border border-slate-250 bg-white rounded-lg text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-emerald-500 disabled:bg-slate-100 disabled:text-slate-500"
+                              />
+                            </div>
                           </div>
                         </div>
 
-                        {/* WhatsApp Verification Code Box */}
+                        {/* WhatsApp Number Verification Box — just a live "does this number have
+                            WhatsApp" check, no code is sent or entered. */}
                         <div className="border-t border-slate-200/60 pt-3.5 mt-2 space-y-3">
-                          {!isOtpSent ? (
-                            <button
-                              type="button"
-                              onClick={handleSendVerificationCode}
-                              disabled={isSendingOtp}
-                              className="w-full py-2 bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-60 font-extrabold text-[11px] rounded-lg transition-all flex items-center justify-center gap-2 cursor-pointer"
-                            >
-                              {isSendingOtp ? (
-                                <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                              ) : (
-                                <MessageCircle className="w-3.5 h-3.5 fill-current text-white" />
+                          {!isPhoneVerified ? (
+                            <div className="space-y-2.5">
+                              {captchaQuestion && (
+                                <div className="flex items-center gap-2.5">
+                                  <label className="text-[11px] text-slate-500 leading-normal shrink-0">
+                                    {t('tourDetailPage.otp.captchaPrompt', { question: captchaQuestion })}
+                                  </label>
+                                  <input
+                                    type="text"
+                                    inputMode="numeric"
+                                    placeholder="?"
+                                    value={captchaAnswer}
+                                    onChange={(e) => setCaptchaAnswer(e.target.value.replace(/[^0-9-]/g, ''))}
+                                    disabled={isCheckingNumber}
+                                    className="w-16 px-2 py-1.5 text-xs text-center font-bold border border-slate-200 bg-slate-50 rounded-lg text-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-500 disabled:bg-slate-100"
+                                  />
+                                </div>
                               )}
-                              {isSendingOtp ? t('tourDetailPage.otp.sendingButton') : t('tourDetailPage.otp.sendButton')}
-                            </button>
+                              <button
+                                type="button"
+                                onClick={handleVerifyPhoneNumber}
+                                disabled={isCheckingNumber}
+                                className="w-full py-2 bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-60 font-extrabold text-[11px] rounded-lg transition-all flex items-center justify-center gap-2 cursor-pointer"
+                              >
+                                {isCheckingNumber ? (
+                                  <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                ) : (
+                                  <MessageCircle className="w-3.5 h-3.5 fill-current text-white" />
+                                )}
+                                {isCheckingNumber ? t('tourDetailPage.otp.sendingButton') : t('tourDetailPage.otp.sendButton')}
+                              </button>
+                            </div>
                           ) : (
-                            <div className="space-y-3">
-                              {showIncomingOtpBanner && (
-                                <div className="bg-slate-900 border-l-4 border-emerald-550 border-emerald-500 rounded-xl p-3.5 shadow-xl text-white max-w-sm mx-auto mb-1">
-                                  <div className="flex items-center justify-between text-[9px] text-slate-400 font-bold mb-1 tracking-wider">
-                                    <div className="flex items-center gap-1">
-                                      <span className="bg-emerald-600 text-white rounded p-0.5 px-1 font-extrabold text-[8px]">WA</span>
-                                      <span>{t('tourDetailPage.otp.whatsappSent')}</span>
-                                    </div>
-                                    <span>{t('tourDetailPage.otp.now')}</span>
-                                  </div>
-                                  <div className="text-[11px] leading-relaxed text-slate-100">
-                                    {t('tourDetailPage.otp.bannerLabel')}
-                                  </div>
-                                </div>
-                              )}
-
-                              {!isPhoneVerified ? (
-                                <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-sm space-y-2.5">
-                                  <div className="text-[11px] text-slate-500 leading-normal">
-                                    {t('tourDetailPage.otp.enterCodePrompt')}
-                                  </div>
-                                  <div className="flex gap-2.5">
-                                    <input
-                                      type="text"
-                                      maxLength={4}
-                                      placeholder={t('tourDetailPage.otp.codePlaceholder')}
-                                      value={userInputOtp}
-                                      onChange={(e) => setUserInputOtp(e.target.value.replace(/\D/g, ''))}
-                                      disabled={isVerifyingOtp}
-                                      className="flex-1 px-3 py-2 text-xs text-center font-bold font-mono tracking-widest border border-slate-200 bg-slate-50 rounded-lg text-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-500 disabled:bg-slate-100"
-                                    />
-                                    <button
-                                      type="button"
-                                      onClick={handleVerifyOtp}
-                                      disabled={isVerifyingOtp}
-                                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-extrabold text-xs rounded-lg transition-all cursor-pointer"
-                                    >
-                                      {isVerifyingOtp ? t('tourDetailPage.otp.verifyingButton') : t('tourDetailPage.otp.verifyButton')}
-                                    </button>
-                                  </div>
-                                  <div className="text-right">
-                                    <button
-                                      type="button"
-                                      onClick={handleSendVerificationCode}
-                                      disabled={isSendingOtp}
-                                      className="text-[10px] text-sky-600 hover:underline font-bold cursor-pointer disabled:opacity-60"
-                                    >
-                                      {t('tourDetailPage.otp.resendButton')}
-                                    </button>
-                                  </div>
-                                </div>
-                              ) : (
-                                <div className="bg-emerald-50 border border-emerald-150 rounded-lg p-3 flex items-center justify-between text-xs text-emerald-800">
-                                  <div className="flex items-center gap-1.5 font-bold">
-                                    <CheckCircle className="w-4 h-4 text-emerald-600" />
-                                    <span>{t('tourDetailPage.otp.verifiedLabel', { phone: bookingCustomerPhone })}</span>
-                                  </div>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setIsPhoneVerified(false);
-                                      setIsOtpSent(false);
-                                    }}
-                                    className="text-[10px] text-slate-400 hover:text-red-500 underline cursor-pointer"
-                                  >
-                                    {t('tourDetailPage.otp.changeNumber')}
-                                  </button>
-                                </div>
-                              )}
+                            <div className="bg-emerald-50 border border-emerald-150 rounded-lg p-3 flex items-center justify-between text-xs text-emerald-800">
+                              <div className="flex items-center gap-1.5 font-bold">
+                                <CheckCircle className="w-4 h-4 text-emerald-600" />
+                                <span>{t('tourDetailPage.otp.verifiedLabel', { phone: getFullPhoneNumber() })}</span>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setIsPhoneVerified(false);
+                                  fetchCaptchaChallenge();
+                                }}
+                                className="text-[10px] text-slate-400 hover:text-red-500 underline cursor-pointer"
+                              >
+                                {t('tourDetailPage.otp.changeNumber')}
+                              </button>
                             </div>
                           )}
                         </div>

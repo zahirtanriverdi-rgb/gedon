@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+import { randomUUID } from "crypto";
 import makeWASocket, {
   useMultiFileAuthState,
   fetchLatestBaileysVersion,
@@ -12,9 +13,9 @@ import pino from "pino";
 
 // Baileys drives a real WhatsApp Web session from the server (the admin scans a QR code with
 // a dedicated business number, same as opening web.whatsapp.com). That connected number is
-// what performs "does this phone have WhatsApp" lookups and sends the real OTP text — there is
-// no official free API for either, so this unofficial-but-widely-used approach is the only
-// viable one without a paid, pre-approved Meta Business/Cloud API account.
+// what performs "does this phone have WhatsApp" lookups — there is no official free API for
+// this, so this unofficial-but-widely-used approach is the only viable one without a paid,
+// pre-approved Meta Business/Cloud API account.
 const AUTH_DIR = path.join(process.cwd(), "data", "whatsapp-auth");
 const logger = pino({ level: "silent" });
 
@@ -99,10 +100,6 @@ export async function logoutWhatsApp(): Promise<void> {
   fs.rmSync(AUTH_DIR, { recursive: true, force: true });
 }
 
-function toJid(phone: string): string {
-  return `${phone.replace(/\D/g, "")}@s.whatsapp.net`;
-}
-
 export async function isRegisteredOnWhatsApp(phone: string): Promise<boolean> {
   if (!sock || status !== "connected") {
     throw new Error("WHATSAPP_NOT_CONNECTED");
@@ -110,13 +107,6 @@ export async function isRegisteredOnWhatsApp(phone: string): Promise<boolean> {
   const digits = phone.replace(/\D/g, "");
   const results = await sock.onWhatsApp(digits);
   return !!results?.[0]?.exists;
-}
-
-export async function sendWhatsAppText(phone: string, text: string): Promise<void> {
-  if (!sock || status !== "connected") {
-    throw new Error("WHATSAPP_NOT_CONNECTED");
-  }
-  await sock.sendMessage(toJid(phone), { text });
 }
 
 // --- Rate limiting -----------------------------------------------------------------------
@@ -174,38 +164,37 @@ export function checkAndConsumeRateLimit(phone: string): RateLimitResult {
   return { allowed: true };
 }
 
-// --- OTP storage ---------------------------------------------------------------------------
-// The code is generated and checked server-side now (it used to be a client-side Math.random()
-// echoed straight back to the same browser, which verified nothing). Kept in memory since a
-// code is only ever relevant for a few minutes within one booking session.
-const OTP_TTL_MS = 5 * 60 * 1000;
-const OTP_MAX_ATTEMPTS = 5;
+// --- Captcha -------------------------------------------------------------------------------
+// A tiny self-hosted math challenge gating the (rate-limited but still real) WhatsApp lookup
+// below, so a scripted loop can't cheaply hammer the connected number just by varying phone
+// numbers. No external account/keys needed, unlike reCAPTCHA/hCaptcha — enough friction for
+// this scale given the per-phone/global limits already in place.
+const CAPTCHA_TTL_MS = 3 * 60 * 1000;
 
-type OtpEntry = { code: string; expiresAt: number; attempts: number };
-const otpStore = new Map<string, OtpEntry>();
+type CaptchaEntry = { answer: number; expiresAt: number };
+const captchaStore = new Map<string, CaptchaEntry>();
 
-export function generateAndStoreOtp(phone: string): string {
-  const digits = phone.replace(/\D/g, "");
-  const code = String(Math.floor(1000 + Math.random() * 9000));
-  otpStore.set(digits, { code, expiresAt: Date.now() + OTP_TTL_MS, attempts: 0 });
-  return code;
+export function generateCaptchaChallenge(): { id: string; question: string } {
+  // Opportunistic sweep of abandoned challenges (never submitted) so the map doesn't grow
+  // unbounded — each entry is otherwise only ever removed when someone submits an answer.
+  const now = Date.now();
+  for (const [id, entry] of captchaStore) {
+    if (now > entry.expiresAt) captchaStore.delete(id);
+  }
+
+  const a = 1 + Math.floor(Math.random() * 8);
+  const b = 1 + Math.floor(Math.random() * 8);
+  const id = randomUUID();
+  captchaStore.set(id, { answer: a + b, expiresAt: now + CAPTCHA_TTL_MS });
+  return { id, question: `${a} + ${b}` };
 }
 
-export type OtpVerifyFailure = "NOT_FOUND" | "EXPIRED" | "TOO_MANY_ATTEMPTS" | "WRONG_CODE";
-
-export function verifyStoredOtp(phone: string, inputCode: string): { ok: boolean; reason?: OtpVerifyFailure } {
-  const digits = phone.replace(/\D/g, "");
-  const entry = otpStore.get(digits);
-  if (!entry) return { ok: false, reason: "NOT_FOUND" };
-  if (Date.now() > entry.expiresAt) {
-    otpStore.delete(digits);
-    return { ok: false, reason: "EXPIRED" };
-  }
-  if (entry.attempts >= OTP_MAX_ATTEMPTS) return { ok: false, reason: "TOO_MANY_ATTEMPTS" };
-
-  entry.attempts += 1;
-  if (entry.code !== inputCode.trim()) return { ok: false, reason: "WRONG_CODE" };
-
-  otpStore.delete(digits);
-  return { ok: true };
+// One-time use: the entry is removed on the first submission attempt regardless of outcome,
+// so a wrong guess can't just be retried against the same challenge.
+export function verifyCaptchaChallenge(id: string, answer: number): boolean {
+  const entry = captchaStore.get(id);
+  captchaStore.delete(id);
+  if (!entry) return false;
+  if (Date.now() > entry.expiresAt) return false;
+  return entry.answer === answer;
 }
