@@ -19,33 +19,6 @@ interface InternationalTourFormProps {
   onNavigateBack: () => void;
 }
 
-function getPremiumStockImageForDestination(country: string, city: string): string {
-  const normCountry = (country || '').toLowerCase();
-  const normCity = (city || '').toLowerCase();
-
-  if (normCountry.includes('it') || normCity.includes('rom') || normCity.includes('rome')) return 'https://images.unsplash.com/photo-1552832230-c0197dd311b5?w=1000&auto=format&fit=crop&q=80';
-  if (normCountry.includes('fran') || normCity.includes('par')) return 'https://images.unsplash.com/photo-1502602898657-3e91760cbb34?w=1000&auto=format&fit=crop&q=80';
-  if (normCountry.includes('indone') || normCity.includes('bal')) return 'https://images.unsplash.com/photo-1537996194471-e657df975ab4?w=1000&auto=format&fit=crop&q=80';
-  if (normCountry.includes('ispan') || normCountry.includes('spai') || normCity.includes('barc') || normCity.includes('madrid')) return 'https://images.unsplash.com/photo-1583422409516-2895a77efedd?w=1000&auto=format&fit=crop&q=80';
-  if (normCountry.includes('gürc') || normCountry.includes('gurc') || normCountry.includes('geor') || normCity.includes('tbil') || normCity.includes('batum')) return 'https://images.unsplash.com/photo-1518005020951-eccb494ad742?w=1000&auto=format&fit=crop&q=80';
-  if (normCountry.includes('türkiy') || normCountry.includes('turk') || normCity.includes('ist') || normCity.includes('capa') || normCity.includes('kap')) return 'https://images.unsplash.com/photo-1524231757912-21f4fe3a7200?w=1000&auto=format&fit=crop&q=80';
-  if (normCountry.includes('alm') || normCountry.includes('germ') || normCity.includes('berl') || normCity.includes('mün')) return 'https://images.unsplash.com/photo-1560969184-10fe8719e047?w=1000&auto=format&fit=crop&q=80';
-  if (normCountry.includes('ingil') || normCountry.includes('brit') || normCountry.includes('uk') || normCity.includes('lond')) return 'https://images.unsplash.com/photo-1513635269975-59663e0ac1ad?w=1000&auto=format&fit=crop&q=80';
-  if (normCountry.includes('ərəb') || normCountry.includes('arab') || normCountry.includes('uae') || normCity.includes('dub')) return 'https://images.unsplash.com/photo-1512453979798-5ea266f8880c?w=1000&auto=format&fit=crop&q=80';
-  if (normCountry.includes('isveçr') || normCountry.includes('switz') || normCity.includes('alpa') || normCity.includes('zur') || normCity.includes('cen')) return 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=1000&auto=format&fit=crop&q=80';
-  if (normCountry.includes('chex') || normCountry.includes('czech') || normCity.includes('praq') || normCity.includes('prag')) return 'https://images.unsplash.com/photo-1519671482749-fd09be7ccebf?w=1000&auto=format&fit=crop&q=80';
-
-  const generalTravelSights = [
-    'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1000&auto=format&fit=crop&q=80',
-    'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=1000&auto=format&fit=crop&q=80',
-    'https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=1000&auto=format&fit=crop&q=80',
-    'https://images.unsplash.com/photo-1488646953014-85cb44e25828?w=1000&auto=format&fit=crop&q=80',
-    'https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=1000&auto=format&fit=crop&q=80'
-  ];
-  const hash = Math.abs((country || '').length + (city || '').length) % generalTravelSights.length;
-  return generalTravelSights[hash];
-}
-
 // Unified create/edit form for international (outbound) tours. Same component is used from
 // VendorPortal's "add-intl-tour" tab (tour=null) and from the edit modal (tour set).
 export function InternationalTourForm({ currentUser, tour, slots, onAddTour, onEditTour, onDeleteTour, onAddSlot, onDeleteSlot, onShowNotification, onNavigateBack }: InternationalTourFormProps) {
@@ -102,6 +75,12 @@ export function InternationalTourForm({ currentUser, tour, slots, onAddTour, onE
 
   const [isSavingForm, setIsSavingForm] = useState(false);
   const [formSubmitError, setFormSubmitError] = useState<string | null>(null);
+
+  // Per-field invalid markers for fields HTML5 `required` can't cover (tag lists, image upload).
+  const [fieldErrors, setFieldErrors] = useState<Record<string, boolean>>({});
+  const clearFieldError = (key: string) => {
+    setFieldErrors((prev) => (prev[key] ? { ...prev, [key]: false } : prev));
+  };
 
   useEffect(() => {
     if (!tour) return;
@@ -174,7 +153,23 @@ export function InternationalTourForm({ currentUser, tour, slots, onAddTour, onE
       return;
     }
 
-    const finalImage = intlTourImage || getPremiumStockImageForDestination(intlTourCountry, intlTourCity);
+    const missing: { key: string; label: string }[] = [];
+    if (!intlLanguages.trim()) missing.push({ key: 'languages', label: 'Danışılan dillər' });
+    if (intlBringItems.filter(Boolean).length === 0) missing.push({ key: 'bringItems', label: 'Özünüzlə gətirin' });
+    if (!intlTourImage) missing.push({ key: 'image', label: 'Əsas Tur Şəkli' });
+    if (intlIncludes.filter(Boolean).length === 0) missing.push({ key: 'includes', label: 'Paketə Daxildir' });
+    if (intlNotIncludes.filter(Boolean).length === 0) missing.push({ key: 'notIncludes', label: 'Paketə Daxil DEYİL' });
+    if (!intlHighlights.trim()) missing.push({ key: 'highlights', label: 'Önə çıxanlar' });
+    if (missing.length > 0) {
+      setFieldErrors(Object.fromEntries(missing.map((m) => [m.key, true])));
+      const message = `Zəhmət olmasa bu xanaları doldurun: ${missing.map((m) => m.label).join(', ')}.`;
+      if (onShowNotification) onShowNotification(message, 'error');
+      else alert(message);
+      return;
+    }
+    setFieldErrors({});
+
+    const finalImage = intlTourImage;
     const cleanHighlights = intlHighlights.split(',').map(s => s.trim()).filter(Boolean);
     const cleanLanguages = intlLanguages.split(',').map(s => s.trim()).filter(Boolean);
     const cleanBringItems = intlBringItems.filter(Boolean);
@@ -448,7 +443,7 @@ export function InternationalTourForm({ currentUser, tour, slots, onAddTour, onE
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">Əsas Tur Şəkli (Seçin və ya yükləyin)</label>
+            <label className="block text-xs font-bold text-slate-700 mb-1">Əsas Tur Şəkli (Seçin və ya yükləyin) *</label>
             {intlTourImage ? (
               <div className="relative border border-slate-200 rounded-lg overflow-hidden group h-24 bg-slate-50 flex items-center justify-between px-3">
                 <div className="flex items-center gap-3">
@@ -469,12 +464,12 @@ export function InternationalTourForm({ currentUser, tour, slots, onAddTour, onE
                   const file = e.dataTransfer.files?.[0];
                   if (file) {
                     const reader = new FileReader();
-                    reader.onloadend = () => setIntlTourImage(reader.result as string);
+                    reader.onloadend = () => { setIntlTourImage(reader.result as string); clearFieldError('image'); };
                     reader.readAsDataURL(file);
                   }
                 }}
                 onClick={() => document.getElementById('intl-file-uploader-input')?.click()}
-                className={`h-24 border-2 border-dashed rounded-lg flex flex-col items-center justify-center p-2 text-center transition-all cursor-pointer ${intlDragActive ? 'border-emerald-500 bg-emerald-50/50' : 'border-slate-300 bg-slate-50 hover:bg-slate-100/75 hover:border-slate-400'}`}
+                className={`h-24 border-2 border-dashed rounded-lg flex flex-col items-center justify-center p-2 text-center transition-all cursor-pointer ${fieldErrors.image ? 'border-red-500 bg-red-50/50' : intlDragActive ? 'border-emerald-500 bg-emerald-50/50' : 'border-slate-300 bg-slate-50 hover:bg-slate-100/75 hover:border-slate-400'}`}
               >
                 <input
                   type="file"
@@ -485,39 +480,56 @@ export function InternationalTourForm({ currentUser, tour, slots, onAddTour, onE
                     const file = e.target.files?.[0];
                     if (file) {
                       const reader = new FileReader();
-                      reader.onloadend = () => setIntlTourImage(reader.result as string);
+                      reader.onloadend = () => { setIntlTourImage(reader.result as string); clearFieldError('image'); };
                       reader.readAsDataURL(file);
                     }
                   }}
                 />
                 <span className="text-lg">📸</span>
                 <span className="text-[10px] font-bold text-slate-705 mt-1">Sürüşdürüb buraxın və ya Seçmək üçün klikləyin</span>
-                <span className="text-[9px] text-slate-400 mt-0.5 font-semibold block leading-tight px-2">(Məcburi deyil. Yükləməsəniz, avtomatik seçiləcək!)</span>
+                <span className={`text-[9px] mt-0.5 font-semibold block leading-tight px-2 ${fieldErrors.image ? 'text-red-600' : 'text-slate-400'}`}>
+                  {fieldErrors.image ? '⚠️ Şəkil yükləmək məcburidir.' : 'Məcburidir — turun əsas şəkli olaraq göstəriləcək.'}
+                </span>
               </div>
             )}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <DynamicStringListInput label="Paketə Daxildir:" items={intlIncludes} onChange={setIntlIncludes} placeholder="Məs: Oteldə spa, Yerli sığorta" />
-            <DynamicStringListInput label="Paketə Daxil DEYİL:" items={intlNotIncludes} onChange={setIntlNotIncludes} placeholder="Məs: Alış-veriş, Şəxsi xərclər" accent="red" />
+            <DynamicStringListInput label="Paketə Daxildir:" items={intlIncludes} onChange={(items) => { setIntlIncludes(items); clearFieldError('includes'); }} placeholder="Məs: Oteldə spa, Yerli sığorta" error={fieldErrors.includes} />
+            <DynamicStringListInput label="Paketə Daxil DEYİL:" items={intlNotIncludes} onChange={(items) => { setIntlNotIncludes(items); clearFieldError('notIncludes'); }} placeholder="Məs: Alış-veriş, Şəxsi xərclər" accent="red" error={fieldErrors.notIncludes} />
           </div>
 
           <div className="space-y-3 pt-3 border-t border-slate-100">
             <div>
               <label className="block text-xs font-bold text-emerald-800 mb-1">Önə çıxanlar (Vergüllə ayırın):</label>
-              <input type="text" value={intlHighlights} onChange={(e) => setIntlHighlights(e.target.value)} placeholder="Məs: Şəhər turu bələdçi ilə" className="w-full px-3 py-2 border border-slate-250 rounded-lg text-xs text-slate-800 focus:ring-1 focus:ring-emerald-700 focus:outline-none" />
+              <input
+                type="text"
+                value={intlHighlights}
+                onChange={(e) => { setIntlHighlights(e.target.value); clearFieldError('highlights'); }}
+                placeholder="Məs: Şəhər turu bələdçi ilə"
+                className={`w-full px-3 py-2 border rounded-lg text-xs text-slate-800 focus:ring-1 focus:ring-emerald-700 focus:outline-none ${fieldErrors.highlights ? 'border-red-500 ring-1 ring-red-300' : 'border-slate-250'}`}
+              />
+              {fieldErrors.highlights && <p className="text-[10px] font-semibold text-red-600 mt-1">⚠️ Ən azı bir xüsusiyyət qeyd edin.</p>}
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-bold text-emerald-800 mb-1">Danışılan dillər (Vergüllə ayırın):</label>
-                <input type="text" value={intlLanguages} onChange={(e) => setIntlLanguages(e.target.value)} placeholder="Azərbaycanca, Rusca, İngiliscə" className="w-full px-3 py-2 border border-slate-250 rounded-lg text-xs text-slate-800 focus:ring-1 focus:ring-emerald-700 focus:outline-none" />
+                <input
+                  type="text"
+                  value={intlLanguages}
+                  onChange={(e) => { setIntlLanguages(e.target.value); clearFieldError('languages'); }}
+                  placeholder="Azərbaycanca, Rusca, İngiliscə"
+                  className={`w-full px-3 py-2 border rounded-lg text-xs text-slate-800 focus:ring-1 focus:ring-emerald-700 focus:outline-none ${fieldErrors.languages ? 'border-red-500 ring-1 ring-red-300' : 'border-slate-250'}`}
+                />
+                {fieldErrors.languages && <p className="text-[10px] font-semibold text-red-600 mt-1">⚠️ Ən azı bir dil qeyd edin.</p>}
               </div>
               <div>
                 <DynamicStringListInput
                   label="Özünüzlə gətirin:"
                   items={intlBringItems}
-                  onChange={setIntlBringItems}
+                  onChange={(items) => { setIntlBringItems(items); clearFieldError('bringItems'); }}
                   placeholder="Məs: Pasport, Hava şəraitinə uyğun geyim"
+                  error={fieldErrors.bringItems}
                 />
               </div>
             </div>

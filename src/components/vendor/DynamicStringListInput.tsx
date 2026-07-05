@@ -7,11 +7,12 @@ interface DynamicStringListInputProps {
   onChange: (items: string[]) => void;
   placeholder?: string;
   accent?: 'emerald' | 'red';
+  error?: boolean;
 }
 
 // Clickable add/remove list of free-text strings — used for "Qiymətə daxildir" /
 // "Qiymətə daxil deyil" on both the domestic and international tour forms.
-export function DynamicStringListInput({ label, items, onChange, placeholder, accent = 'emerald' }: DynamicStringListInputProps) {
+export function DynamicStringListInput({ label, items, onChange, placeholder, accent = 'emerald', error }: DynamicStringListInputProps) {
   const [draft, setDraft] = useState('');
 
   const addItem = () => {
@@ -42,7 +43,7 @@ export function DynamicStringListInput({ label, items, onChange, placeholder, ac
             }
           }}
           placeholder={placeholder}
-          className="flex-1 px-3 py-1.5 border border-slate-200 rounded-lg text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-700"
+          className={`flex-1 px-3 py-1.5 border rounded-lg text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-700 ${error ? 'border-red-500 ring-1 ring-red-300' : 'border-slate-200'}`}
         />
         <button
           type="button"
@@ -73,7 +74,9 @@ export function DynamicStringListInput({ label, items, onChange, placeholder, ac
           ))}
         </div>
       ) : (
-        <p className="text-[10px] text-slate-400 italic mt-1.5">Hələ heç bir maddə əlavə edilməyib.</p>
+        <p className={`text-[10px] italic mt-1.5 ${error ? 'text-red-600 font-semibold not-italic' : 'text-slate-400'}`}>
+          {error ? '⚠️ Ən azı 1 maddə əlavə edin.' : 'Hələ heç bir maddə əlavə edilməyib.'}
+        </p>
       )}
     </div>
   );

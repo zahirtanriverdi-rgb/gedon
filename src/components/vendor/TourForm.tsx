@@ -95,6 +95,51 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
   const goToNextStep = () => setCurrentStep((s) => (s < 3 ? ((s + 1) as 1 | 2 | 3) : s));
   const goToPrevStep = () => setCurrentStep((s) => (s > 1 ? ((s - 1) as 1 | 2 | 3) : s));
 
+  // Per-field invalid markers for fields HTML5 `required` can't cover (tag lists, media) or
+  // that we validate with a custom message instead of relying on native browser tooltips.
+  const [fieldErrors, setFieldErrors] = useState<Record<string, boolean>>({});
+  const clearFieldError = (key: string) => {
+    setFieldErrors((prev) => (prev[key] ? { ...prev, [key]: false } : prev));
+  };
+
+  // Returns the labels of every required-but-empty field in `step`, so goToNextStep (and the
+  // final submit, which re-checks step 3) can report every gap at once instead of one at a time.
+  const getMissingFieldsForStep = (step: 1 | 2 | 3): { key: string; label: string }[] => {
+    const missing: { key: string; label: string }[] = [];
+    if (step === 1) {
+      if (!tourLanguages.trim()) missing.push({ key: 'languages', label: 'Danışılan dillər' });
+      if (tourBringItems.filter(Boolean).length === 0) missing.push({ key: 'bringItems', label: 'Özünüzlə gətirin' });
+    } else if (step === 2) {
+      if (tourImages.length === 0) missing.push({ key: 'media', label: 'Media (ən azı 1 şəkil)' });
+    } else if (step === 3) {
+      if (tourIncludes.filter(Boolean).length === 0) missing.push({ key: 'includes', label: 'Qiymətə daxildir' });
+      if (tourNotIncluded.filter(Boolean).length === 0) missing.push({ key: 'notIncluded', label: 'Qiymətə daxil deyil' });
+      if (!tourHighlights.trim()) missing.push({ key: 'highlights', label: 'Önə çıxanlar' });
+    }
+    return missing;
+  };
+
+  const validateStepAndNotify = (step: 1 | 2 | 3): boolean => {
+    const missing = getMissingFieldsForStep(step);
+    if (missing.length === 0) {
+      setFieldErrors((prev) => {
+        const next = { ...prev };
+        for (const key of ['languages', 'bringItems', 'media', 'includes', 'notIncluded', 'highlights']) delete next[key];
+        return next;
+      });
+      return true;
+    }
+    setFieldErrors((prev) => {
+      const next = { ...prev };
+      for (const { key } of missing) next[key] = true;
+      return next;
+    });
+    const message = `Zəhmət olmasa bu xanaları doldurun: ${missing.map((m) => m.label).join(', ')}.`;
+    if (onShowNotification) onShowNotification(message, 'error');
+    else alert(message);
+    return false;
+  };
+
   // New tour (create mode): pre-fill the WhatsApp guide number with the vendor's own official
   // contact number instead of a hardcoded placeholder. Still editable — a vendor may want a
   // different guide's number for a specific tour.
@@ -182,6 +227,7 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
       return;
     }
     if (currentStep !== 3) {
+      if (!validateStepAndNotify(currentStep)) return;
       goToNextStep();
       return;
     }
@@ -193,6 +239,7 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
       }
       return;
     }
+    if (!validateStepAndNotify(3)) return;
 
     const defaultImg = tourCategory === 'peak'
       ? 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=800'
@@ -363,6 +410,7 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
           if (!tourImage && next.length > 0) setTourImage(next[0]);
           return next;
         });
+        clearFieldError('media');
       });
     }
     if (videoFiles.length > 0) {
@@ -488,7 +536,14 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
 
           <div>
             <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">Danışılan dillər (Vergüllə ayırın):</label>
-            <input type="text" value={tourLanguages} onChange={(e) => setTourLanguages(e.target.value)} placeholder="Azərbaycanca, Rusca, İngiliscə" className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800" />
+            <input
+              type="text"
+              value={tourLanguages}
+              onChange={(e) => { setTourLanguages(e.target.value); clearFieldError('languages'); }}
+              placeholder="Azərbaycanca, Rusca, İngiliscə"
+              className={`w-full px-3 py-2 bg-slate-50 border rounded-lg text-xs text-slate-800 ${fieldErrors.languages ? 'border-red-500 ring-1 ring-red-300' : 'border-slate-200'}`}
+            />
+            {fieldErrors.languages && <p className="text-[10px] font-semibold text-red-600 mt-1">⚠️ Ən azı bir dil qeyd edin.</p>}
           </div>
 
           {tourCategory === 'active' && (
@@ -549,8 +604,9 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
             <DynamicStringListInput
               label="Özünüzlə gətirin:"
               items={tourBringItems}
-              onChange={setTourBringItems}
+              onChange={(items) => { setTourBringItems(items); clearFieldError('bringItems'); }}
               placeholder="Məs: Rahat ayaqqabı, Pasport"
+              error={fieldErrors.bringItems}
             />
           </div>
           <div>
@@ -700,16 +756,17 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
 
           <div className="md:col-span-2 space-y-3 pt-3 border-t border-slate-100">
             <div className="flex items-center justify-between">
-              <label className="block text-[11px] font-bold text-slate-450 tracking-wide">Media Qalereyası (Şəkil və Video):</label>
+              <label className="block text-[11px] font-bold text-slate-450 tracking-wide">Media Qalereyası (ən azı 1 şəkil məcburidir):</label>
               <span className="text-[9px] text-slate-400 font-semibold">Şəkillərdən birini "Ana səhifə şəkli" et</span>
             </div>
             <div className="relative">
               <input type="file" multiple accept="image/*,video/*" onChange={handleMediaFilesChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
-              <div className="w-full px-4 py-3 bg-slate-50 hover:bg-slate-100 border border-dashed border-emerald-300 hover:border-emerald-500 rounded-xl text-xs flex items-center justify-center gap-2 text-emerald-800 font-bold transition">
+              <div className={`w-full px-4 py-3 bg-slate-50 hover:bg-slate-100 border border-dashed rounded-xl text-xs flex items-center justify-center gap-2 text-emerald-800 font-bold transition ${fieldErrors.media ? 'border-red-500 ring-1 ring-red-300' : 'border-emerald-300 hover:border-emerald-500'}`}>
                 <Plus className="w-4 h-4 text-emerald-600" />
                 <span>Cihazdan şəkil və ya video seçin (Multi-upload) 📁📸🎥</span>
               </div>
             </div>
+            {fieldErrors.media && <p className="text-[10px] font-semibold text-red-600">⚠️ Ən azı 1 şəkil əlavə edin.</p>}
 
             {(tourImages.length > 0 || tourVideos.length > 0) && (
               <div className="flex flex-wrap gap-2 mt-2">
@@ -805,20 +862,29 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
           <DynamicStringListInput
             label="Qiymətə daxildir:"
             items={tourIncludes}
-            onChange={setTourIncludes}
+            onChange={(items) => { setTourIncludes(items); clearFieldError('includes'); }}
             placeholder="Məs: Səhər yeməyi, Giriş bileti, Professional Bələdçi"
+            error={fieldErrors.includes}
           />
           <DynamicStringListInput
             label="Qiymətə daxil deyil:"
             items={tourNotIncluded}
-            onChange={setTourNotIncluded}
+            onChange={(items) => { setTourNotIncluded(items); clearFieldError('notIncluded'); }}
             placeholder="Məs: Şəxsi xərclər, Nahar"
             accent="red"
+            error={fieldErrors.notIncluded}
           />
 
           <div>
             <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">Önə çıxanlar (Vergüllə ayırın):</label>
-            <input type="text" value={tourHighlights} onChange={(e) => setTourHighlights(e.target.value)} placeholder="Məs: Panoram mənzərəli marşrut" className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800" />
+            <input
+              type="text"
+              value={tourHighlights}
+              onChange={(e) => { setTourHighlights(e.target.value); clearFieldError('highlights'); }}
+              placeholder="Məs: Panoram mənzərəli marşrut"
+              className={`w-full px-3 py-2 bg-slate-50 border rounded-lg text-xs text-slate-800 ${fieldErrors.highlights ? 'border-red-500 ring-1 ring-red-300' : 'border-slate-200'}`}
+            />
+            {fieldErrors.highlights && <p className="text-[10px] font-semibold text-red-600 mt-1">⚠️ Ən azı bir xüsusiyyət qeyd edin.</p>}
           </div>
         </div>
         )}
