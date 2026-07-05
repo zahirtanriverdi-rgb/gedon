@@ -9,6 +9,7 @@ import jwt from "jsonwebtoken";
 import { randomUUID } from "crypto";
 import { initializeDatabase } from "./server/db";
 import dbClient from "./server/db";
+import { scheduleTourTranslation } from "./server/translate";
 
 const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
@@ -626,6 +627,7 @@ app.post("/api/tours", authenticateUser, async (req: any, res) => {
     );
 
     const rows = await dbClient.query('SELECT * FROM tours WHERE id = ?', [id]);
+    scheduleTourTranslation(id, name, description || null);
     res.status(201).json({ tour: rowToTour(rows[0]) });
   } catch (error: any) {
     console.error("[POST /api/tours] error:", error);
@@ -648,6 +650,7 @@ async function writeLiveTourRow(id: string, merged: Record<string, any>, status:
       JSON.stringify(extra), id
     ]
   );
+  scheduleTourTranslation(id, merged.name, merged.description || null);
 }
 
 // PUT /api/tours/:id — update a tour. Admins edit the live row directly and control approval

@@ -1,0 +1,25 @@
+services:
+  libretranslate:
+    container_name: gedekgorek-libretranslate
+    image: libretranslate/libretranslate:latest
+    ports:
+      # Host 5000 is taken by macOS AirPlay Receiver, so map to 5050 instead.
+      - "5050:5000"
+    restart: unless-stopped
+    environment:
+      # Only download/load the models this project actually needs (source: Azerbaijani,
+      # targets: English/Russian). Argos pivots az->ru automatically through en.
+      - LT_LOAD_ONLY=az,en,ru
+      - LT_UPDATE_MODELS=true
+    healthcheck:
+      test: ["CMD-SHELL", "./venv/bin/python scripts/healthcheck.py"]
+      interval: 10s
+      timeout: 4s
+      retries: 4
+      start_period: 5s
+    volumes:
+      # Persist downloaded models across restarts so they aren't re-fetched every time.
+      - libretranslate_models:/home/libretranslate/.local:rw
+
+volumes:
+  libretranslate_models:

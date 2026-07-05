@@ -14,6 +14,17 @@ import {
   Briefcase
 } from 'lucide-react';
 
+// Shown in place of a tour create/edit form once the vendor's subscription has expired
+// (grace period active or over) — read-only tabs (my-tours, CRM, profile) stay unaffected.
+function SubscriptionExpiredNotice({ message }: { message: string }) {
+  return (
+    <div className="bg-white p-8 rounded-xl border border-orange-200 text-center space-y-3">
+      <h3 className="text-base font-bold text-orange-800">⚠️ Abunəlik müddətiniz bitib</h3>
+      <p className="text-sm text-slate-600 max-w-md mx-auto">{message}</p>
+    </div>
+  );
+}
+
 interface VendorPortalProps {
   tours: Tour[];
   slots: TourSlot[];
@@ -146,6 +157,12 @@ export default function VendorPortal({
   // shows once there's genuinely less than a day left.
   const graceDaysLeft = subDate ? Math.max(0, Math.ceil((subDate.getTime() + GRACE_MS - Date.now()) / DAY_MS)) : 0;
   const daysUntilExpiry = subDate ? Math.max(0, Math.ceil((subDate.getTime() - Date.now()) / DAY_MS)) : 0;
+  // Once the subscription has expired — whether still inside the 3-day grace window or past
+  // it — the vendor keeps full read access to their panel (my-tours, CRM, profile) but can no
+  // longer create or edit tours. `isAutoDeactivated` is already a subset of `isExpired`, so this
+  // is just `isExpired` under a name that reads clearly at each gating call site below.
+  const isSubscriptionExpiredOrInGracePeriod = isExpired;
+  const subscriptionExpiredMessage = `Abunəlik müddətiniz bitib. Yeni tur əlavə etmək və ya mövcud turlara düzəliş etmək üçün admin ilə əlaqə saxlayın və ya abunəliyi yeniləyin. Qalan güzəşt müddəti: ${graceDaysLeft} gün.`;
 
   return (
     <div className="space-y-6">
@@ -310,7 +327,13 @@ export default function VendorPortal({
           exchangeRates={exchangeRates}
           onUpdateExchangeRates={onUpdateExchangeRates}
           onShowNotification={onShowNotification}
-          onEditClick={(tour) => setEditingTour(tour)}
+          onEditClick={(tour) => {
+            if (isSubscriptionExpiredOrInGracePeriod) {
+              if (onShowNotification) onShowNotification(subscriptionExpiredMessage, 'warning');
+              return;
+            }
+            setEditingTour(tour);
+          }}
           onToggleFeatured={onToggleFeatured}
         />
       )}
@@ -333,30 +356,38 @@ export default function VendorPortal({
 
       {/* Subtab HTML Form: Add Tour */}
       {activeSubTab === 'add-tour' && (
-        <TourForm
-          currentUser={currentUser}
-          slots={slots}
-          category={newTourCategory}
-          onCategoryChange={setNewTourCategory}
-          onAddTour={onAddTour}
-          onAddSlot={onAddSlot}
-          onDeleteSlot={onDeleteSlot}
-          onShowNotification={onShowNotification}
-          onNavigateBack={() => setActiveSubTab('my-tours')}
-        />
+        isSubscriptionExpiredOrInGracePeriod ? (
+          <SubscriptionExpiredNotice message={subscriptionExpiredMessage} />
+        ) : (
+          <TourForm
+            currentUser={currentUser}
+            slots={slots}
+            category={newTourCategory}
+            onCategoryChange={setNewTourCategory}
+            onAddTour={onAddTour}
+            onAddSlot={onAddSlot}
+            onDeleteSlot={onDeleteSlot}
+            onShowNotification={onShowNotification}
+            onNavigateBack={() => setActiveSubTab('my-tours')}
+          />
+        )
       )}
 
       {/* Subtab HTML Form: Add International Tour */}
       {activeSubTab === 'add-intl-tour' && (
-        <InternationalTourForm
-          currentUser={currentUser}
-          slots={slots}
-          onAddTour={onAddTour}
-          onAddSlot={onAddSlot}
-          onDeleteSlot={onDeleteSlot}
-          onShowNotification={onShowNotification}
-          onNavigateBack={() => setActiveSubTab('my-tours')}
-        />
+        isSubscriptionExpiredOrInGracePeriod ? (
+          <SubscriptionExpiredNotice message={subscriptionExpiredMessage} />
+        ) : (
+          <InternationalTourForm
+            currentUser={currentUser}
+            slots={slots}
+            onAddTour={onAddTour}
+            onAddSlot={onAddSlot}
+            onDeleteSlot={onDeleteSlot}
+            onShowNotification={onShowNotification}
+            onNavigateBack={() => setActiveSubTab('my-tours')}
+          />
+        )
       )}
 
       {/* Subtab HTML Form: Add Slot Calendar */}
