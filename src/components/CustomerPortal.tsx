@@ -219,6 +219,17 @@ export default function CustomerPortal({
     return () => window.removeEventListener('nav-calculator', handleNavCalculator);
   }, []);
 
+  React.useEffect(() => {
+    const handleNavFaq = () => {
+      setActiveView('faq');
+      setSelectedTour(null);
+      setSelectedOrganizer(null);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+    window.addEventListener('nav-faq', handleNavFaq);
+    return () => window.removeEventListener('nav-faq', handleNavFaq);
+  }, []);
+
   // Use prop if provided, else use local state
   const currentSearchQuery = onSearchChange ? searchQuery : localSearchQuery;
   const handleSearchChange = (val: string) => {

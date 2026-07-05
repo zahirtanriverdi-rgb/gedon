@@ -15,7 +15,8 @@ import {
   X,
   Heart,
   Globe,
-  Calculator
+  Calculator,
+  BookOpen
 } from 'lucide-react';
 
 // The API always responds with JSON, but if a request slips past Express (e.g. a 413
@@ -759,6 +760,16 @@ export default function App() {
                     )}
                   </span>
                   <span className="hidden sm:block text-xs text-label-secondary font-semibold">İstəklər</span>
+                </button>
+                <button
+                  onClick={() => window.dispatchEvent(new CustomEvent('nav-faq'))}
+                  className="relative w-11 sm:w-auto sm:min-w-0 sm:px-2 h-16 sm:h-14 flex flex-col items-center justify-center gap-0.5 hover:text-emerald-600 transition group cursor-pointer bg-transparent border-none p-0"
+                  title="Turdan əvvəl bilməli olduqlarınız"
+                >
+                  <span className="w-11 h-8 sm:w-9 sm:h-7 flex items-center justify-center">
+                    <BookOpen className="w-6 h-6 sm:w-5 sm:h-5 stroke-[2px] transition-colors group-hover:stroke-emerald-500" />
+                  </span>
+                  <span className="hidden sm:block text-xs text-label-secondary font-semibold whitespace-nowrap">Bələdçi</span>
                 </button>
                 <button
                   onClick={() => window.dispatchEvent(new CustomEvent('nav-calculator'))}

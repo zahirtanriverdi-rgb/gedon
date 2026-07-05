@@ -400,7 +400,7 @@ export function TourDetailPage({
               <div className="flex space-x-2 text-xs text-label-tertiary font-medium">
                 <span><strong className="text-label-primary cursor-pointer pointer-events-auto hover:underline" onClick={(e) => { e.stopPropagation(); const org = users.find(u => u.id === selectedTour.vendorId); if (org) { setSelectedOrganizer(org); setActiveView('organizer'); setSelectedTour(null); } }}>{selectedTour.vendorName}</strong> tərəfindən</span>
               </div>
-              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-label-primary tracking-tight leading-tight">
+              <h1 className="text-3xl sm:text-4xl font-extrabold text-label-primary tracking-tight leading-tight">
                 {selectedTour.name}
               </h1>
               <div className="flex flex-wrap items-center justify-between gap-4 mt-2">
