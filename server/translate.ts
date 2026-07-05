@@ -1,58 +1,103 @@
+import { GoogleGenAI, Type } from "@google/genai";
 import dbClient from "./db";
 
-// Self-hosted LibreTranslate instance (see docker-compose.libretranslate.yml).
-// Source content is always Azerbaijani; LibreTranslate/Argos pivots through English
-// automatically for pairs without a direct model (e.g. az->ru).
-const LIBRETRANSLATE_URL = process.env.LIBRETRANSLATE_URL || "http://localhost:5050";
-const LIBRETRANSLATE_API_KEY = process.env.LIBRETRANSLATE_API_KEY || "";
-const SOURCE_LANGUAGE = "az";
-const TARGET_LANGUAGES = ["en", "ru"];
+// Gemini-powered translation for tour content (source: Azerbaijani -> English/Russian).
+// Domain-aware prompting handles tourism vocabulary (zirvə/şəlalə/yürüş etc.) far more
+// reliably than a generic machine-translation model would.
+const TARGET_LANGUAGES = ["en", "ru"] as const;
+type TargetLanguage = (typeof TARGET_LANGUAGES)[number];
 
-export type TourTranslations = Record<string, { name: string; description: string | null }>;
+export type TourTranslations = Partial<Record<TargetLanguage, { name: string; description: string | null }>>;
 
-async function translateText(text: string, target: string): Promise<string | null> {
-  if (!text) return null;
-  try {
-    const res = await fetch(`${LIBRETRANSLATE_URL}/translate`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        q: text,
-        source: SOURCE_LANGUAGE,
-        target,
-        format: "text",
-        ...(LIBRETRANSLATE_API_KEY ? { api_key: LIBRETRANSLATE_API_KEY } : {}),
-      }),
-    });
-    if (!res.ok) {
-      console.error(`[translate] LibreTranslate ${SOURCE_LANGUAGE}->${target} failed: ${res.status} ${await res.text()}`);
-      return null;
+let aiClient: GoogleGenAI | null = null;
+function getGeminiClient(): GoogleGenAI {
+  if (!aiClient) {
+    const key = process.env.GEMINI_API_KEY;
+    if (!key) {
+      throw new Error("GEMINI_API_KEY environment variable is required.");
     }
-    const data = await res.json();
-    return typeof data.translatedText === "string" ? data.translatedText : null;
+    aiClient = new GoogleGenAI({ apiKey: key });
+  }
+  return aiClient;
+}
+
+const SYSTEM_INSTRUCTION = `Sən Azərbaycan dilindən ingilis və rus dillərinə tərcümə edən peşəkar turizm tərcüməçisisən.
+Tur adlarını və təsvirlərini hərfi yox, təbii və axıcı şəkildə tərcümə et.
+Turizm terminologiyasına diqqət et: "zirvə" = "peak/summit", "şəlalə" = "waterfall", "yürüş" = "hike/trek", "kamp" = "camp" və s.
+Yalnız istənilən JSON strukturunda cavab ver, əlavə şərh yazma.`;
+
+const RESPONSE_SCHEMA = {
+  type: Type.OBJECT,
+  properties: {
+    en: {
+      type: Type.OBJECT,
+      properties: {
+        name: { type: Type.STRING },
+        description: { type: Type.STRING },
+      },
+      required: ["name", "description"],
+    },
+    ru: {
+      type: Type.OBJECT,
+      properties: {
+        name: { type: Type.STRING },
+        description: { type: Type.STRING },
+      },
+      required: ["name", "description"],
+    },
+  },
+  required: ["en", "ru"],
+};
+
+function isRateLimitError(error: any): boolean {
+  return error?.status === 429 || /rate limit|quota/i.test(error?.message || "");
+}
+
+async function requestTranslation(name: string, description: string | null, attempt = 0): Promise<TourTranslations> {
+  try {
+    const ai = getGeminiClient();
+    const promptText = `Tur adı: ${name}\nTur təsviri: ${description || "(yoxdur)"}`;
+    const response = await ai.models.generateContent({
+      model: "gemini-3.5-flash",
+      contents: promptText,
+      config: {
+        systemInstruction: SYSTEM_INSTRUCTION,
+        responseMimeType: "application/json",
+        responseSchema: RESPONSE_SCHEMA,
+      },
+    });
+    const parsed = JSON.parse(response.text || "{}");
+    const translations: TourTranslations = {};
+    for (const lang of TARGET_LANGUAGES) {
+      const entry = parsed[lang];
+      if (entry?.name) {
+        translations[lang] = {
+          name: entry.name,
+          description: description ? entry.description || null : null,
+        };
+      }
+    }
+    return translations;
   } catch (error: any) {
-    console.error(`[translate] LibreTranslate request failed (${SOURCE_LANGUAGE}->${target}):`, error.message);
-    return null;
+    if (isRateLimitError(error) && attempt < 3) {
+      const delayMs = 2000 * (attempt + 1);
+      console.warn(`[translate] Gemini rate-limited, retrying in ${delayMs}ms (attempt ${attempt + 1})`);
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+      return requestTranslation(name, description, attempt + 1);
+    }
+    console.error("[translate] Gemini translation failed:", error.message);
+    return {};
   }
 }
 
 export async function translateTourContent(name: string, description: string | null): Promise<TourTranslations> {
-  const translations: TourTranslations = {};
-  for (const target of TARGET_LANGUAGES) {
-    const [translatedName, translatedDescription] = await Promise.all([
-      translateText(name, target),
-      description ? translateText(description, target) : Promise.resolve(null),
-    ]);
-    if (translatedName) {
-      translations[target] = { name: translatedName, description: translatedDescription };
-    }
-  }
-  return translations;
+  if (!name) return {};
+  return requestTranslation(name, description);
 }
 
 // Fire-and-forget: translates a tour's name/description in the background and merges the
-// result into extra_data.translations. Never throws — LibreTranslate being offline or slow
-// must never block or fail tour creation/editing.
+// result into extra_data.translations. Never throws — Gemini being offline, rate-limited, or
+// slow must never block or fail tour creation/editing.
 export function scheduleTourTranslation(tourId: string, name: string, description: string | null) {
   translateTourContent(name, description)
     .then(async (translations) => {

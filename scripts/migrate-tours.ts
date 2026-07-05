@@ -1,6 +1,6 @@
 // One-off migration: replace all peak/camp/hiking tours (and the stray manual test tour)
 // with the real dataset sourced from the docx, while leaving international/active tours,
-// their bookings, and reviews untouched. Also backfills en/ru translations via LibreTranslate
+// their bookings, and reviews untouched. Also backfills en/ru translations via Gemini
 // so the new tours are immediately readable in all three languages instead of waiting on the
 // fire-and-forget background job.
 import dbClient from '../server/db';
@@ -52,7 +52,7 @@ async function main() {
     );
   }
 
-  console.log('[migrate] Backfilling en/ru translations via LibreTranslate (this can take a while)...');
+  console.log('[migrate] Backfilling en/ru translations via Gemini (this can take a while)...');
   let translated = 0;
   for (const tour of newTours) {
     const translations = await translateTourContent(tour.name, tour.description || null);
@@ -67,8 +67,11 @@ async function main() {
         console.log(`[migrate] translated (${translated}/${newTours.length}): ${tour.id}`);
       }
     } else {
-      console.warn(`[migrate] WARNING: no translation produced for ${tour.id} (LibreTranslate offline or failed)`);
+      console.warn(`[migrate] WARNING: no translation produced for ${tour.id} (Gemini offline or failed)`);
     }
+    // Throttle between tours: bulk-looping many sequential Gemini calls without a gap
+    // can trip per-minute rate limits even with the per-call retry in translateTourContent.
+    await new Promise((resolve) => setTimeout(resolve, 1500));
   }
 
   console.log('[migrate] Done.');

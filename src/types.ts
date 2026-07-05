@@ -118,7 +118,7 @@ export interface Tour {
   safetyInstructions?: string;
   allowTeamRegistration?: boolean;
   scheduleFrequency?: string; // e.g. 'one-time', 'daily', 'every-sunday', 'every-weekend'
-  translations?: Partial<Record<'en' | 'ru', { name: string; description: string | null }>>; // Machine-translated (LibreTranslate) name/description, keyed by target language; populated in the background by scheduleTourTranslation. Source-of-truth content (name/description) is always Azerbaijani.
+  translations?: Partial<Record<'en' | 'ru', { name: string; description: string | null }>>; // Machine-translated (Gemini) name/description, keyed by target language; populated in the background by scheduleTourTranslation. Source-of-truth content (name/description) is always Azerbaijani.
 }
 
 export interface TourSlot {
