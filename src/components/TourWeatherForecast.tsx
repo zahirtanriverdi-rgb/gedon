@@ -10,7 +10,7 @@ interface TourWeatherForecastProps {
 }
 
 export const TourWeatherForecast: React.FC<TourWeatherForecastProps> = ({ dates, region, variant = 'compact' }) => {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [forecasts, setForecasts] = useState<Record<string, WeatherInfo>>({});
   const [loading, setLoading] = useState(true);
 
@@ -31,7 +31,7 @@ export const TourWeatherForecast: React.FC<TourWeatherForecastProps> = ({ dates,
           results[date] = {
             tempMin: 12,
             tempMax: 22,
-            label: t('miscWidgets.tourWeatherForecast.fallbackLabel'),
+            labelKey: 'fallback',
             emoji: '⛅',
             isRealLive: false
           };
@@ -97,9 +97,10 @@ export const TourWeatherForecast: React.FC<TourWeatherForecastProps> = ({ dates,
           {dates.map((date, idx) => {
             const forecast = forecasts[date];
             if (!forecast) return null;
+            const conditionLabel = t(`miscWidgets.tourWeatherForecast.conditions.${forecast.labelKey}`);
             return (
-              <div 
-                key={date} 
+              <div
+                key={date}
                 className="flex items-center justify-between text-[11px] bg-slate-50/70 hover:bg-slate-50 border border-slate-200/60 p-1.5 px-2.5 rounded-lg transition-colors gap-2"
               >
                 {/* Date and active status */}
@@ -110,12 +111,12 @@ export const TourWeatherForecast: React.FC<TourWeatherForecastProps> = ({ dates,
 
                 {/* Weather forecast */}
                 <div className="flex items-center gap-1">
-                  <span className="text-sm shrink-0" title={forecast.label}>{forecast.emoji}</span>
+                  <span className="text-sm shrink-0" title={conditionLabel}>{forecast.emoji}</span>
                   <span className="text-slate-600 font-extrabold text-[10px]" title={t('miscWidgets.tourWeatherForecast.minMaxTempTitle')}>
                     {forecast.tempMin}° / {forecast.tempMax}°C
                   </span>
                   <span className="text-slate-400 font-medium text-[9px] hidden sm:inline">
-                    ({forecast.label})
+                    ({conditionLabel})
                   </span>
                 </div>
               </div>
@@ -145,9 +146,14 @@ export const TourWeatherForecast: React.FC<TourWeatherForecastProps> = ({ dates,
         {dates.map((date) => {
           const forecast = forecasts[date];
           if (!forecast) return null;
+          const conditionLabel = t(`miscWidgets.tourWeatherForecast.conditions.${forecast.labelKey}`);
+          // Azerbaijani uppercasing needs 'ı' -> 'İ' (JS's default toUpperCase produces plain 'I'); other languages must not go through this substitution.
+          const conditionLabelUpper = language === 'az'
+            ? conditionLabel.toUpperCase().replace(/I/g, 'İ')
+            : conditionLabel.toUpperCase();
           return (
-            <div 
-              key={date} 
+            <div
+              key={date}
               className="flex items-center justify-between bg-white border border-slate-150 p-2.5 rounded-xl hover:border-sky-300/80 hover:shadow-2xs transition group"
             >
               <div className="flex flex-col">
@@ -155,13 +161,13 @@ export const TourWeatherForecast: React.FC<TourWeatherForecastProps> = ({ dates,
                 <span className="text-[11px] font-black text-slate-800">{formatAzeriDate(date)}</span>
               </div>
               <div className="flex items-center gap-2 text-right">
-                <span className="text-2xl pt-0.5" title={forecast.label}>{forecast.emoji}</span>
+                <span className="text-2xl pt-0.5" title={conditionLabel}>{forecast.emoji}</span>
                 <div className="flex flex-col text-right">
                   <span className="text-[11px] font-black text-slate-800 tracking-tight">
                     {forecast.tempMin}° ➡️ {forecast.tempMax}°C
                   </span>
                   <span className="text-[9px] text-slate-500 font-extrabold tracking-wide">
-                    {forecast.label.toUpperCase().replace(/I/g, 'İ')}
+                    {conditionLabelUpper}
                   </span>
                 </div>
               </div>

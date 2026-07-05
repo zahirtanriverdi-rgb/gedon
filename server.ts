@@ -92,8 +92,9 @@ function getOptionalUser(req: any): { id: string; email: string; role: string } 
 }
 
 // Converts a raw `users` row into the shape the frontend's User type expects. `extra_data`
-// currently only carries `guides` (vendor team members) but is structured so future optional
-// profile fields can be added without another schema migration.
+// carries `guides` (vendor team members) and `aboutTranslations` (hand-written EN/RU of the
+// `about` bio) but is structured so future optional profile fields can be added without
+// another schema migration.
 function rowToUser(row: any) {
   let extra: Record<string, any> = {};
   try { extra = row.extra_data ? JSON.parse(row.extra_data) : {}; } catch { extra = {}; }
@@ -108,6 +109,7 @@ function rowToUser(row: any) {
     companyName: row.company_name || undefined,
     balance: Number(row.balance) || 0,
     about: row.about || undefined,
+    aboutTranslations: extra.aboutTranslations || undefined,
     guides: extra.guides || undefined,
     subscriptionValidUntil: row.subscription_valid_until || undefined,
     createdAt: row.created_at,

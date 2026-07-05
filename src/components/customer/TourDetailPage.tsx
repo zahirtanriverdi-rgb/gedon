@@ -3,7 +3,7 @@ import { Tour, TourSlot, Booking, Review, User } from '../../types';
 import { REVIEWS_ENABLED } from '../../config/features';
 import { computeFeaturedTourIds } from '../../utils/featuredTours';
 import { useLanguage } from '../../i18n/LanguageContext';
-import { getLocalizedTourName, getLocalizedTourDescription } from '../../i18n/tourLocalization';
+import { getLocalizedTourName, getLocalizedTourDescription, getLocalizedGuideBio, getLocalizedGuideSpecialty } from '../../i18n/tourLocalization';
 import { DIAL_CODES, DEFAULT_DIAL_CODE, isoToFlagEmoji } from '../../data/dialCodes';
 import {
   Calendar,
@@ -1440,10 +1440,10 @@ export function TourDetailPage({
                                   </div>
                                   <div className="flex-1 overflow-hidden">
                                      <span className="text-sm font-bold text-slate-800 block truncate" title={g.name}>{g.name}</span>
-                                     <span className="text-[10px] text-emerald-600 font-bold block line-clamp-2 tracking-wide mt-0.5" title={g.specialty}>{g.specialty || t('tourDetailPage.organizerTeam.defaultSpecialty')}</span>
+                                     <span className="text-[10px] text-emerald-600 font-bold block line-clamp-2 tracking-wide mt-0.5" title={getLocalizedGuideSpecialty(g, language)}>{getLocalizedGuideSpecialty(g, language) || t('tourDetailPage.organizerTeam.defaultSpecialty')}</span>
                                   </div>
                                 </div>
-                                <p className="text-xs text-slate-600 font-medium leading-relaxed line-clamp-3" title={g.bio}>{g.bio}</p>
+                                <p className="text-xs text-slate-600 font-medium leading-relaxed line-clamp-3" title={getLocalizedGuideBio(g, language)}>{getLocalizedGuideBio(g, language)}</p>
                               </div>
                             ))}
                           </div>

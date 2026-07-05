@@ -16,9 +16,29 @@ export const seedUsers: User[] = [
     whatsapp_number: '+994706717804',
     avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
     about: 'GedəkGörək Azərbaycanda peşəkar dağçılıq, yürüş və düşərgə turları üzrə ixtisaslaşmış komandadır. Təbiətlə həmahəng, təhlükəsiz və yaddaqalan ekoturlar təşkil edirik.',
+    aboutTranslations: {
+      en: 'GedəkGörək is a team specialized in professional mountaineering, hiking and camping tours in Azerbaijan. We organize safe, memorable eco-tours in harmony with nature.',
+      ru: 'GedəkGörək — команда, специализирующаяся на профессиональных горных, пеших и кемпинговых турах по Азербайджану. Мы организуем безопасные и незабываемые экотуры в гармонии с природой.',
+    },
     guides: [
-      { name: 'Rəşad Nəbiyev', bio: 'Peşəkar alpinist və 10 illik təcrübəyə malik yürüş bələdçisi.', specialty: 'Zirvə yürüşləri və naviqasiya' },
-      { name: 'Aygün Həsənova', bio: 'İlk yardım üzrə sertifikatlı mütəxəssis, kampinq kordinatoru.', specialty: 'Düşərgə həyatı və ekologiya' }
+      {
+        name: 'Rəşad Nəbiyev',
+        bio: 'Peşəkar alpinist və 10 illik təcrübəyə malik yürüş bələdçisi.',
+        specialty: 'Zirvə yürüşləri və naviqasiya',
+        translations: {
+          en: { bio: 'Professional mountaineer and hiking guide with 10 years of experience.', specialty: 'Peak hikes and navigation' },
+          ru: { bio: 'Профессиональный альпинист и гид по треккингу с 10-летним опытом.', specialty: 'Восхождения на вершины и навигация' },
+        },
+      },
+      {
+        name: 'Aygün Həsənova',
+        bio: 'İlk yardım üzrə sertifikatlı mütəxəssis, kampinq kordinatoru.',
+        specialty: 'Düşərgə həyatı və ekologiya',
+        translations: {
+          en: { bio: 'Certified first-aid specialist and camping coordinator.', specialty: 'Camp life and ecology' },
+          ru: { bio: 'Сертифицированный специалист по первой помощи, координатор кемпинга.', specialty: 'Лагерная жизнь и экология' },
+        },
+      }
     ],
     createdAt: '2026-01-10T11:00:00Z'
   },
@@ -35,9 +55,29 @@ export const seedUsers: User[] = [
     whatsapp_number: '+994706717804',
     avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
     about: 'NDA EcoTours olaraq biz təbiəti qorumaqla yanaşı, ekstrim və idman turlarını bir araya gətiririk. Yolsuzluq (off-road) və gəzinti maşrutlarının ustasıyıq.',
+    aboutTranslations: {
+      en: 'At NDA EcoTours, we combine caring for nature with extreme and sports tours. We are masters of off-road and hiking routes.',
+      ru: 'В NDA EcoTours мы сочетаем заботу о природе с экстремальными и спортивными турами. Мы — мастера внедорожных и пеших маршрутов.',
+    },
     guides: [
-      { name: 'Elnur Rüstəmov', bio: 'Off-road sürücüsü və bələdçi.', specialty: 'Yolsuzluq və dağ yolları' },
-      { name: 'Səbinə Məmmədova', bio: 'Yoqa və meditasiya təlimçisi. Təbiətdə yoqa turları üzrə ixtisaslaşıb.', specialty: 'Meditasiya, Yoqa turları' }
+      {
+        name: 'Elnur Rüstəmov',
+        bio: 'Off-road sürücüsü və bələdçi.',
+        specialty: 'Yolsuzluq və dağ yolları',
+        translations: {
+          en: { bio: 'Off-road driver and guide.', specialty: 'Off-road and mountain routes' },
+          ru: { bio: 'Внедорожный водитель и гид.', specialty: 'Бездорожье и горные дороги' },
+        },
+      },
+      {
+        name: 'Səbinə Məmmədova',
+        bio: 'Yoqa və meditasiya təlimçisi. Təbiətdə yoqa turları üzrə ixtisaslaşıb.',
+        specialty: 'Meditasiya, Yoqa turları',
+        translations: {
+          en: { bio: 'Yoga and meditation instructor, specialized in outdoor yoga tours.', specialty: 'Meditation, Yoga tours' },
+          ru: { bio: 'Инструктор по йоге и медитации, специализируется на йога-турах на природе.', specialty: 'Медитация, йога-туры' },
+        },
+      }
     ],
     createdAt: '2026-02-15T09:30:00Z'
   },

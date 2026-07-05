@@ -257,7 +257,9 @@ async function seedIfEmpty() {
 
   for (const user of seedUsers) {
     const passwordHash = await bcrypt.hash(user.password || 'changeme123', 10);
-    const extra = user.guides && user.guides.length > 0 ? { guides: user.guides } : {};
+    const extra: Record<string, any> = {};
+    if (user.guides && user.guides.length > 0) extra.guides = user.guides;
+    if (user.aboutTranslations) extra.aboutTranslations = user.aboutTranslations;
     await dbClient.execute(
       `INSERT INTO users (id, name, email, username, password_hash, role, phone, company_name, balance, avatar, about, extra_data, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,

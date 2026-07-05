@@ -3,7 +3,7 @@ import { User, Tour } from '../types';
 import { MapPin, Star, Calendar, MessageSquare, Phone, ExternalLink } from 'lucide-react';
 import { REVIEWS_ENABLED } from '../config/features';
 import { useLanguage } from '../i18n/LanguageContext';
-import { getLocalizedTourName } from '../i18n/tourLocalization';
+import { getLocalizedTourName, getLocalizedUserAbout, getLocalizedGuideBio, getLocalizedGuideSpecialty } from '../i18n/tourLocalization';
 
 interface OrganizerProfileProps {
   organizer: User;
@@ -66,7 +66,7 @@ export default function OrganizerProfile({ organizer, tours, onBack, onTourClick
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100">
             <h3 className="font-extrabold text-slate-800 mb-3">{t('customerMisc.organizerProfile.about')}</h3>
             <p className="text-slate-600 text-sm leading-relaxed font-medium">
-              {organizer.about || t('customerMisc.organizerProfile.noAboutInfo')}
+              {getLocalizedUserAbout(organizer, language) || t('customerMisc.organizerProfile.noAboutInfo')}
             </p>
           </div>
         </div>
@@ -92,10 +92,10 @@ export default function OrganizerProfile({ organizer, tours, onBack, onTourClick
                       <h4 className="font-extrabold text-slate-800">{guide.name}</h4>
                       {guide.specialty && (
                         <span className="inline-block px-2 py-0.5 bg-blue-50 text-blue-700 text-[10px] font-bold rounded mt-1 mb-2 uppercase tracking-wide">
-                          {guide.specialty}
+                          {getLocalizedGuideSpecialty(guide, language)}
                         </span>
                       )}
-                      <p className="text-xs text-slate-500 font-medium leading-relaxed">{guide.bio}</p>
+                      <p className="text-xs text-slate-500 font-medium leading-relaxed">{getLocalizedGuideBio(guide, language)}</p>
                     </div>
                   </div>
                 ))}

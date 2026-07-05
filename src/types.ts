@@ -6,6 +6,7 @@ export interface Guide {
   bio: string;
   avatar?: string;
   specialty?: string;
+  translations?: Partial<Record<'en' | 'ru', { bio?: string; specialty?: string }>>; // Hand-written bio/specialty translations; source-of-truth (name/bio/specialty) is always Azerbaijani.
 }
 
 export interface User {
@@ -21,6 +22,7 @@ export interface User {
   balance: number;       // In AZN
   whatsapp_number?: string; // Driver/Guide direct WhatsApp link
   about?: string;        // Short biography/about details
+  aboutTranslations?: Partial<Record<'en' | 'ru', string>>; // Hand-written translations of `about`; source-of-truth is always Azerbaijani.
   guides?: Guide[];      // Team members/guides
   subscriptionValidUntil?: string; // ISO date string. Vendor's subscription end date.
   createdAt: string;

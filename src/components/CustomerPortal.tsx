@@ -14,6 +14,11 @@ import { getRecentSearches, addRecentSearch } from '../utils/recentSearches';
 import { getWishlist, toggleWishlist } from '../utils/wishlist';
 import { useLanguage } from '../i18n/LanguageContext';
 
+const MONTH_KEYS = [
+  'january', 'february', 'march', 'april', 'may', 'june',
+  'july', 'august', 'september', 'october', 'november', 'december',
+];
+
 interface CustomerPortalProps {
   tours: Tour[];
   slots: TourSlot[];
@@ -363,21 +368,14 @@ export default function CustomerPortal({
     return Array.from(new Set(dates)).sort();
   }, [slots, tours]);
 
-  // Azerbaijani months names dictionary with correct letters (İyun, İyul)
-  const AZ_MONTHS: Record<string, string> = React.useMemo(() => ({
-    '01': 'Yanvar',
-    '02': 'Fevral',
-    '03': 'Mart',
-    '04': 'Aprel',
-    '05': 'May',
-    '06': 'İyun',
-    '07': 'İyul',
-    '08': 'Avqust',
-    '09': 'Sentyabr',
-    '10': 'Oktyabr',
-    '11': 'Noyabr',
-    '12': 'Dekabr'
-  }), []);
+  // Month names localized to the active language (falls back to AZ inside t()).
+  const monthNames: Record<string, string> = React.useMemo(() => {
+    const entries = MONTH_KEYS.map((key, index) => [
+      String(index + 1).padStart(2, '0'),
+      tGlobal(`miscWidgets.tourWeatherForecast.months.${key}`),
+    ] as const);
+    return Object.fromEntries(entries);
+  }, [tGlobal]);
 
   // Extract unique months (YYYY-MM) that have active slots
   const availableMonths = React.useMemo(() => {
@@ -598,10 +596,6 @@ export default function CustomerPortal({
 
   const getTourMonths = (tourId: string) => {
     const tourSlots = slots.filter(s => s.tourId === tourId);
-    const monthNames = [
-      'Yanvar', 'Fevral', 'Mart', 'Aprel', 'May', 'İyun', 
-      'İyul', 'Avqust', 'Sentyabr', 'Oktyabr', 'Noyabr', 'Dekabr'
-    ];
     const uniqueMonths = new Set<string>();
     tourSlots.forEach(slot => {
       try {
@@ -609,7 +603,7 @@ export default function CustomerPortal({
         if (parts.length >= 2) {
           const monthNum = parseInt(parts[1], 10);
           if (monthNum >= 1 && monthNum <= 12) {
-            uniqueMonths.add(monthNames[monthNum - 1]);
+            uniqueMonths.add(tGlobal(`miscWidgets.tourWeatherForecast.months.${MONTH_KEYS[monthNum - 1]}`));
           }
         }
       } catch (e) {
@@ -748,7 +742,7 @@ export default function CustomerPortal({
           setCalendarDateEnd={setCalendarDateEnd}
           calendarContainerRef={calendarContainerRef}
           currentMonthView={currentMonthView}
-          AZ_MONTHS={AZ_MONTHS}
+          monthNames={monthNames}
           handleCalendarPrevMonth={handleCalendarPrevMonth}
           handleCalendarNextMonth={handleCalendarNextMonth}
           handleCalendarDayClick={handleCalendarDayClick}

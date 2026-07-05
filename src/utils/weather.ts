@@ -1,10 +1,12 @@
 // Weather utility to fetch live weather forecast for Azerbaijan regions using Open-Meteo free API
 // Adheres strictly to guidelines: No mockup is substituted if real integration can be made.
 
+// labelKey references miscWidgets.tourWeatherForecast.conditions.<labelKey>; resolved to
+// display text via t() at render time so the description follows the active UI language.
 export interface WeatherInfo {
   tempMin: number;
   tempMax: number;
-  label: string;
+  labelKey: string;
   emoji: string;
   isRealLive: boolean;
 }
@@ -74,22 +76,22 @@ export function getCoordinatesForRegion(region: string): { lat: number; lon: num
   return regionCoords.baku;
 }
 
-// Translate WMO Weather code to beautiful Azeri descriptions and emojis
-export function getWMOTranslation(code: number): { label: string; emoji: string } {
-  if (code === 0) return { label: 'Açıq Səma', emoji: '☀️' };
-  if (code === 1 || code === 2 || code === 3) return { label: 'Az Buludlu', emoji: '🌤️' };
-  if (code === 45 || code === 48) return { label: 'Dumanlı', emoji: '🌫️' };
-  if (code === 51 || code === 53 || code === 55) return { label: 'Çiskinli', emoji: '🌧️' };
-  if (code === 56 || code === 57) return { label: 'Dondurucu çiskin', emoji: '🌧️' };
-  if (code === 61 || code === 63 || code === 65) return { label: 'Yağışlı', emoji: '🌧️' };
-  if (code === 66 || code === 67) return { label: 'Sulu Qar', emoji: '🌧️' };
-  if (code === 71 || code === 73 || code === 75) return { label: 'Qarlı', emoji: '❄️' };
-  if (code === 77) return { label: 'Dolu', emoji: '❄️' };
-  if (code === 80 || code === 81 || code === 82) return { label: 'Güman edilən leysan', emoji: '🌦️' };
-  if (code === 85 || code === 86) return { label: 'Qar leysanı', emoji: '❄️' };
-  if (code === 95) return { label: 'İldırımlı leysan', emoji: '🌩️' };
-  if (code === 96 || code === 99) return { label: 'Dolu ilə ildırım', emoji: '🌩️' };
-  return { label: 'Dəyişkən Buludlu', emoji: '⛅' };
+// Map WMO Weather code to a labelKey (see WeatherInfo) and emoji
+export function getWMOTranslation(code: number): { labelKey: string; emoji: string } {
+  if (code === 0) return { labelKey: 'clearSky', emoji: '☀️' };
+  if (code === 1 || code === 2 || code === 3) return { labelKey: 'partlyCloudy', emoji: '🌤️' };
+  if (code === 45 || code === 48) return { labelKey: 'foggy', emoji: '🌫️' };
+  if (code === 51 || code === 53 || code === 55) return { labelKey: 'drizzle', emoji: '🌧️' };
+  if (code === 56 || code === 57) return { labelKey: 'freezingDrizzle', emoji: '🌧️' };
+  if (code === 61 || code === 63 || code === 65) return { labelKey: 'rainy', emoji: '🌧️' };
+  if (code === 66 || code === 67) return { labelKey: 'sleet', emoji: '🌧️' };
+  if (code === 71 || code === 73 || code === 75) return { labelKey: 'snowy', emoji: '❄️' };
+  if (code === 77) return { labelKey: 'hail', emoji: '❄️' };
+  if (code === 80 || code === 81 || code === 82) return { labelKey: 'likelyShowers', emoji: '🌦️' };
+  if (code === 85 || code === 86) return { labelKey: 'snowShowers', emoji: '❄️' };
+  if (code === 95) return { labelKey: 'thunderstorm', emoji: '🌩️' };
+  if (code === 96 || code === 99) return { labelKey: 'thunderstormHail', emoji: '🌩️' };
+  return { labelKey: 'variableCloudy', emoji: '⛅' };
 }
 
 // Generate a highly realistic seasonal weather based on month if dates are outside the 16-day forecast range
@@ -114,36 +116,36 @@ export function getSeasonalWeather(dateStr: string, region: string): WeatherInfo
 
   let tempMin = 15;
   let tempMax = 25;
-  let label = 'Mülayim Səma';
+  let labelKey = 'mildSky';
   let emoji = '🌤️';
 
   // Average temps for Azerbaijan based on seasons
   if (month === 12 || month === 1 || month === 2) { // Winter
     tempMin = isMountainous ? -12 : 2;
     tempMax = isMountainous ? -2 : 8;
-    label = isMountainous ? 'Şaxtalı, Qar' : 'Soyuq və Buludlu';
+    labelKey = isMountainous ? 'frostySnow' : 'coldCloudy';
     emoji = isMountainous ? '❄️' : '☁️';
   } else if (month === 3 || month === 4 || month === 5) { // Spring
     tempMin = isMountainous ? 2 : 11;
     tempMax = isMountainous ? 12 : 22;
-    label = 'Yaz Havası, Mülayim';
+    labelKey = 'springMild';
     emoji = '🌤️';
   } else if (month === 6 || month === 7 || month === 8) { // Summer
     tempMin = isMountainous ? 11 : 20;
     tempMax = isMountainous ? 22 : 34;
-    label = 'Gözəl Günəşli';
+    labelKey = 'beautifulSunny';
     emoji = '☀️';
   } else { // Autumn
     tempMin = isMountainous ? 3 : 12;
     tempMax = isMountainous ? 11 : 21;
-    label = 'Sərin və Buludlu';
+    labelKey = 'coolCloudy';
     emoji = '⛅';
   }
 
   return {
     tempMin,
     tempMax,
-    label,
+    labelKey,
     emoji,
     isRealLive: false
   };
@@ -185,7 +187,7 @@ export async function fetchWeatherForDate(dateStr: string, region: string): Prom
           const result: WeatherInfo = {
             tempMin: tMin,
             tempMax: tMax,
-            label: translation.label,
+            labelKey: translation.labelKey,
             emoji: translation.emoji,
             isRealLive: true
           };

@@ -68,7 +68,7 @@ interface ToursHomeViewProps {
   setCalendarDateEnd: (val: string) => void;
   calendarContainerRef: React.RefObject<HTMLDivElement>;
   currentMonthView: string;
-  AZ_MONTHS: Record<string, string>;
+  monthNames: Record<string, string>;
   handleCalendarPrevMonth: () => void;
   handleCalendarNextMonth: () => void;
   handleCalendarDayClick: (dayStr: string) => void;
@@ -126,7 +126,7 @@ export function ToursHomeView({
   setCalendarDateEnd,
   calendarContainerRef,
   currentMonthView,
-  AZ_MONTHS,
+  monthNames,
   handleCalendarPrevMonth,
   handleCalendarNextMonth,
   handleCalendarDayClick,
@@ -362,7 +362,7 @@ export function ToursHomeView({
                         <h4 className="text-xs font-extrabold text-brand-text-main tracking-wider">
                           {(() => {
                             const [y, m] = currentMonthView.split('-');
-                            return `${AZ_MONTHS[m] || m} ${y}`;
+                            return `${monthNames[m] || m} ${y}`;
                           })()}
                         </h4>
                         <div className="flex items-center gap-1.5">
@@ -801,7 +801,7 @@ export function ToursHomeView({
                     {(() => {
                       const tourMonths = getTourMonths(tour.id);
                       const isTopSeller = Number(getAverageRating(tour.id)) >= 4.5 || getReviewsCount(tour.id) >= 1 || tour.name.toLowerCase().includes('kəpəz') || tour.name.toLowerCase().includes('kuzun');
-                      const selectedMonth = tourMonths.length > 0 ? tourMonths[0] : 'May';
+                      const selectedMonth = tourMonths.length > 0 ? tourMonths[0] : tt('miscWidgets.tourWeatherForecast.months.may');
                       const starRating = Math.round(Number(getAverageRating(tour.id)));
                       return (
                         <div className="flex flex-col justify-center gap-1.5 min-w-0">
