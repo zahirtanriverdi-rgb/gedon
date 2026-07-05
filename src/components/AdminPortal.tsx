@@ -579,24 +579,42 @@ export default function AdminPortal({
             </p>
             <div className="space-y-3">
               {users.filter(u => u.role === 'vendor' && !u.isArchived).map(vendor => {
+                const GRACE_MS = 3 * 24 * 60 * 60 * 1000;
+                const DAY_MS = 24 * 60 * 60 * 1000;
                 const subDate = vendor.subscriptionValidUntil ? new Date(vendor.subscriptionValidUntil) : null;
-                const isWarning = subDate ? (subDate.getTime() - Date.now() < 3 * 24 * 60 * 60 * 1000) : true;
+                const isWarning = subDate ? (subDate.getTime() - Date.now() < GRACE_MS) : true;
                 const isExpired = subDate ? (Date.now() > subDate.getTime()) : true;
-                const isAutoDeactivated = subDate ? (Date.now() > subDate.getTime() + 3 * 24 * 60 * 60 * 1000) : true;
-                
+                const isAutoDeactivated = subDate ? (Date.now() > subDate.getTime() + GRACE_MS) : true;
+                // Days left in the 3-day grace period (once expired) or days left until expiry
+                // (while still active but inside the 3-day warning window) — always rounded up
+                // so "0 gün qalıb" only shows once there's genuinely less than a day left.
+                const graceDaysLeft = subDate ? Math.max(0, Math.ceil((subDate.getTime() + GRACE_MS - Date.now()) / DAY_MS)) : 0;
+                const daysUntilExpiry = subDate ? Math.max(0, Math.ceil((subDate.getTime() - Date.now()) / DAY_MS)) : 0;
+
                 return (
                   <div key={vendor.id} className="flex flex-col md:flex-row md:items-center justify-between gap-3 p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs">
                     <div>
                       <strong className="text-slate-900 block">{vendor.name}</strong>
                       <span className="text-[10px] text-slate-500">{vendor.companyName || 'Şirkət adı yoxdur'}</span>
-                      <div className="mt-1">
+                      <div className="mt-1 flex flex-wrap gap-1">
                         {subDate ? (
-                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${isAutoDeactivated ? 'bg-red-100 text-red-800' : isExpired ? 'bg-orange-100 text-orange-800' : 'bg-emerald-100 text-emerald-800'}`}>
-                            {isAutoDeactivated ? 'Turlar Deaktiv Edilib' : isExpired ? `Abunəlik bitib: ${subDate.toLocaleDateString()}` : `Aktivdir: ${subDate.toLocaleDateString()}`}
+                          <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${isAutoDeactivated ? 'bg-red-100 text-red-800' : isExpired ? 'bg-orange-100 text-orange-800' : isWarning ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>
+                            {isAutoDeactivated
+                              ? 'Bitib — turlar deaktiv edilib'
+                              : isExpired
+                              ? `Bitib — güzəşt müddətindən ${graceDaysLeft} gün qalıb`
+                              : isWarning
+                              ? `Bitməyə ${daysUntilExpiry} gün qalıb: ${subDate.toLocaleDateString()}`
+                              : `Aktivdir: ${subDate.toLocaleDateString()}`}
                           </span>
                         ) : (
                           <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-200 text-slate-600">
                             Abunəlik təyin edilməyib
+                          </span>
+                        )}
+                        {vendor.isManuallyDeactivated && (
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-red-100 text-red-800">
+                            Əl ilə Deaktiv Edilib
                           </span>
                         )}
                       </div>
@@ -626,6 +644,30 @@ export default function AdminPortal({
                         className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold p-1.5 px-3 rounded text-xs transition"
                       >
                         +1 Ay
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (onUpdateUser) {
+                            const next = !vendor.isManuallyDeactivated;
+                            onUpdateUser(vendor.id, { isManuallyDeactivated: next });
+                            if (onShowNotification) {
+                              onShowNotification(
+                                next
+                                  ? `${vendor.name} əl ilə deaktiv edildi, turları müştərilərdən gizlədildi.`
+                                  : `${vendor.name} yenidən aktivləşdirildi.`,
+                                'success'
+                              );
+                            }
+                          }
+                        }}
+                        className={`font-bold p-1.5 px-3 rounded text-xs transition border ${
+                          vendor.isManuallyDeactivated
+                            ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200'
+                            : 'bg-amber-50 hover:bg-amber-100 text-amber-700 border-amber-200'
+                        }`}
+                      >
+                        {vendor.isManuallyDeactivated ? 'Aktiv Et' : 'Deaktiv Et'}
                       </button>
                       {onDeleteVendor && (
                         <button

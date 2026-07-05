@@ -83,7 +83,8 @@ export async function initializeDatabase() {
       subscription_valid_until TIMESTAMP,
       extra_data TEXT,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      deleted_at TIMESTAMP
+      deleted_at TIMESTAMP,
+      is_manually_deactivated BOOLEAN DEFAULT 0
     );
   `);
 
@@ -104,6 +105,14 @@ export async function initializeDatabase() {
   }
   try {
     await dbClient.execute(`ALTER TABLE users ADD COLUMN extra_data TEXT`);
+  } catch {
+    // column already exists — safe to ignore
+  }
+
+  // Migration for databases created before `is_manually_deactivated` existed — lets an admin
+  // hide a vendor's tours instantly, independent of their subscription_valid_until date.
+  try {
+    await dbClient.execute(`ALTER TABLE users ADD COLUMN is_manually_deactivated BOOLEAN DEFAULT 0`);
   } catch {
     // column already exists — safe to ignore
   }

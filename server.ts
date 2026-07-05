@@ -102,6 +102,7 @@ function rowToUser(row: any) {
     subscriptionValidUntil: row.subscription_valid_until || undefined,
     createdAt: row.created_at,
     isArchived: !!row.deleted_at,
+    isManuallyDeactivated: !!row.is_manually_deactivated,
   };
 }
 
@@ -291,15 +292,17 @@ app.put("/api/users/:id", authenticateUser, async (req: any, res) => {
     let username = existingRow.username;
     let passwordHash = existingRow.password_hash;
     let subscriptionValidUntil = existingRow.subscription_valid_until;
+    let isManuallyDeactivated = !!existingRow.is_manually_deactivated;
     if (isAdmin) {
       if (body.username !== undefined) username = body.username;
       if (body.password) passwordHash = await bcrypt.hash(body.password, 10);
       if (body.subscriptionValidUntil !== undefined) subscriptionValidUntil = body.subscriptionValidUntil;
+      if (body.isManuallyDeactivated !== undefined) isManuallyDeactivated = !!body.isManuallyDeactivated;
     }
 
     await dbClient.execute(
-      `UPDATE users SET name = ?, email = ?, username = ?, password_hash = ?, phone = ?, company_name = ?, avatar = ?, about = ?, subscription_valid_until = ?, extra_data = ? WHERE id = ?`,
-      [name, email, username, passwordHash, phone, companyName, avatar, about, subscriptionValidUntil, JSON.stringify(extra), req.params.id]
+      `UPDATE users SET name = ?, email = ?, username = ?, password_hash = ?, phone = ?, company_name = ?, avatar = ?, about = ?, subscription_valid_until = ?, extra_data = ?, is_manually_deactivated = ? WHERE id = ?`,
+      [name, email, username, passwordHash, phone, companyName, avatar, about, subscriptionValidUntil, JSON.stringify(extra), isManuallyDeactivated ? 1 : 0, req.params.id]
     );
 
     const updatedRows = await dbClient.query('SELECT * FROM users WHERE id = ?', [req.params.id]);
@@ -537,7 +540,14 @@ app.get("/api/tours", async (req, res) => {
       // or an admin rejects one, it disappears from the marketplace immediately — no exceptions,
       // and no "keep showing the stale approved version while a proposal is under review".
       conditions.push("status = 'approved'");
-      conditions.push("vendor_id NOT IN (SELECT id FROM users WHERE deleted_at IS NOT NULL)");
+      // A vendor keeps showing up for 3 days past subscriptionValidUntil (grace period —
+      // matches the copy in AdminPortal's subscription section); only once that grace
+      // period has fully elapsed do their tours disappear from the public marketplace.
+      const subscriptionGraceCutoff = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
+      conditions.push(
+        "vendor_id NOT IN (SELECT id FROM users WHERE deleted_at IS NOT NULL OR is_manually_deactivated = 1 OR (subscription_valid_until IS NOT NULL AND subscription_valid_until < ?))"
+      );
+      params.push(subscriptionGraceCutoff);
       if (req.query.vendorId) {
         conditions.push('vendor_id = ?');
         params.push(String(req.query.vendorId));

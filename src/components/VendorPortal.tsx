@@ -136,9 +136,16 @@ export default function VendorPortal({
   }, 0);
 
   const subDate = currentUser.subscriptionValidUntil ? new Date(currentUser.subscriptionValidUntil) : null;
-  const isAutoDeactivated = subDate ? (Date.now() > subDate.getTime() + 3 * 24 * 60 * 60 * 1000) : false;
+  const GRACE_MS = 3 * 24 * 60 * 60 * 1000;
+  const DAY_MS = 24 * 60 * 60 * 1000;
+  const isAutoDeactivated = subDate ? (Date.now() > subDate.getTime() + GRACE_MS) : false;
   const isExpired = subDate ? (Date.now() > subDate.getTime()) : false;
-  const isWarning = subDate ? (subDate.getTime() - Date.now() < 3 * 24 * 60 * 60 * 1000) : false;
+  const isWarning = subDate ? (subDate.getTime() - Date.now() < GRACE_MS) : false;
+  // Days left in the 3-day grace period (once expired) or days left until expiry (while
+  // still active but inside the 3-day warning window) — rounded up so "0 gün qalıb" only
+  // shows once there's genuinely less than a day left.
+  const graceDaysLeft = subDate ? Math.max(0, Math.ceil((subDate.getTime() + GRACE_MS - Date.now()) / DAY_MS)) : 0;
+  const daysUntilExpiry = subDate ? Math.max(0, Math.ceil((subDate.getTime() - Date.now()) / DAY_MS)) : 0;
 
   return (
     <div className="space-y-6">
@@ -151,11 +158,11 @@ export default function VendorPortal({
               ⚠️ Abunəlik Statusu
             </h4>
             <p className={`text-xs ${isAutoDeactivated ? 'text-red-700' : isExpired ? 'text-orange-700' : 'text-amber-700'}`}>
-              {isAutoDeactivated 
-                ? 'Sizin abunəlik vaxtınız bitmişdir və 3 gün keçmişdir. Bütün turlarınız müştərilər üçün deaktiv edilib. Yenidən aktivləşdirmək üçün admin ilə əlaqə saxlayın.' 
-                : isExpired 
-                ? `Abunəlik vaxtınız bitib (${subDate.toLocaleDateString()}). 3 gün ərzində yenilənməsə, turlarınız avtomatik gizlədiləcəkdir.`
-                : `Abunəlik vaxtınızın bitməsinə az qalıb: ${subDate.toLocaleDateString()}. Vaxt bitdikdən 3 gün sonra turlarınız deaktiv ediləcək.`}
+              {isAutoDeactivated
+                ? 'Sizin abunəlik vaxtınız bitmişdir və 3 gün keçmişdir. Bütün turlarınız müştərilər üçün deaktiv edilib. Yenidən aktivləşdirmək üçün admin ilə əlaqə saxlayın.'
+                : isExpired
+                ? `Abunəlik vaxtınız bitib (${subDate.toLocaleDateString()}). Güzəşt müddətindən ${graceDaysLeft} gün qalıb — bu müddət bitdikdə turlarınız avtomatik gizlədiləcək.`
+                : `Abunəlik vaxtınızın bitməsinə ${daysUntilExpiry} gün qalıb (${subDate.toLocaleDateString()}). Vaxt bitdikdən sonra 3 gün ərzində yenilənməsə, turlarınız deaktiv ediləcək.`}
             </p>
           </div>
         </div>

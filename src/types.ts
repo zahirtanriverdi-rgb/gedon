@@ -25,6 +25,7 @@ export interface User {
   subscriptionValidUntil?: string; // ISO date string. Vendor's subscription end date.
   createdAt: string;
   isArchived?: boolean; // Soft-deleted by an admin — account can no longer log in, but its tours/slots/bookings are preserved for records
+  isManuallyDeactivated?: boolean; // Admin can flip this on/off any time, independent of subscriptionValidUntil — hides the vendor's tours immediately without touching their subscription date
 }
 
 export type TourCategory = 'peak' | 'camp' | 'hiking' | 'international' | 'active';
