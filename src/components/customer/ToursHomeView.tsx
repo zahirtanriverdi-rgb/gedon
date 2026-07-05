@@ -190,7 +190,7 @@ export function ToursHomeView({
                       window.scrollTo({top: y, behavior: 'smooth'});
                     }
                   }}
-                  className="bg-brand-cta hover:bg-brand-cta-hover text-white font-bold py-2.5 px-6 rounded-full transition-colors flex-shrink-0 text-xs shadow-md cursor-pointer"
+                  className="bg-brand-primary hover:bg-brand-primary-hover text-white font-bold py-2.5 px-6 rounded-full transition-colors flex-shrink-0 text-xs shadow-md cursor-pointer"
                 >
                   {t('searchButton')}
                 </button>
@@ -512,7 +512,7 @@ export function ToursHomeView({
                         const slider = document.getElementById('upcoming-tours-slider');
                         if(slider) slider.scrollBy({ left: -300, behavior: 'smooth' });
                       }}
-                      className="absolute left-0 top-1/2 -translate-y-1/2 -ml-3 md:-ml-4 z-10 bg-brand-accent text-white p-2.5 rounded-full shadow-lg hover:bg-accent-orange-600 transition-colors flex items-center justify-center border-2 border-white"
+                      className="absolute left-0 top-1/2 -translate-y-1/2 -ml-3 md:-ml-4 z-10 bg-brand-bg-page text-brand-accent p-2.5 rounded-full shadow-lg hover:bg-slate-50 transition-colors flex items-center justify-center border-2 border-slate-200"
                     >
                       <ChevronLeft className="w-5 h-5" />
                     </button>
@@ -579,7 +579,7 @@ export function ToursHomeView({
                         const slider = document.getElementById('upcoming-tours-slider');
                         if(slider) slider.scrollBy({ left: 300, behavior: 'smooth' });
                       }}
-                      className="absolute right-0 top-1/2 -translate-y-1/2 -mr-3 md:-mr-4 z-10 bg-brand-accent text-white p-2.5 rounded-full shadow-lg hover:bg-accent-orange-600 transition-colors flex items-center justify-center border-2 border-white"
+                      className="absolute right-0 top-1/2 -translate-y-1/2 -mr-3 md:-mr-4 z-10 bg-brand-bg-page text-brand-accent p-2.5 rounded-full shadow-lg hover:bg-slate-50 transition-colors flex items-center justify-center border-2 border-slate-200"
                     >
                       <ChevronRight className="w-5 h-5" />
                     </button>
@@ -827,7 +827,7 @@ export function ToursHomeView({
                     })()}
 
                     <div className="text-right shrink-0 border-l border-slate-100 pl-4 flex flex-col justify-center">
-                      <span className="text-[9px] text-label-tertiary block tracking-wider font-semibold">QİYMƏT</span>
+                      <span className="text-[9px] text-brand-text-muted block tracking-wider font-semibold">QİYMƏT</span>
                       {tour.discountPrice && tour.discountPrice > 0 && tour.discountPrice < (tour.price ?? minPrice) ? (
                         <div className="flex flex-col items-end">
                           <span className="line-through text-label-tertiary text-xs">
@@ -839,10 +839,10 @@ export function ToursHomeView({
                         </div>
                       ) : (
                         <div className="flex flex-col items-end">
-                          <strong className="text-brand-accent text-2xl font-extrabold leading-tight">
+                          <strong className="text-brand-text-main text-2xl font-extrabold leading-tight">
                             {getConvertedPriceInfo(tour.price ?? minPrice, tour.priceCurrency).both}
                           </strong>
-                          <span className="text-label-tertiary text-[10px] font-medium">/ nəfər</span>
+                          <span className="text-brand-text-muted text-[10px] font-medium">/ nəfər</span>
                         </div>
                       )}
                     </div>

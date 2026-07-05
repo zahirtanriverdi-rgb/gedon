@@ -720,7 +720,7 @@ export default function App() {
                     setIsGlobalSearchFocused(false);
                     window.scrollTo({ top: 300, behavior: 'smooth' });
                   }}
-                  className="bg-brand-cta hover:bg-brand-cta-hover text-white font-bold py-2 px-5 rounded-full transition-colors flex-shrink-0 text-sm shadow-sm cursor-pointer"
+                  className="bg-brand-primary hover:bg-brand-primary-hover text-white font-bold py-2 px-5 rounded-full transition-colors flex-shrink-0 text-sm shadow-sm cursor-pointer"
                 >
                   Axtar
                 </button>
@@ -786,10 +786,10 @@ export default function App() {
                     className="w-11 sm:w-auto sm:min-w-0 sm:px-2 h-16 sm:h-14 flex flex-col items-center justify-center gap-0.5 hover:text-emerald-600 transition group cursor-pointer bg-transparent border-none p-0"
                     title="Valyutanı / Dilini dəyiş"
                   >
-                    <span className="w-11 h-8 sm:w-9 sm:h-7 flex items-center justify-center text-brand-accent">
+                    <span className="w-11 h-8 sm:w-9 sm:h-7 flex items-center justify-center text-brand-text-muted">
                       <Globe className="w-6 h-6 sm:w-5 sm:h-5 stroke-[2px]" />
                     </span>
-                    <span className="hidden sm:block text-xs text-brand-accent font-semibold">
+                    <span className="hidden sm:block text-xs text-brand-text-muted font-semibold">
                       {appLanguage === 'az' && displayCurrency === 'AZN' ? 'AZ / AZN ₼' :
                        appLanguage === 'ru' && displayCurrency === 'AZN' ? 'RU / AZN ₼' :
                        appLanguage === 'en' && displayCurrency === 'USD' ? 'EN / USD $' :

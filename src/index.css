@@ -5,10 +5,10 @@
 /* Exact design-token spec (single source of truth). Component classes below reference
    these directly, e.g. h-[var(--header-height)], rounded-[var(--card-radius)]. */
 :root {
-  --label-primary: #091D36;
-  --label-secondary: #626F7E;
+  --label-primary: #111E12;
+  --label-secondary: #627265;
   --label-tertiary: #858995;
-  --interactive-primary: #317312;
+  --interactive-primary: #1E3F20;
   --label-critical: #ec003f;
   --surface-critical-weak: #ffe8ed;
   --border-primary: #dcdfe4;
@@ -18,17 +18,18 @@
   --card-radius: 12px;
   --section-spacing-y: 32px;
 
-  /* New brand palette (design-system rollout, customer-facing UI first — see
-     ToursHomeView.tsx). Distinct from the turquoise --primary-* scale above,
-     which stays in place for existing screens until they're migrated. */
-  --color-primary: #317312;
-  --color-accent: #FF5903;
+  /* Brand palette (Deep Pine / Muted Gold rollout, project-wide — see MEMORY.md
+     project_design_tokens note). Applied across customer-facing UI and
+     Admin/Vendor panels alike. */
+  --color-primary: #1E3F20;
+  --color-primary-hover: #2D5C30;
+  --color-accent: #C28E46;
   --color-bg-light: #FBFBFA;
-  --color-bg-page: #F2F7FD;
+  --color-bg-page: #FFFFFF;
   --color-cta: #166EF3;
   --color-cta-hover: #24BAEC;
-  --color-text-main: #091D36;
-  --color-text-muted: #536479;
+  --color-text-main: #111E12;
+  --color-text-muted: #627265;
 }
 
 @theme {
@@ -46,15 +47,16 @@
   --color-brand-cta-hover: var(--color-cta-hover);
   --color-brand-text-main: var(--color-text-main);
   --color-brand-text-muted: var(--color-text-muted);
+  --color-brand-primary-hover: var(--color-primary-hover);
 
   /* ---- Semantic UI tokens (text/surface/border) ----
      Generates text, bg, border utilities, e.g. text-label-primary, bg-surface-critical-weak.
      Values are aliases of the plain :root tokens below — kept in @theme too so Tailwind
      generates utility classes from them. */
-  --color-label-primary: #091D36;
-  --color-label-secondary: #626F7E;
+  --color-label-primary: #111E12;
+  --color-label-secondary: #627265;
   --color-label-tertiary: #858995;
-  --color-interactive-primary: #317312;
+  --color-interactive-primary: #1E3F20;
   --color-label-critical: #ec003f;
   --color-surface-critical-weak: #ffe8ed;
   --color-border-primary: #dcdfe4;
@@ -62,19 +64,19 @@
 
   /* ---- Brand palette (single source of truth) ---- */
 
-  /* Primary: Lotus Green — single accent color for the one main CTA / active state per screen.
-     500 is the exact brand anchor (#317312); other steps are interpolated around it. */
-  --color-primary-50: #f3f9ed;
-  --color-primary-100: #e3f0d6;
-  --color-primary-200: #c8e2af;
-  --color-primary-300: #a3ce80;
-  --color-primary-400: #6b9a44;
-  --color-primary-500: #317312;
-  --color-primary-600: #285c0f;
-  --color-primary-700: #21490c;
-  --color-primary-800: #1a3a0a;
-  --color-primary-900: #142d08;
-  --color-primary-950: #0a1804;
+  /* Primary: Deep Pine — single accent color for the one main CTA / active state per screen.
+     500 is the exact brand anchor (#1E3F20); other steps are interpolated around it. */
+  --color-primary-50: #eff5ef;
+  --color-primary-100: #dce9dd;
+  --color-primary-200: #b9d2bb;
+  --color-primary-300: #8fb592;
+  --color-primary-400: #5c8f60;
+  --color-primary-500: #1E3F20;
+  --color-primary-600: #1a371c;
+  --color-primary-700: #163017;
+  --color-primary-800: #112510;
+  --color-primary-900: #0c1b0c;
+  --color-primary-950: #061006;
 
   /* Capri Blue — deep blue accent (indigo/blue utility classes), anchored on brand CTA #166EF3. */
   --color-cta-blue-50: #eef4fe;
@@ -106,19 +108,19 @@
   --color-whatsapp-500: #25d366;
   --color-whatsapp-600: #1ebe57;
 
-  /* Secondary: Orange Zest — CTAs, discount/HOT badges, warnings (use sparingly).
-     500 is the exact brand anchor (#FF5903). */
-  --color-accent-orange-50: #fff2ec;
-  --color-accent-orange-100: #ffe0d1;
-  --color-accent-orange-200: #ffc2a3;
-  --color-accent-orange-300: #ff9d70;
-  --color-accent-orange-400: #ff7a3d;
-  --color-accent-orange-500: #FF5903;
-  --color-accent-orange-600: #db4d02;
-  --color-accent-orange-700: #b23f02;
-  --color-accent-orange-800: #8a3101;
-  --color-accent-orange-900: #692601;
-  --color-accent-orange-950: #3d1600;
+  /* Secondary: Muted Gold — CTAs, discount/HOT badges, price accents (use sparingly).
+     500 is the exact brand anchor (#C28E46). */
+  --color-accent-orange-50: #fbf4e9;
+  --color-accent-orange-100: #f4e4cb;
+  --color-accent-orange-200: #e7c99a;
+  --color-accent-orange-300: #d9ad69;
+  --color-accent-orange-400: #cc9a57;
+  --color-accent-orange-500: #C28E46;
+  --color-accent-orange-600: #a8763a;
+  --color-accent-orange-700: #8c5f2e;
+  --color-accent-orange-800: #714a24;
+  --color-accent-orange-900: #593a1d;
+  --color-accent-orange-950: #3b2612;
 
   /* Secondary: pink-red — CTAs, discount/HOT badges, warnings (use sparingly) */
   --color-accent-pink-50: #ffeaf0;
@@ -134,19 +136,19 @@
   --color-accent-pink-950: #1f0008;
 
   /* Tertiary: ink/surface neutrals — text/contrast (dark) and card/page backgrounds (light).
-     Navy-tinted (not teal) to match the brand text tokens: 50 ≈ bg-light (#FBFBFA),
-     500 = text-muted (#536479) exact, 900 = text-main (#091D36) exact. */
-  --color-ink-50: #fbfbfa;
-  --color-ink-100: #f3f4f6;
-  --color-ink-200: #e5e7eb;
-  --color-ink-300: #d1d5db;
-  --color-ink-400: #9ca3af;
-  --color-ink-500: #536479;
-  --color-ink-600: #566270;
-  --color-ink-700: #3f4a56;
-  --color-ink-800: #2a323c;
-  --color-ink-900: #091D36;
-  --color-ink-950: #05101f;
+     Forest-green-tinted (not navy) to match the brand text tokens: 50 ≈ bg-light (#FBFBFA),
+     500 = text-muted (#627265) exact, 900 = text-main (#111E12) exact. */
+  --color-ink-50: #fafbfa;
+  --color-ink-100: #f1f3f1;
+  --color-ink-200: #e1e6e1;
+  --color-ink-300: #c7d0c7;
+  --color-ink-400: #96a497;
+  --color-ink-500: #627265;
+  --color-ink-600: #55635a;
+  --color-ink-700: #3e483f;
+  --color-ink-800: #2b332c;
+  --color-ink-900: #111E12;
+  --color-ink-950: #0a0f0a;
 
   /* ---- Remap the generic Tailwind palettes used across the app to the brand tokens ----
      This lets existing utility classes (bg-emerald-600, text-slate-700, etc.) render
