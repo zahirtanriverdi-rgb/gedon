@@ -500,11 +500,7 @@ export function TourDetailPage({
                     <button
                       type="button"
                       onClick={() => {
-                        if (showTourSlots) {
-                          document.getElementById('tour-slots-calendar')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                        } else {
-                          setShowTourSlots(true);
-                        }
+                        document.getElementById('tour-full-description')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
                       }}
                       className="text-xs text-slate-500 leading-snug text-left underline decoration-dotted underline-offset-2 hover:text-slate-700 cursor-pointer"
                     >
@@ -1228,7 +1224,7 @@ export function TourDetailPage({
                 </div>
 
                 {/* Full description */}
-                <div className="space-y-4 py-4 border-t border-slate-200">
+                <div id="tour-full-description" className="space-y-4 py-4 border-t border-slate-200 scroll-mt-24">
                   <h2 className="text-xl font-extrabold text-slate-900">Tam təsvir</h2>
                   <div className="relative">
                     <div
