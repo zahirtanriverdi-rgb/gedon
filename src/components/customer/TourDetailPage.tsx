@@ -487,13 +487,29 @@ export function TourDetailPage({
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-6 py-6 border-b border-slate-200">
                   <div className="flex flex-col gap-1.5">
                     <Calendar className="w-6 h-6 text-slate-700 mb-1" />
-                    <span className="text-sm font-extrabold text-slate-900">Ödənişsiz ləğv</span>
-                    <span className="text-xs text-slate-500 leading-snug">48 saat əvvələ qədər ödənişsiz ləğv et</span>
+                    <span className="text-sm font-extrabold text-slate-900">{(selectedTour.cancellationHours ?? 48) === 0 ? 'Ləğv edilmir' : 'Ödənişsiz ləğv'}</span>
+                    <span className="text-xs text-slate-500 leading-snug">
+                      {(selectedTour.cancellationHours ?? 48) === 0
+                        ? 'Bu tur üçün ləğvetmə mümkün deyil'
+                        : `${selectedTour.cancellationHours ?? 48} saat əvvələ qədər ödənişsiz ləğv et`}
+                    </span>
                   </div>
                   <div className="flex flex-col gap-1.5">
                     <Clock className="w-6 h-6 text-slate-700 mb-1" />
                     <span className="text-sm font-extrabold text-slate-900">Müddət: {selectedTour.durationHours ?? (selectedTour.durationDays * 8)} saat</span>
-                    <span className="text-xs text-slate-500 leading-snug">Başlama vaxtlarını görmək üçün yoxlayın.</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (showTourSlots) {
+                          document.getElementById('tour-slots-calendar')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        } else {
+                          setShowTourSlots(true);
+                        }
+                      }}
+                      className="text-xs text-slate-500 leading-snug text-left underline decoration-dotted underline-offset-2 hover:text-slate-700 cursor-pointer"
+                    >
+                      Başlama vaxtlarını görmək üçün yoxlayın.
+                    </button>
                   </div>
                   <div className="flex flex-col gap-1.5">
                     <Globe className="w-6 h-6 text-slate-700 mb-1" />
@@ -1735,8 +1751,12 @@ export function TourDetailPage({
                         <Check className="w-3.5 h-3.5 text-emerald-700" />
                       </div>
                       <div className="space-y-0.5">
-                        <h4 className="text-sm font-extrabold text-slate-800">Ödənişsiz ləğv</h4>
-                        <p className="text-xs text-slate-500 font-medium leading-snug">Tam geri ödəmə üçün 48 saat əvvələ qədər ləğv edin</p>
+                        <h4 className="text-sm font-extrabold text-slate-800">{(selectedTour.cancellationHours ?? 48) === 0 ? 'Ləğv edilmir' : 'Ödənişsiz ləğv'}</h4>
+                        <p className="text-xs text-slate-500 font-medium leading-snug">
+                          {(selectedTour.cancellationHours ?? 48) === 0
+                            ? 'Bu tur üçün ləğvetmə mümkün deyil'
+                            : `Tam geri ödəmə üçün ${selectedTour.cancellationHours ?? 48} saat əvvələ qədər ləğv edin`}
+                        </p>
                       </div>
                     </div>
                     <div className="flex items-start gap-3">

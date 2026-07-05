@@ -85,6 +85,7 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
   const [tourSafetyInstructions, setTourSafetyInstructions] = useState<string>('');
   const [tourAllowTeamRegistration, setTourAllowTeamRegistration] = useState<boolean>(true);
   const [tourScheduleFrequency, setTourScheduleFrequency] = useState<string>('one-time');
+  const [tourCancellationHours, setTourCancellationHours] = useState<number>(48);
   const [tourGuideIds, setTourGuideIds] = useState<string[]>([]);
 
   const [isSavingForm, setIsSavingForm] = useState(false);
@@ -163,6 +164,7 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
     setTourSafetyInstructions(tour.safetyInstructions || '');
     setTourAllowTeamRegistration(tour.allowTeamRegistration !== false);
     setTourScheduleFrequency(tour.scheduleFrequency || 'one-time');
+    setTourCancellationHours(tour.cancellationHours !== undefined ? tour.cancellationHours : 48);
     setTourGuideIds(tour.guideIds || []);
 
     const tourSlots = slots.filter(s => s.tourId === tour.id);
@@ -246,6 +248,7 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
       allowTeamRegistration: tourCategory === 'active' ? tourAllowTeamRegistration : undefined,
       scheduleFrequency: tourCategory === 'active' ? tourScheduleFrequency : undefined,
       guideIds: tourGuideIds.length > 0 ? tourGuideIds : undefined,
+      cancellationHours: tourCancellationHours,
     };
 
     setIsSavingForm(true);
@@ -767,7 +770,7 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
         <div className="space-y-5">
           <div className="bg-primary-50/60 p-4 rounded-xl border border-emerald-100 space-y-3">
             <h4 className="text-[10px] font-extrabold text-emerald-800 tracking-widest">📅 Aktiv Olacağı Günlər və Bilet Qiyməti</h4>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:max-w-md">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:max-w-2xl">
               <div>
                 <label className="block text-[11px] font-bold text-slate-500 tracking-wide mb-1">Qiymət (AZN):</label>
                 <input type="number" min="1" required value={tourPrice} onChange={handleNumberInput(setTourPrice)} className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-800" />
@@ -775,6 +778,15 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
               <div>
                 <label className="block text-[11px] font-bold text-rose-600 tracking-wide mb-1">Endirimli Qiymət (opsional):</label>
                 <input type="number" min="0" placeholder="Məs: 25" value={tourDiscountPrice} onChange={(e) => setTourDiscountPrice(e.target.value)} className="w-full px-3 py-2 bg-white border border-rose-200 rounded-lg text-xs font-bold text-rose-700 placeholder-rose-300" />
+              </div>
+              <div>
+                <label className="block text-[11px] font-bold text-slate-500 tracking-wide mb-1">Ləğv qaydası:</label>
+                <select value={tourCancellationHours} onChange={(e) => setTourCancellationHours(Number(e.target.value))} className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-800">
+                  <option value={24}>24 saat</option>
+                  <option value={48}>48 saat</option>
+                  <option value={72}>72 saat</option>
+                  <option value={0}>Ləğv edilmir</option>
+                </select>
               </div>
             </div>
             <MultiDateCalendar selectedDates={selectedDates} onChange={setSelectedDates} />
