@@ -552,8 +552,8 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
           </div>
 
           {tourCategory === 'active' && (
-            <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4 bg-amber-50/50 p-4 rounded-xl border border-amber-200 shadow-xs">
-              <div className="md:col-span-2 pb-2 mb-2 border-b border-amber-200">
+            <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4 bg-amber-50/50 p-4 rounded-xl border border-amber-200 shadow-xs">
+              <div className="md:col-span-3 pb-2 mb-2 border-b border-amber-200">
                 <h4 className="text-xs font-bold text-amber-900 flex items-center gap-1.5 tracking-wider">{t('vendorTourForms.tourForm.activeSection.heading')}</h4>
               </div>
               <div>
@@ -579,28 +579,6 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
               <div>
                 <label className="block text-[11px] font-bold text-amber-700 tracking-wide mb-1">{t('vendorTourForms.tourForm.activeSection.ageLimit.label')}</label>
                 <input type="text" value={tourAgeLimit} onChange={(e) => setTourAgeLimit(e.target.value)} placeholder={t('vendorTourForms.tourForm.activeSection.ageLimit.placeholder')} className="w-full px-3 py-2 bg-white border border-amber-200 rounded-lg text-xs" />
-              </div>
-              <div className="md:col-span-2">
-                <label className="block text-[11px] font-bold text-amber-700 tracking-wide mb-1">{t('vendorTourForms.tourForm.activeSection.requiredEquipment.label')}</label>
-                <textarea rows={2} value={tourRequiredEquipment} onChange={(e) => setTourRequiredEquipment(e.target.value)} placeholder={t('vendorTourForms.tourForm.activeSection.requiredEquipment.placeholder')} className="w-full px-3 py-2 bg-white border border-amber-200 rounded-lg text-xs" />
-              </div>
-              <div className="flex items-center gap-2">
-                <input type="checkbox" id="optAvt" checked={tourEquipmentIncluded} onChange={(e) => setTourEquipmentIncluded(e.target.checked)} className="w-4 h-4 text-emerald-600 rounded" />
-                <label htmlFor="optAvt" className="text-xs text-slate-700 font-semibold cursor-pointer select-none">✅ {t('vendorTourForms.tourForm.activeSection.equipmentIncluded')}</label>
-              </div>
-              {!tourEquipmentIncluded ? (
-                <div>
-                  <label className="block text-[11px] font-bold text-amber-700 tracking-wide mb-1">{t('vendorTourForms.tourForm.activeSection.rentalPrice.label')}</label>
-                  <input type="number" min="0" value={tourEquipmentRentalPrice} onChange={handleNumberInput(setTourEquipmentRentalPrice)} className="w-full px-3 py-2 bg-white border border-amber-200 rounded-lg text-xs" placeholder={t('vendorTourForms.tourForm.activeSection.rentalPrice.placeholder')} />
-                </div>
-              ) : <div />}
-              <div className="flex items-center gap-2">
-                <input type="checkbox" id="optTeam" checked={tourAllowTeamRegistration} onChange={(e) => setTourAllowTeamRegistration(e.target.checked)} className="w-4 h-4 text-emerald-600 rounded" />
-                <label htmlFor="optTeam" className="text-xs text-slate-700 font-semibold cursor-pointer select-none">👥 {t('vendorTourForms.tourForm.activeSection.allowTeamRegistration')}</label>
-              </div>
-              <div className="md:col-span-2 mt-2">
-                <label className="block text-[11px] font-bold text-rose-700 tracking-wide mb-1">{t('vendorTourForms.tourForm.activeSection.safetyInstructions.label')}</label>
-                <textarea rows={3} value={tourSafetyInstructions} onChange={(e) => setTourSafetyInstructions(e.target.value)} placeholder={t('vendorTourForms.tourForm.activeSection.safetyInstructions.placeholder')} className="w-full px-3 py-2 bg-white border border-rose-300 ring-1 ring-rose-100 rounded-lg text-xs" />
               </div>
             </div>
           )}
@@ -628,6 +606,35 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
 
         {currentStep === 2 && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {tourCategory === 'active' && (
+            <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4 bg-amber-50/50 p-4 rounded-xl border border-amber-200 shadow-xs">
+              <div className="md:col-span-2 pb-2 mb-2 border-b border-amber-200">
+                <h4 className="text-xs font-bold text-amber-900 flex items-center gap-1.5 tracking-wider">{t('vendorTourForms.tourForm.activeSection.equipmentHeading')}</h4>
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-[11px] font-bold text-amber-700 tracking-wide mb-1">{t('vendorTourForms.tourForm.activeSection.requiredEquipment.label')}</label>
+                <textarea rows={2} value={tourRequiredEquipment} onChange={(e) => setTourRequiredEquipment(e.target.value)} placeholder={t('vendorTourForms.tourForm.activeSection.requiredEquipment.placeholder')} className="w-full px-3 py-2 bg-white border border-amber-200 rounded-lg text-xs" />
+              </div>
+              <div className="flex items-center gap-2">
+                <input type="checkbox" id="optAvt" checked={tourEquipmentIncluded} onChange={(e) => setTourEquipmentIncluded(e.target.checked)} className="w-4 h-4 text-emerald-600 rounded" />
+                <label htmlFor="optAvt" className="text-xs text-slate-700 font-semibold cursor-pointer select-none">✅ {t('vendorTourForms.tourForm.activeSection.equipmentIncluded')}</label>
+              </div>
+              {!tourEquipmentIncluded ? (
+                <div>
+                  <label className="block text-[11px] font-bold text-amber-700 tracking-wide mb-1">{t('vendorTourForms.tourForm.activeSection.rentalPrice.label')}</label>
+                  <input type="number" min="0" value={tourEquipmentRentalPrice} onChange={handleNumberInput(setTourEquipmentRentalPrice)} className="w-full px-3 py-2 bg-white border border-amber-200 rounded-lg text-xs" placeholder={t('vendorTourForms.tourForm.activeSection.rentalPrice.placeholder')} />
+                </div>
+              ) : <div />}
+              <div className="flex items-center gap-2">
+                <input type="checkbox" id="optTeam" checked={tourAllowTeamRegistration} onChange={(e) => setTourAllowTeamRegistration(e.target.checked)} className="w-4 h-4 text-emerald-600 rounded" />
+                <label htmlFor="optTeam" className="text-xs text-slate-700 font-semibold cursor-pointer select-none">👥 {t('vendorTourForms.tourForm.activeSection.allowTeamRegistration')}</label>
+              </div>
+              <div className="md:col-span-2 mt-2">
+                <label className="block text-[11px] font-bold text-rose-700 tracking-wide mb-1">{t('vendorTourForms.tourForm.activeSection.safetyInstructions.label')}</label>
+                <textarea rows={3} value={tourSafetyInstructions} onChange={(e) => setTourSafetyInstructions(e.target.value)} placeholder={t('vendorTourForms.tourForm.activeSection.safetyInstructions.placeholder')} className="w-full px-3 py-2 bg-white border border-rose-300 ring-1 ring-rose-100 rounded-lg text-xs" />
+              </div>
+            </div>
+          )}
           <div className="md:col-span-2">
             <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">{t('vendorTourForms.tourForm.fields.meetingPoint.label')}</label>
             <select

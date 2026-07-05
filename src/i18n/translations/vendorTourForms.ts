@@ -90,6 +90,7 @@ export const vendorTourForms = {
         },
         activeSection: {
           heading: '🏅 AKTİV HƏYAT VƏ MACƏRA PARAMETRLƏRİ',
+          equipmentHeading: '🦺 AVADANLIQ VƏ TƏHLÜKƏSİZLİK',
           activityType: {
             label: 'İdman / Fəaliyyət Növü:',
             volleyball: '🏐 Voleybol',
@@ -156,6 +157,11 @@ export const vendorTourForms = {
         },
       },
       internationalTourForm: {
+        steps: {
+          basic: 'Əsas Məlumatlar',
+          logistics: 'Logistika və Proqram',
+          pricing: 'Qiymət və Qaydalar',
+        },
         header: {
           titleEdit: 'Xarici Turu Redaktə Et',
           titleNew: 'Pasportlu Xarici Səyahət Paket Operatoru (Yeni Xarici Tur)',
@@ -268,6 +274,8 @@ export const vendorTourForms = {
           generic: 'Xarici tur yadda saxlanılarkən xəta baş verdi.',
         },
         buttons: {
+          back: '← Geri',
+          next: 'İrəli →',
           cancel: 'Ləğv Et',
           submitting: 'Göndərilir...',
           saveChanges: 'Dəyişiklikləri Saxla',
@@ -365,6 +373,7 @@ export const vendorTourForms = {
         },
         activeSection: {
           heading: '🏅 ACTIVE LIFESTYLE AND ADVENTURE PARAMETERS',
+          equipmentHeading: '🦺 EQUIPMENT AND SAFETY',
           activityType: {
             label: 'Sport / Activity Type:',
             volleyball: '🏐 Volleyball',
@@ -431,6 +440,11 @@ export const vendorTourForms = {
         },
       },
       internationalTourForm: {
+        steps: {
+          basic: 'Basic Information',
+          logistics: 'Logistics and Itinerary',
+          pricing: 'Pricing and Rules',
+        },
         header: {
           titleEdit: 'Edit International Tour',
           titleNew: 'International Travel Package Operator (New International Tour)',
@@ -543,6 +557,8 @@ export const vendorTourForms = {
           generic: 'An error occurred while saving the international tour.',
         },
         buttons: {
+          back: '← Back',
+          next: 'Next →',
           cancel: 'Cancel',
           submitting: 'Submitting...',
           saveChanges: 'Save Changes',
@@ -640,6 +656,7 @@ export const vendorTourForms = {
         },
         activeSection: {
           heading: '🏅 ПАРАМЕТРЫ АКТИВНОГО ОТДЫХА И ПРИКЛЮЧЕНИЙ',
+          equipmentHeading: '🦺 СНАРЯЖЕНИЕ И БЕЗОПАСНОСТЬ',
           activityType: {
             label: 'Вид спорта / активности:',
             volleyball: '🏐 Волейбол',
@@ -706,6 +723,11 @@ export const vendorTourForms = {
         },
       },
       internationalTourForm: {
+        steps: {
+          basic: 'Основная информация',
+          logistics: 'Логистика и программа',
+          pricing: 'Цена и правила',
+        },
         header: {
           titleEdit: 'Редактировать международный тур',
           titleNew: 'Оператор зарубежных туристических пакетов (Новый международный тур)',
@@ -818,6 +840,8 @@ export const vendorTourForms = {
           generic: 'Произошла ошибка при сохранении международного тура.',
         },
         buttons: {
+          back: '← Назад',
+          next: 'Далее →',
           cancel: 'Отмена',
           submitting: 'Отправка...',
           saveChanges: 'Сохранить изменения',
