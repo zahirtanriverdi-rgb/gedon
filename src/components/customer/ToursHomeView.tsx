@@ -20,6 +20,7 @@ import { TourWeatherForecast } from '../TourWeatherForecast';
 import { ReviewSubmissionPanel } from './ReviewSubmissionPanel';
 import { computeFeaturedTourIds } from '../../utils/featuredTours';
 import { useLanguage } from '../../i18n/LanguageContext';
+import { getLocalizedTourName, getLocalizedTourDescription } from '../../i18n/tourLocalization';
 
 type ConvertedPriceInfo = {
   azn: number;
@@ -145,7 +146,7 @@ export function ToursHomeView({
   onSelectTour,
   setActiveView
 }: ToursHomeViewProps) {
-  const { t: tt } = useLanguage();
+  const { t: tt, language } = useLanguage();
   const featuredTourIds = React.useMemo(() => computeFeaturedTourIds(tours, slots), [tours, slots]);
   return (
         // -mx-5 cancels the parent <main>'s fixed px-5 (20px) so this container can
@@ -546,7 +547,7 @@ export function ToursHomeView({
                           </button>
                         </div>
                         <div className="flex flex-col flex-1 justify-center overflow-hidden h-full py-1">
-                          <h4 className="text-[14px] font-black text-brand-text-main truncate mb-1" title={tour.name}>{tour.name}</h4>
+                          <h4 className="text-[14px] font-black text-brand-text-main truncate mb-1" title={getLocalizedTourName(tour, language)}>{getLocalizedTourName(tour, language)}</h4>
                           <div className="text-[12px] font-bold text-brand-text-muted mb-2 flex items-center gap-1.5">
                             <MapPin className="w-3.5 h-3.5 text-brand-primary shrink-0" />
                             <span className="truncate">{tour.region}</span>
@@ -668,7 +669,7 @@ export function ToursHomeView({
                 <div className="relative h-52 overflow-hidden bg-slate-100">
                   <img
                     src={tour.image || undefined}
-                    alt={tour.name}
+                    alt={getLocalizedTourName(tour, language)}
                     className="w-full h-full object-cover group-hover:scale-102 transition duration-500"
                     referrerPolicy="no-referrer"
                   />
@@ -744,7 +745,7 @@ export function ToursHomeView({
                           {tour.activityType === 'volleyball' ? '🏐' : tour.activityType === 'ski' ? '⛷️' : tour.activityType === 'rafting' ? '🚣‍♂️' : tour.activityType === 'running' ? '🏃‍♂️' : tour.activityType === 'bike' ? '🚴‍♂️' : '🏆'}
                         </span>
                       )}
-                      {tour.name}
+                      {getLocalizedTourName(tour, language)}
                     </h3>
 
                     {isSportActive && (
@@ -782,7 +783,7 @@ export function ToursHomeView({
                     )}
 
                     <p className="text-xs text-brand-text-muted line-clamp-2 leading-relaxed">
-                      {tour.description}
+                      {getLocalizedTourDescription(tour, language)}
                     </p>
 
                     {/* Integrated Automatic Online Weather Forecasting */}

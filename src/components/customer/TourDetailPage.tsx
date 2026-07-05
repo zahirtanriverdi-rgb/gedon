@@ -3,6 +3,7 @@ import { Tour, TourSlot, Booking, Review, User } from '../../types';
 import { REVIEWS_ENABLED } from '../../config/features';
 import { computeFeaturedTourIds } from '../../utils/featuredTours';
 import { useLanguage } from '../../i18n/LanguageContext';
+import { getLocalizedTourName, getLocalizedTourDescription } from '../../i18n/tourLocalization';
 import {
   Calendar,
   Check,
@@ -84,7 +85,7 @@ export function TourDetailPage({
   handlePackingExperienceSelect,
   togglePackingItemChecked
 }: TourDetailPageProps) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [isDescExpanded, setIsDescExpanded] = useState<boolean>(false);
   const [selectedSlot, setSelectedSlot] = useState<TourSlot | null>(null);
   const [bookingQty, setBookingQty] = useState<number>(1);
@@ -420,7 +421,7 @@ export function TourDetailPage({
                 <span><strong className="text-label-primary cursor-pointer pointer-events-auto hover:underline" onClick={(e) => { e.stopPropagation(); const org = users.find(u => u.id === selectedTour.vendorId); if (org) { setSelectedOrganizer(org); setActiveView('organizer'); setSelectedTour(null); } }}>{selectedTour.vendorName}</strong> {t('tourDetailPage.header.by')}</span>
               </div>
               <h1 className="text-3xl sm:text-4xl font-extrabold text-label-primary tracking-tight leading-tight">
-                {selectedTour.name}
+                {getLocalizedTourName(selectedTour, language)}
               </h1>
               <div className="flex flex-wrap items-center justify-between gap-4 mt-2">
                 <div className="flex items-center gap-4">
@@ -1246,21 +1247,23 @@ export function TourDetailPage({
                 {/* Full description */}
                 <div id="tour-full-description" className="space-y-4 py-4 border-t border-slate-200 scroll-mt-24">
                   <h2 className="text-xl font-extrabold text-slate-900">{t('tourDetailPage.fullDescription.title')}</h2>
+                  {(() => { const localizedDescription = getLocalizedTourDescription(selectedTour, language); return (
                   <div className="relative">
                     <div
                       className={`overflow-hidden transition-all duration-300 ease-in-out ${
-                        isDescExpanded || selectedTour.description.length <= 320 ? 'max-h-[1000px]' : 'max-h-[150px]'
+                        isDescExpanded || localizedDescription.length <= 320 ? 'max-h-[1000px]' : 'max-h-[150px]'
                       }`}
                     >
                       <p className="text-slate-700 text-sm leading-relaxed whitespace-pre-line font-medium antialiased">
-                        {selectedTour.description}
+                        {localizedDescription}
                       </p>
                     </div>
-                    {!isDescExpanded && selectedTour.description.length > 320 && (
+                    {!isDescExpanded && localizedDescription.length > 320 && (
                       <div className="absolute bottom-0 left-0 w-full h-12 bg-gradient-to-t from-white to-transparent pointer-events-none" />
                     )}
                   </div>
-                  {selectedTour.description.length > 320 && (
+                  ); })()}
+                  {getLocalizedTourDescription(selectedTour, language).length > 320 && (
                     <button
                       type="button"
                       onClick={() => setIsDescExpanded(!isDescExpanded)}
@@ -1828,7 +1831,7 @@ export function TourDetailPage({
                         <div className="relative aspect-[4/3] overflow-hidden">
                           <img
                             src={tour.image}
-                            alt={tour.name}
+                            alt={getLocalizedTourName(tour, language)}
                             className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                             referrerPolicy="no-referrer"
                           />
@@ -1843,7 +1846,7 @@ export function TourDetailPage({
                             <span>{tour.region}</span>
                           </div>
                           <h3 className="font-bold text-label-primary text-[16px] mb-3 line-clamp-2 leading-[1.4] group-hover:text-emerald-700 transition">
-                            {tour.name}
+                            {getLocalizedTourName(tour, language)}
                           </h3>
                           {REVIEWS_ENABLED && (
                             <div className="flex items-center gap-1 text-xs font-bold text-label-primary mb-4">

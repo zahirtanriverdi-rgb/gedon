@@ -3,6 +3,7 @@ import { User, Tour } from '../types';
 import { MapPin, Star, Calendar, MessageSquare, Phone, ExternalLink } from 'lucide-react';
 import { REVIEWS_ENABLED } from '../config/features';
 import { useLanguage } from '../i18n/LanguageContext';
+import { getLocalizedTourName } from '../i18n/tourLocalization';
 
 interface OrganizerProfileProps {
   organizer: User;
@@ -12,7 +13,7 @@ interface OrganizerProfileProps {
 }
 
 export default function OrganizerProfile({ organizer, tours, onBack, onTourClick }: OrganizerProfileProps) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   // Belt-and-suspenders alongside the server-side filter (GET /api/tours only returns
   // status = 'approved' to anonymous/customer requests) — a pending or rejected tour must
   // never show up on a vendor's public profile.
@@ -115,7 +116,7 @@ export default function OrganizerProfile({ organizer, tours, onBack, onTourClick
                   >
                     <div className="relative aspect-[4/3] overflow-hidden bg-slate-100">
                       {tour.image && (
-                        <img src={tour.image} alt={tour.name} className="w-full h-full object-cover group-hover:scale-102 transition duration-500" />
+                        <img src={tour.image} alt={getLocalizedTourName(tour, language)} className="w-full h-full object-cover group-hover:scale-102 transition duration-500" />
                       )}
                       <div className="absolute top-3 left-3 bg-white/90 backdrop-blur text-slate-900 px-2 py-1 text-xs font-bold rounded">
                         {tour.durationDays} {t('customerMisc.organizerProfile.durationDaysSuffix')}
@@ -131,7 +132,7 @@ export default function OrganizerProfile({ organizer, tours, onBack, onTourClick
                           </div>
                         )}
                       </div>
-                      <h3 className="text-[16px] font-bold leading-[1.4] text-label-primary">{tour.name}</h3>
+                      <h3 className="text-[16px] font-bold leading-[1.4] text-label-primary">{getLocalizedTourName(tour, language)}</h3>
                       <div className="flex items-center text-label-secondary text-[14px] font-normal gap-1">
                         <MapPin className="w-3.5 h-3.5" />
                         {tour.region}

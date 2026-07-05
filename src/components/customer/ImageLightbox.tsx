@@ -2,6 +2,7 @@ import React from 'react';
 import { Tour } from '../../types';
 import { X, ChevronLeft, ChevronRight, Play } from 'lucide-react';
 import { useLanguage } from '../../i18n/LanguageContext';
+import { getLocalizedTourName } from '../../i18n/tourLocalization';
 
 interface ImageLightboxProps {
   tour: Tour | null;
@@ -10,7 +11,7 @@ interface ImageLightboxProps {
 }
 
 export function ImageLightbox({ tour, lightboxIndex, onSetLightboxIndex }: ImageLightboxProps) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   if (!tour || lightboxIndex === null) return null;
 
   const allMedia: {type: 'image' | 'video', url: string}[] = [];
@@ -50,7 +51,7 @@ export function ImageLightbox({ tour, lightboxIndex, onSetLightboxIndex }: Image
       <div className="flex items-center justify-between text-white w-full max-w-5xl mx-auto z-10 p-2">
         <div className="flex flex-col">
           <span className="text-xs text-slate-400 font-semibold tracking-wider font-mono">{t('customerHome.imageLightbox.galleryLabel', { current: lightboxIndex + 1, total: allMedia.length })}</span>
-          <span className="text-sm font-bold truncate max-w-[200px] xs:max-w-xs">{tour.name}</span>
+          <span className="text-sm font-bold truncate max-w-[200px] xs:max-w-xs">{getLocalizedTourName(tour, language)}</span>
         </div>
         <button
           type="button"
