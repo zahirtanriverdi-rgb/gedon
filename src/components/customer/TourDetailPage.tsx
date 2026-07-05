@@ -92,6 +92,13 @@ export function TourDetailPage({
   const [showTourSlots, setShowTourSlots] = useState<boolean>(false);
   const isFeaturedThisMonth = React.useMemo(() => computeFeaturedTourIds(tours, slots).has(selectedTour.id), [tours, slots, selectedTour.id]);
 
+  // Opening a tour carries over whatever scroll position the home page list was at (e.g. the
+  // user had scrolled down to see this card), so without this the detail page renders already
+  // scrolled past the gallery/title straight into the middle of the page.
+  React.useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'auto' });
+  }, [selectedTour.id]);
+
   // Keep participant count within the capacity of whichever slot is currently selected,
   // so the sticky sidebar and the booking form below always agree on the same numbers.
   React.useEffect(() => {
