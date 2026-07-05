@@ -292,6 +292,11 @@ export default function CustomerPortal({
   const [selectedTour, setSelectedTour] = useState<Tour | null>(null);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
+  // Tour opened via the home page's quick "WhatsApp ilə Rezerv et" card button — shown as a
+  // popup over the current page (unlike selectedTour, which replaces it) and jumps straight
+  // to the booking/OTP step instead of the gallery/description view.
+  const [quickBookTour, setQuickBookTour] = useState<Tour | null>(null);
+
   // Handle dynamic routing for tours based on URL
   React.useEffect(() => {
     const handlePopState = () => {
@@ -325,29 +330,12 @@ export default function CustomerPortal({
   const [packingAnalyzingMap, setPackingAnalyzingMap] = useState<Record<string, boolean>>({});
   const [checkedPackingItems, setCheckedPackingItems] = useState<Record<string, boolean>>({});
 
-  // Quick WhatsApp opening helper
+  // Quick WhatsApp reserve helper — opens the same guest-booking/OTP popup as the full tour
+  // page (see quickBookTour below) instead of redirecting straight to a wa.me link, so the
+  // number gets verified through the real WhatsApp check before anything is sent.
   const handleQuickWhatsApp = (tour: Tour, e: React.MouseEvent) => {
     e.stopPropagation();
-    
-    // Quick lead metrics integration
-    fetch('/api/bookings/whatsapp-click', {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        tourId: tour.id,
-        startDate: (slots.filter(s => s.tourId === tour.id)[0]?.startDate) || "Tezliklə",
-        participantsCount: 1,
-        vendorId: tour.vendorId || "vendor-default",
-        booking_reference: `QL-${Math.floor(1000 + Math.random() * 9000)}`
-      })
-    }).catch(err => console.warn('Lead metrics offline:', err));
-
-    const targetWa = tour.whatsapp_number 
-      ? tour.whatsapp_number.replace(/[\s\+]+/g, '') 
-      : '994706717804';
-    const text = tGlobal('customerMisc.customerPortal.whatsappQuickMessage', { tourName: tour.name });
-    const whatsappUrl = `https://api.whatsapp.com/send?phone=${targetWa}&text=${encodeURIComponent(text)}`;
-    window.open(whatsappUrl, '_blank');
+    setQuickBookTour(tour);
   };
 
   // Simulate an AI "thinking" delay before revealing the packing list for the chosen experience level
@@ -809,6 +797,51 @@ export default function CustomerPortal({
           handlePackingExperienceSelect={handlePackingExperienceSelect}
           togglePackingItemChecked={togglePackingItemChecked}
         />
+      )}
+
+      {/* Quick "WhatsApp ilə Rezerv et" popup — same TourDetailPage/booking/OTP flow as the full
+          page, just opened as an overlay so the home page underneath stays put. */}
+      {quickBookTour && (
+        <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-start justify-center overflow-y-auto py-6 px-3">
+          <div className="bg-white w-full max-w-5xl rounded-2xl shadow-2xl relative my-auto">
+            <button
+              type="button"
+              onClick={() => setQuickBookTour(null)}
+              className="absolute -top-3 -right-3 z-10 bg-slate-900 text-white rounded-full w-9 h-9 flex items-center justify-center shadow-lg hover:bg-slate-700 cursor-pointer"
+              aria-label="Close"
+            >
+              ✕
+            </button>
+            <div className="max-h-[90vh] overflow-y-auto rounded-2xl">
+              <TourDetailPage
+                key={quickBookTour.id}
+                selectedTour={quickBookTour}
+                tours={tours}
+                slots={slots}
+                reviews={reviews}
+                users={users}
+                wishlist={wishlist}
+                currentUser={currentUser}
+                onAddBooking={onAddBooking}
+                onShowNotification={onShowNotification}
+                getConvertedPriceInfo={getConvertedPriceInfo}
+                getReviewsCount={getReviewsCount}
+                handleShareTour={handleShareTour}
+                handleToggleWishlist={handleToggleWishlist}
+                setActiveView={setActiveView}
+                setSelectedOrganizer={setSelectedOrganizer}
+                setSelectedTour={() => setQuickBookTour(null)}
+                setLightboxIndex={setLightboxIndex}
+                packingExperienceMap={packingExperienceMap}
+                packingAnalyzingMap={packingAnalyzingMap}
+                checkedPackingItems={checkedPackingItems}
+                handlePackingExperienceSelect={handlePackingExperienceSelect}
+                togglePackingItemChecked={togglePackingItemChecked}
+                autoOpenBooking
+              />
+            </div>
+          </div>
+        </div>
       )}
 
       <ImageLightbox tour={selectedTour} lightboxIndex={lightboxIndex} onSetLightboxIndex={setLightboxIndex} />

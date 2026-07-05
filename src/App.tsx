@@ -966,6 +966,7 @@ export default function App() {
                 onCreateVendor={handleCreateVendor}
                 onDeleteVendor={handleDeleteVendor}
                 onUpdateTourStatus={handleUpdateTourStatus}
+                authToken={authToken}
               />
             )}
 

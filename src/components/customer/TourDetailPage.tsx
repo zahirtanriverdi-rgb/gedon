@@ -59,6 +59,10 @@ interface TourDetailPageProps {
   checkedPackingItems: Record<string, boolean>;
   handlePackingExperienceSelect: (tourId: string, choice: 'beginner' | 'pro') => void;
   togglePackingItemChecked: (key: string) => void;
+  // When true, jumps straight to the booking/OTP form on mount using the tour's earliest
+  // available slot — used by the home page's quick "WhatsApp ilə Rezerv et" popup, where the
+  // whole point is skipping the gallery/description browsing step.
+  autoOpenBooking?: boolean;
 }
 
 export function TourDetailPage({
@@ -83,7 +87,8 @@ export function TourDetailPage({
   packingAnalyzingMap,
   checkedPackingItems,
   handlePackingExperienceSelect,
-  togglePackingItemChecked
+  togglePackingItemChecked,
+  autoOpenBooking
 }: TourDetailPageProps) {
   const { t, language } = useLanguage();
   const [isDescExpanded, setIsDescExpanded] = useState<boolean>(false);
@@ -136,11 +141,12 @@ export function TourDetailPage({
   // Guest booking details (replacing previous registration requirement)
   const [bookingCustomerName, setBookingCustomerName] = useState<string>('');
   const [bookingCustomerPhone, setBookingCustomerPhone] = useState<string>('');
-  const [verificationOtpCode, setVerificationOtpCode] = useState<string>('');
   const [userInputOtp, setUserInputOtp] = useState<string>('');
   const [isOtpSent, setIsOtpSent] = useState<boolean>(false);
   const [isPhoneVerified, setIsPhoneVerified] = useState<boolean>(false);
   const [showIncomingOtpBanner, setShowIncomingOtpBanner] = useState<boolean>(false);
+  const [isSendingOtp, setIsSendingOtp] = useState<boolean>(false);
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState<boolean>(false);
 
   // Active Lifestyle Booking States
   const [usingOwnEquipment, setUsingOwnEquipment] = useState<boolean>(false);
@@ -191,11 +197,12 @@ export function TourDetailPage({
     setIsBookingStep(true);
     setBookingCustomerName('');
     setBookingCustomerPhone('');
-    setVerificationOtpCode('');
     setUserInputOtp('');
     setIsOtpSent(false);
     setIsPhoneVerified(false);
     setShowIncomingOtpBanner(false);
+    setIsSendingOtp(false);
+    setIsVerifyingOtp(false);
 
     // Active Lifestyle States Reset
     setUsingOwnEquipment(false);
@@ -212,7 +219,24 @@ export function TourDetailPage({
     setSafetyAcknowledged(false);
   };
 
-  const handleSendVerificationCode = () => {
+  // Quick-reserve popup entry point (see CustomerPortal's home-page WhatsApp card button):
+  // skip straight to the booking form using the tour's earliest slot with open capacity,
+  // instead of making the customer scroll down and pick a date themselves.
+  React.useEffect(() => {
+    if (!autoOpenBooking) return;
+    const earliestAvailableSlot = slots
+      .filter(s => s.tourId === selectedTour.id && s.capacity - s.bookedCount > 0)
+      .sort((a, b) => a.startDate.localeCompare(b.startDate))[0];
+    if (earliestAvailableSlot) handleOpenBooking(earliestAvailableSlot);
+    // Only ever run once per popup open — handleOpenBooking itself resets the form fields,
+    // so re-running it on every render (e.g. after selectedSlot changes) would wipe user input.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoOpenBooking, selectedTour.id]);
+
+  // Sends the OTP through the real WhatsApp session (server/whatsapp.ts): the server checks
+  // the number actually has WhatsApp before generating/sending anything and stores the code
+  // itself, so the client never sees or echoes back the real code (see handleVerifyOtp).
+  const handleSendVerificationCode = async () => {
     if (!bookingCustomerName.trim()) {
       if (onShowNotification) onShowNotification(t('tourDetailPage.booking.validation.nameRequired'), 'warning');
       return;
@@ -222,41 +246,77 @@ export function TourDetailPage({
       return;
     }
 
-    // Clean Phone value
     const cleanPhone = bookingCustomerPhone.replace(/\D/g, '');
     if (cleanPhone.length < 7) {
       if (onShowNotification) onShowNotification(t('tourDetailPage.booking.validation.phoneInvalid'), 'warning');
       return;
     }
 
-    const generatedCode = String(Math.floor(1000 + Math.random() * 9000));
-    setVerificationOtpCode(generatedCode);
-    setIsOtpSent(true);
-    setUserInputOtp('');
-    setIsPhoneVerified(false);
-    setShowIncomingOtpBanner(true);
+    setIsSendingOtp(true);
+    try {
+      const res = await fetch('/api/whatsapp/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: cleanPhone, name: bookingCustomerName.trim() })
+      });
+      const data = await res.json().catch(() => ({}));
 
-    if (onShowNotification) {
-      onShowNotification(t('tourDetailPage.booking.validation.otpSent', { code: generatedCode }), 'success');
+      if (!res.ok) {
+        let message = data.error || t('tourDetailPage.booking.validation.otpSendFailed');
+        if (res.status === 422 && data.hasWhatsapp === false) {
+          message = t('tourDetailPage.booking.validation.otpNoWhatsapp');
+        } else if (res.status === 429) {
+          message = t('tourDetailPage.booking.validation.otpRateLimited');
+        } else if (res.status === 503) {
+          message = t('tourDetailPage.booking.validation.otpServiceUnavailable');
+        }
+        if (onShowNotification) onShowNotification(message, 'error');
+        return;
+      }
+
+      setIsOtpSent(true);
+      setUserInputOtp('');
+      setIsPhoneVerified(false);
+      setShowIncomingOtpBanner(true);
+      if (onShowNotification) onShowNotification(t('tourDetailPage.booking.validation.otpSent'), 'success');
+    } catch {
+      if (onShowNotification) onShowNotification(t('tourDetailPage.booking.validation.otpServiceUnavailable'), 'error');
+    } finally {
+      setIsSendingOtp(false);
     }
   };
 
-  const handleVerifyOtp = () => {
+  // Verifies against the server-stored code (see /api/whatsapp/verify-otp) rather than a
+  // value the client generated itself.
+  const handleVerifyOtp = async () => {
     if (!userInputOtp.trim()) {
       if (onShowNotification) onShowNotification(t('tourDetailPage.booking.validation.otpEmpty'), 'warning');
       return;
     }
-    if (userInputOtp === verificationOtpCode) {
-      setIsPhoneVerified(true);
-      setShowIncomingOtpBanner(false);
-      if (onShowNotification) {
-        onShowNotification(t('tourDetailPage.booking.validation.otpVerified'), 'success');
+
+    const cleanPhone = bookingCustomerPhone.replace(/\D/g, '');
+    setIsVerifyingOtp(true);
+    try {
+      const res = await fetch('/api/whatsapp/verify-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: cleanPhone, code: userInputOtp.trim() })
+      });
+      const data = await res.json().catch(() => ({}));
+
+      if (res.ok && data.verified) {
+        setIsPhoneVerified(true);
+        setShowIncomingOtpBanner(false);
+        if (onShowNotification) onShowNotification(t('tourDetailPage.booking.validation.otpVerified'), 'success');
+      } else {
+        setIsPhoneVerified(false);
+        if (onShowNotification) onShowNotification(data.error || t('tourDetailPage.booking.validation.otpWrong'), 'error');
       }
-    } else {
+    } catch {
       setIsPhoneVerified(false);
-      if (onShowNotification) {
-        onShowNotification(t('tourDetailPage.booking.validation.otpWrong'), 'error');
-      }
+      if (onShowNotification) onShowNotification(t('tourDetailPage.booking.validation.otpWrong'), 'error');
+    } finally {
+      setIsVerifyingOtp(false);
     }
   };
 
@@ -983,15 +1043,20 @@ export function TourDetailPage({
                             <button
                               type="button"
                               onClick={handleSendVerificationCode}
-                              className="w-full py-2 bg-slate-900 text-white hover:bg-slate-800 font-extrabold text-[11px] rounded-lg transition-all flex items-center justify-center gap-2 cursor-pointer"
+                              disabled={isSendingOtp}
+                              className="w-full py-2 bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-60 font-extrabold text-[11px] rounded-lg transition-all flex items-center justify-center gap-2 cursor-pointer"
                             >
-                              <MessageCircle className="w-3.5 h-3.5 fill-current text-white" />
-                              {t('tourDetailPage.otp.sendButton')}
+                              {isSendingOtp ? (
+                                <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                              ) : (
+                                <MessageCircle className="w-3.5 h-3.5 fill-current text-white" />
+                              )}
+                              {isSendingOtp ? t('tourDetailPage.otp.sendingButton') : t('tourDetailPage.otp.sendButton')}
                             </button>
                           ) : (
                             <div className="space-y-3">
                               {showIncomingOtpBanner && (
-                                <div className="bg-slate-900 border-l-4 border-emerald-550 border-emerald-500 rounded-xl p-3.5 shadow-xl text-white max-w-sm mx-auto mb-1 animate-pulse">
+                                <div className="bg-slate-900 border-l-4 border-emerald-550 border-emerald-500 rounded-xl p-3.5 shadow-xl text-white max-w-sm mx-auto mb-1">
                                   <div className="flex items-center justify-between text-[9px] text-slate-400 font-bold mb-1 tracking-wider">
                                     <div className="flex items-center gap-1">
                                       <span className="bg-emerald-600 text-white rounded p-0.5 px-1 font-extrabold text-[8px]">WA</span>
@@ -999,8 +1064,8 @@ export function TourDetailPage({
                                     </div>
                                     <span>{t('tourDetailPage.otp.now')}</span>
                                   </div>
-                                  <div className="text-[11px] leading-relaxed text-slate-105 text-slate-100">
-                                    <span className="font-normal text-slate-350">{t('tourDetailPage.otp.bannerLabel')}</span> <strong className="text-emerald-400 font-mono text-sm tracking-widest">{verificationOtpCode}</strong>
+                                  <div className="text-[11px] leading-relaxed text-slate-100">
+                                    {t('tourDetailPage.otp.bannerLabel')}
                                   </div>
                                 </div>
                               )}
@@ -1017,21 +1082,24 @@ export function TourDetailPage({
                                       placeholder={t('tourDetailPage.otp.codePlaceholder')}
                                       value={userInputOtp}
                                       onChange={(e) => setUserInputOtp(e.target.value.replace(/\D/g, ''))}
-                                      className="flex-1 px-3 py-2 text-xs text-center font-bold font-mono tracking-widest border border-slate-200 bg-slate-50 rounded-lg text-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-500"
+                                      disabled={isVerifyingOtp}
+                                      className="flex-1 px-3 py-2 text-xs text-center font-bold font-mono tracking-widest border border-slate-200 bg-slate-50 rounded-lg text-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-500 disabled:bg-slate-100"
                                     />
                                     <button
                                       type="button"
                                       onClick={handleVerifyOtp}
-                                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-lg transition-all cursor-pointer"
+                                      disabled={isVerifyingOtp}
+                                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white font-extrabold text-xs rounded-lg transition-all cursor-pointer"
                                     >
-                                      {t('tourDetailPage.otp.verifyButton')}
+                                      {isVerifyingOtp ? t('tourDetailPage.otp.verifyingButton') : t('tourDetailPage.otp.verifyButton')}
                                     </button>
                                   </div>
                                   <div className="text-right">
                                     <button
                                       type="button"
                                       onClick={handleSendVerificationCode}
-                                      className="text-[10px] text-sky-600 hover:underline font-bold cursor-pointer"
+                                      disabled={isSendingOtp}
+                                      className="text-[10px] text-sky-600 hover:underline font-bold cursor-pointer disabled:opacity-60"
                                     >
                                       {t('tourDetailPage.otp.resendButton')}
                                     </button>
