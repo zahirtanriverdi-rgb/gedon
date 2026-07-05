@@ -107,6 +107,7 @@ export interface Tour {
   meetingPoint?: string;
   meetingPointLat?: number;
   meetingPointLng?: number;
+  meetingPointEmbedUrl?: string; // Google Maps embed <iframe> src for the selected fixed meeting point (domestic tours, see src/data/meetingPoints.ts)
   guideIds?: string[]; // Which of the vendor's registered Guides are assigned to this specific tour
   isManuallyFeatured?: boolean; // Vendor override for the "Ayın Ən Çox Satılanı" badge — takes priority over the automatic monthly-bookings calculation, one tour per vendor at a time
   manuallyFeaturedAt?: string; // ISO timestamp of when the manual override was set

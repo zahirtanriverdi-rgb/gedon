@@ -1265,6 +1265,17 @@ export function TourDetailPage({
                     <p className="text-sm font-medium text-slate-700 leading-relaxed">
                       {selectedTour.meetingPoint}
                     </p>
+                    {selectedTour.meetingPointEmbedUrl && (
+                      <iframe
+                        src={selectedTour.meetingPointEmbedUrl}
+                        width="100%"
+                        height="400"
+                        style={{ border: 0 }}
+                        loading="lazy"
+                        allowFullScreen
+                        className="rounded-xl h-[250px] sm:h-[400px]"
+                      />
+                    )}
                   </div>
                 )}
 

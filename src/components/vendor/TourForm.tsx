@@ -3,7 +3,7 @@ import { Tour, TourSlot, User, Guide } from '../../types';
 import { parseGpsFile } from '../../utils/gpxParser';
 import { Plus, X, Check } from 'lucide-react';
 import { DynamicStringListInput } from './DynamicStringListInput';
-import { LocationAutocompleteInput } from './LocationAutocompleteInput';
+import { MEETING_POINTS } from '../../data/meetingPoints';
 import { MultiDateCalendar, toIsoDate } from './MultiDateCalendar';
 import { TourDangerZone } from './TourDangerZone';
 
@@ -77,8 +77,7 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
   const [tourActiveDifficulty, setTourActiveDifficulty] = useState<string>('medium');
   const [tourAgeLimit, setTourAgeLimit] = useState<string>('18-45 yaş');
   const [tourMeetingPoint, setTourMeetingPoint] = useState<string>('');
-  const [tourMeetingPointLat, setTourMeetingPointLat] = useState<number | undefined>(undefined);
-  const [tourMeetingPointLng, setTourMeetingPointLng] = useState<number | undefined>(undefined);
+  const [tourMeetingPointEmbedUrl, setTourMeetingPointEmbedUrl] = useState<string>('');
   const [tourRequiredEquipment, setTourRequiredEquipment] = useState<string>('');
   const [tourEquipmentIncluded, setTourEquipmentIncluded] = useState<boolean>(true);
   const [tourEquipmentRentalPrice, setTourEquipmentRentalPrice] = useState<number | ''>(0);
@@ -201,8 +200,7 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
     setTourActiveDifficulty(tour.activeDifficulty || 'medium');
     setTourAgeLimit(tour.ageLimit || '18-45 yaş');
     setTourMeetingPoint(tour.meetingPoint || '');
-    setTourMeetingPointLat(tour.meetingPointLat);
-    setTourMeetingPointLng(tour.meetingPointLng);
+    setTourMeetingPointEmbedUrl(tour.meetingPointEmbedUrl || '');
     setTourRequiredEquipment(tour.requiredEquipment || '');
     setTourEquipmentIncluded(tour.equipmentIncluded !== false);
     setTourEquipmentRentalPrice(tour.equipmentRentalPrice || 0);
@@ -286,8 +284,7 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
       activeDifficulty: tourCategory === 'active' ? (tourActiveDifficulty as 'beginner' | 'medium' | 'professional') : undefined,
       ageLimit: tourCategory === 'active' ? tourAgeLimit : undefined,
       meetingPoint: tourMeetingPoint || undefined,
-      meetingPointLat: tourMeetingPointLat,
-      meetingPointLng: tourMeetingPointLng,
+      meetingPointEmbedUrl: tourMeetingPoint ? tourMeetingPointEmbedUrl : undefined,
       requiredEquipment: tourCategory === 'active' ? tourRequiredEquipment : undefined,
       equipmentIncluded: tourCategory === 'active' ? tourEquipmentIncluded : undefined,
       equipmentRentalPrice: tourCategory === 'active' ? (Number(tourEquipmentRentalPrice) || 0) : undefined,
@@ -624,18 +621,21 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
         {currentStep === 2 && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="md:col-span-2">
-            <LocationAutocompleteInput
-              label="Görüş Yeri:"
+            <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">Görüş Yeri:</label>
+            <select
               value={tourMeetingPoint}
-              lat={tourMeetingPointLat}
-              lng={tourMeetingPointLng}
-              onChange={(address, lat, lng) => {
-                setTourMeetingPoint(address);
-                setTourMeetingPointLat(lat);
-                setTourMeetingPointLng(lng);
+              onChange={(e) => {
+                const selected = MEETING_POINTS.find((p) => p.name === e.target.value);
+                setTourMeetingPoint(selected?.name || '');
+                setTourMeetingPointEmbedUrl(selected?.embedUrl || '');
               }}
-              placeholder="Məsələn: Tofiq Bəhramov adına Respublika Stadionunun qarşısı..."
-            />
+              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700"
+            >
+              <option value="">— Görüş yeri seçin —</option>
+              {MEETING_POINTS.map((point) => (
+                <option key={point.name} value={point.name}>{point.name}</option>
+              ))}
+            </select>
           </div>
 
           <div>
