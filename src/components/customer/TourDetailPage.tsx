@@ -3,7 +3,6 @@ import { Tour, TourSlot, Booking, Review, User } from '../../types';
 import { REVIEWS_ENABLED } from '../../config/features';
 import { computeFeaturedTourIds } from '../../utils/featuredTours';
 import {
-  AlertCircle,
   Calendar,
   Check,
   CheckCircle,
@@ -435,25 +434,6 @@ export function TourDetailPage({
                   </button>
                 </div>
               </div>
-            </div>
-
-            {/* Info Banner — placed right after the header's wishlist/share row, at the very top of the page */}
-            <div className="bg-emerald-50 rounded-xl p-4 border border-emerald-100 flex items-center justify-between mb-8">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-emerald-100 text-brand-primary rounded-lg">
-                  <AlertCircle className="w-5 h-5" />
-                </div>
-                <div>
-                  <h4 className="font-bold text-brand-primary text-sm">Turdan əvvəl bilməli olduqlarınız</h4>
-                  <p className="text-brand-primary text-xs mt-0.5">Avadanlıq, geyim və çətinlik dərəcələri haqqında tam bələdçi</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setActiveView('faq')}
-                className="px-4 py-2 bg-brand-primary hover:opacity-90 text-white font-bold text-xs rounded-lg transition"
-              >
-                Oxu
-              </button>
             </div>
 
             {/* TWO COLUMN WRAPPER — items-stretch (default) so the right column wrapper is as tall as the
