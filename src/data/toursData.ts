@@ -59,6 +59,7 @@ export const seedUsers: User[] = [
     id: 'user-admin',
     name: 'Elnur Cəfərov',
     email: 'admin@gedekgore.az',
+    password: 'admin123',
     role: 'admin',
     phone: '+994 55 555 55 55',
     balance: 1450.0,
