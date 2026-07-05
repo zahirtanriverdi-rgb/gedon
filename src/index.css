@@ -24,10 +24,11 @@
   --color-primary: #317312;
   --color-accent: #FF5903;
   --color-bg-light: #FBFBFA;
+  --color-bg-page: #F2F7FD;
   --color-cta: #166EF3;
   --color-cta-hover: #24BAEC;
   --color-text-main: #091D36;
-  --color-text-muted: #626F7E;
+  --color-text-muted: #536479;
 }
 
 @theme {
@@ -40,6 +41,7 @@
   --color-brand-primary: var(--color-primary);
   --color-brand-accent: var(--color-accent);
   --color-brand-bg-light: var(--color-bg-light);
+  --color-brand-bg-page: var(--color-bg-page);
   --color-brand-cta: var(--color-cta);
   --color-brand-cta-hover: var(--color-cta-hover);
   --color-brand-text-main: var(--color-text-main);
@@ -133,13 +135,13 @@
 
   /* Tertiary: ink/surface neutrals — text/contrast (dark) and card/page backgrounds (light).
      Navy-tinted (not teal) to match the brand text tokens: 50 ≈ bg-light (#FBFBFA),
-     500 = text-muted (#626F7E) exact, 900 = text-main (#091D36) exact. */
+     500 = text-muted (#536479) exact, 900 = text-main (#091D36) exact. */
   --color-ink-50: #fbfbfa;
   --color-ink-100: #f3f4f6;
   --color-ink-200: #e5e7eb;
   --color-ink-300: #d1d5db;
   --color-ink-400: #9ca3af;
-  --color-ink-500: #626F7E;
+  --color-ink-500: #536479;
   --color-ink-600: #566270;
   --color-ink-700: #3f4a56;
   --color-ink-800: #2a323c;

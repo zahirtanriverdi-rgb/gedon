@@ -665,9 +665,9 @@ export default function App() {
       className="min-h-screen font-sans text-slate-700 flex flex-col justify-between"
       id="app_root"
       style={{
-        // Flat, uniform ~2% Capri Blue tint over ink-50 (#f9fbfb) — same color everywhere,
+        // Flat, uniform brand page background (--color-bg-page) — same color everywhere,
         // not a gradient.
-        backgroundColor: '#f4f8fb',
+        backgroundColor: 'var(--color-bg-page)',
       }}
     >
       {/* Main Elegant Header — flush with the page background at scrollY 0, gains a
@@ -683,9 +683,9 @@ export default function App() {
             setIsGlobalSearchFocused(false);
             window.dispatchEvent(new CustomEvent('nav-home'));
           }}>
-            <div className="flex flex-col font-black text-black leading-tight text-xl tracking-tight">
+            <div className="flex flex-col font-black text-brand-primary leading-tight text-xl tracking-tight">
               <span>GedəkGörək</span>
-              <span className="hidden sm:block text-[12px] uppercase tracking-widest text-slate-500 font-bold">Marketplace</span>
+              <span className="hidden sm:block text-[12px] uppercase tracking-widest text-brand-primary font-bold">Marketplace</span>
             </div>
           </div>
 
@@ -759,7 +759,7 @@ export default function App() {
                       </span>
                     )}
                   </span>
-                  <span className="hidden sm:block text-xs text-label-secondary font-semibold">İstəklər</span>
+                  <span className="hidden sm:block text-xs text-brand-text-main font-semibold">İstəklər</span>
                 </button>
                 <button
                   onClick={() => window.dispatchEvent(new CustomEvent('nav-faq'))}
@@ -769,7 +769,7 @@ export default function App() {
                   <span className="w-11 h-8 sm:w-9 sm:h-7 flex items-center justify-center">
                     <BookOpen className="w-6 h-6 sm:w-5 sm:h-5 stroke-[2px] transition-colors group-hover:stroke-emerald-500" />
                   </span>
-                  <span className="hidden sm:block text-xs text-label-secondary font-semibold whitespace-nowrap">Bələdçi</span>
+                  <span className="hidden sm:block text-xs text-brand-text-main font-semibold whitespace-nowrap">Bələdçi</span>
                 </button>
                 <button
                   onClick={() => window.dispatchEvent(new CustomEvent('nav-calculator'))}
@@ -778,7 +778,7 @@ export default function App() {
                   <span className="w-11 h-8 sm:w-9 sm:h-7 flex items-center justify-center">
                     <Calculator className="w-6 h-6 sm:w-5 sm:h-5 stroke-[2px] transition-colors group-hover:stroke-emerald-500" />
                   </span>
-                  <span className="hidden sm:block text-xs text-label-secondary font-semibold whitespace-nowrap">Qrup hesabla</span>
+                  <span className="hidden sm:block text-xs text-brand-text-main font-semibold whitespace-nowrap">Qrup hesabla</span>
                 </button>
                 <div className="relative">
                   <button
@@ -786,10 +786,10 @@ export default function App() {
                     className="w-11 sm:w-auto sm:min-w-0 sm:px-2 h-16 sm:h-14 flex flex-col items-center justify-center gap-0.5 hover:text-emerald-600 transition group cursor-pointer bg-transparent border-none p-0"
                     title="Valyutanı / Dilini dəyiş"
                   >
-                    <span className="w-11 h-8 sm:w-9 sm:h-7 flex items-center justify-center">
+                    <span className="w-11 h-8 sm:w-9 sm:h-7 flex items-center justify-center text-brand-accent">
                       <Globe className="w-6 h-6 sm:w-5 sm:h-5 stroke-[2px]" />
                     </span>
-                    <span className="hidden sm:block text-xs text-label-secondary font-semibold">
+                    <span className="hidden sm:block text-xs text-brand-accent font-semibold">
                       {appLanguage === 'az' && displayCurrency === 'AZN' ? 'AZ / AZN ₼' :
                        appLanguage === 'ru' && displayCurrency === 'AZN' ? 'RU / AZN ₼' :
                        appLanguage === 'en' && displayCurrency === 'USD' ? 'EN / USD $' :

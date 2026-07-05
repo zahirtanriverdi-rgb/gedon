@@ -281,7 +281,7 @@ export function ToursHomeView({
             {/* Expandable Advanced Filters Toggle Button */}
             <button
               onClick={() => setIsFiltersExpanded(!isFiltersExpanded)}
-              className="mt-0 mb-1 text-[11px] font-bold text-brand-text-muted hover:text-brand-cta flex items-center gap-1 transition-colors"
+              className="mt-0 mb-1 text-[11px] font-bold text-brand-accent hover:text-accent-orange-600 flex items-center gap-1 transition-colors"
             >
               {isFiltersExpanded ? 'Gizlət' : 'Geniş Axtarış Filtrləri'} 
               <svg className={`w-3 h-3 transition-transform ${isFiltersExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -512,7 +512,7 @@ export function ToursHomeView({
                         const slider = document.getElementById('upcoming-tours-slider');
                         if(slider) slider.scrollBy({ left: -300, behavior: 'smooth' });
                       }}
-                      className="absolute left-0 top-1/2 -translate-y-1/2 -ml-3 md:-ml-4 z-10 bg-brand-cta text-white p-2.5 rounded-full shadow-lg hover:bg-brand-cta-hover transition-colors flex items-center justify-center border-2 border-white"
+                      className="absolute left-0 top-1/2 -translate-y-1/2 -ml-3 md:-ml-4 z-10 bg-brand-accent text-white p-2.5 rounded-full shadow-lg hover:bg-accent-orange-600 transition-colors flex items-center justify-center border-2 border-white"
                     >
                       <ChevronLeft className="w-5 h-5" />
                     </button>
@@ -550,7 +550,7 @@ export function ToursHomeView({
                             <span className="truncate">{tour.region}</span>
                           </div>
                           <div className="flex items-center justify-between mt-auto">
-                            <span className="text-[11px] font-black text-brand-primary bg-emerald-50 border border-emerald-100 px-2 py-1 rounded-md tracking-tight">
+                            <span className="text-[11px] font-black text-brand-primary bg-white border border-emerald-100 px-2 py-1 rounded-md tracking-tight">
                               {slot.startDate}
                           </span>
                           {tour.discountPrice && tour.discountPrice > 0 && tour.discountPrice < (tour.price ?? slot.price) ? (
@@ -579,7 +579,7 @@ export function ToursHomeView({
                         const slider = document.getElementById('upcoming-tours-slider');
                         if(slider) slider.scrollBy({ left: 300, behavior: 'smooth' });
                       }}
-                      className="absolute right-0 top-1/2 -translate-y-1/2 -mr-3 md:-mr-4 z-10 bg-brand-cta text-white p-2.5 rounded-full shadow-lg hover:bg-brand-cta-hover transition-colors flex items-center justify-center border-2 border-white"
+                      className="absolute right-0 top-1/2 -translate-y-1/2 -mr-3 md:-mr-4 z-10 bg-brand-accent text-white p-2.5 rounded-full shadow-lg hover:bg-accent-orange-600 transition-colors flex items-center justify-center border-2 border-white"
                     >
                       <ChevronRight className="w-5 h-5" />
                     </button>
@@ -839,7 +839,7 @@ export function ToursHomeView({
                         </div>
                       ) : (
                         <div className="flex flex-col items-end">
-                          <strong className="text-label-primary text-2xl font-extrabold leading-tight">
+                          <strong className="text-brand-accent text-2xl font-extrabold leading-tight">
                             {getConvertedPriceInfo(tour.price ?? minPrice, tour.priceCurrency).both}
                           </strong>
                           <span className="text-label-tertiary text-[10px] font-medium">/ nəfər</span>
