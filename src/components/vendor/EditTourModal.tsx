@@ -2,6 +2,7 @@ import { Tour, TourSlot, User } from '../../types';
 import { X, Edit } from 'lucide-react';
 import { TourForm } from './TourForm';
 import { InternationalTourForm } from './InternationalTourForm';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 interface EditTourModalProps {
   tour: Tour | null;
@@ -20,6 +21,7 @@ interface EditTourModalProps {
 // creating tours — editing is just those components rendered with `tour` set instead of a
 // dedicated duplicate form.
 export function EditTourModal({ tour, slots, currentUser, onAddTour, onEditTour, onDeleteTour, onAddSlot, onDeleteSlot, onShowNotification, onClose }: EditTourModalProps) {
+  const { t } = useLanguage();
   if (!tour) return null;
   const isIntl = tour.isInternational || tour.category === 'international';
 
@@ -32,8 +34,8 @@ export function EditTourModal({ tour, slots, currentUser, onAddTour, onEditTour,
               <Edit className="w-5 h-5 text-amber-700" />
             </div>
             <div>
-              <h3 className="font-extrabold text-slate-900 text-sm">Tur Reqlamentini Yeniləyin</h3>
-              <p className="text-[10px] text-slate-500 font-medium">Marşrut bələdçisi, kateqoriyası və ətraflı rekvizitlərinə düzəliş edin</p>
+              <h3 className="font-extrabold text-slate-900 text-sm">{t('vendorMisc.editTourModal.title')}</h3>
+              <p className="text-[10px] text-slate-500 font-medium">{t('vendorMisc.editTourModal.subtitle')}</p>
             </div>
           </div>
           <button

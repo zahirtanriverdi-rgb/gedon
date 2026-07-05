@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Tour, Booking, Review } from '../../types';
 import { CheckCircle, AlertCircle, Star } from 'lucide-react';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 interface ReviewSubmissionPanelProps {
   tours: Tour[];
@@ -11,6 +12,7 @@ interface ReviewSubmissionPanelProps {
 }
 
 export function ReviewSubmissionPanel({ tours, bookings, reviews, currentUser, onAddReview }: ReviewSubmissionPanelProps) {
+  const { t } = useLanguage();
   const [reviewRating, setReviewRating] = useState<number>(5);
   const [reviewComment, setReviewComment] = useState<string>('');
   const [selectedBookingForReview, setSelectedBookingForReview] = useState<string>('');
@@ -50,7 +52,7 @@ export function ReviewSubmissionPanel({ tours, bookings, reviews, currentUser, o
       setReviewComment('');
       setSelectedBookingForReview('');
     } catch (e: any) {
-      setReviewSubmitError(e?.message || 'Rəy göndərilərkən xəta baş verdi. Zəhmət olmasa yenidən cəhd edin.');
+      setReviewSubmitError(e?.message || t('customerHome.reviewSubmissionPanel.submitError'));
     } finally {
       setIsSubmittingReview(false);
     }
@@ -61,35 +63,35 @@ export function ReviewSubmissionPanel({ tours, bookings, reviews, currentUser, o
       <div>
         <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
           <CheckCircle className="text-emerald-500 w-5 h-5" />
-          Təhlükəsiz Rəy Yazma Paneli (Anti-Fake System)
+          {t('customerHome.reviewSubmissionPanel.heading')}
         </h3>
         <p className="text-xs text-slate-500 mt-1">
-          Bizim sistemdə yalnız turlarda həqiqətən iştirak edib, ödənişi təsdiqlənmiş şəxslər rəy yaza bilərlər. Bu, saxta reytinqlərin qarşısını alır.
+          {t('customerHome.reviewSubmissionPanel.subheading')}
         </p>
       </div>
 
       {userEligibleBookings.length === 0 ? (
         <div className="bg-slate-50 p-4 rounded-lg text-slate-500 text-xs flex items-center gap-2">
           <AlertCircle className="w-4 h-4 text-emerald-500 flex-shrink-0" />
-          <span>Hazırda rəy yaza biləcəyiniz tamamlanmış / ödənilmiş aktiv rezervasiyanız yoxdur. Rəy yazmaq üçün yandakı turlardan birinə bilet alıb ödənişi tamamlayın.</span>
+          <span>{t('customerHome.reviewSubmissionPanel.noEligibleBookings')}</span>
         </div>
       ) : (
         <form onSubmit={handleAddReviewSubmit} className="space-y-4 bg-slate-50/50 p-4 rounded-xl border border-slate-150">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-medium text-slate-500 mb-1">Dəyərləndirilməli Rezervasiya ID-si (Booking):</label>
+              <label className="block text-xs font-medium text-slate-500 mb-1">{t('customerHome.reviewSubmissionPanel.bookingSelectLabel')}</label>
               <select
                 required
                 value={selectedBookingForReview}
                 onChange={(e) => setSelectedBookingForReview(e.target.value)}
                 className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs"
               >
-                <option value="">Rezervasiya seçin</option>
+                <option value="">{t('customerHome.reviewSubmissionPanel.bookingSelectPlaceholder')}</option>
                 {userEligibleBookings.map(b => {
-                  const tour = tours.find(t => t.id === b.tourId);
+                  const tour = tours.find(tt => tt.id === b.tourId);
                   return (
                     <option key={b.id} value={b.id}>
-                      {tour?.name} ({b.bookingDate}) - {b.totalAmount} AZN (Bilet #{b.id})
+                      {tour?.name} ({b.bookingDate}) - {b.totalAmount} AZN ({t('customerHome.reviewSubmissionPanel.ticketHash')}{b.id})
                     </option>
                   );
                 })}
@@ -97,7 +99,7 @@ export function ReviewSubmissionPanel({ tours, bookings, reviews, currentUser, o
             </div>
 
             <div>
-              <label className="block text-xs font-medium text-slate-500 mb-1">Xal (Rating):</label>
+              <label className="block text-xs font-medium text-slate-500 mb-1">{t('customerHome.reviewSubmissionPanel.ratingLabel')}</label>
               <div className="flex items-center gap-2 py-1.5">
                 {[1, 2, 3, 4, 5].map(num => (
                   <button
@@ -109,19 +111,19 @@ export function ReviewSubmissionPanel({ tours, bookings, reviews, currentUser, o
                     <Star className="w-5 h-5 fill-current" />
                   </button>
                 ))}
-                <span className="text-xs text-slate-600 font-bold ml-1">({reviewRating}/5 ulduz)</span>
+                <span className="text-xs text-slate-600 font-bold ml-1">{t('customerHome.reviewSubmissionPanel.ratingSuffix', { rating: reviewRating })}</span>
               </div>
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-medium text-slate-500 mb-1">Rəyiniz / Şərhiniz:</label>
+            <label className="block text-xs font-medium text-slate-500 mb-1">{t('customerHome.reviewSubmissionPanel.commentLabel')}</label>
             <textarea
               required
               rows={3}
               value={reviewComment}
               onChange={(e) => setReviewComment(e.target.value)}
-              placeholder="Rəhbər professional idimi? Marşrut xoşunuza gəldimi? Təcrübənizi bizimlə bölüşün..."
+              placeholder={t('customerHome.reviewSubmissionPanel.commentPlaceholder')}
               className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-500"
             />
           </div>
@@ -143,7 +145,7 @@ export function ReviewSubmissionPanel({ tours, bookings, reviews, currentUser, o
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
               </svg>
             )}
-            {isSubmittingReview ? 'Göndərilir...' : 'Yalnız Həqiqi İştirakçı Rəyini Göndər'}
+            {isSubmittingReview ? t('customerHome.reviewSubmissionPanel.submitting') : t('customerHome.reviewSubmissionPanel.submitButton')}
           </button>
         </form>
       )}

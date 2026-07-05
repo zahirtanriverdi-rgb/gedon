@@ -6,16 +6,11 @@ import { DynamicStringListInput } from './DynamicStringListInput';
 import { MEETING_POINTS } from '../../data/meetingPoints';
 import { MultiDateCalendar, toIsoDate } from './MultiDateCalendar';
 import { TourDangerZone } from './TourDangerZone';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 // Older guides saved before Guide.id existed have no stable identifier — fall back to their
 // name so tour-guide assignment still works for pre-existing profile data.
 const getGuideKey = (guide: Guide): string => guide.id || guide.name;
-
-const FORM_STEPS = [
-  { number: 1 as const, label: 'Əsas Məlumatlar' },
-  { number: 2 as const, label: 'Logistika və Proqram' },
-  { number: 3 as const, label: 'Qiymət və Qaydalar' },
-];
 
 interface TourFormProps {
   currentUser: User;
@@ -36,7 +31,14 @@ interface TourFormProps {
 // used from VendorPortal's "add-tour" tab (tour=null) and from the edit modal (tour set) —
 // only the Danger Zone is mode-specific.
 export function TourForm({ currentUser, tour, slots, category: tourCategory, onCategoryChange: setTourCategory, onAddTour, onEditTour, onDeleteTour, onAddSlot, onDeleteSlot, onShowNotification, onNavigateBack }: TourFormProps) {
+  const { t } = useLanguage();
   const isEditMode = !!tour;
+
+  const FORM_STEPS = [
+    { number: 1 as const, label: t('vendorTourForms.tourForm.steps.basic') },
+    { number: 2 as const, label: t('vendorTourForms.tourForm.steps.logistics') },
+    { number: 3 as const, label: t('vendorTourForms.tourForm.steps.pricing') },
+  ];
 
   // Number inputs are bound to `number | ''` state (not plain `number`) so the field can be
   // fully cleared: clearing the input sets state to '' instead of forcing a "0" back into the
@@ -106,14 +108,14 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
   const getMissingFieldsForStep = (step: 1 | 2 | 3): { key: string; label: string }[] => {
     const missing: { key: string; label: string }[] = [];
     if (step === 1) {
-      if (!tourLanguages.trim()) missing.push({ key: 'languages', label: 'Danışılan dillər' });
-      if (tourBringItems.filter(Boolean).length === 0) missing.push({ key: 'bringItems', label: 'Özünüzlə gətirin' });
+      if (!tourLanguages.trim()) missing.push({ key: 'languages', label: t('vendorTourForms.tourForm.validation.fieldLanguages') });
+      if (tourBringItems.filter(Boolean).length === 0) missing.push({ key: 'bringItems', label: t('vendorTourForms.tourForm.validation.fieldBringItems') });
     } else if (step === 2) {
-      if (tourImages.length === 0) missing.push({ key: 'media', label: 'Media (ən azı 1 şəkil)' });
+      if (tourImages.length === 0) missing.push({ key: 'media', label: t('vendorTourForms.tourForm.validation.fieldMedia') });
     } else if (step === 3) {
-      if (tourIncludes.filter(Boolean).length === 0) missing.push({ key: 'includes', label: 'Qiymətə daxildir' });
-      if (tourNotIncluded.filter(Boolean).length === 0) missing.push({ key: 'notIncluded', label: 'Qiymətə daxil deyil' });
-      if (!tourHighlights.trim()) missing.push({ key: 'highlights', label: 'Önə çıxanlar' });
+      if (tourIncludes.filter(Boolean).length === 0) missing.push({ key: 'includes', label: t('vendorTourForms.tourForm.validation.fieldIncludes') });
+      if (tourNotIncluded.filter(Boolean).length === 0) missing.push({ key: 'notIncluded', label: t('vendorTourForms.tourForm.validation.fieldNotIncluded') });
+      if (!tourHighlights.trim()) missing.push({ key: 'highlights', label: t('vendorTourForms.tourForm.validation.fieldHighlights') });
     }
     return missing;
   };
@@ -133,7 +135,7 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
       for (const { key } of missing) next[key] = true;
       return next;
     });
-    const message = `Zəhmət olmasa bu xanaları doldurun: ${missing.map((m) => m.label).join(', ')}.`;
+    const message = `${t('vendorTourForms.tourForm.validation.missingFieldsPrefix')} ${missing.map((m) => m.label).join(', ')}.`;
     if (onShowNotification) onShowNotification(message, 'error');
     else alert(message);
     return false;
@@ -159,7 +161,7 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
     const returnTime = new Date(tourReturnDateTime).getTime();
     if (isNaN(departure) || isNaN(returnTime)) return;
     if (returnTime <= departure) {
-      setDateTimeError('Dönüş tarixi çıxış tarixindən sonra olmalıdır.');
+      setDateTimeError(t('vendorTourForms.tourForm.dateTimeError'));
       return;
     }
     setDateTimeError(null);
@@ -230,10 +232,11 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
       return;
     }
     if (!tourName || !tourRegion || !tourDescription) {
+      const requiredFieldsMessage = t('vendorTourForms.tourForm.validation.missingRequiredFields');
       if (onShowNotification) {
-        onShowNotification('Zəhmət olmasa bütün məcburi xanaları doldurun.', 'error');
+        onShowNotification(requiredFieldsMessage, 'error');
       } else {
-        alert('Zəhmət olmasa bütün məcburi xanaları doldurun.');
+        alert(requiredFieldsMessage);
       }
       return;
     }
@@ -300,19 +303,24 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
     try {
       let tourId: string;
       if (isEditMode && tour) {
+        const activeLabel = t('vendorTourForms.tourForm.changeLog.statusActive');
+        const inactiveLabel = t('vendorTourForms.tourForm.changeLog.statusInactive');
         const changes: string[] = [];
-        if (tour.name !== tourName) changes.push(`Ad (${tour.name} ➡️ ${tourName})`);
+        if (tour.name !== tourName) changes.push(t('vendorTourForms.tourForm.changeLog.nameChange', { oldName: tour.name, newName: tourName }));
         if ((tour.isActive !== false) !== tourIsActive) {
-          changes.push(`Status (${(tour.isActive !== false) ? 'Aktiv' : 'Deaktiv'} ➡️ ${tourIsActive ? 'Aktiv' : 'Deaktiv'})`);
+          changes.push(t('vendorTourForms.tourForm.changeLog.statusChange', {
+            oldStatus: (tour.isActive !== false) ? activeLabel : inactiveLabel,
+            newStatus: tourIsActive ? activeLabel : inactiveLabel,
+          }));
         }
-        if (tour.image !== tourImage) changes.push('Kover Şəkil dəyişdi 🖼️');
-        const lastChangeLog = changes.length > 0 ? changes.join(' | ') : 'Xırda düzəlişlər';
+        if (tour.image !== tourImage) changes.push(t('vendorTourForms.tourForm.changeLog.coverImageChanged'));
+        const lastChangeLog = changes.length > 0 ? changes.join(' | ') : t('vendorTourForms.tourForm.changeLog.minorChanges');
 
         const updatedTour: Tour = { ...tour, ...sharedFields, lastChangeLog };
         tourId = tour.id;
         if (onEditTour) await onEditTour(updatedTour);
         if (onShowNotification) {
-          onShowNotification('Tur məlumatları yeniləndi və yenidən təsdiqlənməsi üçün Admin nümayəndəsinə göndərildi! ⏳✨', 'info');
+          onShowNotification(t('vendorTourForms.tourForm.notifications.tourUpdatedPendingApproval'), 'info');
         }
       } else {
         const newTour: Tour = {
@@ -359,7 +367,7 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
 
       onNavigateBack();
     } catch (err: any) {
-      setFormSubmitError(err?.message || 'Tur yadda saxlanılarkən xəta baş verdi.');
+      setFormSubmitError(err?.message || t('vendorTourForms.tourForm.submitErrors.generic'));
     } finally {
       setIsSavingForm(false);
     }
@@ -374,10 +382,10 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
         setTourGpxData(JSON.stringify(parsed));
         setTourGpxFileName(file.name);
         if (onShowNotification) {
-          onShowNotification(`🎉 GPX/KML marşrut xəritəsi uğurla yükləndi! (${parsed.stats.distanceKm} km, Yüksəklik: +${parsed.stats.elevationGainM}m)`, 'success');
+          onShowNotification(t('vendorTourForms.tourForm.notifications.gpxUploaded', { distanceKm: parsed.stats.distanceKm, elevationGainM: parsed.stats.elevationGainM }), 'success');
         }
       } catch (err: any) {
-        if (onShowNotification) onShowNotification(`❌ Fayl oxunarkən xəta: ${err.message || 'Format dəstəklənmir'}`, 'error');
+        if (onShowNotification) onShowNotification(t('vendorTourForms.tourForm.notifications.gpxError', { error: err.message || t('vendorTourForms.tourForm.notifications.gpxErrorDefault') }), 'error');
       }
     };
     reader.readAsText(file);
@@ -417,9 +425,9 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
     }
     if (onShowNotification && (imageFiles.length > 0 || videoFiles.length > 0)) {
       const parts: string[] = [];
-      if (imageFiles.length > 0) parts.push(`${imageFiles.length} şəkil`);
-      if (videoFiles.length > 0) parts.push(`${videoFiles.length} video`);
-      onShowNotification(`${parts.join(' və ')} qalereyaya əlavə edildi! 📸🎥`, 'success');
+      if (imageFiles.length > 0) parts.push(t('vendorTourForms.tourForm.notifications.mediaAddedImages', { count: imageFiles.length }));
+      if (videoFiles.length > 0) parts.push(t('vendorTourForms.tourForm.notifications.mediaAddedVideos', { count: videoFiles.length }));
+      onShowNotification(t('vendorTourForms.tourForm.notifications.mediaAdded', { parts: parts.join(t('vendorTourForms.tourForm.notifications.mediaAddedJoiner')) }), 'success');
     }
   };
 
@@ -428,10 +436,10 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
       <form onSubmit={handleTourSubmit} className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-5">
         <div>
           <span className="text-[10px] tracking-widest text-slate-400 font-bold block mb-1">
-            {isEditMode ? 'Tur Reqlamentini Yeniləyin' : (tourCategory === 'active' ? 'Yeni Aktiv Həyat Tədbiri' : 'Yeni Marşrut')}
+            {isEditMode ? t('vendorTourForms.tourForm.header.eyebrowEdit') : (tourCategory === 'active' ? t('vendorTourForms.tourForm.header.eyebrowNewActive') : t('vendorTourForms.tourForm.header.eyebrowNewStandard'))}
           </span>
           <h3 className="font-extrabold text-slate-900 text-sm">
-            {isEditMode ? 'Marşrut bələdçisi, kateqoriyası və ətraflı rekvizitlərinə düzəliş edin' : (tourCategory === 'active' ? 'Aktiv həyat tərzi və idman tədbiri yaradın' : 'Azərbaycan daxili yeni tur paradiqması tərtib edin')}
+            {isEditMode ? t('vendorTourForms.tourForm.header.titleEdit') : (tourCategory === 'active' ? t('vendorTourForms.tourForm.header.titleNewActive') : t('vendorTourForms.tourForm.header.titleNewStandard'))}
           </h3>
         </div>
 
@@ -465,61 +473,61 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
         {currentStep === 1 && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">Turun Başlığı:</label>
+            <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">{t('vendorTourForms.tourForm.fields.name.label')}</label>
             <input
               type="text"
               required
               value={tourName}
               onChange={(e) => setTourName(e.target.value)}
-              placeholder="Məsələn: Sulut zirvə yürüşü"
+              placeholder={t('vendorTourForms.tourForm.fields.name.placeholder')}
               className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
             />
           </div>
 
           <div>
-            <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">Regionlar və Nöqtələr:</label>
+            <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">{t('vendorTourForms.tourForm.fields.region.label')}</label>
             <input
               type="text"
               required
               value={tourRegion}
               onChange={(e) => setTourRegion(e.target.value)}
-              placeholder="Məsələn: İsmayıllı (Sulut kəndi)"
+              placeholder={t('vendorTourForms.tourForm.fields.region.placeholder')}
               className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
             />
           </div>
 
           <div>
-            <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">Kateqoriya:</label>
+            <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">{t('vendorTourForms.tourForm.fields.category.label')}</label>
             <select
               value={tourCategory}
               onChange={(e) => setTourCategory(e.target.value as any)}
               className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700"
             >
-              <option value="hiking">🥾 Hiking (Yürüş, gəzinti)</option>
-              <option value="peak">🏔️ Zirvə Turları (Alpinizm)</option>
-              <option value="camp">⛺ Camp Turları (Düşərgə)</option>
-              <option value="active">🏃‍♂️ Aktiv Həyat (İdman və Macəra)</option>
+              <option value="hiking">{t('vendorTourForms.tourForm.fields.category.hiking')}</option>
+              <option value="peak">{t('vendorTourForms.tourForm.fields.category.peak')}</option>
+              <option value="camp">{t('vendorTourForms.tourForm.fields.category.camp')}</option>
+              <option value="active">{t('vendorTourForms.tourForm.fields.category.active')}</option>
             </select>
           </div>
 
           {tourCategory !== 'active' && (
             <div>
-              <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">Çətinlik dərəcəsi:</label>
+              <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">{t('vendorTourForms.tourForm.fields.difficulty.label')}</label>
               <select
                 value={tourDifficulty}
                 onChange={(e) => setTourDifficulty(e.target.value as any)}
                 className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700"
               >
-                <option value="easy">Asan (Yorucu olmayan təbiət yürüşü)</option>
-                <option value="medium">Orta (Kanyon və azdere yürüşləri)</option>
-                <option value="hard">Çətin (Dik aşırımlar)</option>
-                <option value="extreme">Ekstremal (Yüksək dağlıq yürüşlər)</option>
+                <option value="easy">{t('vendorTourForms.tourForm.fields.difficulty.easy')}</option>
+                <option value="medium">{t('vendorTourForms.tourForm.fields.difficulty.medium')}</option>
+                <option value="hard">{t('vendorTourForms.tourForm.fields.difficulty.hard')}</option>
+                <option value="extreme">{t('vendorTourForms.tourForm.fields.difficulty.extreme')}</option>
               </select>
             </div>
           )}
 
           <div>
-            <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">Müddət (Gün):</label>
+            <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">{t('vendorTourForms.tourForm.fields.days.label')}</label>
             <input
               type="number"
               min="1"
@@ -532,86 +540,86 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
           </div>
 
           <div>
-            <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">Danışılan dillər (Vergüllə ayırın):</label>
+            <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">{t('vendorTourForms.tourForm.fields.languages.label')}</label>
             <input
               type="text"
               value={tourLanguages}
               onChange={(e) => { setTourLanguages(e.target.value); clearFieldError('languages'); }}
-              placeholder="Azərbaycanca, Rusca, İngiliscə"
+              placeholder={t('vendorTourForms.tourForm.fields.languages.placeholder')}
               className={`w-full px-3 py-2 bg-slate-50 border rounded-lg text-xs text-slate-800 ${fieldErrors.languages ? 'border-red-500 ring-1 ring-red-300' : 'border-slate-200'}`}
             />
-            {fieldErrors.languages && <p className="text-[10px] font-semibold text-red-600 mt-1">⚠️ Ən azı bir dil qeyd edin.</p>}
+            {fieldErrors.languages && <p className="text-[10px] font-semibold text-red-600 mt-1">⚠️ {t('vendorTourForms.tourForm.fields.languages.error')}</p>}
           </div>
 
           {tourCategory === 'active' && (
             <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4 bg-amber-50/50 p-4 rounded-xl border border-amber-200 shadow-xs">
               <div className="md:col-span-2 pb-2 mb-2 border-b border-amber-200">
-                <h4 className="text-xs font-bold text-amber-900 flex items-center gap-1.5 tracking-wider">🏅 AKTİV HƏYAT VƏ MACƏRA PARAMETRLƏRİ</h4>
+                <h4 className="text-xs font-bold text-amber-900 flex items-center gap-1.5 tracking-wider">{t('vendorTourForms.tourForm.activeSection.heading')}</h4>
               </div>
               <div>
-                <label className="block text-[11px] font-bold text-amber-700 tracking-wide mb-1">İdman / Fəaliyyət Növü:</label>
+                <label className="block text-[11px] font-bold text-amber-700 tracking-wide mb-1">{t('vendorTourForms.tourForm.activeSection.activityType.label')}</label>
                 <select value={tourActivityType} onChange={(e) => setTourActivityType(e.target.value)} className="w-full px-3 py-2 bg-white border border-amber-200 rounded-lg text-xs font-semibold text-slate-700">
-                  <option value="volleyball">🏐 Voleybol</option>
-                  <option value="running">🏃‍♂️ Qaçış (Marafon)</option>
-                  <option value="ski">⛷️ Xizək</option>
-                  <option value="rafting">🚣‍♂️ Rafting</option>
-                  <option value="bike">🚴‍♂️ Velosiped</option>
-                  <option value="canyon">🧗‍♂️ Kanyoninq</option>
-                  <option value="other">🏆 Digər İdmanlar</option>
+                  <option value="volleyball">{t('vendorTourForms.tourForm.activeSection.activityType.volleyball')}</option>
+                  <option value="running">{t('vendorTourForms.tourForm.activeSection.activityType.running')}</option>
+                  <option value="ski">{t('vendorTourForms.tourForm.activeSection.activityType.ski')}</option>
+                  <option value="rafting">{t('vendorTourForms.tourForm.activeSection.activityType.rafting')}</option>
+                  <option value="bike">{t('vendorTourForms.tourForm.activeSection.activityType.bike')}</option>
+                  <option value="canyon">{t('vendorTourForms.tourForm.activeSection.activityType.canyon')}</option>
+                  <option value="other">{t('vendorTourForms.tourForm.activeSection.activityType.other')}</option>
                 </select>
               </div>
               <div>
-                <label className="block text-[11px] font-bold text-amber-700 tracking-wide mb-1">Fiziki Hazırlıq (Çətinlik):</label>
+                <label className="block text-[11px] font-bold text-amber-700 tracking-wide mb-1">{t('vendorTourForms.tourForm.activeSection.activeDifficulty.label')}</label>
                 <select value={tourActiveDifficulty} onChange={(e) => setTourActiveDifficulty(e.target.value)} className="w-full px-3 py-2 bg-white border border-amber-200 rounded-lg text-xs font-semibold text-slate-700">
-                  <option value="beginner">🟢 Başlanğıc (Hər kəs qatıla bilər)</option>
-                  <option value="medium">🟡 Orta (Fiziki aktiv insanlar)</option>
-                  <option value="professional">🔴 Professional (Peşəkar idmançılar)</option>
+                  <option value="beginner">{t('vendorTourForms.tourForm.activeSection.activeDifficulty.beginner')}</option>
+                  <option value="medium">{t('vendorTourForms.tourForm.activeSection.activeDifficulty.medium')}</option>
+                  <option value="professional">{t('vendorTourForms.tourForm.activeSection.activeDifficulty.professional')}</option>
                 </select>
               </div>
               <div>
-                <label className="block text-[11px] font-bold text-amber-700 tracking-wide mb-1">Yaş Limiti:</label>
-                <input type="text" value={tourAgeLimit} onChange={(e) => setTourAgeLimit(e.target.value)} placeholder="Məs: 18-45 yaş" className="w-full px-3 py-2 bg-white border border-amber-200 rounded-lg text-xs" />
+                <label className="block text-[11px] font-bold text-amber-700 tracking-wide mb-1">{t('vendorTourForms.tourForm.activeSection.ageLimit.label')}</label>
+                <input type="text" value={tourAgeLimit} onChange={(e) => setTourAgeLimit(e.target.value)} placeholder={t('vendorTourForms.tourForm.activeSection.ageLimit.placeholder')} className="w-full px-3 py-2 bg-white border border-amber-200 rounded-lg text-xs" />
               </div>
               <div className="md:col-span-2">
-                <label className="block text-[11px] font-bold text-amber-700 tracking-wide mb-1">Zəruri Avadanlıqlar (Təchizat Siyahısı):</label>
-                <textarea rows={2} value={tourRequiredEquipment} onChange={(e) => setTourRequiredEquipment(e.target.value)} placeholder="Məs: Xizək dəsti, kaska, əlcək..." className="w-full px-3 py-2 bg-white border border-amber-200 rounded-lg text-xs" />
+                <label className="block text-[11px] font-bold text-amber-700 tracking-wide mb-1">{t('vendorTourForms.tourForm.activeSection.requiredEquipment.label')}</label>
+                <textarea rows={2} value={tourRequiredEquipment} onChange={(e) => setTourRequiredEquipment(e.target.value)} placeholder={t('vendorTourForms.tourForm.activeSection.requiredEquipment.placeholder')} className="w-full px-3 py-2 bg-white border border-amber-200 rounded-lg text-xs" />
               </div>
               <div className="flex items-center gap-2">
                 <input type="checkbox" id="optAvt" checked={tourEquipmentIncluded} onChange={(e) => setTourEquipmentIncluded(e.target.checked)} className="w-4 h-4 text-emerald-600 rounded" />
-                <label htmlFor="optAvt" className="text-xs text-slate-700 font-semibold cursor-pointer select-none">✅ Avadanlıqlar bilet qiymətinə daxildir</label>
+                <label htmlFor="optAvt" className="text-xs text-slate-700 font-semibold cursor-pointer select-none">✅ {t('vendorTourForms.tourForm.activeSection.equipmentIncluded')}</label>
               </div>
               {!tourEquipmentIncluded ? (
                 <div>
-                  <label className="block text-[11px] font-bold text-amber-700 tracking-wide mb-1">Kirayə Haqqı (+AZN):</label>
-                  <input type="number" min="0" value={tourEquipmentRentalPrice} onChange={handleNumberInput(setTourEquipmentRentalPrice)} className="w-full px-3 py-2 bg-white border border-amber-200 rounded-lg text-xs" placeholder="Məs: 15 AZN" />
+                  <label className="block text-[11px] font-bold text-amber-700 tracking-wide mb-1">{t('vendorTourForms.tourForm.activeSection.rentalPrice.label')}</label>
+                  <input type="number" min="0" value={tourEquipmentRentalPrice} onChange={handleNumberInput(setTourEquipmentRentalPrice)} className="w-full px-3 py-2 bg-white border border-amber-200 rounded-lg text-xs" placeholder={t('vendorTourForms.tourForm.activeSection.rentalPrice.placeholder')} />
                 </div>
               ) : <div />}
               <div className="flex items-center gap-2">
                 <input type="checkbox" id="optTeam" checked={tourAllowTeamRegistration} onChange={(e) => setTourAllowTeamRegistration(e.target.checked)} className="w-4 h-4 text-emerald-600 rounded" />
-                <label htmlFor="optTeam" className="text-xs text-slate-700 font-semibold cursor-pointer select-none">👥 Komanda qeydiyyatına izn verilsin</label>
+                <label htmlFor="optTeam" className="text-xs text-slate-700 font-semibold cursor-pointer select-none">👥 {t('vendorTourForms.tourForm.activeSection.allowTeamRegistration')}</label>
               </div>
               <div className="md:col-span-2 mt-2">
-                <label className="block text-[11px] font-bold text-rose-700 tracking-wide mb-1">Təhlükəsizlik və Tibbi Təlimat:</label>
-                <textarea rows={3} value={tourSafetyInstructions} onChange={(e) => setTourSafetyInstructions(e.target.value)} placeholder="Macəra idmanının risklərini bura yazın..." className="w-full px-3 py-2 bg-white border border-rose-300 ring-1 ring-rose-100 rounded-lg text-xs" />
+                <label className="block text-[11px] font-bold text-rose-700 tracking-wide mb-1">{t('vendorTourForms.tourForm.activeSection.safetyInstructions.label')}</label>
+                <textarea rows={3} value={tourSafetyInstructions} onChange={(e) => setTourSafetyInstructions(e.target.value)} placeholder={t('vendorTourForms.tourForm.activeSection.safetyInstructions.placeholder')} className="w-full px-3 py-2 bg-white border border-rose-300 ring-1 ring-rose-100 rounded-lg text-xs" />
               </div>
             </div>
           )}
 
           <div>
             <DynamicStringListInput
-              label="Özünüzlə gətirin:"
+              label={t('vendorTourForms.tourForm.fields.bringItems.label')}
               items={tourBringItems}
               onChange={(items) => { setTourBringItems(items); clearFieldError('bringItems'); }}
-              placeholder="Məs: Rahat ayaqqabı, Pasport"
+              placeholder={t('vendorTourForms.tourForm.fields.bringItems.placeholder')}
               error={fieldErrors.bringItems}
             />
           </div>
           <div>
             <DynamicStringListInput
-              label="İcazə verilmir:"
+              label={t('vendorTourForms.tourForm.fields.notAllowedItems.label')}
               items={tourNotAllowedItems}
               onChange={setTourNotAllowedItems}
-              placeholder="Məs: Böyük çamadanlar"
+              placeholder={t('vendorTourForms.tourForm.fields.notAllowedItems.placeholder')}
               accent="red"
             />
           </div>
@@ -621,7 +629,7 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
         {currentStep === 2 && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="md:col-span-2">
-            <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">Görüş Yeri:</label>
+            <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">{t('vendorTourForms.tourForm.fields.meetingPoint.label')}</label>
             <select
               value={tourMeetingPoint}
               onChange={(e) => {
@@ -631,7 +639,7 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
               }}
               className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700"
             >
-              <option value="">— Görüş yeri seçin —</option>
+              <option value="">{t('vendorTourForms.tourForm.fields.meetingPoint.placeholderOption')}</option>
               {MEETING_POINTS.map((point) => (
                 <option key={point.name} value={point.name}>{point.name}</option>
               ))}
@@ -639,12 +647,12 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
           </div>
 
           <div>
-            <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">WhatsApp Bələdçi Nömrəsi:</label>
-            <input type="tel" required value={tourWhatsApp} onChange={(e) => setTourWhatsApp(e.target.value)} placeholder="Məs: +994 XX XXX XX XX" className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 font-bold" />
+            <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">{t('vendorTourForms.tourForm.fields.whatsapp.label')}</label>
+            <input type="tel" required value={tourWhatsApp} onChange={(e) => setTourWhatsApp(e.target.value)} placeholder={t('vendorTourForms.tourForm.fields.whatsapp.placeholder')} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 font-bold" />
           </div>
 
           <div>
-            <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">Çıxış tarixi və saatı:</label>
+            <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">{t('vendorTourForms.tourForm.fields.departureDateTime.label')}</label>
             <input
               type="datetime-local"
               value={tourDepartureDateTime}
@@ -653,7 +661,7 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
             />
           </div>
           <div>
-            <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">Bakıya dönüş tarixi və saatı:</label>
+            <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">{t('vendorTourForms.tourForm.fields.returnDateTime.label')}</label>
             <input
               type="datetime-local"
               value={tourReturnDateTime}
@@ -667,7 +675,7 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
 
           <div>
             <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">
-              Tam müddət (saat){tourDepartureDateTime && tourReturnDateTime ? ' — avtomatik hesablanır' : ''}:
+              {t('vendorTourForms.tourForm.fields.durationHours.label', { autoSuffix: tourDepartureDateTime && tourReturnDateTime ? t('vendorTourForms.tourForm.fields.durationHours.autoSuffix') : '' })}
             </label>
             <input
               type="number"
@@ -682,10 +690,10 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
           </div>
 
           <div className="md:col-span-2">
-            <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">Bu tur üçün bələdçilər:</label>
+            <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">{t('vendorTourForms.tourForm.fields.guides.label')}</label>
             {(currentUser.guides || []).length === 0 ? (
               <p className="text-[10px] text-slate-400 italic bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
-                Hələ profilinizə bələdçi əlavə etməmisiniz. Əvvəlcə "Profil Məlumatları" bölməsindən bələdçi əlavə edin, sonra buradan bu tura təyin edə bilərsiniz.
+                {t('vendorTourForms.tourForm.fields.guides.empty')}
               </p>
             ) : (
               <div className="flex flex-wrap gap-2">
@@ -702,7 +710,7 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
                       }`}
                     >
                       {isSelected && <Check className="w-3 h-3" />}
-                      {guide.name || 'Adsız bələdçi'}
+                      {guide.name || t('vendorTourForms.tourForm.fields.guides.unnamed')}
                     </button>
                   );
                 })}
@@ -713,8 +721,8 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
           {/* GPX Track Uploader */}
           <div className="md:col-span-2 bg-slate-50 border border-slate-200 p-4 rounded-xl space-y-3">
             <div className="flex items-center justify-between">
-              <label className="block text-[11px] font-extrabold text-slate-400 tracking-wide">GPS Marşrut Faylı (GPX və ya KML)</label>
-              <span className="text-[9px] font-extrabold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded">3D XƏRİTƏ VİZUALİZASİYASI ⛰️</span>
+              <label className="block text-[11px] font-extrabold text-slate-400 tracking-wide">{t('vendorTourForms.tourForm.fields.gpx.label')}</label>
+              <span className="text-[9px] font-extrabold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded">{t('vendorTourForms.tourForm.fields.gpx.badge')}</span>
             </div>
             {!tourGpxFileName ? (
               <div className="border border-dashed border-slate-350 rounded-lg p-4 flex flex-col items-center justify-center bg-white hover:bg-slate-50 transition cursor-pointer relative group">
@@ -725,8 +733,8 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
                   className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
                 />
                 <div className="text-center space-y-1">
-                  <p className="text-xs font-bold text-slate-700 group-hover:text-indigo-600 transition">Bura klikləyin və ya GPX / KML faylını dartın</p>
-                  <p className="text-[10px] text-slate-400">Operator GPX trek faylı yüklədikdə müştərilərə 3D hündürlük və real trek xəritəsi göstərilir</p>
+                  <p className="text-xs font-bold text-slate-700 group-hover:text-indigo-600 transition">{t('vendorTourForms.tourForm.fields.gpx.dropHint')}</p>
+                  <p className="text-[10px] text-slate-400">{t('vendorTourForms.tourForm.fields.gpx.helpText')}</p>
                 </div>
               </div>
             ) : (
@@ -736,37 +744,37 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
                     <span className="p-1 px-1.5 text-[10px] font-bold text-white bg-indigo-600 rounded animate-pulse">GPS</span>
                     <span className="text-xs font-bold text-indigo-950 truncate max-w-[200px]" title={tourGpxFileName}>{tourGpxFileName}</span>
                   </div>
-                  <button type="button" onClick={() => { setTourGpxData(''); setTourGpxFileName(''); }} className="text-[10px] font-black text-red-600 hover:text-red-700 tracking-wide cursor-pointer transition">Sil ✕</button>
+                  <button type="button" onClick={() => { setTourGpxData(''); setTourGpxFileName(''); }} className="text-[10px] font-black text-red-600 hover:text-red-700 tracking-wide cursor-pointer transition">{t('vendorTourForms.tourForm.fields.gpx.remove')}</button>
                 </div>
               </div>
             )}
           </div>
 
           <div className="md:col-span-2">
-            <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">Əhatəli marşrut planı və açıqlama:</label>
+            <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">{t('vendorTourForms.tourForm.fields.description.label')}</label>
             <textarea
               required
               rows={4}
               value={tourDescription}
               onChange={(e) => setTourDescription(e.target.value)}
-              placeholder="Tur iştirakçılarını hansı inanılmaz fəaliyyətlər gözləyir?"
+              placeholder={t('vendorTourForms.tourForm.fields.description.placeholder')}
               className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-700"
             />
           </div>
 
           <div className="md:col-span-2 space-y-3 pt-3 border-t border-slate-100">
             <div className="flex items-center justify-between">
-              <label className="block text-[11px] font-bold text-slate-450 tracking-wide">Media Qalereyası (ən azı 1 şəkil məcburidir):</label>
-              <span className="text-[9px] text-slate-400 font-semibold">Şəkillərdən birini "Ana səhifə şəkli" et</span>
+              <label className="block text-[11px] font-bold text-slate-450 tracking-wide">{t('vendorTourForms.tourForm.fields.media.label')}</label>
+              <span className="text-[9px] text-slate-400 font-semibold">{t('vendorTourForms.tourForm.fields.media.coverHint')}</span>
             </div>
             <div className="relative">
               <input type="file" multiple accept="image/*,video/*" onChange={handleMediaFilesChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
               <div className={`w-full px-4 py-3 bg-slate-50 hover:bg-slate-100 border border-dashed rounded-xl text-xs flex items-center justify-center gap-2 text-emerald-800 font-bold transition ${fieldErrors.media ? 'border-red-500 ring-1 ring-red-300' : 'border-emerald-300 hover:border-emerald-500'}`}>
                 <Plus className="w-4 h-4 text-emerald-600" />
-                <span>Cihazdan şəkil və ya video seçin (Multi-upload) 📁📸🎥</span>
+                <span>{t('vendorTourForms.tourForm.fields.media.selectButton')}</span>
               </div>
             </div>
-            {fieldErrors.media && <p className="text-[10px] font-semibold text-red-600">⚠️ Ən azı 1 şəkil əlavə edin.</p>}
+            {fieldErrors.media && <p className="text-[10px] font-semibold text-red-600">⚠️ {t('vendorTourForms.tourForm.fields.media.error')}</p>}
 
             {(tourImages.length > 0 || tourVideos.length > 0) && (
               <div className="flex flex-wrap gap-2 mt-2">
@@ -778,7 +786,7 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
                       {isCover ? (
                         <div className="absolute bottom-1 left-1 right-1 bg-emerald-600 text-white text-[8px] font-extrabold px-1.5 py-0.5 rounded flex items-center justify-center gap-1">
                           <Check className="w-2.5 h-2.5" />
-                          <span>ƏSAS ŞƏKİL</span>
+                          <span>{t('vendorTourForms.tourForm.fields.media.coverBadge')}</span>
                         </div>
                       ) : (
                         <button
@@ -786,7 +794,7 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
                           onClick={() => setTourImage(img)}
                           className="absolute bottom-1 left-1 right-1 bg-slate-900/80 hover:bg-emerald-600 text-white text-[8px] font-bold px-1.5 py-0.5 rounded transition opacity-0 group-hover:opacity-100"
                         >
-                          Ana səhifə şəkli et
+                          {t('vendorTourForms.tourForm.fields.media.makeCover')}
                         </button>
                       )}
                       <button
@@ -807,7 +815,7 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
                     <video src={vid || undefined} className="h-full w-full object-contain" muted playsInline />
                     <div className="absolute bottom-1 left-1 bg-slate-900/80 text-white font-bold text-[8px] px-1.5 py-0.5 rounded flex items-center gap-1">
                       <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-ping" />
-                      <span>VİDEO</span>
+                      <span>{t('vendorTourForms.tourForm.fields.media.videoBadge')}</span>
                     </div>
                     <button type="button" onClick={() => setTourVideos(prev => prev.filter((_, i) => i !== idx))} className="absolute top-1 right-1 bg-red-600 hover:bg-red-700 text-white p-0.5 rounded-full shadow-xs transition cursor-pointer z-10">
                       <X className="w-2.5 h-2.5" />
@@ -817,7 +825,7 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
               </div>
             )}
             {tourImages.length === 0 && tourVideos.length === 0 && (
-              <p className="text-[10px] text-slate-400 italic">Hələ heç bir media əlavə edilməyib.</p>
+              <p className="text-[10px] text-slate-400 italic">{t('vendorTourForms.tourForm.fields.media.empty')}</p>
             )}
           </div>
         </div>
@@ -826,65 +834,65 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
         {currentStep === 3 && (
         <div className="space-y-5">
           <div className="bg-primary-50/60 p-4 rounded-xl border border-emerald-100 space-y-3">
-            <h4 className="text-[10px] font-extrabold text-emerald-800 tracking-widest">📅 Aktiv Olacağı Günlər və Bilet Qiyməti</h4>
+            <h4 className="text-[10px] font-extrabold text-emerald-800 tracking-widest">{t('vendorTourForms.tourForm.pricingSection.heading')}</h4>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:max-w-2xl">
               <div>
-                <label className="block text-[11px] font-bold text-slate-500 tracking-wide mb-1">Qiymət (AZN):</label>
+                <label className="block text-[11px] font-bold text-slate-500 tracking-wide mb-1">{t('vendorTourForms.tourForm.fields.price.label')}</label>
                 <input type="number" min="1" required value={tourPrice} onChange={handleNumberInput(setTourPrice)} className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-800" />
               </div>
               <div>
-                <label className="block text-[11px] font-bold text-rose-600 tracking-wide mb-1">Endirimli Qiymət (opsional):</label>
-                <input type="number" min="0" placeholder="Məs: 25" value={tourDiscountPrice} onChange={(e) => setTourDiscountPrice(e.target.value)} className="w-full px-3 py-2 bg-white border border-rose-200 rounded-lg text-xs font-bold text-rose-700 placeholder-rose-300" />
+                <label className="block text-[11px] font-bold text-rose-600 tracking-wide mb-1">{t('vendorTourForms.tourForm.fields.discountPrice.label')}</label>
+                <input type="number" min="0" placeholder={t('vendorTourForms.tourForm.fields.discountPrice.placeholder')} value={tourDiscountPrice} onChange={(e) => setTourDiscountPrice(e.target.value)} className="w-full px-3 py-2 bg-white border border-rose-200 rounded-lg text-xs font-bold text-rose-700 placeholder-rose-300" />
               </div>
               <div>
-                <label className="block text-[11px] font-bold text-slate-500 tracking-wide mb-1">Ləğv qaydası:</label>
+                <label className="block text-[11px] font-bold text-slate-500 tracking-wide mb-1">{t('vendorTourForms.tourForm.fields.cancellationHours.label')}</label>
                 <select value={tourCancellationHours} onChange={(e) => setTourCancellationHours(Number(e.target.value))} className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-800">
-                  <option value={24}>24 saat</option>
-                  <option value={48}>48 saat</option>
-                  <option value={72}>72 saat</option>
-                  <option value={0}>Ləğv edilmir</option>
+                  <option value={24}>{t('vendorTourForms.tourForm.fields.cancellationHours.option24')}</option>
+                  <option value={48}>{t('vendorTourForms.tourForm.fields.cancellationHours.option48')}</option>
+                  <option value={72}>{t('vendorTourForms.tourForm.fields.cancellationHours.option72')}</option>
+                  <option value={0}>{t('vendorTourForms.tourForm.fields.cancellationHours.optionNone')}</option>
                 </select>
               </div>
             </div>
             <MultiDateCalendar selectedDates={selectedDates} onChange={setSelectedDates} />
             {tourCategory === 'active' && (
               <div>
-                <label className="block text-[11px] font-bold text-emerald-700 tracking-wide mb-1">Tədbirin Planlaması:</label>
+                <label className="block text-[11px] font-bold text-emerald-700 tracking-wide mb-1">{t('vendorTourForms.tourForm.fields.scheduleFrequency.label')}</label>
                 <select value={tourScheduleFrequency} onChange={(e) => setTourScheduleFrequency(e.target.value)} className="w-full sm:w-64 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-lg text-xs font-semibold text-emerald-800">
-                  <option value="one-time">Bir dəfəlik (Göstərilən tarixlərdə)</option>
-                  <option value="daily">Hər gün (Mütəmadi)</option>
-                  <option value="every-weekend">Hər həftəsonu (Şənbə və Bazar)</option>
+                  <option value="one-time">{t('vendorTourForms.tourForm.fields.scheduleFrequency.oneTime')}</option>
+                  <option value="daily">{t('vendorTourForms.tourForm.fields.scheduleFrequency.daily')}</option>
+                  <option value="every-weekend">{t('vendorTourForms.tourForm.fields.scheduleFrequency.everyWeekend')}</option>
                 </select>
               </div>
             )}
           </div>
 
           <DynamicStringListInput
-            label="Qiymətə daxildir:"
+            label={t('vendorTourForms.tourForm.fields.includes.label')}
             items={tourIncludes}
             onChange={(items) => { setTourIncludes(items); clearFieldError('includes'); }}
-            placeholder="Məs: Səhər yeməyi, Giriş bileti, Professional Bələdçi"
+            placeholder={t('vendorTourForms.tourForm.fields.includes.placeholder')}
             error={fieldErrors.includes}
           />
           <DynamicStringListInput
-            label="Qiymətə daxil deyil:"
+            label={t('vendorTourForms.tourForm.fields.notIncluded.label')}
             items={tourNotIncluded}
             onChange={(items) => { setTourNotIncluded(items); clearFieldError('notIncluded'); }}
-            placeholder="Məs: Şəxsi xərclər, Nahar"
+            placeholder={t('vendorTourForms.tourForm.fields.notIncluded.placeholder')}
             accent="red"
             error={fieldErrors.notIncluded}
           />
 
           <div>
-            <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">Önə çıxanlar (Vergüllə ayırın):</label>
+            <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">{t('vendorTourForms.tourForm.fields.highlights.label')}</label>
             <input
               type="text"
               value={tourHighlights}
               onChange={(e) => { setTourHighlights(e.target.value); clearFieldError('highlights'); }}
-              placeholder="Məs: Panoram mənzərəli marşrut"
+              placeholder={t('vendorTourForms.tourForm.fields.highlights.placeholder')}
               className={`w-full px-3 py-2 bg-slate-50 border rounded-lg text-xs text-slate-800 ${fieldErrors.highlights ? 'border-red-500 ring-1 ring-red-300' : 'border-slate-200'}`}
             />
-            {fieldErrors.highlights && <p className="text-[10px] font-semibold text-red-600 mt-1">⚠️ Ən azı bir xüsusiyyət qeyd edin.</p>}
+            {fieldErrors.highlights && <p className="text-[10px] font-semibold text-red-600 mt-1">⚠️ {t('vendorTourForms.tourForm.fields.highlights.error')}</p>}
           </div>
         </div>
         )}
@@ -913,7 +921,7 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
               onClick={goToPrevStep}
               className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-lg transition-all cursor-pointer"
             >
-              ← Geri
+              {t('vendorTourForms.tourForm.buttons.back')}
             </button>
           )}
 
@@ -923,18 +931,18 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
             className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-lg transition-all cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
           >
             {currentStep < 3 ? (
-              <>İrəli →</>
+              <>{t('vendorTourForms.tourForm.buttons.next')}</>
             ) : (
               <>
                 {isEditMode && <Check className="w-3.5 h-3.5" />}
-                {isSavingForm ? 'Göndərilir...' : isEditMode ? 'Dəyişiklikləri Saxla' : (tourCategory === 'active' ? 'Tədbiri Platformaya Göndər' : 'Marşrutu Platformaya Göndər')}
+                {isSavingForm ? t('vendorTourForms.tourForm.buttons.submitting') : isEditMode ? t('vendorTourForms.tourForm.buttons.saveChanges') : (tourCategory === 'active' ? t('vendorTourForms.tourForm.buttons.submitActiveEvent') : t('vendorTourForms.tourForm.buttons.submitStandardTour'))}
               </>
             )}
           </button>
 
           {currentStep === 1 && (
             <button type="button" onClick={onNavigateBack} className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-lg transition-all cursor-pointer">
-              Ləğv et
+              {t('vendorTourForms.tourForm.buttons.cancel')}
             </button>
           )}
         </div>

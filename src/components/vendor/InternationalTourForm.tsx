@@ -5,6 +5,7 @@ import { DynamicStringListInput } from './DynamicStringListInput';
 import { LocationAutocompleteInput } from './LocationAutocompleteInput';
 import { MultiDateCalendar, toIsoDate } from './MultiDateCalendar';
 import { TourDangerZone } from './TourDangerZone';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 interface InternationalTourFormProps {
   currentUser: User;
@@ -22,6 +23,7 @@ interface InternationalTourFormProps {
 // Unified create/edit form for international (outbound) tours. Same component is used from
 // VendorPortal's "add-intl-tour" tab (tour=null) and from the edit modal (tour set).
 export function InternationalTourForm({ currentUser, tour, slots, onAddTour, onEditTour, onDeleteTour, onAddSlot, onDeleteSlot, onShowNotification, onNavigateBack }: InternationalTourFormProps) {
+  const { t } = useLanguage();
   const isEditMode = !!tour;
 
   // Number inputs are bound to `number | ''` state so clearing the field doesn't force a
@@ -128,7 +130,7 @@ export function InternationalTourForm({ currentUser, tour, slots, onAddTour, onE
 
   const handleIntlAddDay = () => {
     const nextDay = intlItinerary.length + 1;
-    setIntlItinerary([...intlItinerary, { day: nextDay, title: `${nextDay}-ci Gün fəaliyyətləri`, description: '', image: '' }]);
+    setIntlItinerary([...intlItinerary, { day: nextDay, title: t('vendorTourForms.internationalTourForm.itinerary.newDayTitle', { day: nextDay }), description: '', image: '' }]);
   };
 
   const handleIntlRemoveDay = (index: number) => {
@@ -146,23 +148,23 @@ export function InternationalTourForm({ currentUser, tour, slots, onAddTour, onE
     e.preventDefault();
     if (!intlTourName || !intlTourCity || !intlTourHotelName) {
       if (onShowNotification) {
-        onShowNotification('Zəhmət olmasa operator, bütün lazımi xanaları doldurun (Ad, Şəhər və Otel adını daxil edin).', 'error');
+        onShowNotification(t('vendorTourForms.internationalTourForm.validation.missingRequiredFields'), 'error');
       } else {
-        alert('Zəhmət olmasa bütün vacib xanaları doldurun.');
+        alert(t('vendorTourForms.internationalTourForm.validation.missingRequiredFieldsFallback'));
       }
       return;
     }
 
     const missing: { key: string; label: string }[] = [];
-    if (!intlLanguages.trim()) missing.push({ key: 'languages', label: 'Danışılan dillər' });
-    if (intlBringItems.filter(Boolean).length === 0) missing.push({ key: 'bringItems', label: 'Özünüzlə gətirin' });
-    if (!intlTourImage) missing.push({ key: 'image', label: 'Əsas Tur Şəkli' });
-    if (intlIncludes.filter(Boolean).length === 0) missing.push({ key: 'includes', label: 'Paketə Daxildir' });
-    if (intlNotIncludes.filter(Boolean).length === 0) missing.push({ key: 'notIncludes', label: 'Paketə Daxil DEYİL' });
-    if (!intlHighlights.trim()) missing.push({ key: 'highlights', label: 'Önə çıxanlar' });
+    if (!intlLanguages.trim()) missing.push({ key: 'languages', label: t('vendorTourForms.internationalTourForm.validation.fieldLanguages') });
+    if (intlBringItems.filter(Boolean).length === 0) missing.push({ key: 'bringItems', label: t('vendorTourForms.internationalTourForm.validation.fieldBringItems') });
+    if (!intlTourImage) missing.push({ key: 'image', label: t('vendorTourForms.internationalTourForm.validation.fieldImage') });
+    if (intlIncludes.filter(Boolean).length === 0) missing.push({ key: 'includes', label: t('vendorTourForms.internationalTourForm.validation.fieldIncludes') });
+    if (intlNotIncludes.filter(Boolean).length === 0) missing.push({ key: 'notIncludes', label: t('vendorTourForms.internationalTourForm.validation.fieldNotIncludes') });
+    if (!intlHighlights.trim()) missing.push({ key: 'highlights', label: t('vendorTourForms.internationalTourForm.validation.fieldHighlights') });
     if (missing.length > 0) {
       setFieldErrors(Object.fromEntries(missing.map((m) => [m.key, true])));
-      const message = `Zəhmət olmasa bu xanaları doldurun: ${missing.map((m) => m.label).join(', ')}.`;
+      const message = `${t('vendorTourForms.internationalTourForm.validation.missingFieldsPrefix')} ${missing.map((m) => m.label).join(', ')}.`;
       if (onShowNotification) onShowNotification(message, 'error');
       else alert(message);
       return;
@@ -179,7 +181,14 @@ export function InternationalTourForm({ currentUser, tour, slots, onAddTour, onE
       name: intlTourName,
       category: 'international' as const,
       difficulty: 'easy' as const,
-      description: `Bu ${intlTourCountry} (${intlTourCity}) turu üçün xüsusi layihələndirilib. ${intlTourNights} gecə və ${intlTourDays} gündüz davam edir. Otel: ${intlTourHotelName} (${intlTourHotelStars}*).`,
+      description: t('vendorTourForms.internationalTourForm.generatedDescription', {
+        country: intlTourCountry,
+        city: intlTourCity,
+        nights: intlTourNights,
+        days: intlTourDays,
+        hotelName: intlTourHotelName,
+        hotelStars: intlTourHotelStars,
+      }),
       region: `${intlTourCountry}, ${intlTourCity}`,
       durationDays: Number(intlTourDays),
       includes: intlIncludes.filter(Boolean),
@@ -192,8 +201,8 @@ export function InternationalTourForm({ currentUser, tour, slots, onAddTour, onE
       destinationCity: intlTourCity,
       durationNights: Number(intlTourNights),
       flightIncluded: intlTourFlightIncluded,
-      flightDetails: intlTourFlightDetails || (intlTourFlightIncluded ? 'Azərbaycan Hava Yolları, Bakıdan gediş-dönüş baqaj daxil' : 'Aviabilet daxil deyil'),
-      transferDetails: intlTourTransferDetails || 'Hava limanından qarşılanma və otelə transfer daxildir.',
+      flightDetails: intlTourFlightDetails || (intlTourFlightIncluded ? t('vendorTourForms.internationalTourForm.defaultFlightDetailsIncluded') : t('vendorTourForms.internationalTourForm.defaultFlightDetailsExcluded')),
+      transferDetails: intlTourTransferDetails || t('vendorTourForms.internationalTourForm.defaultTransferDetails'),
       hotelName: intlTourHotelName,
       hotelStars: Number(intlTourHotelStars),
       roomTypes: [
@@ -223,15 +232,20 @@ export function InternationalTourForm({ currentUser, tour, slots, onAddTour, onE
     try {
       let tourId: string;
       if (isEditMode && tour) {
-        const changes: string[] = ['Xarici tur rekvizitləri yeniləndi ✈️'];
+        const activeLabel = t('vendorTourForms.internationalTourForm.changeLog.statusActive');
+        const inactiveLabel = t('vendorTourForms.internationalTourForm.changeLog.statusInactive');
+        const changes: string[] = [t('vendorTourForms.internationalTourForm.changeLog.updated')];
         if ((tour.isActive !== false) !== intlIsActive) {
-          changes.push(`Status (${(tour.isActive !== false) ? 'Aktiv' : 'Deaktiv'} ➡️ ${intlIsActive ? 'Aktiv' : 'Deaktiv'})`);
+          changes.push(t('vendorTourForms.internationalTourForm.changeLog.statusChange', {
+            oldStatus: (tour.isActive !== false) ? activeLabel : inactiveLabel,
+            newStatus: intlIsActive ? activeLabel : inactiveLabel,
+          }));
         }
         const updatedTour: Tour = { ...tour, ...sharedFields, lastChangeLog: changes.join(' | ') };
         tourId = tour.id;
         if (onEditTour) await onEditTour(updatedTour);
         if (onShowNotification) {
-          onShowNotification('Tur məlumatları yeniləndi və yenidən təsdiqlənməsi üçün Admin nümayəndəsinə göndərildi! ⏳✨', 'info');
+          onShowNotification(t('vendorTourForms.internationalTourForm.notifications.tourUpdatedPendingApproval'), 'info');
         }
       } else {
         const newTour: Tour = {
@@ -248,7 +262,7 @@ export function InternationalTourForm({ currentUser, tour, slots, onAddTour, onE
         tourId = newTour.id;
         await onAddTour(newTour);
         if (onShowNotification) {
-          onShowNotification('Təbrik edirik! Yeni Xarici Tur uğurla yaradıldı və təsdiq gözləmə siyahısına əlavə edildi. ⏳✈️', 'info');
+          onShowNotification(t('vendorTourForms.internationalTourForm.notifications.tourCreatedPendingApproval'), 'info');
         }
       }
 
@@ -280,7 +294,7 @@ export function InternationalTourForm({ currentUser, tour, slots, onAddTour, onE
 
       onNavigateBack();
     } catch (err: any) {
-      setFormSubmitError(err?.message || 'Xarici tur yadda saxlanılarkən xəta baş verdi.');
+      setFormSubmitError(err?.message || t('vendorTourForms.internationalTourForm.submitErrors.generic'));
     } finally {
       setIsSavingForm(false);
     }
@@ -290,48 +304,48 @@ export function InternationalTourForm({ currentUser, tour, slots, onAddTour, onE
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
       <div className="bg-gradient-to-r from-emerald-800 to-teal-800 p-6 text-white">
         <h2 className="text-sm font-bold flex items-center gap-2 tracking-wider">
-          ✈️ {isEditMode ? 'Xarici Turu Redaktə Et' : 'Pasportlu Xarici Səyahət Paket Operatoru (Yeni Xarici Tur)'}
+          ✈️ {isEditMode ? t('vendorTourForms.internationalTourForm.header.titleEdit') : t('vendorTourForms.internationalTourForm.header.titleNew')}
         </h2>
         <p className="text-[11px] text-emerald-100 mt-1">
-          Türkiyə, Avropa, Asiya və digər xarici ölkələrə lüks, çoxgünlük turların qeydiyyat forması.
+          {t('vendorTourForms.internationalTourForm.header.subtitle')}
         </p>
       </div>
 
       <form onSubmit={handleInternationalTourSubmit} className="p-6 space-y-6">
         {/* A) Əsas Səyahət Məlumatları */}
         <div className="space-y-4">
-          <h3 className="text-xs font-bold text-emerald-700 tracking-wider border-b pb-1">A) Əsas Səyahət Məlumatları</h3>
+          <h3 className="text-xs font-bold text-emerald-700 tracking-wider border-b pb-1">{t('vendorTourForms.internationalTourForm.sections.basicInfo')}</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="md:col-span-2">
-              <label className="block text-xs font-bold text-slate-700 mb-1">Turun Tam Adı *</label>
-              <input type="text" required value={intlTourName} onChange={(e) => setIntlTourName(e.target.value)} placeholder="Məsələn: Kapadokya Sehrli Payız Turu" className="w-full px-3 py-2 border border-slate-250 rounded-lg text-xs text-slate-800 focus:ring-1 focus:ring-emerald-700 focus:outline-none" />
+              <label className="block text-xs font-bold text-slate-700 mb-1">{t('vendorTourForms.internationalTourForm.fields.name.label')}</label>
+              <input type="text" required value={intlTourName} onChange={(e) => setIntlTourName(e.target.value)} placeholder={t('vendorTourForms.internationalTourForm.fields.name.placeholder')} className="w-full px-3 py-2 border border-slate-250 rounded-lg text-xs text-slate-800 focus:ring-1 focus:ring-emerald-700 focus:outline-none" />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">İstiqamət Ölkə *</label>
-              <input type="text" required value={intlTourCountry} onChange={(e) => setIntlTourCountry(e.target.value)} placeholder="Ölkə (məs: Türkiyə)" className="w-full px-3 py-2 border border-slate-250 rounded-lg text-xs text-slate-800 focus:ring-1 focus:ring-emerald-700 focus:outline-none" />
+              <label className="block text-xs font-bold text-slate-700 mb-1">{t('vendorTourForms.internationalTourForm.fields.country.label')}</label>
+              <input type="text" required value={intlTourCountry} onChange={(e) => setIntlTourCountry(e.target.value)} placeholder={t('vendorTourForms.internationalTourForm.fields.country.placeholder')} className="w-full px-3 py-2 border border-slate-250 rounded-lg text-xs text-slate-800 focus:ring-1 focus:ring-emerald-700 focus:outline-none" />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">İstiqamət Şəhər / Region *</label>
-              <input type="text" required value={intlTourCity} onChange={(e) => setIntlTourCity(e.target.value)} placeholder="Şəhər (məs: Kapadokya)" className="w-full px-3 py-2 border border-slate-250 rounded-lg text-xs text-slate-800 focus:ring-1 focus:ring-emerald-700 focus:outline-none" />
+              <label className="block text-xs font-bold text-slate-700 mb-1">{t('vendorTourForms.internationalTourForm.fields.city.label')}</label>
+              <input type="text" required value={intlTourCity} onChange={(e) => setIntlTourCity(e.target.value)} placeholder={t('vendorTourForms.internationalTourForm.fields.city.placeholder')} className="w-full px-3 py-2 border border-slate-250 rounded-lg text-xs text-slate-800 focus:ring-1 focus:ring-emerald-700 focus:outline-none" />
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Gecə sayısı *</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">{t('vendorTourForms.internationalTourForm.fields.nights.label')}</label>
                 <input type="number" required min={1} value={intlTourNights} onChange={handleNumberInput(setIntlTourNights)} className="w-full px-3 py-2 border border-slate-250 rounded-lg text-xs text-slate-800 focus:ring-1 focus:ring-emerald-700 focus:outline-none" />
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Gündüz sayısı *</label>
+                <label className="block text-xs font-bold text-slate-700 mb-1">{t('vendorTourForms.internationalTourForm.fields.days.label')}</label>
                 <input type="number" required min={1} value={intlTourDays} onChange={handleNumberInput(setIntlTourDays)} className="w-full px-3 py-2 border border-slate-250 rounded-lg text-xs text-slate-800 focus:ring-1 focus:ring-emerald-700 focus:outline-none" />
               </div>
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Maksimum Qrup Tutumu *</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">{t('vendorTourForms.internationalTourForm.fields.capacity.label')}</label>
               <input type="number" required min={1} value={intlTourCapacity} onChange={handleNumberInput(setIntlTourCapacity)} className="w-full px-3 py-2 border border-slate-250 rounded-lg text-xs text-slate-800 focus:ring-1 focus:ring-emerald-700 focus:outline-none" />
             </div>
           </div>
           <div>
             <LocationAutocompleteInput
-              label="Görüş Yeri:"
+              label={t('vendorTourForms.internationalTourForm.fields.meetingPoint.label')}
               value={intlMeetingPoint}
               lat={intlMeetingPointLat}
               lng={intlMeetingPointLng}
@@ -340,27 +354,27 @@ export function InternationalTourForm({ currentUser, tour, slots, onAddTour, onE
                 setIntlMeetingPointLat(lat);
                 setIntlMeetingPointLng(lng);
               }}
-              placeholder="Məsələn: Tofiq Bəhramov adına Respublika Stadionunun qarşısı..."
+              placeholder={t('vendorTourForms.internationalTourForm.fields.meetingPoint.placeholder')}
             />
           </div>
         </div>
 
         {/* B) Loqistika və Nəqliyyat Məlumatları */}
         <div className="space-y-4">
-          <h3 className="text-xs font-bold text-teal-700 tracking-wider border-b pb-1">B) Loqistika və Nəqliyyat Məlumatları</h3>
+          <h3 className="text-xs font-bold text-teal-700 tracking-wider border-b pb-1">{t('vendorTourForms.internationalTourForm.sections.logistics')}</h3>
           <div className="space-y-3">
             <label className="flex items-center gap-2 cursor-pointer select-none">
               <input type="checkbox" checked={intlTourFlightIncluded} onChange={(e) => setIntlTourFlightIncluded(e.target.checked)} className="w-4 h-4 text-emerald-600 rounded-sm border-slate-300 focus:ring-emerald-500" />
-              <span className="text-xs font-black text-slate-800">Aviabilet qiymətə daxildir</span>
+              <span className="text-xs font-black text-slate-800">{t('vendorTourForms.internationalTourForm.fields.flightIncluded')}</span>
             </label>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Uçuş Təfərrüatları</label>
-                <textarea rows={2} value={intlTourFlightDetails} onChange={(e) => setIntlTourFlightDetails(e.target.value)} placeholder="Məsələn: Bakı - Kayseri Pegasus Hava yolları gediş-dönüş, 23kg baqaj daxildir." className="w-full px-3 py-2 border border-slate-250 rounded-lg text-xs text-slate-800 focus:ring-1 focus:ring-emerald-700 focus:outline-none" />
+                <label className="block text-xs font-bold text-slate-700 mb-1">{t('vendorTourForms.internationalTourForm.fields.flightDetails.label')}</label>
+                <textarea rows={2} value={intlTourFlightDetails} onChange={(e) => setIntlTourFlightDetails(e.target.value)} placeholder={t('vendorTourForms.internationalTourForm.fields.flightDetails.placeholder')} className="w-full px-3 py-2 border border-slate-250 rounded-lg text-xs text-slate-800 focus:ring-1 focus:ring-emerald-700 focus:outline-none" />
               </div>
               <div>
-                <label className="block text-xs font-bold text-slate-700 mb-1">Ölkədaxili Transfer növü</label>
-                <textarea rows={2} value={intlTourTransferDetails} onChange={(e) => setIntlTourTransferDetails(e.target.value)} placeholder="Məsələn: Hava limanında VIP transfer." className="w-full px-3 py-2 border border-slate-250 rounded-lg text-xs text-slate-800 focus:ring-1 focus:ring-emerald-700 focus:outline-none" />
+                <label className="block text-xs font-bold text-slate-700 mb-1">{t('vendorTourForms.internationalTourForm.fields.transferDetails.label')}</label>
+                <textarea rows={2} value={intlTourTransferDetails} onChange={(e) => setIntlTourTransferDetails(e.target.value)} placeholder={t('vendorTourForms.internationalTourForm.fields.transferDetails.placeholder')} className="w-full px-3 py-2 border border-slate-250 rounded-lg text-xs text-slate-800 focus:ring-1 focus:ring-emerald-700 focus:outline-none" />
               </div>
             </div>
           </div>
@@ -368,47 +382,47 @@ export function InternationalTourForm({ currentUser, tour, slots, onAddTour, onE
 
         {/* C) Yerləşmə (Otel) Məlumatları */}
         <div className="space-y-4">
-          <h3 className="text-xs font-bold text-emerald-750 tracking-wider border-b pb-1">C) Yerləşmə (Otel) Məlumatları</h3>
+          <h3 className="text-xs font-bold text-emerald-750 tracking-wider border-b pb-1">{t('vendorTourForms.internationalTourForm.sections.accommodation')}</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Otelin Adı *</label>
-              <input type="text" required value={intlTourHotelName} onChange={(e) => setIntlTourHotelName(e.target.value)} placeholder="Məsələn: Crowne Plaza Cappadocia" className="w-full px-3 py-2 border border-slate-250 rounded-lg text-xs text-slate-800 focus:ring-1 focus:ring-emerald-700 focus:outline-none" />
+              <label className="block text-xs font-bold text-slate-700 mb-1">{t('vendorTourForms.internationalTourForm.fields.hotelName.label')}</label>
+              <input type="text" required value={intlTourHotelName} onChange={(e) => setIntlTourHotelName(e.target.value)} placeholder={t('vendorTourForms.internationalTourForm.fields.hotelName.placeholder')} className="w-full px-3 py-2 border border-slate-250 rounded-lg text-xs text-slate-800 focus:ring-1 focus:ring-emerald-700 focus:outline-none" />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Otelin Ulduz Sayı *</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">{t('vendorTourForms.internationalTourForm.fields.hotelStars.label')}</label>
               <select value={intlTourHotelStars} onChange={(e) => setIntlTourHotelStars(Number(e.target.value))} className="w-full px-3 py-2 border border-slate-250 rounded-lg text-xs text-slate-800 focus:ring-1 focus:ring-emerald-700 focus:outline-none bg-white cursor-pointer">
-                <option value={5}>⭐⭐⭐⭐⭐ 5 Ulduzlu Lüks Otel</option>
-                <option value={4}>⭐⭐⭐⭐☆ 4 Ulduzlu Premium Otel</option>
-                <option value={3}>⭐⭐⭐☆☆ 3 Ulduzlu Standart Otel</option>
-                <option value={2}>⭐⭐☆☆☆ 2 Ulduzlu Butik / Hostel</option>
-                <option value={1}>⭐☆☆☆☆ 1 Ulduzlu Qonaq Evi</option>
+                <option value={5}>{t('vendorTourForms.internationalTourForm.fields.hotelStars.option5')}</option>
+                <option value={4}>{t('vendorTourForms.internationalTourForm.fields.hotelStars.option4')}</option>
+                <option value={3}>{t('vendorTourForms.internationalTourForm.fields.hotelStars.option3')}</option>
+                <option value={2}>{t('vendorTourForms.internationalTourForm.fields.hotelStars.option2')}</option>
+                <option value={1}>{t('vendorTourForms.internationalTourForm.fields.hotelStars.option1')}</option>
               </select>
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Qidalanma Seçimi *</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">{t('vendorTourForms.internationalTourForm.fields.mealType.label')}</label>
               <select value={intlTourMealType} onChange={(e) => setIntlTourMealType(e.target.value)} className="w-full px-3 py-2 border border-slate-250 rounded-lg text-xs text-slate-800 focus:ring-1 focus:ring-emerald-700 focus:outline-none bg-white cursor-pointer">
-                <option value="Səhər yeməyi">Səhər yeməyi daxildir (BB)</option>
-                <option value="Hər şey daxil (AI)">Hər şey daxil (All Inclusive - AI)</option>
-                <option value="Yarım pansion (HB)">Yarım pansion (HB)</option>
-                <option value="Tam pansion (FB)">Tam pansion (FB)</option>
-                <option value="Qidalanma daxil deyil">Qidalanma daxil DEYİL (Only Room - RO)</option>
+                <option value="Səhər yeməyi">{t('vendorTourForms.internationalTourForm.fields.mealType.bb')}</option>
+                <option value="Hər şey daxil (AI)">{t('vendorTourForms.internationalTourForm.fields.mealType.ai')}</option>
+                <option value="Yarım pansion (HB)">{t('vendorTourForms.internationalTourForm.fields.mealType.hb')}</option>
+                <option value="Tam pansion (FB)">{t('vendorTourForms.internationalTourForm.fields.mealType.fb')}</option>
+                <option value="Qidalanma daxil deyil">{t('vendorTourForms.internationalTourForm.fields.mealType.ro')}</option>
               </select>
             </div>
           </div>
 
           <div>
-            <label className="block text-[11px] font-black text-emerald-800 mb-2">Otaq Altdərnək Qiymət fərqləri:</label>
+            <label className="block text-[11px] font-black text-emerald-800 mb-2">{t('vendorTourForms.internationalTourForm.fields.roomDiffs.label')}</label>
             <div className="grid grid-cols-3 gap-3 bg-slate-50 p-3.5 rounded-xl border border-slate-150">
               <div>
-                <label className="block text-[10px] text-slate-500 font-bold mb-1">Double Otaq fərqi</label>
+                <label className="block text-[10px] text-slate-500 font-bold mb-1">{t('vendorTourForms.internationalTourForm.fields.roomDiffs.double')}</label>
                 <input type="number" value={intlRoomDoubleDiff} onChange={handleNumberInput(setIntlRoomDoubleDiff)} className="w-full px-2 py-1 border border-slate-200 rounded-md text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-700" />
               </div>
               <div>
-                <label className="block text-[10px] text-slate-500 font-bold mb-1">Twin otaq fərqi</label>
+                <label className="block text-[10px] text-slate-500 font-bold mb-1">{t('vendorTourForms.internationalTourForm.fields.roomDiffs.twin')}</label>
                 <input type="number" value={intlRoomTwinDiff} onChange={handleNumberInput(setIntlRoomTwinDiff)} className="w-full px-2 py-1 border border-slate-200 rounded-md text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-700" />
               </div>
               <div>
-                <label className="block text-[10px] text-slate-500 font-bold mb-1">Single otaq fərqi</label>
+                <label className="block text-[10px] text-slate-500 font-bold mb-1">{t('vendorTourForms.internationalTourForm.fields.roomDiffs.single')}</label>
                 <input type="number" value={intlRoomSingleDiff} onChange={handleNumberInput(setIntlRoomSingleDiff)} className="w-full px-2 py-1 border border-slate-200 rounded-md text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-700" />
               </div>
             </div>
@@ -417,18 +431,18 @@ export function InternationalTourForm({ currentUser, tour, slots, onAddTour, onE
 
         {/* D) Qiymət, Təqvim və Paket İnformasiyası */}
         <div className="space-y-4">
-          <h3 className="text-xs font-bold text-teal-800 tracking-wider border-b pb-1">D) Qiymət, Təqvim və Paket İnformasiyası</h3>
+          <h3 className="text-xs font-bold text-teal-800 tracking-wider border-b pb-1">{t('vendorTourForms.internationalTourForm.sections.pricing')}</h3>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Baza Paket Qiyməti *</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">{t('vendorTourForms.internationalTourForm.fields.basePrice.label')}</label>
               <input type="number" required min={1} value={intlTourPrice} onChange={handleNumberInput(setIntlTourPrice)} className="w-full px-3 py-2 border border-slate-250 rounded-lg text-xs text-slate-800 focus:ring-1 focus:ring-emerald-700" />
             </div>
             <div>
-              <label className="block text-xs font-bold text-rose-600 mb-1">Endirimli Qiymət (opsional):</label>
-              <input type="number" min="0" placeholder="Məs: 399" value={intlTourDiscountPrice} onChange={(e) => setIntlTourDiscountPrice(e.target.value)} className="w-full px-3 py-2 border border-rose-200 rounded-lg text-xs text-rose-700 placeholder-rose-300 focus:ring-1 focus:ring-rose-500" />
+              <label className="block text-xs font-bold text-rose-600 mb-1">{t('vendorTourForms.internationalTourForm.fields.discountPrice.label')}</label>
+              <input type="number" min="0" placeholder={t('vendorTourForms.internationalTourForm.fields.discountPrice.placeholder')} value={intlTourDiscountPrice} onChange={(e) => setIntlTourDiscountPrice(e.target.value)} className="w-full px-3 py-2 border border-rose-200 rounded-lg text-xs text-rose-700 placeholder-rose-300 focus:ring-1 focus:ring-rose-500" />
             </div>
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Valyuta Seçimi *</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">{t('vendorTourForms.internationalTourForm.fields.currency.label')}</label>
               <select value={intlTourCurrency} onChange={(e) => setIntlTourCurrency(e.target.value as 'AZN' | 'USD' | 'EUR')} className="w-full px-3 py-2 border border-slate-250 rounded-lg text-xs text-slate-800 focus:ring-1 focus:ring-emerald-700 bg-white cursor-pointer">
                 <option value="AZN">AZN (₼)</option>
                 <option value="USD">USD ($)</option>
@@ -438,21 +452,21 @@ export function InternationalTourForm({ currentUser, tour, slots, onAddTour, onE
           </div>
 
           <div className="bg-primary-50/60 p-4 rounded-xl border border-emerald-100 space-y-3">
-            <h4 className="text-[10px] font-extrabold text-emerald-800 tracking-widest">📅 Turun Aktiv Olacağı Yola Çıxış Tarixləri</h4>
+            <h4 className="text-[10px] font-extrabold text-emerald-800 tracking-widest">{t('vendorTourForms.internationalTourForm.sections.activeDatesHeading')}</h4>
             <MultiDateCalendar selectedDates={selectedDates} onChange={setSelectedDates} />
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-slate-700 mb-1">Əsas Tur Şəkli (Seçin və ya yükləyin) *</label>
+            <label className="block text-xs font-bold text-slate-700 mb-1">{t('vendorTourForms.internationalTourForm.fields.mainImage.label')}</label>
             {intlTourImage ? (
               <div className="relative border border-slate-200 rounded-lg overflow-hidden group h-24 bg-slate-50 flex items-center justify-between px-3">
                 <div className="flex items-center gap-3">
                   <img src={intlTourImage || undefined} alt="Yüklənən şəkil" className="w-16 h-16 object-cover rounded-lg border border-slate-200" referrerPolicy="no-referrer" />
                   <div>
-                    <span className="text-[10px] text-emerald-700 font-extrabold block">✓ ŞƏKİL YÜKLƏNDİ</span>
+                    <span className="text-[10px] text-emerald-700 font-extrabold block">{t('vendorTourForms.internationalTourForm.fields.mainImage.uploadedBadge')}</span>
                   </div>
                 </div>
-                <button type="button" onClick={() => setIntlTourImage('')} className="px-2.5 py-1 bg-red-100 hover:bg-red-200 text-red-700 text-[10px] font-black rounded-lg transition">Şəkli Sil</button>
+                <button type="button" onClick={() => setIntlTourImage('')} className="px-2.5 py-1 bg-red-100 hover:bg-red-200 text-red-700 text-[10px] font-black rounded-lg transition">{t('vendorTourForms.internationalTourForm.fields.mainImage.remove')}</button>
               </div>
             ) : (
               <div
@@ -486,59 +500,59 @@ export function InternationalTourForm({ currentUser, tour, slots, onAddTour, onE
                   }}
                 />
                 <span className="text-lg">📸</span>
-                <span className="text-[10px] font-bold text-slate-705 mt-1">Sürüşdürüb buraxın və ya Seçmək üçün klikləyin</span>
+                <span className="text-[10px] font-bold text-slate-705 mt-1">{t('vendorTourForms.internationalTourForm.fields.mainImage.dropHint')}</span>
                 <span className={`text-[9px] mt-0.5 font-semibold block leading-tight px-2 ${fieldErrors.image ? 'text-red-600' : 'text-slate-400'}`}>
-                  {fieldErrors.image ? '⚠️ Şəkil yükləmək məcburidir.' : 'Məcburidir — turun əsas şəkli olaraq göstəriləcək.'}
+                  {fieldErrors.image ? `⚠️ ${t('vendorTourForms.internationalTourForm.fields.mainImage.required')}` : t('vendorTourForms.internationalTourForm.fields.mainImage.requiredHint')}
                 </span>
               </div>
             )}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <DynamicStringListInput label="Paketə Daxildir:" items={intlIncludes} onChange={(items) => { setIntlIncludes(items); clearFieldError('includes'); }} placeholder="Məs: Oteldə spa, Yerli sığorta" error={fieldErrors.includes} />
-            <DynamicStringListInput label="Paketə Daxil DEYİL:" items={intlNotIncludes} onChange={(items) => { setIntlNotIncludes(items); clearFieldError('notIncludes'); }} placeholder="Məs: Alış-veriş, Şəxsi xərclər" accent="red" error={fieldErrors.notIncludes} />
+            <DynamicStringListInput label={t('vendorTourForms.internationalTourForm.fields.includes.label')} items={intlIncludes} onChange={(items) => { setIntlIncludes(items); clearFieldError('includes'); }} placeholder={t('vendorTourForms.internationalTourForm.fields.includes.placeholder')} error={fieldErrors.includes} />
+            <DynamicStringListInput label={t('vendorTourForms.internationalTourForm.fields.notIncludes.label')} items={intlNotIncludes} onChange={(items) => { setIntlNotIncludes(items); clearFieldError('notIncludes'); }} placeholder={t('vendorTourForms.internationalTourForm.fields.notIncludes.placeholder')} accent="red" error={fieldErrors.notIncludes} />
           </div>
 
           <div className="space-y-3 pt-3 border-t border-slate-100">
             <div>
-              <label className="block text-xs font-bold text-emerald-800 mb-1">Önə çıxanlar (Vergüllə ayırın):</label>
+              <label className="block text-xs font-bold text-emerald-800 mb-1">{t('vendorTourForms.internationalTourForm.fields.highlights.label')}</label>
               <input
                 type="text"
                 value={intlHighlights}
                 onChange={(e) => { setIntlHighlights(e.target.value); clearFieldError('highlights'); }}
-                placeholder="Məs: Şəhər turu bələdçi ilə"
+                placeholder={t('vendorTourForms.internationalTourForm.fields.highlights.placeholder')}
                 className={`w-full px-3 py-2 border rounded-lg text-xs text-slate-800 focus:ring-1 focus:ring-emerald-700 focus:outline-none ${fieldErrors.highlights ? 'border-red-500 ring-1 ring-red-300' : 'border-slate-250'}`}
               />
-              {fieldErrors.highlights && <p className="text-[10px] font-semibold text-red-600 mt-1">⚠️ Ən azı bir xüsusiyyət qeyd edin.</p>}
+              {fieldErrors.highlights && <p className="text-[10px] font-semibold text-red-600 mt-1">⚠️ {t('vendorTourForms.internationalTourForm.fields.highlights.error')}</p>}
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-bold text-emerald-800 mb-1">Danışılan dillər (Vergüllə ayırın):</label>
+                <label className="block text-xs font-bold text-emerald-800 mb-1">{t('vendorTourForms.internationalTourForm.fields.languages.label')}</label>
                 <input
                   type="text"
                   value={intlLanguages}
                   onChange={(e) => { setIntlLanguages(e.target.value); clearFieldError('languages'); }}
-                  placeholder="Azərbaycanca, Rusca, İngiliscə"
+                  placeholder={t('vendorTourForms.internationalTourForm.fields.languages.placeholder')}
                   className={`w-full px-3 py-2 border rounded-lg text-xs text-slate-800 focus:ring-1 focus:ring-emerald-700 focus:outline-none ${fieldErrors.languages ? 'border-red-500 ring-1 ring-red-300' : 'border-slate-250'}`}
                 />
-                {fieldErrors.languages && <p className="text-[10px] font-semibold text-red-600 mt-1">⚠️ Ən azı bir dil qeyd edin.</p>}
+                {fieldErrors.languages && <p className="text-[10px] font-semibold text-red-600 mt-1">⚠️ {t('vendorTourForms.internationalTourForm.fields.languages.error')}</p>}
               </div>
               <div>
                 <DynamicStringListInput
-                  label="Özünüzlə gətirin:"
+                  label={t('vendorTourForms.internationalTourForm.fields.bringItems.label')}
                   items={intlBringItems}
                   onChange={(items) => { setIntlBringItems(items); clearFieldError('bringItems'); }}
-                  placeholder="Məs: Pasport, Hava şəraitinə uyğun geyim"
+                  placeholder={t('vendorTourForms.internationalTourForm.fields.bringItems.placeholder')}
                   error={fieldErrors.bringItems}
                 />
               </div>
             </div>
             <div>
               <DynamicStringListInput
-                label="İcazə verilmir:"
+                label={t('vendorTourForms.internationalTourForm.fields.notAllowedItems.label')}
                 items={intlNotAllowedItems}
                 onChange={setIntlNotAllowedItems}
-                placeholder="Məs: Böyük çamadanlar"
+                placeholder={t('vendorTourForms.internationalTourForm.fields.notAllowedItems.placeholder')}
                 accent="red"
               />
             </div>
@@ -548,25 +562,25 @@ export function InternationalTourForm({ currentUser, tour, slots, onAddTour, onE
         {/* E) Proqram (Günbəgün) */}
         <div className="space-y-4">
           <div className="flex items-center justify-between border-b pb-1">
-            <h3 className="text-xs font-bold text-emerald-800 tracking-wider">E) Proqram (Günbəgün Aktiv Gündəlik Planı)</h3>
-            <button type="button" onClick={handleIntlAddDay} className="bg-emerald-700 hover:bg-emerald-850 text-white font-black text-xs px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all shadow-xs">⏳ Gün Əlavə Et +</button>
+            <h3 className="text-xs font-bold text-emerald-800 tracking-wider">{t('vendorTourForms.internationalTourForm.sections.itinerary')}</h3>
+            <button type="button" onClick={handleIntlAddDay} className="bg-emerald-700 hover:bg-emerald-850 text-white font-black text-xs px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all shadow-xs">{t('vendorTourForms.internationalTourForm.itinerary.addDay')}</button>
           </div>
           <div className="space-y-4">
             {intlItinerary.map((iti, index) => (
               <div key={index} className="border border-slate-200 p-4 rounded-xl bg-slate-50 relative space-y-3">
                 <div className="flex justify-between items-center bg-slate-200/50 p-1.5 rounded-lg">
-                  <span className="text-xs font-extrabold text-primary-800">📅 {iti.day}-ci Gün Planı</span>
+                  <span className="text-xs font-extrabold text-primary-800">{t('vendorTourForms.internationalTourForm.itinerary.dayPlan', { day: iti.day })}</span>
                   {intlItinerary.length > 1 && (
-                    <button type="button" onClick={() => handleIntlRemoveDay(index)} className="text-red-500 hover:text-red-705 text-xs font-bold px-2 py-0.5">Günü Sil 🗑️</button>
+                    <button type="button" onClick={() => handleIntlRemoveDay(index)} className="text-red-500 hover:text-red-705 text-xs font-bold px-2 py-0.5">{t('vendorTourForms.internationalTourForm.itinerary.removeDay')}</button>
                   )}
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-600 mb-1">Günlük Başlıq</label>
+                    <label className="block text-[10px] font-bold text-slate-600 mb-1">{t('vendorTourForms.internationalTourForm.itinerary.dayTitleLabel')}</label>
                     <input type="text" required value={iti.title} onChange={(e) => handleIntlItineraryChange(index, 'title', e.target.value)} className="w-full px-2 py-1.5 border border-slate-250 rounded-md text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-700" />
                   </div>
                   <div>
-                    <label className="block text-[10px] font-bold text-slate-600 mb-1">Günün Şəkili</label>
+                    <label className="block text-[10px] font-bold text-slate-600 mb-1">{t('vendorTourForms.internationalTourForm.itinerary.dayImageLabel')}</label>
                     <div className="flex items-center gap-2">
                       <input
                         type="file"
@@ -584,24 +598,24 @@ export function InternationalTourForm({ currentUser, tour, slots, onAddTour, onE
                       />
                       {!iti.image ? (
                         <button type="button" onClick={() => document.getElementById(`intl-itinerary-file-${index}`)?.click()} className="w-full flex items-center justify-center gap-2 border border-dashed border-slate-300 hover:border-emerald-500 bg-slate-50 hover:bg-emerald-50/20 text-slate-500 hover:text-emerald-700 text-xs py-2 px-3 rounded-lg transition-all cursor-pointer font-bold">
-                          📁 Şəkil Yüklə
+                          {t('vendorTourForms.internationalTourForm.itinerary.uploadImage')}
                         </button>
                       ) : (
                         <div className="flex items-center gap-3 bg-emerald-50/35 border border-emerald-100 p-1.5 rounded-lg w-full">
                           <img src={iti.image || undefined} alt={`Gün ${iti.day}`} className="w-12 h-9 object-cover rounded-md border border-emerald-200/50 shrink-0" />
                           <div className="min-w-0 flex-1">
-                            <span className="text-[10px] font-bold text-emerald-800 block leading-tight">Şəkil yükləndi</span>
+                            <span className="text-[10px] font-bold text-emerald-800 block leading-tight">{t('vendorTourForms.internationalTourForm.itinerary.imageUploaded')}</span>
                           </div>
                           <div className="flex gap-1.5 shrink-0">
-                            <button type="button" onClick={() => document.getElementById(`intl-itinerary-file-${index}`)?.click()} className="text-[10px] text-indigo-600 hover:text-indigo-800 font-bold px-1.5 py-1 cursor-pointer hover:bg-white rounded transition-all">Dəyiş</button>
-                            <button type="button" onClick={() => handleIntlItineraryChange(index, 'image', '')} className="text-[10px] text-red-500 hover:text-red-700 font-bold px-1.5 py-1 cursor-pointer hover:bg-white rounded transition-all">Sil</button>
+                            <button type="button" onClick={() => document.getElementById(`intl-itinerary-file-${index}`)?.click()} className="text-[10px] text-indigo-600 hover:text-indigo-800 font-bold px-1.5 py-1 cursor-pointer hover:bg-white rounded transition-all">{t('vendorTourForms.internationalTourForm.itinerary.changeImage')}</button>
+                            <button type="button" onClick={() => handleIntlItineraryChange(index, 'image', '')} className="text-[10px] text-red-500 hover:text-red-700 font-bold px-1.5 py-1 cursor-pointer hover:bg-white rounded transition-all">{t('vendorTourForms.internationalTourForm.itinerary.removeImage')}</button>
                           </div>
                         </div>
                       )}
                     </div>
                   </div>
                   <div className="md:col-span-2">
-                    <label className="block text-[10px] font-bold text-slate-600 mb-1">Günlük fəaliyyətlərin tam təsviri</label>
+                    <label className="block text-[10px] font-bold text-slate-600 mb-1">{t('vendorTourForms.internationalTourForm.itinerary.descriptionLabel')}</label>
                     <textarea rows={2} required value={iti.description} onChange={(e) => handleIntlItineraryChange(index, 'description', e.target.value)} className="w-full px-2.5 py-1.5 border border-slate-250 rounded-md text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-700" />
                   </div>
                 </div>
@@ -628,10 +642,10 @@ export function InternationalTourForm({ currentUser, tour, slots, onAddTour, onE
         )}
 
         <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200">
-          <button type="button" onClick={() => onNavigateBack()} className="px-4 py-2 border border-slate-250 text-slate-600 text-xs font-bold rounded-lg hover:bg-slate-50">Ləğv Et</button>
+          <button type="button" onClick={() => onNavigateBack()} className="px-4 py-2 border border-slate-250 text-slate-600 text-xs font-bold rounded-lg hover:bg-slate-50">{t('vendorTourForms.internationalTourForm.buttons.cancel')}</button>
           <button type="submit" disabled={isSavingForm} className="px-6 py-2.5 bg-emerald-800 hover:bg-emerald-850 text-white font-black text-xs rounded-lg shadow-sm transition-all disabled:opacity-50 flex items-center gap-1.5">
             {isEditMode && <Check className="w-4 h-4" />}
-            {isSavingForm ? 'Göndərilir...' : isEditMode ? 'Dəyişiklikləri Saxla' : '✈️ Xarici Səyahət Turunu Yarat'}
+            {isSavingForm ? t('vendorTourForms.internationalTourForm.buttons.submitting') : isEditMode ? t('vendorTourForms.internationalTourForm.buttons.saveChanges') : t('vendorTourForms.internationalTourForm.buttons.createTour')}
           </button>
         </div>
       </form>

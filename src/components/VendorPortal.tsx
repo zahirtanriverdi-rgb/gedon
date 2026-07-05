@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Tour, TourSlot, Booking, User } from '../types';
+import { useLanguage } from '../i18n/LanguageContext';
 import { ProfileTab } from './vendor/ProfileTab';
 import { AddSlotForm } from './vendor/AddSlotForm';
 import { TourForm } from './vendor/TourForm';
@@ -17,9 +18,10 @@ import {
 // Shown in place of a tour create/edit form once the vendor's subscription has expired
 // (grace period active or over) — read-only tabs (my-tours, CRM, profile) stay unaffected.
 function SubscriptionExpiredNotice({ message }: { message: string }) {
+  const { t } = useLanguage();
   return (
     <div className="bg-white p-8 rounded-xl border border-orange-200 text-center space-y-3">
-      <h3 className="text-base font-bold text-orange-800">⚠️ Abunəlik müddətiniz bitib</h3>
+      <h3 className="text-base font-bold text-orange-800">⚠️ {t('vendorMisc.vendorPortal.subscriptionExpiredTitle')}</h3>
       <p className="text-sm text-slate-600 max-w-md mx-auto">{message}</p>
     </div>
   );
@@ -68,6 +70,7 @@ export default function VendorPortal({
   onToggleFeatured,
   onUserUpdated
 }: VendorPortalProps) {
+  const { t } = useLanguage();
   const [activeSubTab, setActiveSubTab] = useState<'my-tours' | 'add-tour' | 'add-intl-tour' | 'add-slot' | 'profile' | 'crm'>('my-tours');
   const [tourSearchTerm, setTourSearchTerm] = useState('');
   const [selectedTicketBooking, setSelectedTicketBooking] = useState<Booking | null>(null);
@@ -114,14 +117,14 @@ export default function VendorPortal({
             ticketUrl: data.ticketUrl
           });
         }
-        if (onShowNotification) onShowNotification('Sifariş üçün PDF bilet uğurla yaradıldı!', 'success');
+        if (onShowNotification) onShowNotification(t('vendorMisc.vendorPortal.ticketCreated'), 'success');
         return data.ticketUrl;
       } else {
-        if (onShowNotification) onShowNotification(data.error || 'Bilet yaradılarkən xəta baş verdi.', 'error');
+        if (onShowNotification) onShowNotification(data.error || t('vendorMisc.vendorPortal.ticketCreateError'), 'error');
       }
     } catch (err) {
       console.error('Bilet yaradılarkən xəta baş verdi:', err);
-      if (onShowNotification) onShowNotification('Sistem xətası: Bilet yaradıla bilmədi.', 'error');
+      if (onShowNotification) onShowNotification(t('vendorMisc.vendorPortal.ticketSystemError'), 'error');
     }
   };
 
@@ -162,7 +165,7 @@ export default function VendorPortal({
   // longer create or edit tours. `isAutoDeactivated` is already a subset of `isExpired`, so this
   // is just `isExpired` under a name that reads clearly at each gating call site below.
   const isSubscriptionExpiredOrInGracePeriod = isExpired;
-  const subscriptionExpiredMessage = `Abunəlik müddətiniz bitib. Yeni tur əlavə etmək və ya mövcud turlara düzəliş etmək üçün admin ilə əlaqə saxlayın və ya abunəliyi yeniləyin. Qalan güzəşt müddəti: ${graceDaysLeft} gün.`;
+  const subscriptionExpiredMessage = t('vendorMisc.vendorPortal.subscriptionExpiredMessage', { days: graceDaysLeft });
 
   return (
     <div className="space-y-6">
@@ -172,14 +175,14 @@ export default function VendorPortal({
         <div className={`p-4 rounded-xl border flex items-center justify-between shadow-xs ${isAutoDeactivated ? 'bg-red-50 border-red-200' : isExpired ? 'bg-orange-50 border-orange-200' : 'bg-amber-50 border-amber-200'}`}>
           <div className="space-y-1">
             <h4 className={`text-sm font-bold flex items-center gap-2 ${isAutoDeactivated ? 'text-red-800' : isExpired ? 'text-orange-800' : 'text-amber-800'}`}>
-              ⚠️ Abunəlik Statusu
+              ⚠️ {t('vendorMisc.vendorPortal.subscriptionStatusTitle')}
             </h4>
             <p className={`text-xs ${isAutoDeactivated ? 'text-red-700' : isExpired ? 'text-orange-700' : 'text-amber-700'}`}>
               {isAutoDeactivated
-                ? 'Sizin abunəlik vaxtınız bitmişdir və 3 gün keçmişdir. Bütün turlarınız müştərilər üçün deaktiv edilib. Yenidən aktivləşdirmək üçün admin ilə əlaqə saxlayın.'
+                ? t('vendorMisc.vendorPortal.subscriptionAutoDeactivated')
                 : isExpired
-                ? `Abunəlik vaxtınız bitib (${subDate.toLocaleDateString()}). Güzəşt müddətindən ${graceDaysLeft} gün qalıb — bu müddət bitdikdə turlarınız avtomatik gizlədiləcək.`
-                : `Abunəlik vaxtınızın bitməsinə ${daysUntilExpiry} gün qalıb (${subDate.toLocaleDateString()}). Vaxt bitdikdən sonra 3 gün ərzində yenilənməsə, turlarınız deaktiv ediləcək.`}
+                ? t('vendorMisc.vendorPortal.subscriptionExpiredGrace', { date: subDate.toLocaleDateString(), days: graceDaysLeft })
+                : t('vendorMisc.vendorPortal.subscriptionExpiringSoon', { days: daysUntilExpiry, date: subDate.toLocaleDateString() })}
             </p>
           </div>
         </div>
@@ -191,9 +194,9 @@ export default function VendorPortal({
         {/* Metric 1 */}
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs flex items-center justify-between">
           <div className="space-y-1">
-            <span className="text-[10px] text-slate-400 font-bold tracking-widest">Mənim Turlarım</span>
-            <h4 className="text-xl font-extrabold text-slate-900">{myTours.length} Marşrut</h4>
-            <p className="text-[10px] text-slate-500">Platformada daxil edilən aktiv turlar</p>
+            <span className="text-[10px] text-slate-400 font-bold tracking-widest">{t('vendorMisc.vendorPortal.metricMyTours')}</span>
+            <h4 className="text-xl font-extrabold text-slate-900">{t('vendorMisc.vendorPortal.metricMyToursValue', { count: myTours.length })}</h4>
+            <p className="text-[10px] text-slate-500">{t('vendorMisc.vendorPortal.metricMyToursSubtitle')}</p>
           </div>
           <div className="p-2.5 bg-[#eff6ff] border border-[#dbeafe] text-[#1d4ed8] rounded-lg">
             <Briefcase className="w-5 h-5" />
@@ -203,9 +206,9 @@ export default function VendorPortal({
         {/* Metric 2 */}
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs flex items-center justify-between">
           <div className="space-y-1">
-            <span className="text-[10px] text-slate-400 font-bold tracking-widest">Ümumi Satış Gəliri (AZN)</span>
+            <span className="text-[10px] text-slate-400 font-bold tracking-widest">{t('vendorMisc.vendorPortal.metricRevenue')}</span>
             <h4 className="text-xl font-extrabold text-emerald-750">{myTotalGrossRevenue.toFixed(2)} AZN</h4>
-            <p className="text-[10px] text-slate-500">Platformada satılan bütün turların cəmi</p>
+            <p className="text-[10px] text-slate-500">{t('vendorMisc.vendorPortal.metricRevenueSubtitle')}</p>
           </div>
           <div className="p-2.5 bg-emerald-50 border border-emerald-100 text-emerald-700 rounded-lg">
             <DollarSign className="w-5 h-5" />
@@ -215,9 +218,9 @@ export default function VendorPortal({
         {/* Metric 3 */}
         <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs flex items-center justify-between">
           <div className="space-y-1">
-            <span className="text-[10px] text-slate-400 font-bold tracking-widest">Satılan Biletlər</span>
-            <h4 className="text-xl font-extrabold text-primary-700">{myBookings.length} Bilet</h4>
-            <p className="text-[10px] text-slate-500">Uğurlu iştirakçı qeydiyyatı</p>
+            <span className="text-[10px] text-slate-400 font-bold tracking-widest">{t('vendorMisc.vendorPortal.metricTickets')}</span>
+            <h4 className="text-xl font-extrabold text-primary-700">{t('vendorMisc.vendorPortal.metricTicketsValue', { count: myBookings.length })}</h4>
+            <p className="text-[10px] text-slate-500">{t('vendorMisc.vendorPortal.metricTicketsSubtitle')}</p>
           </div>
           <div className="p-2.5 bg-violet-50 border border-violet-100 text-violet-700 rounded-lg">
             <Users className="w-5 h-5" />
@@ -236,7 +239,7 @@ export default function VendorPortal({
               : 'border-transparent text-zinc-500 hover:text-zinc-700'
           }`}
         >
-          🗄️ Turlarım və Cari Rezervasiyalar
+          🗄️ {t('vendorMisc.vendorPortal.tabMyTours')}
         </button>
 
         <button
@@ -247,7 +250,7 @@ export default function VendorPortal({
               : 'border-transparent text-zinc-500 hover:text-zinc-700'
           }`}
         >
-          📊 CRM & İştirakçılar
+          📊 {t('vendorMisc.vendorPortal.tabCrm')}
         </button>
 
         <button
@@ -263,7 +266,7 @@ export default function VendorPortal({
               : 'border-transparent text-zinc-500 hover:text-zinc-700'
           }`}
         >
-          ➕ Yeni Marşrut Yarat
+          ➕ {t('vendorMisc.vendorPortal.tabAddTour')}
         </button>
 
         <button
@@ -277,7 +280,7 @@ export default function VendorPortal({
               : 'border-transparent text-zinc-500 hover:text-zinc-700'
           }`}
         >
-          🏃‍♂️ Aktiv Həyat (İdman) Yarat
+          🏃‍♂️ {t('vendorMisc.vendorPortal.tabAddActiveTour')}
         </button>
 
         <button
@@ -288,7 +291,7 @@ export default function VendorPortal({
               : 'border-transparent text-zinc-500 hover:text-zinc-700'
           }`}
         >
-          ✈️ <span className="text-emerald-750 font-black animate-pulse">Yeni Xarici Tur Yarat</span>
+          ✈️ <span className="text-emerald-750 font-black animate-pulse">{t('vendorMisc.vendorPortal.tabAddIntlTour')}</span>
         </button>
 
         <button
@@ -299,7 +302,7 @@ export default function VendorPortal({
               : 'border-transparent text-zinc-500 hover:text-zinc-700'
           }`}
         >
-          📅 Cari Tura Təqvim Əlavə Et
+          📅 {t('vendorMisc.vendorPortal.tabAddSlot')}
         </button>
 
         <button
@@ -310,7 +313,7 @@ export default function VendorPortal({
               : 'border-transparent text-zinc-500 hover:text-zinc-700'
           }`}
         >
-          👤 Profil Məlumatları
+          👤 {t('vendorMisc.vendorPortal.tabProfile')}
         </button>
       </div>
 

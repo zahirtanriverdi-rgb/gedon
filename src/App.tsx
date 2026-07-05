@@ -9,6 +9,8 @@ import AdminLogin from './components/AdminLogin';
 import { SearchDropdown } from './components/SearchDropdown';
 import { getRecentSearches, addRecentSearch } from './utils/recentSearches';
 import { getWishlist, WISHLIST_CHANGED_EVENT } from './utils/wishlist';
+import { useLanguage } from './i18n/LanguageContext';
+import LanguageSwitcher from './components/LanguageSwitcher';
 import {
   ShieldAlert,
   RefreshCw,
@@ -236,7 +238,7 @@ export default function App() {
     try {
       localStorage.setItem('turlar_exchange_rates', JSON.stringify(newRates));
     } catch (e) {}
-    showNotification('Valyuta məzənnələri uğurla yeniləndi! 💱✨', 'success');
+    showNotification(t('app.notifications.ratesUpdated'), 'success');
   };
 
   // Global search and scroll state for sticky header
@@ -251,7 +253,9 @@ export default function App() {
   // background at the very top and only separates once the user starts scrolling.
   const [isHeaderScrolled, setIsHeaderScrolled] = useState(false);
   const [displayCurrency, setDisplayCurrency] = useState<'AZN' | 'USD' | 'EUR'>('AZN');
-  const [appLanguage, setAppLanguage] = useState<'az' | 'en' | 'ru'>('az');
+  // Language selection lives in the global LanguageContext (src/i18n/LanguageContext.tsx) so
+  // it's shared/persisted across the whole app, not just the customer marketplace header.
+  const { language: appLanguage, setLanguage: setAppLanguage, t } = useLanguage();
   const [isLangMenuOpen, setIsLangMenuOpen] = useState(false);
 
   // Wishlist ids live in localStorage (see utils/wishlist.ts); we mirror them here so the
@@ -332,9 +336,9 @@ export default function App() {
       setBookings(prev => [data.booking, ...prev]);
       // Mirror the server-side slot capacity increment locally so the UI stays in sync.
       setSlots(prev => prev.map(s => s.id === data.booking.slotId ? { ...s, bookedCount: s.bookedCount + data.booking.participantsCount } : s));
-      showNotification(`Rezervasiya uğurla tamamlandı! Bilet ID: #${data.booking.id}`, 'success');
+      showNotification(t('app.notifications.bookingConfirmed', { id: data.booking.id }), 'success');
     } catch (e: any) {
-      showNotification(e.message || 'Rezervasiya zamanı xəta baş verdi.', 'error');
+      showNotification(e.message || t('app.notifications.bookingError'), 'error');
       throw e; // let the caller (e.g. CustomerPortal's booking form) know the create failed too
     }
   };
@@ -357,9 +361,9 @@ export default function App() {
         const tourData = await tourResponse.json();
         setTours(prev => prev.map(t => t.id === tourData.tour.id ? tourData.tour : t));
       }
-      showNotification('Rəyiniz uğurla əlavə olundu və İştirakçı statusu ilə təsdiqləndi!', 'success');
+      showNotification(t('app.notifications.reviewAdded'), 'success');
     } catch (e: any) {
-      showNotification(e.message || 'Rəy əlavə edilərkən xəta baş verdi.', 'error');
+      showNotification(e.message || t('app.notifications.reviewError'), 'error');
       throw e; // let the caller (e.g. CustomerPortal's review form) know the create failed too
     }
   };
@@ -395,9 +399,9 @@ export default function App() {
       if (!response.ok) throw new Error(parsed.error || 'Vendor hesabı yaradıla bilmədi.');
 
       setUsers(prev => [...prev, parsed.user]);
-      showNotification(`🎉 "${data.companyName}" üçün yeni operator hesabı yaradıldı!`, 'success');
+      showNotification(t('app.notifications.vendorCreated', { name: data.companyName }), 'success');
     } catch (e: any) {
-      showNotification(e.message || 'Vendor hesabı yaradılarkən xəta baş verdi.', 'error');
+      showNotification(e.message || t('app.notifications.vendorCreateError'), 'error');
       throw e;
     }
   };
@@ -413,9 +417,9 @@ export default function App() {
       if (!response.ok) throw new Error(parsed.error || 'Operator arxivləşdirilə bilmədi.');
 
       setUsers(prev => prev.map(u => u.id === vendorId ? { ...u, isArchived: true } : u));
-      showNotification('Operator hesabı arxivləşdirildi. Turları və rezervasiyaları qorunub, amma artıq platformada görünməyəcək.', 'success');
+      showNotification(t('app.notifications.vendorArchived'), 'success');
     } catch (e: any) {
-      showNotification(e.message || 'Operator arxivləşdirilərkən xəta baş verdi.', 'error');
+      showNotification(e.message || t('app.notifications.vendorArchiveError'), 'error');
       throw e;
     }
   };
@@ -441,11 +445,11 @@ export default function App() {
         return t;
       }));
       showNotification(
-        isManuallyFeatured ? '⭐ Tur "Ayın Ən Çox Satılanı" olaraq seçildi!' : 'Seçim ləğv edildi, sistem yenidən avtomatik hesablayacaq.',
+        isManuallyFeatured ? t('app.notifications.featuredSelected') : t('app.notifications.featuredCleared'),
         'success'
       );
     } catch (e: any) {
-      showNotification(e.message || 'Seçim yenilənərkən xəta baş verdi.', 'error');
+      showNotification(e.message || t('app.notifications.planUpdateError'), 'error');
     }
   };
 
@@ -460,9 +464,9 @@ export default function App() {
       if (!response.ok) throw new Error(parsed.error || 'İstifadəçi yenilənə bilmədi.');
 
       setUsers(prev => prev.map(u => u.id === userId ? { ...u, ...parsed.user } : u));
-      showNotification('İstifadəçi məlumatları (operator) uğurla yeniləndi!', 'success');
+      showNotification(t('app.notifications.operatorUpdated'), 'success');
     } catch (e: any) {
-      showNotification(e.message || 'İstifadəçi yenilənərkən xəta baş verdi.', 'error');
+      showNotification(e.message || t('app.notifications.operatorUpdateError'), 'error');
     }
   };
 
@@ -486,9 +490,9 @@ export default function App() {
       if (!response.ok) throw new Error(data.error || 'Tarix əlavə edilə bilmədi.');
 
       setSlots(prev => [...prev, data.slot]);
-      showNotification('Yeni təqvim slotu (satış tərifi) uğurla daxil edildi!', 'success');
+      showNotification(t('app.notifications.slotAdded'), 'success');
     } catch (e: any) {
-      showNotification(e.message || 'Tarix əlavə edilərkən xəta baş verdi.', 'error');
+      showNotification(e.message || t('app.notifications.slotAddError'), 'error');
       throw e;
     }
   };
@@ -502,7 +506,7 @@ export default function App() {
       }
       setSlots(prev => prev.filter(s => s.id !== slotId));
     } catch (e: any) {
-      showNotification(e.message || 'Tarix silinərkən xəta baş verdi.', 'error');
+      showNotification(e.message || t('app.notifications.slotDeleteError'), 'error');
       throw e;
     }
   };
@@ -518,16 +522,16 @@ export default function App() {
       if (!response.ok) throw new Error(data.error || 'Tur yaradıla bilmədi.');
 
       setTours(prev => [data.tour, ...prev]);
-      showNotification('Yeni tur marşrutu tərtib olundu və təsdiq gözləmə siyahısına əlavə edildi! Admin panelindən bunu təsdiqləyə bilərsiniz. ⏳✨', 'info');
+      showNotification(t('app.notifications.tourCreated'), 'info');
     } catch (e: any) {
-      showNotification(e.message || 'Tur yaradılarkən xəta baş verdi.', 'error');
+      showNotification(e.message || t('app.notifications.tourCreateError'), 'error');
       throw e;
     }
   };
 
   const handleUpdatePriceCalculatorConfig = (newConfig: PriceCalculatorConfig) => {
     setPlatformConfig(prev => ({ ...prev, priceCalculatorConfig: newConfig }));
-    showNotification('Qiymət hesablayıcısının xərc elementləri yeniləndi! 🧮', 'success');
+    showNotification(t('app.notifications.calculatorUpdated'), 'success');
   };
 
   const handleApproveTour = async (tourId: string) => {
@@ -541,9 +545,9 @@ export default function App() {
       if (!response.ok) throw new Error(data.error || 'Tur təsdiqlənə bilmədi.');
 
       setTours(prev => prev.map(t => t.id === tourId ? data.tour : t));
-      showNotification('Tur marşrutu admin tərəfindən uğurla təsdiqləndi və satışa buraxıldı!', 'success');
+      showNotification(t('app.notifications.tourApproved'), 'success');
     } catch (e: any) {
-      showNotification(e.message || 'Tur təsdiqlənərkən xəta baş verdi.', 'error');
+      showNotification(e.message || t('app.notifications.tourApproveError'), 'error');
       throw e;
     }
   };
@@ -559,9 +563,9 @@ export default function App() {
       if (!response.ok) throw new Error(data.error || 'Tur rədd edilə bilmədi.');
 
       setTours(prev => prev.map(t => t.id === tourId ? data.tour : t));
-      showNotification('Tur rədd edildi.', 'info');
+      showNotification(t('app.notifications.tourRejected'), 'info');
     } catch (e: any) {
-      showNotification(e.message || 'Tur rədd edilərkən xəta baş verdi.', 'error');
+      showNotification(e.message || t('app.notifications.tourRejectError'), 'error');
       throw e;
     }
   };
@@ -577,9 +581,9 @@ export default function App() {
       if (!response.ok) throw new Error(data.error || 'Rezervasiya təsdiqlənə bilmədi.');
 
       setBookings(prev => prev.map(b => b.id === bookingId ? data.booking : b));
-      showNotification('WhatsApp Ödəniş qəbzi təsdiqləndi! Müştəriyə bilet təsdiqi və SMS bildiriş göndərildi.', 'success');
+      showNotification(t('app.notifications.paymentConfirmed'), 'success');
     } catch (e: any) {
-      showNotification(e.message || 'Rezervasiya təsdiqlənərkən xəta baş verdi.', 'error');
+      showNotification(e.message || t('app.notifications.bookingConfirmError'), 'error');
       throw e;
     }
   };
@@ -595,9 +599,9 @@ export default function App() {
       if (!response.ok) throw new Error(data.error || 'Tur yenilənə bilmədi.');
 
       setTours(prev => prev.map(t => t.id === updatedTour.id ? data.tour : t));
-      showNotification('Tur marşrutu uğurla yeniləndi! 📝✨', 'success');
+      showNotification(t('app.notifications.tourUpdated'), 'success');
     } catch (e: any) {
-      showNotification(e.message || 'Tur yenilənərkən xəta baş verdi.', 'error');
+      showNotification(e.message || t('app.notifications.tourUpdateError'), 'error');
       throw e;
     }
   };
@@ -614,9 +618,9 @@ export default function App() {
       setSlots(prev => prev.filter(s => s.tourId !== tourId));
       setBookings(prev => prev.filter(b => b.tourId !== tourId));
       setReviews(prev => prev.filter(r => r.tourId !== tourId));
-      showNotification('Tur marşrutu sistemdən birdəfəlik silindi! 🗑️✨', 'success');
+      showNotification(t('app.notifications.tourDeleted'), 'success');
     } catch (e: any) {
-      showNotification(e.message || 'Tur silinərkən xəta baş verdi.', 'error');
+      showNotification(e.message || t('app.notifications.tourDeleteError'), 'error');
       throw e;
     }
   };
@@ -643,7 +647,7 @@ export default function App() {
         }));
       }
     } catch (e: any) {
-      showNotification(e.message || 'Rezervasiya yenilənərkən xəta baş verdi.', 'error');
+      showNotification(e.message || t('app.notifications.bookingUpdateError'), 'error');
       throw e; // let the caller (e.g. VendorPortal's CRM table) know the update failed too
     }
   };
@@ -660,7 +664,7 @@ export default function App() {
 
       setTours(prev => prev.map(t => t.id === tourId ? data.tour : t));
     } catch (e: any) {
-      showNotification(e.message || 'Tur statusu dəyişdirilərkən xəta baş verdi.', 'error');
+      showNotification(e.message || t('app.notifications.tourStatusError'), 'error');
     }
   };
 
@@ -705,11 +709,7 @@ export default function App() {
                 <div className="pl-4 pr-2 flex items-center flex-1">
                    <input
                      type="text"
-                     placeholder={
-                       appLanguage === 'az' ? "Tur adı, region və ya açar söz axtar..." :
-                       appLanguage === 'ru' ? "Поиск названия тура, региона..." :
-                       "Search tour name, region or keyword..."
-                     }
+                     placeholder={t('app.search.placeholder')}
                      value={globalSearchQuery}
                      onChange={(e) => setGlobalSearchQuery(e.target.value)}
                      onFocus={() => setIsGlobalSearchFocused(true)}
@@ -731,7 +731,7 @@ export default function App() {
                   }}
                   className="bg-brand-primary hover:bg-brand-primary-hover text-white font-bold py-2 px-5 rounded-full transition-colors flex-shrink-0 text-sm shadow-sm cursor-pointer"
                 >
-                  Axtar
+                  {t('app.search.button')}
                 </button>
               </div>
 
@@ -768,17 +768,17 @@ export default function App() {
                       </span>
                     )}
                   </span>
-                  <span className="hidden sm:block text-xs text-brand-text-main font-semibold">İstəklər</span>
+                  <span className="hidden sm:block text-xs text-brand-text-main font-semibold">{t('app.nav.wishlist')}</span>
                 </button>
                 <button
                   onClick={() => window.dispatchEvent(new CustomEvent('nav-faq'))}
                   className="relative w-11 sm:w-auto sm:min-w-0 sm:px-2 h-16 sm:h-14 flex flex-col items-center justify-center gap-0.5 hover:text-emerald-600 transition group cursor-pointer bg-transparent border-none p-0"
-                  title="Turdan əvvəl bilməli olduqlarınız"
+                  title={t('app.nav.guideTitle')}
                 >
                   <span className="w-11 h-8 sm:w-9 sm:h-7 flex items-center justify-center">
                     <BookOpen className="w-6 h-6 sm:w-5 sm:h-5 stroke-[2px] transition-colors group-hover:stroke-emerald-500" />
                   </span>
-                  <span className="hidden sm:block text-xs text-brand-text-main font-semibold whitespace-nowrap">Bələdçi</span>
+                  <span className="hidden sm:block text-xs text-brand-text-main font-semibold whitespace-nowrap">{t('app.nav.guide')}</span>
                 </button>
                 <button
                   onClick={() => window.dispatchEvent(new CustomEvent('nav-calculator'))}
@@ -787,13 +787,13 @@ export default function App() {
                   <span className="w-11 h-8 sm:w-9 sm:h-7 flex items-center justify-center">
                     <Calculator className="w-6 h-6 sm:w-5 sm:h-5 stroke-[2px] transition-colors group-hover:stroke-emerald-500" />
                   </span>
-                  <span className="hidden sm:block text-xs text-brand-text-main font-semibold whitespace-nowrap">Qrup hesabla</span>
+                  <span className="hidden sm:block text-xs text-brand-text-main font-semibold whitespace-nowrap">{t('app.nav.calculator')}</span>
                 </button>
                 <div className="relative">
                   <button
                     onClick={() => setIsLangMenuOpen(!isLangMenuOpen)}
                     className="w-11 sm:w-auto sm:min-w-0 sm:px-2 h-16 sm:h-14 flex flex-col items-center justify-center gap-0.5 hover:text-emerald-600 transition group cursor-pointer bg-transparent border-none p-0"
-                    title="Valyutanı / Dilini dəyiş"
+                    title={t('app.nav.changeLangCurrency')}
                   >
                     <span className="w-11 h-8 sm:w-9 sm:h-7 flex items-center justify-center text-brand-text-muted">
                       <Globe className="w-6 h-6 sm:w-5 sm:h-5 stroke-[2px]" />
@@ -837,13 +837,14 @@ export default function App() {
                 </div>
               </div>
             ) : (
-              <nav className="flex items-center gap-6">
+              <nav className="flex items-center gap-4">
+                <LanguageSwitcher />
                 {loggedInVendor && (
                   <button
                     onClick={handleOperatorLogout}
                     className="text-xs font-semibold py-1 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-all ml-4"
                   >
-                    Çıxış
+                    {t('app.nav.logout')}
                   </button>
                 )}
                 {loggedInAdmin && (
@@ -851,7 +852,7 @@ export default function App() {
                     onClick={handleAdminLogout}
                     className="text-xs font-semibold py-1 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-all ml-4"
                   >
-                    Çıxış
+                    {t('app.nav.logout')}
                   </button>
                 )}
               </nav>
@@ -868,7 +869,7 @@ export default function App() {
             {isMarketplaceDataLoading && (
               <div className="flex flex-col items-center justify-center py-24 gap-4">
                 <RefreshCw className="w-8 h-8 text-emerald-500 animate-spin" />
-                <p className="text-sm font-semibold text-slate-500">Bazar məlumatları yüklənir...</p>
+                <p className="text-sm font-semibold text-slate-500">{t('app.state.marketplaceLoading')}</p>
               </div>
             )}
 
@@ -880,7 +881,7 @@ export default function App() {
                   onClick={loadMarketplaceData}
                   className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg transition"
                 >
-                  Yenidən cəhd et
+                  {t('app.state.retry')}
                 </button>
               </div>
             )}
@@ -979,7 +980,7 @@ export default function App() {
       <footer className="bg-slate-900 text-slate-400 py-8 border-t border-slate-850 text-xs">
         <div className="max-w-[var(--global-max-width)] mx-auto px-5 flex flex-col md:flex-row items-center justify-between gap-4">
           <div>
-            <p className="text-slate-500 mt-1">Azərbaycan daxili turlar ekosistemi SaaS arxitektura sənədləşməsi və simulyator paneli.</p>
+            <p className="text-slate-500 mt-1">{t('app.footer.tagline')}</p>
           </div>
           <div className="flex gap-4">
             <span className="hover:text-white transition">Privacy Policy</span>

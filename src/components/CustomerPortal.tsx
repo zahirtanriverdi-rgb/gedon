@@ -12,6 +12,7 @@ import { TourReviewsList } from './customer/TourReviewsList';
 import { TourDetailPage } from './customer/TourDetailPage';
 import { getRecentSearches, addRecentSearch } from '../utils/recentSearches';
 import { getWishlist, toggleWishlist } from '../utils/wishlist';
+import { useLanguage } from '../i18n/LanguageContext';
 
 interface CustomerPortalProps {
   tours: Tour[];
@@ -52,6 +53,7 @@ export default function CustomerPortal({
   appLanguage = 'az',
   priceCalculatorConfig
 }: CustomerPortalProps) {
+  const { t: tGlobal } = useLanguage();
   // Helper for currency conversion based on central exchange rates
   const getConvertedPriceInfo = (price: number, currency?: 'AZN' | 'USD' | 'EUR') => {
     const usdRate = exchangeRates?.USD || 1.70;
@@ -343,7 +345,7 @@ export default function CustomerPortal({
     const targetWa = tour.whatsapp_number 
       ? tour.whatsapp_number.replace(/[\s\+]+/g, '') 
       : '994706717804';
-    const text = `Salam! GedəkGörək saytından '${tour.name}' turu haqqında məlumat və rezervasiya daxil etmək istəyirəm. Zəhmət olmasa köməklik edərdiniz.`;
+    const text = tGlobal('customerMisc.customerPortal.whatsappQuickMessage', { tourName: tour.name });
     const whatsappUrl = `https://api.whatsapp.com/send?phone=${targetWa}&text=${encodeURIComponent(text)}`;
     window.open(whatsappUrl, '_blank');
   };
@@ -638,12 +640,22 @@ export default function CustomerPortal({
     const minPrice = tourSlots.length > 0 ? Math.min(...tourSlots.map(s => s.price)) : 25;
     
     const shareUrl = window.location.origin;
-    const text = `*GEDƏKGÖRƏK - TUR PAYLAŞIMI*\n\n- *Turun adi:* ${tour.name}\n- *Region:* ${tour.region}\n- *Muddet:* ${tour.durationDays} Gun\n- *Qiymet:* ${minPrice} AZN-den\n- *Kateqoriya:* ${tour.category === 'hiking' ? 'Yurus / Hiking' : tour.category === 'camp' ? 'Kamp' : 'Zirve'}\n- *Teskilatci:* ${tour.vendorName}\n\n*Tur haqqinda:* ${tour.description.slice(0, 180)}...\n\n*Etrafli melumat ve bilet sifarisi ucun platformani ziyaret edin:* ${shareUrl}\n\nTebietde unudulmaz anlar kecirmek ucun biletinizi derhal platforma uzerinden elde edin!`;
+    const categoryLabel = tour.category === 'hiking' ? 'Yurus / Hiking' : tour.category === 'camp' ? 'Kamp' : 'Zirve';
+    const text = tGlobal('customerMisc.customerPortal.shareTourTemplate', {
+      tourName: tour.name,
+      region: tour.region,
+      durationDays: tour.durationDays,
+      minPrice,
+      category: categoryLabel,
+      vendorName: tour.vendorName,
+      descriptionExcerpt: tour.description.slice(0, 180),
+      shareUrl,
+    });
 
     const shareViaWhatsApp = () => {
       navigator.clipboard.writeText(text).then(() => {
         if (onShowNotification) {
-          onShowNotification('Möhtəşəm tur məlumatları panoya kopyalandı! Eyni zamanda paylaşım üçün WhatsApp yönləndirilir. 📋✨', 'success');
+          onShowNotification(tGlobal('customerMisc.customerPortal.shareCopiedNotification'), 'success');
         }
         setTimeout(() => {
           const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
@@ -655,7 +667,7 @@ export default function CustomerPortal({
         const win = window.open(whatsappUrl, '_blank');
         if (win) win.focus();
         if (onShowNotification) {
-          onShowNotification('WhatsApp paylaşım pəncərəsi uğurla aktivləşdirildi! 🌿', 'success');
+          onShowNotification(tGlobal('customerMisc.customerPortal.shareWhatsAppActivatedNotification'), 'success');
         }
       });
     };

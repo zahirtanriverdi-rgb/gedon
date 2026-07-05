@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { X } from 'lucide-react';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 interface DynamicStringListInputProps {
   label: string;
@@ -13,6 +14,7 @@ interface DynamicStringListInputProps {
 // Clickable add/remove list of free-text strings — used for "Qiymətə daxildir" /
 // "Qiymətə daxil deyil" on both the domestic and international tour forms.
 export function DynamicStringListInput({ label, items, onChange, placeholder, accent = 'emerald', error }: DynamicStringListInputProps) {
+  const { t } = useLanguage();
   const [draft, setDraft] = useState('');
 
   const addItem = () => {
@@ -50,7 +52,7 @@ export function DynamicStringListInput({ label, items, onChange, placeholder, ac
           onClick={addItem}
           className={`px-3 py-1.5 text-white font-bold text-xs rounded-lg transition ${isRed ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700'}`}
         >
-          Əlavə et
+          {t('vendorMisc.dynamicStringListInput.addButton')}
         </button>
       </div>
       {items.length > 0 ? (
@@ -75,7 +77,7 @@ export function DynamicStringListInput({ label, items, onChange, placeholder, ac
         </div>
       ) : (
         <p className={`text-[10px] italic mt-1.5 ${error ? 'text-red-600 font-semibold not-italic' : 'text-slate-400'}`}>
-          {error ? '⚠️ Ən azı 1 maddə əlavə edin.' : 'Hələ heç bir maddə əlavə edilməyib.'}
+          {error ? `⚠️ ${t('vendorMisc.dynamicStringListInput.minOneItem')}` : t('vendorMisc.dynamicStringListInput.noItemsYet')}
         </p>
       )}
     </div>

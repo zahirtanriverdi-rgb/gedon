@@ -1,6 +1,7 @@
 import { DayPicker } from 'react-day-picker';
 import 'react-day-picker/style.css';
 import { X } from 'lucide-react';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 interface MultiDateCalendarProps {
   selectedDates: Date[];
@@ -17,6 +18,7 @@ function toIsoDate(date: Date): string {
 // Lets an operator pick the concrete calendar days a tour runs on. Each selected date turns
 // into one TourSlot on submit (see TourForm/InternationalTourForm's slot-diffing logic).
 export function MultiDateCalendar({ selectedDates, onChange }: MultiDateCalendarProps) {
+  const { t } = useLanguage();
   const sorted = [...selectedDates].sort((a, b) => a.getTime() - b.getTime());
 
   return (
@@ -50,7 +52,7 @@ export function MultiDateCalendar({ selectedDates, onChange }: MultiDateCalendar
           ))}
         </div>
       ) : (
-        <p className="text-[10px] text-slate-400 italic">Hələ heç bir tarix seçilməyib — təqvimdən klikləyərək turun aktiv olacağı günləri seçin.</p>
+        <p className="text-[10px] text-slate-400 italic">{t('vendorMisc.multiDateCalendar.noDatesSelected')}</p>
       )}
     </div>
   );

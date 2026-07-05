@@ -1,7 +1,9 @@
 import React from 'react';
 import { Loader2 } from 'lucide-react';
+import { useLanguage } from '../../i18n/LanguageContext';
 
-// Curated packing lists shown after the simulated AI "thinking" delay, keyed by hiking experience level
+// Curated packing lists shown after the simulated AI "thinking" delay, keyed by hiking experience level.
+// AZ text lives here as the ultimate fallback; the translated variants are looked up via t() at render time.
 const PACKING_LISTS: Record<'beginner' | 'pro', string[]> = {
   beginner: [
     'Yoxuş və enişlərdə dizlərə düşən yükü azaltmaq üçün teleskopik yürüş çubuqları',
@@ -38,6 +40,9 @@ export function PackingListSection({
   onSelectExperience,
   onToggleChecked
 }: PackingListSectionProps) {
+  const { t } = useLanguage();
+  const getPackingItems = (level: 'beginner' | 'pro'): string[] =>
+    PACKING_LISTS[level].map((_, index) => t(`customerHome.packingListSection.items.${level}.${index}`));
   return (
     <div className="bg-amber-50/45 border border-amber-200/60 rounded-2xl p-5 space-y-4 hover:border-amber-300/85 transition duration-300">
       <div className="flex items-start justify-between flex-wrap gap-3 border-b border-amber-200/40 pb-3">
@@ -45,10 +50,10 @@ export function PackingListSection({
           <span className="text-xl">🎒</span>
           <div>
             <h4 className="text-xs font-black text-amber-900 tracking-widest leading-none border-b border-amber-200/20 pb-0.5">
-              Ağıllı Çanta & İlkin Hazırlıq
+              {t('customerHome.packingListSection.heading')}
             </h4>
             <p className="text-[10px] text-amber-800/80 font-bold mt-1">
-              Sizin fərdi təcrübənizə uyğun çanta və yürüş tövsiyələri
+              {t('customerHome.packingListSection.subheading')}
             </p>
           </div>
         </div>
@@ -57,7 +62,7 @@ export function PackingListSection({
       {/* INTERACTIVE QUESTION SECTION */}
       <div className="bg-white/95 border border-amber-150 p-4 rounded-xl space-y-3.5 shadow-4xs">
         <p className="text-xs font-extrabold text-slate-800 flex items-center gap-1.5">
-          <span className="animate-pulse">❓</span> Bundan öncə neçə yürüşdə (hiking-də) olmusunuz?
+          <span className="animate-pulse">❓</span> {t('customerHome.packingListSection.question')}
         </p>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
@@ -71,10 +76,10 @@ export function PackingListSection({
             }`}
           >
             <span className="text-[11px] font-black text-slate-800 flex items-center gap-1">
-              <span className="text-xs">🟢</span> 0 - 2 dəfə (Yeni başlayan)
+              <span className="text-xs">🟢</span> {t('customerHome.packingListSection.beginnerOption.label')}
             </span>
             <span className="text-[9px] text-slate-500 mt-1.5 font-medium leading-normal">
-              Evdə olan rahat əşyalarla sadə hazırlıq. Bahalı avadanlığa ehtiyac yoxdur!
+              {t('customerHome.packingListSection.beginnerOption.desc')}
             </span>
           </button>
 
@@ -88,10 +93,10 @@ export function PackingListSection({
             }`}
           >
             <span className="text-[11px] font-black text-slate-800 flex items-center gap-1">
-              <span className="text-xs">⚡</span> 3 və ya daha çox (Təcrübəli)
+              <span className="text-xs">⚡</span> {t('customerHome.packingListSection.proOption.label')}
             </span>
             <span className="text-[9px] text-slate-500 mt-1.5 font-medium leading-normal">
-              Relyefə və çətinliyə xüsusi texniki səviyyə avadanlığı və qoruyucu geyim.
+              {t('customerHome.packingListSection.proOption.desc')}
             </span>
           </button>
         </div>
@@ -103,14 +108,14 @@ export function PackingListSection({
           <div className="flex items-center justify-center gap-2">
             <Loader2 className="w-4 h-4 text-amber-600 animate-spin" />
             <p className="text-[10px] text-slate-500 font-bold tracking-wider">
-              Təcrübəniz analiz edilir və sizə özəl çanta siyahısı hazırlanır...
+              {t('customerHome.packingListSection.analyzing')}
             </p>
           </div>
         </div>
       ) : packingExperienceMap[tourId] ? (
         (() => {
           const userChoice = packingExperienceMap[tourId] as 'beginner' | 'pro';
-          const items = PACKING_LISTS[userChoice];
+          const items = getPackingItems(userChoice);
 
           return (
             <div className="bg-white border border-amber-200/80 p-4.5 rounded-xl text-xs space-y-3 shadow-xs text-slate-850 animate-fadeIn">
@@ -118,10 +123,10 @@ export function PackingListSection({
                 <div className="space-y-3 bg-emerald-50/20 border border-emerald-100/70 p-4 rounded-lg">
                   <div className="flex items-center justify-between border-b border-emerald-100/40 pb-2 mb-1">
                     <span className="flex items-center gap-1.5 text-xs font-black text-emerald-800 tracking-widest">
-                      <span>🟢</span> Sizə Uyğun: Yeni Başlayan Çantası
+                      <span>🟢</span> {t('customerHome.packingListSection.beginnerResult.title')}
                     </span>
                     <span className="bg-emerald-100 text-emerald-800 font-bold text-[9px] px-1.5 py-0.5 rounded leading-none select-none">
-                      Məsləhət Görülür
+                      {t('customerHome.packingListSection.recommendedBadge')}
                     </span>
                   </div>
                   <ul className="space-y-1.5">
@@ -146,7 +151,7 @@ export function PackingListSection({
                 <div className="space-y-3 bg-indigo-50/15 border border-indigo-100/60 p-4 rounded-lg">
                   <div className="flex items-center justify-between border-b border-indigo-150/40 pb-2 mb-1">
                     <span className="flex items-center gap-1.5 text-xs font-black text-indigo-800 tracking-widest">
-                      <span>⚡</span> Sizə Uyğun: Texniki Peşəkar Siyahı
+                      <span>⚡</span> {t('customerHome.packingListSection.proResult.title')}
                     </span>
                   </div>
                   <ul className="space-y-1.5">
@@ -170,13 +175,13 @@ export function PackingListSection({
               )}
 
               <div className="pt-2 text-[9px] text-emerald-700 font-bold border-t border-slate-100 flex items-center justify-between gap-1 leading-normal">
-                <span>💚 <strong>Bələdçi Rəyi:</strong> Sizə hər zaman rahat olacaq geyim və ayaqqabılar seçin; yürüşün, fəslin ləzzətini hiss edin!</span>
+                <span>💚 <strong>{t('customerHome.packingListSection.guideAdviceLabel')}:</strong> {t('customerHome.packingListSection.guideAdviceText')}</span>
                 <button
                   type="button"
                   onClick={() => onSelectExperience(tourId, userChoice === 'beginner' ? 'pro' : 'beginner')}
                   className="text-[9px] text-indigo-700 font-black underline hover:text-indigo-800 cursor-pointer select-none whitespace-nowrap"
                 >
-                  {userChoice === 'beginner' ? "Təcrübəli siyahısına keç" : "Başlayanlar üçün keç"}
+                  {userChoice === 'beginner' ? t('customerHome.packingListSection.switchToPro') : t('customerHome.packingListSection.switchToBeginner')}
                 </button>
               </div>
             </div>
@@ -184,7 +189,7 @@ export function PackingListSection({
         })()
       ) : (
         <div className="text-center p-4 bg-white/70 border border-dashed border-slate-200 rounded-xl text-[11px] text-slate-500 font-medium">
-          💡 Yuxarıdakı suala cavab seçərək sizə özəl olan ağıllı bələdçi tövsiyələrini dərhal açın!
+          💡 {t('customerHome.packingListSection.promptChooseAbove')}
         </div>
       )}
     </div>

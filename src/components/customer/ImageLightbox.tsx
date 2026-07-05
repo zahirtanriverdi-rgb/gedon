@@ -1,6 +1,7 @@
 import React from 'react';
 import { Tour } from '../../types';
 import { X, ChevronLeft, ChevronRight, Play } from 'lucide-react';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 interface ImageLightboxProps {
   tour: Tour | null;
@@ -9,6 +10,7 @@ interface ImageLightboxProps {
 }
 
 export function ImageLightbox({ tour, lightboxIndex, onSetLightboxIndex }: ImageLightboxProps) {
+  const { t } = useLanguage();
   if (!tour || lightboxIndex === null) return null;
 
   const allMedia: {type: 'image' | 'video', url: string}[] = [];
@@ -47,7 +49,7 @@ export function ImageLightbox({ tour, lightboxIndex, onSetLightboxIndex }: Image
       {/* Lightbox Header Controls */}
       <div className="flex items-center justify-between text-white w-full max-w-5xl mx-auto z-10 p-2">
         <div className="flex flex-col">
-          <span className="text-xs text-slate-400 font-semibold tracking-wider font-mono">QALEREYA VİZUALİTOR ({lightboxIndex + 1} / {allMedia.length})</span>
+          <span className="text-xs text-slate-400 font-semibold tracking-wider font-mono">{t('customerHome.imageLightbox.galleryLabel', { current: lightboxIndex + 1, total: allMedia.length })}</span>
           <span className="text-sm font-bold truncate max-w-[200px] xs:max-w-xs">{tour.name}</span>
         </div>
         <button
@@ -84,7 +86,7 @@ export function ImageLightbox({ tour, lightboxIndex, onSetLightboxIndex }: Image
           {currentMedia.type === 'image' ? (
             <img
               src={currentMedia.url || undefined}
-              alt={`Full view ${lightboxIndex}`}
+              alt={t('customerHome.imageLightbox.fullViewAlt', { index: lightboxIndex })}
               className="max-h-[70vh] max-w-full object-contain rounded-xl shadow-2xl transition-all duration-300"
               referrerPolicy="no-referrer"
             />
@@ -132,7 +134,7 @@ export function ImageLightbox({ tour, lightboxIndex, onSetLightboxIndex }: Image
               }`}
             >
               {m.type === 'image' ? (
-                <img src={m.url || undefined} alt={`Thumb ${i}`} className="w-full h-full object-cover" />
+                <img src={m.url || undefined} alt={t('customerHome.imageLightbox.thumbAlt', { index: i })} className="w-full h-full object-cover" />
               ) : (
                 <div className="w-full h-full bg-slate-950 flex items-center justify-center relative">
                   <video src={m.url || undefined} className="w-full h-full object-cover opacity-60" muted playsInline />

@@ -10,12 +10,14 @@ import {
   Activity
 } from 'lucide-react';
 import maplibregl from 'maplibre-gl';
+import { useLanguage } from '../i18n/LanguageContext';
 
 interface GpsTrackVisualizerProps {
   gpxDataString: string;
 }
 
 export const GpsTrackVisualizer: React.FC<GpsTrackVisualizerProps> = ({ gpxDataString }) => {
+  const { t } = useLanguage();
   const [parsed, setParsed] = useState<ParsedGpxRoute | null>(null);
   const [isOpen, setIsOpen] = useState<boolean>(false);
 
@@ -47,17 +49,17 @@ export const GpsTrackVisualizer: React.FC<GpsTrackVisualizerProps> = ({ gpxDataS
           <div>
             <div className="flex items-center gap-1.5 flex-wrap">
               <span className="text-[9px] font-extrabold tracking-widest text-sky-600 uppercase bg-sky-50 px-2 py-0.5 rounded border border-sky-100">
-                İNTERAKTİV 3D EKSPEDİSİYA
+                {t('miscWidgets.gpsTrackVisualizer.badgeInteractive3d')}
               </span>
               <span className="p-0.5 px-1.5 bg-sky-500 text-white font-black text-[8px] rounded uppercase">
-                Yeni Göstərici
+                {t('miscWidgets.gpsTrackVisualizer.badgeNew')}
               </span>
             </div>
             <h4 className="text-sm font-black text-slate-800 leading-tight uppercase mt-1.5">
-              YÜRÜŞ TRAEKTORİYASINA PEYK XƏRİTƏSİNDƏ BAXIN 🏔️
+              {t('miscWidgets.gpsTrackVisualizer.heading')}
             </h4>
             <p className="text-[11px] text-slate-500 leading-normal max-w-md mt-1 font-medium">
-              Dağ relyefini, keçid yüksəkliklərini və marşrut trayektoriyasını fırlana bilən 3D peyk kamerası ilə yaxından kəşf edin.
+              {t('miscWidgets.gpsTrackVisualizer.description')}
             </p>
           </div>
         </div>
@@ -68,7 +70,7 @@ export const GpsTrackVisualizer: React.FC<GpsTrackVisualizerProps> = ({ gpxDataS
           onClick={() => setIsOpen(true)}
           className="w-full md:w-auto px-5 py-3.5 bg-sky-600 hover:bg-sky-700 text-white font-black text-xs uppercase tracking-wider rounded-xl cursor-pointer transition active:scale-[0.98] flex items-center justify-center gap-1.5 shadow-md shadow-sky-600/10 shrink-0"
         >
-          <span>Peyk xəritəsini aç 🚀</span>
+          <span>{t('miscWidgets.gpsTrackVisualizer.openButton')}</span>
         </button>
       </div>
 
@@ -93,6 +95,7 @@ interface GpsMapOverlayProps {
 }
 
 const GpsMapOverlay: React.FC<GpsMapOverlayProps> = ({ parsed, onClose }) => {
+  const { t } = useLanguage();
   const [mapMode, setMapMode] = useState<'3d' | '2d'>('3d');
   const [isPlaying, setIsPlaying] = useState<boolean>(true);
   const [playbackSpeed, setPlaybackSpeed] = useState<number>(2.0);
@@ -156,11 +159,11 @@ const GpsMapOverlay: React.FC<GpsMapOverlayProps> = ({ parsed, onClose }) => {
     }
     if (distanceRef.current) {
       const accumDistance = (parsed.stats.distanceKm * progress).toFixed(1);
-      distanceRef.current.textContent = `Gedişat: ${accumDistance} km`;
+      distanceRef.current.textContent = t('miscWidgets.gpsTrackVisualizer.distanceLabel', { distance: accumDistance });
     }
     if (altitudeRef.current) {
       const currentAltitude = Math.round(activePt ? activePt[2] : parsed.stats.lowestPointM);
-      altitudeRef.current.textContent = `Yüksəklik: ${currentAltitude} metr`;
+      altitudeRef.current.textContent = t('miscWidgets.gpsTrackVisualizer.altitudeLabel', { altitude: currentAltitude });
     }
   };
 
@@ -489,9 +492,9 @@ const GpsMapOverlay: React.FC<GpsMapOverlayProps> = ({ parsed, onClose }) => {
         {/* BOTTOM-LEFT: CLEAN ROUNDED MAP METRICS CAPSULE PILL BADGE */}
         <div className="absolute bottom-4 left-4 bg-sky-600/95 text-white p-2.5 px-4 rounded-full font-extrabold text-[11px] uppercase tracking-wider flex items-center gap-2.5 z-[20] shadow-xl shadow-black/40 animate-pulse">
           <Activity className="w-3.5 h-3.5 text-sky-200" />
-          <span ref={distanceRef}>Gedişat: 0.0 km</span>
+          <span ref={distanceRef}>{t('miscWidgets.gpsTrackVisualizer.distanceLabel', { distance: '0.0' })}</span>
           <span className="text-white/30">|</span>
-          <span ref={altitudeRef}>Yüksəklik: {Math.round(parsed.stats.lowestPointM)} metr</span>
+          <span ref={altitudeRef}>{t('miscWidgets.gpsTrackVisualizer.altitudeLabel', { altitude: Math.round(parsed.stats.lowestPointM) })}</span>
         </div>
 
         {/* EXIT BUTTON */}
@@ -504,7 +507,7 @@ const GpsMapOverlay: React.FC<GpsMapOverlayProps> = ({ parsed, onClose }) => {
           className="absolute top-4 right-4 p-2.5 px-4 bg-slate-950/90 hover:bg-slate-900 text-white rounded-xl text-xs font-black border border-white/15 cursor-pointer flex items-center gap-1.5 backdrop-blur-md active:scale-95 transition z-[40]"
         >
           <X className="w-4 h-4 text-rose-500" />
-          <span>ÇIXIŞ</span>
+          <span>{t('miscWidgets.gpsTrackVisualizer.exitButton')}</span>
         </button>
 
       </div>
@@ -520,7 +523,7 @@ const GpsMapOverlay: React.FC<GpsMapOverlayProps> = ({ parsed, onClose }) => {
             className={`p-3 rounded-full cursor-pointer transition min-h-[44px] min-w-[44px] flex items-center justify-center ${
               isPlaying ? 'bg-sky-600 text-white hover:bg-sky-500' : 'bg-emerald-600 text-white hover:bg-emerald-500'
             }`}
-            aria-label={isPlaying ? "Simulyasiyanı dayandır" : "Simulyasiyaya başla"}
+            aria-label={isPlaying ? t('miscWidgets.gpsTrackVisualizer.pauseSimulation') : t('miscWidgets.gpsTrackVisualizer.startSimulation')}
           >
             {isPlaying ? <Pause className="w-4 h-4 fill-current" /> : <Play className="w-4 h-4 fill-current" />}
           </button>
@@ -533,7 +536,7 @@ const GpsMapOverlay: React.FC<GpsMapOverlayProps> = ({ parsed, onClose }) => {
               updateMapAndMarkerVisuals(0);
             }}
             className="p-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-full cursor-pointer transition min-h-[44px] min-w-[44px] flex items-center justify-center"
-            title="Sıfırla"
+            title={t('miscWidgets.gpsTrackVisualizer.resetTitle')}
           >
             <RotateCcw className="w-4 h-4" />
           </button>
@@ -543,10 +546,10 @@ const GpsMapOverlay: React.FC<GpsMapOverlayProps> = ({ parsed, onClose }) => {
             type="button"
             onClick={() => setMapMode(mapMode === '3d' ? '2d' : '3d')}
             className="px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-700/80 rounded-xl text-[11px] font-black text-white cursor-pointer active:scale-95 transition flex items-center gap-2 min-h-[44px]"
-            title={mapMode === '3d' ? "2D xəritə rejiminə keç" : "3D relyef rejiminə keç"}
+            title={mapMode === '3d' ? t('miscWidgets.gpsTrackVisualizer.switchTo2d') : t('miscWidgets.gpsTrackVisualizer.switchTo3d')}
           >
             <Layers className="w-4 h-4 text-sky-400" />
-            <span>{mapMode === '3d' ? '2D REJİM' : '3D GÖRÜNÜŞ'}</span>
+            <span>{mapMode === '3d' ? t('miscWidgets.gpsTrackVisualizer.mode2d') : t('miscWidgets.gpsTrackVisualizer.mode3d')}</span>
           </button>
 
           {/* Camera Follow mode toggle */}
@@ -566,16 +569,16 @@ const GpsMapOverlay: React.FC<GpsMapOverlayProps> = ({ parsed, onClose }) => {
                 ? 'bg-sky-600/25 text-sky-400 border-sky-500/40' 
                 : 'bg-slate-800 text-slate-400 border-slate-700 hover:text-white'
             }`}
-            title={isFollowing ? "Kameranı sərbəst burax (Xəritəni sərbəst fırladın)" : "Kameranı alpinistə kilidlə"}
+            title={isFollowing ? t('miscWidgets.gpsTrackVisualizer.releaseCameraTitle') : t('miscWidgets.gpsTrackVisualizer.lockCameraTitle')}
           >
             <Compass className={`w-4 h-4 ${isFollowing ? 'text-sky-400 animate-spin-slow' : 'text-slate-400'}`} style={isFollowing ? { animationDuration: '6s' } : undefined} />
-            <span>{isFollowing ? 'Kamera: İZLƏYİR' : 'Kamera: SƏRBƏST'}</span>
+            <span>{isFollowing ? t('miscWidgets.gpsTrackVisualizer.cameraFollowing') : t('miscWidgets.gpsTrackVisualizer.cameraFree')}</span>
           </button>
         </div>
 
         {/* Seamless drag progress scrub slider */}
         <div className="flex-1 w-full max-w-lg flex items-center gap-3">
-          <span className="text-[10px] font-black text-slate-400 tracking-wider uppercase">İZLƏMƏ PANELİ:</span>
+          <span className="text-[10px] font-black text-slate-400 tracking-wider uppercase">{t('miscWidgets.gpsTrackVisualizer.trackingPanel')}</span>
           <div className="flex-1 relative flex items-center py-1">
             <input
               ref={sliderRef}
@@ -600,7 +603,7 @@ const GpsMapOverlay: React.FC<GpsMapOverlayProps> = ({ parsed, onClose }) => {
 
         {/* Speed presets */}
         <div className="flex items-center gap-2 font-mono">
-          <span className="text-[9px] text-slate-500 font-extrabold uppercase">Sürət:</span>
+          <span className="text-[9px] text-slate-500 font-extrabold uppercase">{t('miscWidgets.gpsTrackVisualizer.speed')}</span>
           {[1.0, 2.0, 3.5].map(s => (
             <button
               key={s}

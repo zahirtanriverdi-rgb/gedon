@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Tour, TourSlot } from '../../types';
+import { useLanguage } from '../../i18n/LanguageContext';
 import { Calendar, Edit, Search, Star } from 'lucide-react';
 import { computeFeaturedTourIds } from '../../utils/featuredTours';
 
@@ -18,6 +19,7 @@ interface MyToursTabProps {
 }
 
 export function MyToursTab({ tours, slots, myTours, myTourIds, tourSearchTerm, onTourSearchChange, exchangeRates, onUpdateExchangeRates, onShowNotification, onEditClick, onToggleFeatured }: MyToursTabProps) {
+  const { t } = useLanguage();
   const [cbarLoading, setCbarLoading] = useState<boolean>(false);
   const [togglingFeaturedId, setTogglingFeaturedId] = useState<string | null>(null);
   const featuredTourIds = React.useMemo(() => computeFeaturedTourIds(tours, slots), [tours, slots]);
@@ -63,18 +65,18 @@ export function MyToursTab({ tours, slots, myTours, myTourIds, tourSearchTerm, o
         if (data.success && data.USD && data.EUR) {
           onUpdateExchangeRates({ USD: data.USD, EUR: data.EUR });
           if (onShowNotification) {
-            onShowNotification(`🎉 CBAR rəsmi məzənnələri uğurla yeniləndi! USD: ${data.USD} AZN, EUR: ${data.EUR} AZN`, 'success');
+            onShowNotification(t('vendorMisc.myToursTab.cbarUpdated', { usd: data.USD, eur: data.EUR }), 'success');
           }
         } else {
-          throw new Error("Məlumat düzgün oxunmadı");
+          throw new Error(t('vendorMisc.myToursTab.dataReadError'));
         }
       } else {
         const errData = await response.json().catch(() => ({}));
-        throw new Error(errData.error || "Məzənnə serverindən xəta cavabı alındı");
+        throw new Error(errData.error || t('vendorMisc.myToursTab.rateServerError'));
       }
     } catch (err: any) {
       if (onShowNotification) {
-        onShowNotification(`❌ Məzənnə gətirilərkən səhv oldu: ${err.message}`, 'error');
+        onShowNotification(t('vendorMisc.myToursTab.rateFetchError', { message: err.message }), 'error');
       }
     } finally {
       setCbarLoading(false);
@@ -87,11 +89,11 @@ export function MyToursTab({ tours, slots, myTours, myTourIds, tourSearchTerm, o
           {/* List of current tours */}
           <div className="lg:col-span-2 space-y-4">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <h3 className="text-xs font-bold text-slate-400 tracking-widest">Aktiv Marşrutlarım</h3>
+              <h3 className="text-xs font-bold text-slate-400 tracking-widest">{t('vendorMisc.myToursTab.activeToursTitle')}</h3>
               <div className="relative w-full sm:max-w-[240px]">
                 <input
                   type="text"
-                  placeholder="Məkan və ya tur adı ilə axtar..."
+                  placeholder={t('vendorMisc.myToursTab.searchPlaceholder')}
                   value={tourSearchTerm}
                   onChange={(e) => onTourSearchChange(e.target.value)}
                   className="w-full bg-white border border-slate-200 text-slate-700 p-2 pl-8 pr-3 text-xs rounded-xl focus:outline-none focus:border-emerald-700 focus:ring-1 focus:ring-emerald-700/50 transition shadow-xs placeholder-slate-400"
@@ -102,7 +104,7 @@ export function MyToursTab({ tours, slots, myTours, myTourIds, tourSearchTerm, o
             
             {myTours.length === 0 ? (
               <div className="p-8 text-center bg-white border border-slate-200 rounded-xl text-slate-400 italic text-xs">
-                Hələ heç bir tur marşrutu daxil etməmisiniz. Yeni Marşrut Yarat düyməsindən istifadə edin.
+                {t('vendorMisc.myToursTab.noToursYet')}
               </div>
             ) : (
               myTours.map((tour) => {
@@ -120,7 +122,7 @@ export function MyToursTab({ tours, slots, myTours, myTourIds, tourSearchTerm, o
                         <h4 className="font-bold text-slate-900 text-xs leading-tight truncate max-w-full">{tour.name}</h4>
                         {featuredTourIds.has(tour.id) && (
                           <span className="inline-flex items-center gap-1 text-[9px] bg-amber-100 text-amber-800 border border-amber-200 font-extrabold px-1.5 py-0.5 rounded-full">
-                            🔥 Ayın Ən Çox Satılanı{tour.isManuallyFeatured ? ' (Seçilmiş)' : ''}
+                            🔥 {t('vendorMisc.myToursTab.bestSeller')}{tour.isManuallyFeatured ? ` ${t('vendorMisc.myToursTab.bestSellerSelected')}` : ''}
                           </span>
                         )}
                       </div>
@@ -132,14 +134,14 @@ export function MyToursTab({ tours, slots, myTours, myTourIds, tourSearchTerm, o
                         </span>
                       </div>
                       <div className="text-[10px] text-slate-500 font-semibold">
-                        Aktiv Satış Slotu: <strong className="text-slate-700 font-mono">{tourSlots.length} ədəd</strong>
+                        {t('vendorMisc.myToursTab.activeSlotCount')} <strong className="text-slate-700 font-mono">{t('vendorMisc.myToursTab.activeSlotCountValue', { count: tourSlots.length })}</strong>
                       </div>
                       {tour.status === 'rejected' && (
                         <div className="text-[10px] text-red-700 font-semibold bg-red-50 border border-red-100 rounded-lg px-2 py-1.5 max-w-md">
-                          <span className="block">⚠️ Admin tərəfindən rədd edildi — düzəliş edib yenidən göndərməlisiniz. Təsdiqlənənə qədər müştərilərə görünməyəcək.</span>
+                          <span className="block">⚠️ {t('vendorMisc.myToursTab.rejectedNotice')}</span>
                           {tour.rejectionReason && (
                             <span className="block mt-1 text-red-800">
-                              <strong>Səbəb:</strong> {tour.rejectionReason}
+                              <strong>{t('vendorMisc.myToursTab.rejectionReasonLabel')}</strong> {tour.rejectionReason}
                             </span>
                           )}
                         </div>
@@ -149,19 +151,19 @@ export function MyToursTab({ tours, slots, myTours, myTourIds, tourSearchTerm, o
                     <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
                       {tour.isActive === false ? (
                         <span className="text-[9px] bg-rose-50 text-rose-800 border border-rose-100 font-bold px-2 py-0.5 rounded-full">
-                          Deaktiv edilib (Görünmür)
+                          {t('vendorMisc.myToursTab.statusDeactivated')}
                         </span>
                       ) : tour.status === 'rejected' ? (
                         <span className="text-[9px] bg-red-50 text-red-800 border border-red-200 font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
-                          ❌ Rədd olundu - Düzəliş et
+                          ❌ {t('vendorMisc.myToursTab.statusRejected')}
                         </span>
                       ) : tour.status === 'pending_approval' ? (
                         <span className="text-[9px] bg-amber-55/60 text-amber-800 border border-amber-200 font-bold px-2 py-0.5 rounded-full flex items-center gap-1 animate-pulse">
-                          ⏳ Təsdiq gözləyir
+                          ⏳ {t('vendorMisc.myToursTab.statusPending')}
                         </span>
                       ) : (
                         <span className="text-[9px] bg-emerald-50 text-emerald-800 border border-emerald-100 font-bold px-2 py-0.5 rounded-full">
-                          Aktiv Satışda
+                          {t('vendorMisc.myToursTab.statusActive')}
                         </span>
                       )}
                       <button
@@ -170,7 +172,7 @@ export function MyToursTab({ tours, slots, myTours, myTourIds, tourSearchTerm, o
                         className="flex items-center gap-1 py-1 px-2.5 bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-[10px] rounded-md transition-all cursor-pointer shadow-xs"
                       >
                         <Edit className="w-2.5 h-2.5" />
-                        <span>Düzəliş et</span>
+                        <span>{t('vendorMisc.myToursTab.editButton')}</span>
                       </button>
                       {onToggleFeatured && (
                         <button
@@ -184,7 +186,7 @@ export function MyToursTab({ tours, slots, myTours, myTourIds, tourSearchTerm, o
                           }`}
                         >
                           <Star className="w-2.5 h-2.5" />
-                          <span>{tour.isManuallyFeatured ? 'Seçimi ləğv et' : 'Seçilmiş et'}</span>
+                          <span>{tour.isManuallyFeatured ? t('vendorMisc.myToursTab.unfeatureButton') : t('vendorMisc.myToursTab.featureButton')}</span>
                         </button>
                       )}
                     </div>
@@ -200,9 +202,9 @@ export function MyToursTab({ tours, slots, myTours, myTourIds, tourSearchTerm, o
               <div className="flex items-center gap-2">
                 <span className="text-base">💱</span>
                 <div>
-                  <h4 className="text-xs font-black text-amber-950 tracking-wider">Cari Valyuta Məzənnələri</h4>
+                  <h4 className="text-xs font-black text-amber-950 tracking-wider">{t('vendorMisc.myToursTab.currencyRatesTitle')}</h4>
                   <p className="text-[10px] text-slate-500 leading-normal">
-                    Xarici turlarda xərclərin AZN ekvivalentini hesablamaq üçün məzənnələri tənzimləyin.
+                    {t('vendorMisc.myToursTab.currencyRatesSubtitle')}
                   </p>
                 </div>
               </div>
@@ -243,7 +245,7 @@ export function MyToursTab({ tours, slots, myTours, myTourIds, tourSearchTerm, o
               
               <div className="text-[9px] text-amber-800 bg-amber-50/70 p-2 rounded border border-amber-200/50 flex gap-1 items-start leading-relaxed font-medium">
                 <span className="mt-0.5">ℹ️</span>
-                <p>Məzənnə dəyişdikdə, müştəri tərəfindəki xarici bilet qiymətlərinin AZN ekvivalentləri avtomatik yenilənəcəkdir.</p>
+                <p>{t('vendorMisc.myToursTab.currencyRatesInfo')}</p>
               </div>
 
               <button
@@ -255,11 +257,11 @@ export function MyToursTab({ tours, slots, myTours, myTourIds, tourSearchTerm, o
                 {cbarLoading ? (
                   <>
                     <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    Məzənnə gətirilir...
+                    {t('vendorMisc.myToursTab.cbarLoading')}
                   </>
                 ) : (
                   <>
-                    🔄 Canlı CBAR Məzənnəsini Yenilə
+                    🔄 {t('vendorMisc.myToursTab.cbarRefreshButton')}
                   </>
                 )}
               </button>
@@ -267,14 +269,14 @@ export function MyToursTab({ tours, slots, myTours, myTourIds, tourSearchTerm, o
 
             {/* Slots overview widget */}
           <div className="bg-white p-5 rounded-xl border border-slate-200 space-y-4 h-fit shadow-xs">
-            <h4 className="text-xs font-bold text-slate-400 tracking-widest">Aktiv Təqvim Planı (Capacity)</h4>
+            <h4 className="text-xs font-bold text-slate-400 tracking-widest">{t('vendorMisc.myToursTab.calendarPlanTitle')}</h4>
             <p className="text-[11px] text-slate-500 leading-normal">
-              Aşağıdakı bələdçi tarixlərindən limitlərin və ümumi doluluq faizlərinin real-time göstəricilərini izləyin.
+              {t('vendorMisc.myToursTab.calendarPlanSubtitle')}
             </p>
 
             <div className="space-y-2.5 max-h-96 overflow-y-auto pr-1">
               {slots.filter(s => myTourIds.includes(s.tourId)).length === 0 ? (
-                <div className="text-center p-6 text-slate-400 italic text-[11px]">Planlaşdırılmış aktiv slot yoxdur.</div>
+                <div className="text-center p-6 text-slate-400 italic text-[11px]">{t('vendorMisc.myToursTab.noSlotsPlanned')}</div>
               ) : (
                 slots.filter(s => myTourIds.includes(s.tourId)).map((slot) => {
                   const associatedTour = tours.find(t => t.id === slot.tourId);
@@ -291,18 +293,18 @@ export function MyToursTab({ tours, slots, myTours, myTourIds, tourSearchTerm, o
                     const aznPortion = Math.round(slot.price * (exchangeRates?.EUR || 1.85));
                     formattedPrice = `${slot.price} € (~ ${aznPortion} ₼)`;
                   }
-                  
+
                   return (
                     <div key={slot.id} className="bg-slate-50 p-3 rounded-lg border border-slate-150 text-xs space-y-1.5">
                       <div className="flex items-start justify-between">
                         <span className="font-bold text-slate-900 block line-clamp-1 flex-1">{tourName}</span>
-                        <span className="font-bold text-emerald-750 ml-2 font-mono text-[10px]">{formattedPrice} / nəfər</span>
+                        <span className="font-bold text-emerald-750 ml-2 font-mono text-[10px]">{t('vendorMisc.myToursTab.perPerson', { price: formattedPrice })}</span>
                       </div>
 
                       <div className="flex justify-between text-[10px] text-slate-500 font-medium">
-                        <span>📆 Tarix: {slot.startDate}</span>
+                        <span>📆 {t('vendorMisc.myToursTab.dateLabel', { date: slot.startDate })}</span>
                         <span className={isFull ? 'text-red-600 font-bold' : 'text-slate-600'}>
-                          {slot.bookedCount} / {slot.capacity} Yer
+                          {t('vendorMisc.myToursTab.seatsLabel', { booked: slot.bookedCount, capacity: slot.capacity })}
                         </span>
                       </div>
 

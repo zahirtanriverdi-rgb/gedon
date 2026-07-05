@@ -1,6 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import AdminLogin from './AdminLogin';
+import { LanguageProvider } from '../i18n/LanguageContext';
+
+function renderWithLanguage(ui: Parameters<typeof render>[0]) {
+  return render(<LanguageProvider>{ui}</LanguageProvider>);
+}
 
 describe('AdminLogin', () => {
   beforeEach(() => {
@@ -8,7 +13,7 @@ describe('AdminLogin', () => {
   });
 
   it('renders email/password fields and submit button', () => {
-    render(<AdminLogin onLogin={vi.fn()} />);
+    renderWithLanguage(<AdminLogin onLogin={vi.fn()} />);
     expect(screen.getByPlaceholderText('admin@nümunə.az')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('••••••••')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Daxil ol/i })).toBeInTheDocument();
@@ -22,7 +27,7 @@ describe('AdminLogin', () => {
       json: async () => ({ success: true, token: 'fake-jwt', user: fakeUser }),
     }) as any;
 
-    render(<AdminLogin onLogin={onLogin} />);
+    renderWithLanguage(<AdminLogin onLogin={onLogin} />);
     fireEvent.change(screen.getByPlaceholderText('admin@nümunə.az'), { target: { value: 'admin@gedekgore.az' } });
     fireEvent.change(screen.getByPlaceholderText('••••••••'), { target: { value: 'changeme123' } });
     fireEvent.click(screen.getByRole('button', { name: /Daxil ol/i }));
@@ -37,7 +42,7 @@ describe('AdminLogin', () => {
       json: async () => ({ error: 'E-poçt və ya şifrə yanlışdır!' }),
     }) as any;
 
-    render(<AdminLogin onLogin={onLogin} />);
+    renderWithLanguage(<AdminLogin onLogin={onLogin} />);
     fireEvent.change(screen.getByPlaceholderText('admin@nümunə.az'), { target: { value: 'wrong@x.az' } });
     fireEvent.change(screen.getByPlaceholderText('••••••••'), { target: { value: 'wrong' } });
     fireEvent.click(screen.getByRole('button', { name: /Daxil ol/i }));

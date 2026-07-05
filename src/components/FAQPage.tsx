@@ -1,69 +1,71 @@
 import React, { useState } from 'react';
 import { ChevronDown, ChevronUp, Info, Navigation, Shield, BookOpen, Activity } from 'lucide-react';
-
-const faqs = [
-  {
-    category: 'Hazırlıq və Avadanlıq',
-    icon: <Shield className="w-5 h-5 text-emerald-600" />,
-    items: [
-      {
-        q: 'Tura özümüzlə nə götürməliyik?',
-        a: 'Tura qatılarkən mövsümə uyğun rahat geyim, qapalı və sürüşməyən (mümkünsə hiking) ayaqqabı götürmək vacibdir. Özünüzlə yetərli miqdarda (ən azı 1.5 - 2 litr) su, enerji verici qəlyanaltılar, günəş eynəyi, papaq və ehtiyat isti geyim götürün.'
-      },
-      {
-        q: 'Hansı ayaqqabı uyğundur?',
-        a: 'Dağlıq və meşəlik ərazilər üçün altı dişli, topuğu tutan Trekking və ya Hiking botları məsləhətdir. Gündəlik idman ayaqqabıları (krasovka) sürüşmə riski yaradır və ayağı burxulmalardan qorumur.'
-      }
-    ]
-  },
-  {
-    category: 'Çətinlik Dərəcələri',
-    icon: <Activity className="w-5 h-5 text-emerald-600" />,
-    items: [
-      {
-        q: 'Asan tur nə deməkdir?',
-        a: 'Asan turlar adətən yüksəklik fərqi az olan, yeni başlayanlar və uşaqlar (müəyyən yaşdan yuxarı) üçün uyğun, böyük fiziki güc tələb etməyən cığırlar üzrə aparılır.'
-      },
-      {
-        q: 'Çətin tur anlayışı nədir?',
-        a: 'Çətin turlar böyük yüksəklik fərqləri, kəskin yoxuşlar və bəzən texniki maneələrlə zəngindir. Bu turlara yalnız aktiv fiziki formaya sahib və əvvəlki təcrübəsi olan iştirakçılar qatıla bilər.'
-      }
-    ]
-  },
-  {
-    category: 'Terminologiya Lüğəti',
-    icon: <BookOpen className="w-5 h-5 text-emerald-600" />,
-    items: [
-      {
-        q: 'Hiking, Trekking və Camping anlayışlarının fərqləri nələrdir?',
-        a: '• Hiking: Hazır və müəyyən edilmiş cığırlarla 1 günlük təbiət yürüşüdür.\n• Trekking: Daha çətin şərtlərdə, adətən bir neçə gün davam edən və bəzən cığır olmayan ərazilərdən keçən çətin yürüşdür.\n• Camping: Gecəni təbiətdə, çadırda qalmaqla cəmləşən fəaliyyətdir.'
-      }
-    ]
-  },
-  {
-    category: 'Zirvə vs Hiking',
-    icon: <Navigation className="w-5 h-5 text-emerald-600" />,
-    items: [
-      {
-        q: 'Zirvə yürüşü ilə adi hikingin fərqi nədir?',
-        a: 'Zirvə yürüşü (Alpinizm) müəyyən bir dağın zirvəsinə çatmağı hədəfləyir, çox vaxt kəskin iqlim dəyişikliyi, yüksəklik xəstəliyi riski və unikal texniki ləvazimatlar (kaska, buz baltası və s.) tələb edir. Adi hiking isə daha çox mənzərə və təbiətdən zövq almaq üçün cığır boyu gəzintidir.'
-      }
-    ]
-  },
-  {
-    category: 'Avadanlıq Bələdçisi',
-    icon: <Info className="w-5 h-5 text-emerald-600" />,
-    items: [
-      {
-        q: 'Gore-tex nədir və niyə dağ şəraitində vacibdir?',
-        a: 'Gore-tex suya davamlı, lakin eyni zamanda nəfəs ala bilən xüsusi membran (parça) texnologiyasıdır. Dağ şəraitində hava qeyri-sabit olduğundan, yağıntıdan qorunmaq və tərləməmək üçün bu tip geyim və ayaqqabılar həyati önəm daşıyır.'
-      }
-    ]
-  }
-];
+import { useLanguage } from '../i18n/LanguageContext';
 
 export default function FAQPage({ onBack }: { onBack: () => void }) {
+  const { t } = useLanguage();
   const [openIndex, setOpenIndex] = useState<string | null>(null);
+
+  const faqs = [
+    {
+      category: t('customerMisc.faqPage.categories.prepEquipment'),
+      icon: <Shield className="w-5 h-5 text-emerald-600" />,
+      items: [
+        {
+          q: t('customerMisc.faqPage.items.whatToBring.q'),
+          a: t('customerMisc.faqPage.items.whatToBring.a')
+        },
+        {
+          q: t('customerMisc.faqPage.items.whichShoes.q'),
+          a: t('customerMisc.faqPage.items.whichShoes.a')
+        }
+      ]
+    },
+    {
+      category: t('customerMisc.faqPage.categories.difficultyLevels'),
+      icon: <Activity className="w-5 h-5 text-emerald-600" />,
+      items: [
+        {
+          q: t('customerMisc.faqPage.items.easyTourMeaning.q'),
+          a: t('customerMisc.faqPage.items.easyTourMeaning.a')
+        },
+        {
+          q: t('customerMisc.faqPage.items.hardTourMeaning.q'),
+          a: t('customerMisc.faqPage.items.hardTourMeaning.a')
+        }
+      ]
+    },
+    {
+      category: t('customerMisc.faqPage.categories.terminologyGlossary'),
+      icon: <BookOpen className="w-5 h-5 text-emerald-600" />,
+      items: [
+        {
+          q: t('customerMisc.faqPage.items.hikingTrekkingCamping.q'),
+          a: t('customerMisc.faqPage.items.hikingTrekkingCamping.a')
+        }
+      ]
+    },
+    {
+      category: t('customerMisc.faqPage.categories.summitVsHiking'),
+      icon: <Navigation className="w-5 h-5 text-emerald-600" />,
+      items: [
+        {
+          q: t('customerMisc.faqPage.items.summitVsHiking.q'),
+          a: t('customerMisc.faqPage.items.summitVsHiking.a')
+        }
+      ]
+    },
+    {
+      category: t('customerMisc.faqPage.categories.equipmentGuide'),
+      icon: <Info className="w-5 h-5 text-emerald-600" />,
+      items: [
+        {
+          q: t('customerMisc.faqPage.items.goreTex.q'),
+          a: t('customerMisc.faqPage.items.goreTex.a')
+        }
+      ]
+    }
+  ];
 
   const toggleAccordion = (id: string) => {
     setOpenIndex(openIndex === id ? null : id);
@@ -75,13 +77,13 @@ export default function FAQPage({ onBack }: { onBack: () => void }) {
         onClick={onBack}
         className="mb-6 flex items-center text-emerald-600 font-bold hover:text-emerald-700 transition"
       >
-        <span className="mr-2">←</span> Geri qayıt
+        <span className="mr-2">←</span> {t('customerMisc.faqPage.backButton')}
       </button>
 
       <div className="bg-white rounded-2xl p-6 md:p-10 shadow-sm border border-slate-100">
-        <h1 className="text-3xl font-extrabold text-slate-900 mb-2">Məlumat və FAQ</h1>
+        <h1 className="text-3xl font-extrabold text-slate-900 mb-2">{t('customerMisc.faqPage.title')}</h1>
         <p className="text-slate-500 mb-8 font-medium">
-          Turlara düzgün hazırlaşmaq üçün təlimatlar və ən çox verilən suallar.
+          {t('customerMisc.faqPage.subtitle')}
         </p>
 
         <div className="space-y-6">

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { loadGoogleMaps, isGoogleMapsConfigured } from '../../utils/googleMapsLoader';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 interface LocationAutocompleteInputProps {
   label: string;
@@ -16,6 +17,7 @@ interface LocationAutocompleteInputProps {
 // back to a plain text input (no crash, no silent data loss) if the Maps API key isn't
 // configured for this environment.
 export function LocationAutocompleteInput({ label, value, lat, lng, onChange, placeholder, required }: LocationAutocompleteInputProps) {
+  const { t } = useLanguage();
   const inputRef = useRef<HTMLInputElement>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<google.maps.Map | null>(null);
@@ -25,13 +27,13 @@ export function LocationAutocompleteInput({ label, value, lat, lng, onChange, pl
 
   useEffect(() => {
     if (!isGoogleMapsConfigured()) {
-      setMapsError('Google Maps inteqrasiyası konfiqurasiya edilməyib (GOOGLE_MAPS_PLATFORM_KEY boşdur).');
+      setMapsError(t('vendorMisc.locationAutocompleteInput.notConfigured'));
       return;
     }
     let cancelled = false;
     loadGoogleMaps()
       .then(() => { if (!cancelled) setMapsReady(true); })
-      .catch((err) => { if (!cancelled) setMapsError(err.message || 'Google Maps yüklənə bilmədi.'); });
+      .catch((err) => { if (!cancelled) setMapsError(err.message || t('vendorMisc.locationAutocompleteInput.loadFailed')); });
     return () => { cancelled = true; };
   }, []);
 
@@ -87,12 +89,12 @@ export function LocationAutocompleteInput({ label, value, lat, lng, onChange, pl
       />
       {mapsError ? (
         <p className="text-[10px] text-slate-400 italic mt-1">
-          Xəritə axtarışı əlçatan deyil — ünvanı sadəcə mətn olaraq yazın. ({mapsError})
+          {t('vendorMisc.locationAutocompleteInput.mapUnavailable', { error: mapsError })}
         </p>
       ) : lat !== undefined && lng !== undefined ? (
         <div ref={mapContainerRef} className="w-full h-40 mt-2 rounded-lg border border-slate-200 overflow-hidden" />
       ) : mapsReady ? (
-        <p className="text-[10px] text-slate-400 italic mt-1">Yazmağa başlayın — ünvan variantları görünəcək.</p>
+        <p className="text-[10px] text-slate-400 italic mt-1">{t('vendorMisc.locationAutocompleteInput.startTyping')}</p>
       ) : null}
     </div>
   );

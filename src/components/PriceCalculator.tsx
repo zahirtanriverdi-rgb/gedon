@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Calculator, Users, Map, Tent, Sun, Info } from 'lucide-react';
 import { PriceCalculatorConfig } from '../types';
+import { useLanguage } from '../i18n/LanguageContext';
 
 // Fallback used only if no config prop is passed in at all (defensive default, shouldn't
 // normally happen since App.tsx always provides platformConfig.priceCalculatorConfig).
@@ -26,6 +27,7 @@ export interface PriceCalculatorProps {
 }
 
 export const PriceCalculator: React.FC<PriceCalculatorProps> = ({ onBack, config }) => {
+  const { t } = useLanguage();
   const cfg = config || FALLBACK_CONFIG;
   const distances = cfg.destinations;
 
@@ -114,16 +116,16 @@ export const PriceCalculator: React.FC<PriceCalculatorProps> = ({ onBack, config
           onClick={onBack}
           className="mb-6 flex items-center gap-2 text-slate-500 hover:text-slate-800 font-bold transition-colors"
         >
-          <span>←</span> Geri qayıt
+          <span>←</span> {t('miscWidgets.priceCalculator.back')}
         </button>
       )}
-      
+
       <div className="mb-8">
         <h1 className="text-3xl font-extrabold text-label-primary tracking-tight flex items-center gap-3">
           <span className="text-4xl">🧮</span>
-          Qrup üçün qiymət hesabla
+          {t('miscWidgets.priceCalculator.title')}
         </h1>
-        <p className="text-slate-500 mt-2 font-medium">Turunuzun təxmini xərcini əvvəlcədən hesablayın və büdcənizi planlayın.</p>
+        <p className="text-slate-500 mt-2 font-medium">{t('miscWidgets.priceCalculator.subtitle')}</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -134,14 +136,14 @@ export const PriceCalculator: React.FC<PriceCalculatorProps> = ({ onBack, config
         <div className="flex flex-col gap-2">
           <label className="font-bold text-slate-700 flex items-center gap-2">
             <Map className="w-5 h-5 text-primary-500" />
-            İstiqamət
+            {t('miscWidgets.priceCalculator.destination')}
           </label>
-          <select 
+          <select
             value={destination}
             onChange={(e) => setDestination(e.target.value)}
             className="w-full p-3 border-2 border-slate-200 rounded-xl focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 outline-none transition-all font-medium text-slate-700 bg-white"
           >
-            <option value="">Seçin...</option>
+            <option value="">{t('miscWidgets.priceCalculator.selectPlaceholder')}</option>
             {Object.keys(distances).map(dest => (
               <option key={dest} value={dest}>{dest}</option>
             ))}
@@ -152,7 +154,7 @@ export const PriceCalculator: React.FC<PriceCalculatorProps> = ({ onBack, config
         <div className="flex flex-col gap-2">
           <label className="font-bold text-slate-700 flex items-center gap-2">
             <Sun className="w-5 h-5 text-primary-500" />
-            Tur Növü
+            {t('miscWidgets.priceCalculator.tourType')}
           </label>
           <div className="grid grid-cols-2 gap-4">
             <button
@@ -164,7 +166,7 @@ export const PriceCalculator: React.FC<PriceCalculatorProps> = ({ onBack, config
               }`}
             >
               <span className="text-2xl">🥾</span>
-              Gündəlik Tur (1 gün)
+              {t('miscWidgets.priceCalculator.dailyTour')}
             </button>
             <button
               onClick={() => setTourType('camp')}
@@ -175,7 +177,7 @@ export const PriceCalculator: React.FC<PriceCalculatorProps> = ({ onBack, config
               }`}
             >
               <span className="text-2xl">⛺</span>
-              Kamp Turu (2 gün)
+              {t('miscWidgets.priceCalculator.campTour')}
             </button>
           </div>
         </div>
@@ -184,7 +186,7 @@ export const PriceCalculator: React.FC<PriceCalculatorProps> = ({ onBack, config
         <div className="flex flex-col gap-2">
           <label className="font-bold text-slate-700 flex items-center gap-2">
             <Users className="w-5 h-5 text-primary-500" />
-            İştirakçı Sayı
+            {t('miscWidgets.priceCalculator.participantCount')}
           </label>
           <div className="flex items-center gap-4 bg-slate-50 p-2 rounded-xl border border-slate-200 w-fit">
             <button 
@@ -207,7 +209,7 @@ export const PriceCalculator: React.FC<PriceCalculatorProps> = ({ onBack, config
         <div className="flex flex-col gap-3 p-5 rounded-2xl bg-slate-50 border border-slate-200">
           <label className="font-bold text-slate-700 flex items-center gap-2">
             <span className="text-xl">🍽️</span>
-            Yemək Seçimi
+            {t('miscWidgets.priceCalculator.foodChoice')}
           </label>
           
           {tourType === 'daily' ? (
@@ -220,27 +222,27 @@ export const PriceCalculator: React.FC<PriceCalculatorProps> = ({ onBack, config
                   onChange={() => setDailyFood('kend')}
                   className="w-5 h-5 text-primary-500 focus:ring-primary-500" 
                 />
-                <span className="font-medium text-slate-700">🍱 Kənd evi naharı ({cfg.foodDailyKendPrice} AZN)</span>
+                <span className="font-medium text-slate-700">{t('miscWidgets.priceCalculator.foodKendOption', { price: cfg.foodDailyKendPrice })}</span>
               </label>
               <label className="flex items-center gap-3 cursor-pointer">
-                <input 
-                  type="radio" 
-                  name="dailyFood" 
+                <input
+                  type="radio"
+                  name="dailyFood"
                   checked={dailyFood === 'sendvic'}
                   onChange={() => setDailyFood('sendvic')}
-                  className="w-5 h-5 text-primary-500 focus:ring-primary-500" 
+                  className="w-5 h-5 text-primary-500 focus:ring-primary-500"
                 />
-                <span className="font-medium text-slate-700">🥪 Sendviç ({cfg.foodDailySendvicPrice} AZN)</span>
+                <span className="font-medium text-slate-700">{t('miscWidgets.priceCalculator.foodSandwichOption', { price: cfg.foodDailySendvicPrice })}</span>
               </label>
               <label className="flex items-center gap-3 cursor-pointer">
-                <input 
-                  type="radio" 
-                  name="dailyFood" 
+                <input
+                  type="radio"
+                  name="dailyFood"
                   checked={dailyFood === 'yox'}
                   onChange={() => setDailyFood('yox')}
-                  className="w-5 h-5 text-primary-500 focus:ring-primary-500" 
+                  className="w-5 h-5 text-primary-500 focus:ring-primary-500"
                 />
-                <span className="font-medium text-slate-700">Yemək istəmirəm (0 AZN)</span>
+                <span className="font-medium text-slate-700">{t('miscWidgets.priceCalculator.foodNoneOption')}</span>
               </label>
             </div>
           ) : (
@@ -252,16 +254,16 @@ export const PriceCalculator: React.FC<PriceCalculatorProps> = ({ onBack, config
                   onChange={(e) => setCampBreakfast(e.target.checked)}
                   className="w-5 h-5 rounded text-primary-500 focus:ring-primary-500" 
                 />
-                <span className="font-medium text-slate-700">🍳 Səhər yeməyi ({cfg.campBreakfastPrice} AZN/adam)</span>
+                <span className="font-medium text-slate-700">{t('miscWidgets.priceCalculator.breakfastOption', { price: cfg.campBreakfastPrice })}</span>
               </label>
               <label className="flex items-center gap-3 cursor-pointer">
-                <input 
-                  type="checkbox" 
+                <input
+                  type="checkbox"
                   checked={campLunch}
                   onChange={(e) => setCampLunch(e.target.checked)}
-                  className="w-5 h-5 rounded text-primary-500 focus:ring-primary-500" 
+                  className="w-5 h-5 rounded text-primary-500 focus:ring-primary-500"
                 />
-                <span className="font-medium text-slate-700">🍽️ Günorta yeməyi ({cfg.campLunchPrice} AZN/adam)</span>
+                <span className="font-medium text-slate-700">{t('miscWidgets.priceCalculator.lunchOption', { price: cfg.campLunchPrice })}</span>
               </label>
             </div>
           )}
@@ -272,7 +274,7 @@ export const PriceCalculator: React.FC<PriceCalculatorProps> = ({ onBack, config
           <div className="flex flex-col gap-3 p-5 rounded-2xl bg-slate-50 border border-slate-200 animate-fadeIn">
             <label className="font-bold text-slate-700 flex items-center gap-2 mb-2">
               <Tent className="w-5 h-5 text-primary-500" />
-              Kamp Avadanlığı
+              {t('miscWidgets.priceCalculator.campEquipment')}
             </label>
             
             <div className="flex flex-col gap-4">
@@ -284,7 +286,7 @@ export const PriceCalculator: React.FC<PriceCalculatorProps> = ({ onBack, config
                     onChange={(e) => setNeedTent(e.target.checked)}
                     className="w-5 h-5 rounded text-primary-500 focus:ring-primary-500" 
                   />
-                  <span className="font-medium text-slate-700">⛺ Çadır ({cfg.tentRentalPrice} AZN/adam)</span>
+                  <span className="font-medium text-slate-700">{t('miscWidgets.priceCalculator.tentOption', { price: cfg.tentRentalPrice })}</span>
                 </label>
                 
                 {needTent && (
@@ -297,7 +299,7 @@ export const PriceCalculator: React.FC<PriceCalculatorProps> = ({ onBack, config
                         className="sr-only peer" 
                       />
                       <div className="w-9 h-5 bg-slate-300 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-primary-500/50 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-primary-500"></div>
-                      <span className="ml-2 text-sm font-medium text-slate-600">Öz çadırım var (0 AZN)</span>
+                      <span className="ml-2 text-sm font-medium text-slate-600">{t('miscWidgets.priceCalculator.hasOwnTent')}</span>
                     </label>
                   </div>
                 )}
@@ -310,17 +312,17 @@ export const PriceCalculator: React.FC<PriceCalculatorProps> = ({ onBack, config
                   onChange={(e) => setNeedSleepingBag(e.target.checked)}
                   className="w-5 h-5 rounded text-primary-500 focus:ring-primary-500" 
                 />
-                <span className="font-medium text-slate-700">🛏️ Tulum/Yataq kisəsi ({cfg.sleepingBagRentalPrice} AZN/adam)</span>
+                <span className="font-medium text-slate-700">{t('miscWidgets.priceCalculator.sleepingBagOption', { price: cfg.sleepingBagRentalPrice })}</span>
               </label>
 
               <label className="flex items-center gap-3 cursor-pointer">
-                <input 
-                  type="checkbox" 
+                <input
+                  type="checkbox"
                   checked={needMat}
                   onChange={(e) => setNeedMat(e.target.checked)}
-                  className="w-5 h-5 rounded text-primary-500 focus:ring-primary-500" 
+                  className="w-5 h-5 rounded text-primary-500 focus:ring-primary-500"
                 />
-                <span className="font-medium text-slate-700">🟫 Mat ({cfg.matRentalPrice} AZN/adam)</span>
+                <span className="font-medium text-slate-700">{t('miscWidgets.priceCalculator.matOption', { price: cfg.matRentalPrice })}</span>
               </label>
             </div>
           </div>
@@ -333,42 +335,42 @@ export const PriceCalculator: React.FC<PriceCalculatorProps> = ({ onBack, config
         <div className="sticky top-6 bg-white border-2 border-primary-500 rounded-2xl overflow-hidden shadow-lg">
           <div className="bg-primary-500 px-5 py-4 flex items-center gap-2 text-white">
             <Calculator className="w-5 h-5" />
-            <h3 className="font-bold text-lg">Xərc Hesabı</h3>
+            <h3 className="font-bold text-lg">{t('miscWidgets.priceCalculator.costSummary')}</h3>
           </div>
-          
+
           <div className="p-5 flex flex-col gap-4">
             <div className="flex justify-between items-center pb-3 border-b border-slate-100">
-              <span className="text-slate-600 font-medium">🚌 Avtobus:</span>
+              <span className="text-slate-600 font-medium">{t('miscWidgets.priceCalculator.bus')}</span>
               <span className="font-bold text-slate-800">{formatMoney(costs?.ppBus)}</span>
             </div>
             <div className="flex justify-between items-center pb-3 border-b border-slate-100">
-              <span className="text-slate-600 font-medium">👨‍🏫 Bələdçi:</span>
+              <span className="text-slate-600 font-medium">{t('miscWidgets.priceCalculator.guide')}</span>
               <span className="font-bold text-slate-800">{formatMoney(costs?.ppGuide)}</span>
             </div>
             <div className="flex justify-between items-center pb-3 border-b border-slate-100">
-              <span className="text-slate-600 font-medium">🍽️ Yemək:</span>
+              <span className="text-slate-600 font-medium">{t('miscWidgets.priceCalculator.food')}</span>
               <span className="font-bold text-slate-800">{formatMoney(costs?.ppFood)}</span>
             </div>
             <div className="flex justify-between items-center pb-3 border-b border-slate-100">
-              <span className="text-slate-600 font-medium">⛺ Avadanlıq:</span>
+              <span className="text-slate-600 font-medium">{t('miscWidgets.priceCalculator.equipment')}</span>
               <span className="font-bold text-slate-800">{formatMoney(costs?.ppEq)}</span>
             </div>
-            
+
             <div className="mt-2 bg-primary-500/10 p-4 rounded-xl flex flex-col gap-2 border border-primary-500/20">
               <div className="flex justify-between items-center">
-                <span className="text-primary-500 font-bold">👤 Adam başı:</span>
+                <span className="text-primary-500 font-bold">{t('miscWidgets.priceCalculator.perPerson')}</span>
                 <span className="font-extrabold text-label-primary text-xl">{formatMoney(costs?.ppTotal)}</span>
               </div>
               <div className="flex justify-between items-center mt-1">
-                <span className="text-slate-700 font-bold">👥 Qrup cəmi:</span>
+                <span className="text-slate-700 font-bold">{t('miscWidgets.priceCalculator.groupTotal')}</span>
                 <span className="font-extrabold text-label-primary text-xl">{formatMoney(costs?.groupTotal)}</span>
               </div>
-              <span className="text-xs text-label-tertiary font-medium self-end">({participants} nəfər üçün)</span>
+              <span className="text-xs text-label-tertiary font-medium self-end">{t('miscWidgets.priceCalculator.forPeopleCount', { count: participants })}</span>
             </div>
 
             <div className="mt-4 flex items-start gap-2 bg-slate-50 p-3 rounded-lg text-xs text-slate-500 font-medium">
               <Info className="w-4 h-4 shrink-0 text-primary-500 mt-0.5" />
-              <p>⚠️ Bu qiymət təxminidir, yekun qiymət operator tərəfindən təsdiqlənir.</p>
+              <p>{t('miscWidgets.priceCalculator.disclaimer')}</p>
             </div>
           </div>
         </div>

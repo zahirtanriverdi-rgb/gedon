@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { Html5QrcodeScanner } from 'html5-qrcode';
 import { X } from 'lucide-react';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 interface QrScannerModalProps {
   isOpen: boolean;
@@ -9,6 +10,7 @@ interface QrScannerModalProps {
 }
 
 export function QrScannerModal({ isOpen, onClose, onScan }: QrScannerModalProps) {
+  const { t } = useLanguage();
   useEffect(() => {
     if (!isOpen) return;
 
@@ -50,14 +52,14 @@ export function QrScannerModal({ isOpen, onClose, onScan }: QrScannerModalProps)
       <div className="bg-white rounded-2xl w-full max-w-md overflow-hidden animate-scaleIn font-sans">
         <div className="p-4 bg-slate-900 text-white flex justify-between items-center">
           <h3 className="font-extrabold text-sm flex items-center gap-2">
-            📷 QR Kod İlə Check-in
+            📷 {t('vendorMisc.qrScannerModal.title')}
           </h3>
           <button onClick={onClose} className="text-slate-400 hover:text-white transition cursor-pointer">
             <X className="w-5 h-5"/>
           </button>
         </div>
         <div className="p-4 bg-slate-50 relative min-h-[350px]">
-          <p className="text-xs text-slate-500 mb-4 text-center font-medium">Biletin üzərindəki QR kodu kameraya yaxınlaşdırın</p>
+          <p className="text-xs text-slate-500 mb-4 text-center font-medium">{t('vendorMisc.qrScannerModal.instructions')}</p>
           <div id="reader" className="w-full rounded-xl overflow-hidden shadow-sm bg-black border-2 border-dashed border-slate-300"></div>
         </div>
       </div>

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Tour, TourSlot, Booking, User } from '../../types';
 import { QrScannerModal } from './QrScannerModal';
 import { Calendar, CheckCircle, Copy, Download, FileText, Plus, Printer, Send, Users, X } from 'lucide-react';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 interface CrmTabProps {
   tours: Tour[];
@@ -16,6 +17,8 @@ interface CrmTabProps {
 }
 
 export function CrmTab({ tours, slots, bookings, currentUser, operatorToken, onEditBooking, onAddBooking, onShowNotification, triggerTicketGeneration }: CrmTabProps) {
+  const { t } = useLanguage();
+
   // CRM & Tour Manifest States
   const [crmTourId, setCrmTourId] = useState<string>('');
   const [crmSlotId, setCrmSlotId] = useState<string>('');
@@ -60,7 +63,7 @@ export function CrmTab({ tours, slots, bookings, currentUser, operatorToken, onE
     setIsQrScannerOpen(false);
 
     if (!operatorToken) {
-      if (onShowNotification) onShowNotification('Sessiyanız bitib. Yenidən daxil olun.', 'error');
+      if (onShowNotification) onShowNotification(t('vendorBookings.crmTab.notifications.sessionExpired'), 'error');
       return;
     }
 
@@ -77,13 +80,13 @@ export function CrmTab({ tours, slots, bookings, currentUser, operatorToken, onE
 
       if (!response.ok) {
         if (onShowNotification) {
-          onShowNotification(data.error || 'Sistemdə bu bilet məlumatı tapılmadı! Xahiş edirik QR kodu bir daha yoxlayın. ❌', 'error');
+          onShowNotification(data.error || t('vendorBookings.crmTab.notifications.ticketNotFound'), 'error');
         }
         return;
       }
 
       if (data.alreadyCheckedIn) {
-        if (onShowNotification) onShowNotification('Bu bilet artıq check-in edilib! ⚠️', 'warning');
+        if (onShowNotification) onShowNotification(t('vendorBookings.crmTab.notifications.alreadyCheckedIn'), 'warning');
         return;
       }
 
@@ -91,11 +94,11 @@ export function CrmTab({ tours, slots, bookings, currentUser, operatorToken, onE
         await onEditBooking(data.booking);
       }
       if (onShowNotification) {
-        onShowNotification(`Check-in uğurludur: ${data.booking.customerName} (${data.booking.participantsCount} nəfər) ✅`, 'success');
+        onShowNotification(t('vendorBookings.crmTab.notifications.checkinSuccess', { name: data.booking.customerName, count: data.booking.participantsCount }), 'success');
       }
     } catch (err) {
       console.error('Check-in zamanı xəta baş verdi:', err);
-      if (onShowNotification) onShowNotification('Sistem xətası: Check-in edilə bilmədi.', 'error');
+      if (onShowNotification) onShowNotification(t('vendorBookings.crmTab.notifications.checkinSystemError'), 'error');
     }
   };
 
@@ -127,15 +130,15 @@ export function CrmTab({ tours, slots, bookings, currentUser, operatorToken, onE
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
                 <h3 className="text-sm font-extrabold text-slate-800 tracking-widest flex items-center gap-2">
-                  📊 İŞTİRAKÇI SİYAHISI VƏ CRM PANELİ
+                  📊 {t('vendorBookings.crmTab.header.title')}
                 </h3>
                 <p className="text-xs text-slate-500 mt-1">
-                  Müştəri rezervasiyalarını izləyin, iştirak/ödəniş statuslarını idarə edin.
+                  {t('vendorBookings.crmTab.header.subtitle')}
                 </p>
               </div>
               <div className="flex items-center gap-2.5 text-[11px] font-bold text-slate-500 bg-white border border-slate-200 px-3 py-1.5 rounded-full shadow-xs">
                 <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span>Məlumatlar real-time olaraq avtomatik yadda saxlanılır</span>
+                <span>{t('vendorBookings.crmTab.header.autoSaveNotice')}</span>
               </div>
             </div>
 
@@ -143,7 +146,7 @@ export function CrmTab({ tours, slots, bookings, currentUser, operatorToken, onE
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
               {/* Tour Dropdown */}
               <div className="space-y-1.5">
-                <label className="block text-xs font-semibold text-slate-700">📌 Tur Seçin:</label>
+                <label className="block text-xs font-semibold text-slate-700">📌 {t('vendorBookings.crmTab.controls.tourLabel')}</label>
                 <select
                   value={crmTourId}
                   onChange={(e) => {
@@ -152,7 +155,7 @@ export function CrmTab({ tours, slots, bookings, currentUser, operatorToken, onE
                   }}
                   className="w-full bg-white border border-slate-200 text-slate-700 p-2.5 text-xs rounded-xl focus:outline-none focus:border-emerald-700 focus:ring-1 focus:ring-emerald-700/50 transition shadow-xs font-bold"
                 >
-                  <option value="">-- Bütün Turlar (Son Rezervasiyalar) --</option>
+                  <option value="">{t('vendorBookings.crmTab.controls.allToursOption')}</option>
                   {tours.filter(t => t.vendorId === currentUser.id).map((t) => (
                     <option key={t.id} value={t.id}>
                       {t.name} ({t.region})
@@ -163,17 +166,17 @@ export function CrmTab({ tours, slots, bookings, currentUser, operatorToken, onE
 
               {/* Date/Slot Dropdown */}
               <div className="space-y-1.5">
-                <label className="block text-xs font-semibold text-slate-700">📅 Tarix / Slot Seçin:</label>
+                <label className="block text-xs font-semibold text-slate-700">📅 {t('vendorBookings.crmTab.controls.slotLabel')}</label>
                 <select
                   value={crmSlotId}
                   onChange={(e) => setCrmSlotId(e.target.value)}
                   disabled={!crmTourId}
                   className="w-full bg-white border border-slate-200 text-slate-700 p-2.5 text-xs rounded-xl focus:outline-none focus:border-emerald-700 focus:ring-1 focus:ring-emerald-700/50 transition shadow-xs disabled:bg-slate-100 disabled:text-slate-400 font-mono font-bold font-sans"
                 >
-                  <option value="">-- Bütün Tarixlər (Bütün Sifarişlər) --</option>
+                  <option value="">{t('vendorBookings.crmTab.controls.allSlotsOption')}</option>
                   {slots.filter(s => s.tourId === crmTourId).map((s) => (
                     <option key={s.id} value={s.id}>
-                      {s.startDate} ({s.price} AZN) — {s.bookedCount} nəfər qeydiyyatda
+                      {s.startDate} ({s.price} AZN) — {t('vendorBookings.crmTab.controls.slotBookedCount', { count: s.bookedCount })}
                     </option>
                   ))}
                 </select>
@@ -189,7 +192,7 @@ export function CrmTab({ tours, slots, bookings, currentUser, operatorToken, onE
                   <Users className="w-5 h-5" />
                 </div>
                 <div>
-                  <span className="block text-[10px] text-slate-400 font-bold tracking-wider">Qrup Limiti (Yer)</span>
+                  <span className="block text-[10px] text-slate-400 font-bold tracking-wider">{t('vendorBookings.crmTab.metrics.groupCapacity')}</span>
                   <strong className="text-base text-slate-800 font-mono">{selectedCrmSlot.capacity}</strong>
                 </div>
               </div>
@@ -199,8 +202,8 @@ export function CrmTab({ tours, slots, bookings, currentUser, operatorToken, onE
                   <CheckCircle className="w-5 h-5" />
                 </div>
                 <div>
-                  <span className="block text-[10px] text-slate-400 font-bold tracking-wider">Platforma Rezervasiyaları</span>
-                  <strong className="text-base text-slate-800 font-mono">{webBookingsCount} nəfər</strong>
+                  <span className="block text-[10px] text-slate-400 font-bold tracking-wider">{t('vendorBookings.crmTab.metrics.platformBookings')}</span>
+                  <strong className="text-base text-slate-800 font-mono">{t('vendorBookings.crmTab.metrics.peopleCount', { count: webBookingsCount })}</strong>
                 </div>
               </div>
 
@@ -209,22 +212,22 @@ export function CrmTab({ tours, slots, bookings, currentUser, operatorToken, onE
                   <Send className="w-5 h-5" />
                 </div>
                 <div>
-                  <span className="block text-[10px] text-slate-400 font-bold tracking-wider">Kənar Satışlar (WP/İG)</span>
-                  <strong className="text-base text-slate-800 font-mono">{selectedCrmTour?.externalSales || 0} yer</strong>
+                  <span className="block text-[10px] text-slate-400 font-bold tracking-wider">{t('vendorBookings.crmTab.metrics.externalSales')}</span>
+                  <strong className="text-base text-slate-800 font-mono">{t('vendorBookings.crmTab.metrics.seatsCount', { count: selectedCrmTour?.externalSales || 0 })}</strong>
                 </div>
               </div>
 
               <div className={`p-4 rounded-xl border shadow-xs flex items-center gap-3 transition ${
-                remainingSeats <= 3 
-                  ? 'bg-rose-50 border-rose-200 text-rose-900' 
+                remainingSeats <= 3
+                  ? 'bg-rose-50 border-rose-200 text-rose-900'
                   : 'bg-emerald-50/50 border-emerald-100 text-emerald-950'
               }`}>
                 <div className={`p-2.5 rounded-lg ${remainingSeats <= 3 ? 'bg-rose-100 text-rose-700' : 'bg-emerald-100 text-emerald-700'}`}>
                   <Calendar className="w-5 h-5" />
                 </div>
                 <div>
-                  <span className="block text-[10px] font-bold tracking-wider opacity-75">Boş Qalan Son Yerlər</span>
-                  <strong className="text-base font-mono">{remainingSeats} yer</strong>
+                  <span className="block text-[10px] font-bold tracking-wider opacity-75">{t('vendorBookings.crmTab.metrics.seatsRemaining')}</span>
+                  <strong className="text-base font-mono">{t('vendorBookings.crmTab.metrics.seatsCount', { count: remainingSeats })}</strong>
                 </div>
               </div>
             </div>
@@ -235,10 +238,10 @@ export function CrmTab({ tours, slots, bookings, currentUser, operatorToken, onE
                 <div className="p-4 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 font-sans">
                   <div className="flex items-center gap-2">
                     <span className="p-1 px-2.5 bg-slate-200 text-slate-700 border border-slate-300 font-extrabold text-[10px] rounded-md font-mono font-bold">
-                      {selectedCrmSlot ? `SLOT #${selectedCrmSlot.id.slice(5).toUpperCase()}` : (crmTourId ? "SEÇİLMİŞ TUR" : "BÜTÜN SİFARİŞLƏR")}
+                      {selectedCrmSlot ? t('vendorBookings.crmTab.table.badge.slot', { id: selectedCrmSlot.id.slice(5).toUpperCase() }) : (crmTourId ? t('vendorBookings.crmTab.table.badge.selectedTour') : t('vendorBookings.crmTab.table.badge.allOrders'))}
                     </span>
                     <span className="text-xs font-bold text-slate-700 font-sans">
-                      İştirakçı siyahısı (Gösterilən: {filteredCrmBookingsForSlot.length} bilet qrupu, Ümumi: {activeCrmBookingsForSlot.length})
+                      {t('vendorBookings.crmTab.table.participantListSummary', { shown: filteredCrmBookingsForSlot.length, total: activeCrmBookingsForSlot.length })}
                     </span>
                   </div>
 
@@ -247,19 +250,19 @@ export function CrmTab({ tours, slots, bookings, currentUser, operatorToken, onE
                       type="button"
                       onClick={() => {
                         if (!crmTourId) {
-                          if (onShowNotification) onShowNotification('Siyahını yükləmək üçün əvvəlcə bir Tur seçin.', 'warning');
+                          if (onShowNotification) onShowNotification(t('vendorBookings.crmTab.notifications.selectTourFirstExport'), 'warning');
                           return;
                         }
                         if (!selectedCrmSlot) {
-                          if (onShowNotification) onShowNotification('Siyahını yükləmək üçün zəhmət olmasa yuxarıdan bir Tarix/Slot seçin.', 'warning');
+                          if (onShowNotification) onShowNotification(t('vendorBookings.crmTab.notifications.selectSlotFirstExport'), 'warning');
                           return;
                         }
                         if (filteredCrmBookingsForSlot.length === 0) {
-                          if (onShowNotification) onShowNotification('Bu slot üçün ixrac ediləcək iştirakçı tapılmadı.', 'warning');
+                          if (onShowNotification) onShowNotification(t('vendorBookings.crmTab.notifications.noParticipantsToExport'), 'warning');
                           return;
                         }
 
-                        const headers = 'Sıra,Ad Soyad,Telefon,Ödəniş Statusu,Operator Qeydi,Bilet Sayı,Bilet Linki\n';
+                        const headers = t('vendorBookings.crmTab.csv.headers') + '\n';
                         const rows = filteredCrmBookingsForSlot.map((b, idx) => {
                           const name = b.customerName.replace(/"/g, '""');
                           const phone = b.customerPhone.replace(/"/g, '""');
@@ -279,13 +282,13 @@ export function CrmTab({ tours, slots, bookings, currentUser, operatorToken, onE
                         document.body.removeChild(link);
 
                         if (onShowNotification) {
-                          onShowNotification('İştirakçı siyahısı CSV formatında yükləndi! 📥', 'success');
+                          onShowNotification(t('vendorBookings.crmTab.notifications.csvExported'), 'success');
                         }
                       }}
                       className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-800 font-extrabold text-[10px] rounded-lg transition border border-slate-250 cursor-pointer flex items-center gap-1.5 shadow-xs font-sans font-bold"
                     >
                       <Download className="w-3.5 h-3.5" />
-                      <span>Eksport (CSV)</span>
+                      <span>{t('vendorBookings.crmTab.buttons.exportCsv')}</span>
                     </button>
 
                     <button
@@ -297,42 +300,42 @@ export function CrmTab({ tours, slots, bookings, currentUser, operatorToken, onE
 
                         if (confirmedBookings.length === 0) {
                           if (onShowNotification) {
-                            onShowNotification('WhatsApp üçün fəal/görünən ödənişli iştirakçı siyahısı tapılmadı.', 'warning');
+                            onShowNotification(t('vendorBookings.crmTab.notifications.noConfirmedForWhatsapp'), 'warning');
                           }
                           return;
                         }
 
-                        let text = `📋 *TUR İŞTİRAKÇI MANİFESTİ (ÖDƏNİŞLİ)*\n`;
-                        text += `🏔️ *Tur:* ${selectedCrmTour?.name || ''}\n`;
-                        text += `📅 *Tarix:* ${selectedCrmSlot?.startDate || ''}\n`;
-                        text += `👥 *İştirakçı sayı:* ${confirmedBookings.reduce((sum, b) => sum + b.participantsCount, 0)} nəfər\n\n`;
+                        let text = `📋 *${t('vendorBookings.crmTab.whatsappManifest.title')}*\n`;
+                        text += `🏔️ *${t('vendorBookings.crmTab.whatsappManifest.tourLabel')}:* ${selectedCrmTour?.name || ''}\n`;
+                        text += `📅 *${t('vendorBookings.crmTab.whatsappManifest.dateLabel')}:* ${selectedCrmSlot?.startDate || ''}\n`;
+                        text += `👥 *${t('vendorBookings.crmTab.whatsappManifest.participantCountLabel')}:* ${t('vendorBookings.crmTab.metrics.peopleCount', { count: confirmedBookings.reduce((sum, b) => sum + b.participantsCount, 0) })}\n\n`;
 
                         let count = 1;
                         confirmedBookings.forEach((b) => {
-                          const noteText = b.operatorNote ? `_${b.operatorNote}_` : 'Yoxdur';
-                          text += `${count}. *${b.customerName}* (Bilet: ${b.participantsCount})\n`;
-                          text += `   📞 Telefon: ${b.customerPhone}\n`;
-                          text += `   📝 Qeyd: ${noteText}\n\n`;
+                          const noteText = b.operatorNote ? `_${b.operatorNote}_` : t('vendorBookings.crmTab.whatsappManifest.noNote');
+                          text += `${count}. *${b.customerName}* (${t('vendorBookings.crmTab.whatsappManifest.ticketLabel')}: ${b.participantsCount})\n`;
+                          text += `   📞 ${t('vendorBookings.crmTab.whatsappManifest.phoneLabel')}: ${b.customerPhone}\n`;
+                          text += `   📝 ${t('vendorBookings.crmTab.whatsappManifest.noteLabel')}: ${noteText}\n\n`;
                           count++;
                         });
 
-                        text += `*Tərtib edildi:* ${new Date().toLocaleDateString('az-AZ')} | gedekgorek.az CRM 🌲`;
+                        text += `*${t('vendorBookings.crmTab.whatsappManifest.generatedOn')}:* ${new Date().toLocaleDateString('az-AZ')} | gedekgorek.az CRM 🌲`;
 
                         navigator.clipboard.writeText(text).then(() => {
                           if (onShowNotification) {
-                            onShowNotification('Təsdiqlənmiş iştirakçı siyahısı WhatsApp üçün kopyalandı! 📋📲', 'success');
+                            onShowNotification(t('vendorBookings.crmTab.notifications.whatsappCopySuccess'), 'success');
                           }
                         }).catch(err => {
                           console.error('Kopyalama xətası:', err);
                           if (onShowNotification) {
-                            onShowNotification('Panoya kopyalamaq alınmadı.', 'error');
+                            onShowNotification(t('vendorBookings.crmTab.notifications.clipboardError'), 'error');
                           }
                         });
                       }}
                       className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 hover:text-emerald-950 border border-emerald-200 font-extrabold text-[10px] rounded-lg transition cursor-pointer flex items-center gap-1.5 shadow-xs font-sans font-bold"
                     >
                       <Copy className="w-3.5 h-3.5" />
-                      <span>WhatsApp üçün kopyala</span>
+                      <span>{t('vendorBookings.crmTab.buttons.copyForWhatsapp')}</span>
                     </button>
                   </div>
                 </div>
@@ -341,36 +344,36 @@ export function CrmTab({ tours, slots, bookings, currentUser, operatorToken, onE
                 <div className="p-4 bg-white border-b border-slate-200/50 flex flex-col md:flex-row md:items-center justify-between gap-4 font-sans text-xs">
                   <div className="flex flex-wrap items-center gap-4">
                     <div className="flex items-center gap-2">
-                      <span className="text-[11px] font-bold text-slate-500 tracking-wider font-sans">Ödəniş Statusu:</span>
+                      <span className="text-[11px] font-bold text-slate-500 tracking-wider font-sans">{t('vendorBookings.crmTab.filters.paymentStatusLabel')}</span>
                       <select
                         value={filterPayment}
                         onChange={(e) => setFilterPayment(e.target.value as any)}
                         className="bg-slate-50 border border-slate-200 hover:border-slate-300 text-slate-707 text-slate-700 p-1.5 px-2 text-xs rounded-xl focus:outline-none focus:border-emerald-600 transition cursor-pointer font-bold"
                       >
-                        <option value="Bütün">Bütün (Hamısı)</option>
-                        <option value="Ödənilib">Ödənilib</option>
-                        <option value="Ödənilməyib">Ödənilməyib</option>
+                        <option value="Bütün">{t('vendorBookings.crmTab.filters.allOption')}</option>
+                        <option value="Ödənilib">{t('vendorBookings.crmTab.filters.paidOption')}</option>
+                        <option value="Ödənilməyib">{t('vendorBookings.crmTab.filters.unpaidOption')}</option>
                       </select>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-2">
-                    <button 
+                    <button
                       type="button"
                       onClick={() => setIsQrScannerOpen(true)}
                       className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-md transition duration-150 cursor-pointer flex items-center gap-2 text-xs font-sans select-none"
                     >
-                      <span>📷 QR İlə Yoxla</span>
+                      <span>📷 {t('vendorBookings.crmTab.buttons.checkWithQr')}</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => {
                         if (!crmTourId) {
-                          if (onShowNotification) onShowNotification('Yeni iştirakçı əlavə etmək üçün əvvəlcə bir Tur seçin.', 'warning');
+                          if (onShowNotification) onShowNotification(t('vendorBookings.crmTab.notifications.selectTourFirstAdd'), 'warning');
                           return;
                         }
                         if (!crmSlotId) {
-                          if (onShowNotification) onShowNotification('Yeni iştirakçı əlavə etmək üçün zəhmət olmasa yuxarıdan bir Tarix/Slot seçin.', 'warning');
+                          if (onShowNotification) onShowNotification(t('vendorBookings.crmTab.notifications.selectSlotFirstAdd'), 'warning');
                           return;
                         }
                         setManualName('');
@@ -383,7 +386,7 @@ export function CrmTab({ tours, slots, bookings, currentUser, operatorToken, onE
                       className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-md transition duration-150 cursor-pointer flex items-center gap-2 text-xs font-sans select-none"
                     >
                       <Plus className="w-4 h-4" />
-                      <span>Yeni İştirakçı Əlavə Et</span>
+                      <span>{t('vendorBookings.crmTab.buttons.addParticipant')}</span>
                     </button>
                   </div>
                 </div>
@@ -392,20 +395,20 @@ export function CrmTab({ tours, slots, bookings, currentUser, operatorToken, onE
                   <table className="w-full text-left border-collapse text-xs">
                     <thead className="bg-ink-50 border-b border-slate-200 text-slate-400 font-bold tracking-wider text-[10px]">
                       <tr>
-                        <th className="p-3 text-center w-12">Sıra</th>
-                        <th className="p-3">Adı və Soyadı</th>
-                        <th className="p-3">Mobil Telefon</th>
-                        <th className="p-3">Ödəniş Statusu</th>
-                        <th className="p-3">Bilet & Tarix</th>
-                        <th className="p-3 w-64">Operator Qeydi</th>
-                        <th className="p-3 text-center">PDF Bilet</th>
+                        <th className="p-3 text-center w-12">{t('vendorBookings.crmTab.table.headers.order')}</th>
+                        <th className="p-3">{t('vendorBookings.crmTab.table.headers.customer')}</th>
+                        <th className="p-3">{t('vendorBookings.crmTab.table.headers.phone')}</th>
+                        <th className="p-3">{t('vendorBookings.crmTab.table.headers.paymentStatus')}</th>
+                        <th className="p-3">{t('vendorBookings.crmTab.table.headers.ticketAndDate')}</th>
+                        <th className="p-3 w-64">{t('vendorBookings.crmTab.table.headers.operatorNote')}</th>
+                        <th className="p-3 text-center">{t('vendorBookings.crmTab.table.headers.pdfTicket')}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 text-slate-750 text-slate-700">
                       {filteredCrmBookingsForSlot.length === 0 ? (
                         <tr>
                           <td colSpan={7} className="p-10 text-center italic text-slate-400 border-b-0 bg-slate-50/50">
-                            Axtarış filtrinə və tənzimləmələrə uyğun heç bir bilet qrafiki tapılmadı.
+                            {t('vendorBookings.crmTab.table.emptyState')}
                           </td>
                         </tr>
                       ) : (
@@ -460,15 +463,15 @@ export function CrmTab({ tours, slots, bookings, currentUser, operatorToken, onE
                                       if (value === 'paid') {
                                         triggerTicketGeneration(updated, selectedCrmTour?.name || '', selectedCrmTour?.region || '', selectedCrmSlot?.startDate || '');
                                         if (onShowNotification) {
-                                          onShowNotification('Sifariş təsdiqləndi. PDF bilet tənzimləndi! 🎫', 'success');
+                                          onShowNotification(t('vendorBookings.crmTab.notifications.orderConfirmedTicketReady'), 'success');
                                         }
                                       } else if (value === 'cancelled') {
                                         if (onShowNotification) {
-                                          onShowNotification(`Sifariş ləğv edildi və boş yer geri qaytarıldı.`, 'warning');
+                                          onShowNotification(t('vendorBookings.crmTab.notifications.orderCancelledSeatReturned'), 'warning');
                                         }
                                       } else {
                                         if (onShowNotification) {
-                                          onShowNotification(`Sifariş statusu qeydə alındı.`, 'info');
+                                          onShowNotification(t('vendorBookings.crmTab.notifications.orderStatusSaved'), 'info');
                                         }
                                       }
                                     } catch {
@@ -481,14 +484,14 @@ export function CrmTab({ tours, slots, bookings, currentUser, operatorToken, onE
                                       : b.status === 'cancelled' ? 'bg-red-50 text-red-800 border-red-250 focus:ring-red-700/55' : 'bg-amber-50 text-amber-800 border-amber-250 focus:ring-amber-700/55'
                                   }`}
                                 >
-                                  <option value="paid">Təsdiqləndi (Ödənilib)</option>
-                                  <option value="pending">Gözləyir (WhatsApp)</option>
-                                  <option value="cancelled">Ləğv Edildi</option>
+                                  <option value="paid">{t('vendorBookings.crmTab.statusSelect.confirmedPaid')}</option>
+                                  <option value="pending">{t('vendorBookings.crmTab.statusSelect.pendingWhatsapp')}</option>
+                                  <option value="cancelled">{t('vendorBookings.crmTab.statusSelect.cancelled')}</option>
                                 </select>
                               </td>
                               <td className="p-1.5 py-3">
                                 <span className="font-bold flex items-center gap-1 text-[11px] text-slate-800 font-mono">
-                                  🎟️ {b.participantsCount} nəfər
+                                  🎟️ {t('vendorBookings.crmTab.metrics.peopleCount', { count: b.participantsCount })}
                                 </span>
                                 <span className="block text-[9px] text-slate-400 font-medium font-mono">
                                   {b.bookingDate}
@@ -497,7 +500,7 @@ export function CrmTab({ tours, slots, bookings, currentUser, operatorToken, onE
                               <td className="p-1.5 py-3">
                                 <input
                                   type="text"
-                                  placeholder="Məs: Sumqayıtdan minəcək..."
+                                  placeholder={t('vendorBookings.crmTab.table.notePlaceholder')}
                                   key={`${b.id}-note`}
                                   defaultValue={b.operatorNote || ''}
                                   onBlur={(e) => {
@@ -515,10 +518,10 @@ export function CrmTab({ tours, slots, bookings, currentUser, operatorToken, onE
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="inline-flex items-center gap-1 px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-705 text-emerald-800 border border-emerald-200 hover:border-emerald-300 rounded font-black text-[10px] transition cursor-pointer select-none"
-                                    title="Klikləyin və yükləyin"
+                                    title={t('vendorBookings.crmTab.table.clickToDownload')}
                                   >
                                     <FileText className="w-3.5 h-3.5" />
-                                    <span>Yüklə</span>
+                                    <span>{t('vendorBookings.crmTab.buttons.download')}</span>
                                   </a>
                                 ) : b.status === 'paid' ? (
                                   <button
@@ -526,18 +529,18 @@ export function CrmTab({ tours, slots, bookings, currentUser, operatorToken, onE
                                     onClick={() => {
                                       triggerTicketGeneration(b, selectedCrmTour?.name || '', selectedCrmTour?.region || '', selectedCrmSlot?.startDate || '');
                                       if (onShowNotification) {
-                                        onShowNotification('Sistem bilet yaradılması sorğusunu arxa planda başlatdı... 🎫', 'info');
+                                        onShowNotification(t('vendorBookings.crmTab.notifications.ticketGenerationStarted'), 'info');
                                       }
                                     }}
                                     className="inline-flex items-center gap-1 px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-250 hover:border-slate-350 rounded font-bold text-[10px] transition cursor-pointer"
                                   >
                                     <Printer className="w-3.5 h-3.5" />
-                                    <span>Bilet Quraşdır</span>
+                                    <span>{t('vendorBookings.crmTab.buttons.setupTicket')}</span>
                                   </button>
                                 ) : b.status === 'cancelled' ? (
-                                  <span className="text-[10px] text-red-500 font-bold">LƏĞV EDİLİB</span>
+                                  <span className="text-[10px] text-red-500 font-bold">{t('vendorBookings.crmTab.table.cancelledBadge')}</span>
                                 ) : (
-                                  <span className="text-[10px] text-slate-400 italic">Gözləmədə...</span>
+                                  <span className="text-[10px] text-slate-400 italic">{t('vendorBookings.crmTab.table.pendingEllipsis')}</span>
                                 )}
                               </td>
                             </tr>
@@ -555,7 +558,7 @@ export function CrmTab({ tours, slots, bookings, currentUser, operatorToken, onE
                   <div className="bg-white rounded-2xl border border-slate-100 shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto overflow-hidden animate-scaleIn font-sans">
                     <div className="p-4 bg-slate-900 text-white flex items-center justify-between">
                       <h4 className="text-xs font-extrabold tracking-widest flex items-center gap-2">
-                        🎟️ İştirakçı Əlavə Et (Kənar Satış)
+                        🎟️ {t('vendorBookings.crmTab.addModal.title')}
                       </h4>
                       <button
                         type="button"
@@ -571,7 +574,7 @@ export function CrmTab({ tours, slots, bookings, currentUser, operatorToken, onE
                         e.preventDefault();
                         if (!manualName || !manualPhone) {
                           if (onShowNotification) {
-                            onShowNotification('Zəhmət olmasa Ad Soyad və Telefon sahələrini doldurun.', 'warning');
+                            onShowNotification(t('vendorBookings.crmTab.addModal.fillNameAndPhone'), 'warning');
                           }
                           return;
                         }
@@ -612,7 +615,7 @@ export function CrmTab({ tours, slots, bookings, currentUser, operatorToken, onE
                           setIsAddParticipantOpen(false);
 
                           if (onShowNotification) {
-                            onShowNotification('Kənar iştirakçı uğurla qeydiyyata alındı və yer limiti azaldıldı! 🌲✨', 'success');
+                            onShowNotification(t('vendorBookings.crmTab.notifications.manualParticipantAdded'), 'success');
                           }
 
                           if (finalPaymentStatus === 'Ödənilib') {
@@ -624,7 +627,7 @@ export function CrmTab({ tours, slots, bookings, currentUser, operatorToken, onE
                             );
                           }
                         } catch (err: any) {
-                          setManualBookingError(err?.message || 'İştirakçı əlavə edilərkən xəta baş verdi. Yenidən cəhd edin.');
+                          setManualBookingError(err?.message || t('vendorBookings.crmTab.addModal.addParticipantError'));
                         } finally {
                           setIsSubmittingManualBooking(false);
                         }
@@ -632,7 +635,7 @@ export function CrmTab({ tours, slots, bookings, currentUser, operatorToken, onE
                       className="p-6 text-left flex flex-col gap-4"
                     >
                       <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 text-xs text-slate-700">
-                        <div className="font-bold text-slate-900 mb-1">Seçilmiş Marşrut və Tarix:</div>
+                        <div className="font-bold text-slate-900 mb-1">{t('vendorBookings.crmTab.addModal.selectedRouteAndDate')}</div>
                         <div className="flex items-center justify-between mt-1.5">
                           <span className="font-semibold text-emerald-800">{selectedCrmTour?.name}</span>
                           <span className="px-2 py-0.5 bg-slate-200 text-slate-700 font-mono font-bold rounded">{selectedCrmSlot?.startDate}</span>
@@ -640,11 +643,11 @@ export function CrmTab({ tours, slots, bookings, currentUser, operatorToken, onE
                       </div>
 
                       <div className="space-y-1">
-                        <label className="block text-xs font-bold text-slate-700">Adı və Soyadı *</label>
+                        <label className="block text-xs font-bold text-slate-700">{t('vendorBookings.crmTab.addModal.nameLabel')}</label>
                         <input
                           type="text"
                           required
-                          placeholder="Məs: Əli Məmmədov"
+                          placeholder={t('vendorBookings.crmTab.addModal.namePlaceholder')}
                           value={manualName}
                           onChange={(e) => setManualName(e.target.value)}
                           className="w-full bg-slate-50 border border-slate-200 p-2.5 text-xs rounded-xl focus:outline-none focus:border-emerald-600 focus:bg-white transition"
@@ -652,11 +655,11 @@ export function CrmTab({ tours, slots, bookings, currentUser, operatorToken, onE
                       </div>
 
                       <div className="space-y-1">
-                        <label className="block text-xs font-bold text-slate-705 text-slate-700">Mobil Telefon Nömrəsi *</label>
+                        <label className="block text-xs font-bold text-slate-705 text-slate-700">{t('vendorBookings.crmTab.addModal.phoneLabel')}</label>
                         <input
                           type="tel"
                           required
-                          placeholder="Məs: +994 50 123 45 67"
+                          placeholder={t('vendorBookings.crmTab.addModal.phonePlaceholder')}
                           value={manualPhone}
                           onChange={(e) => setManualPhone(e.target.value)}
                           className="w-full bg-slate-50 border border-slate-200 p-2.5 text-xs rounded-xl focus:outline-none focus:border-emerald-600 focus:bg-white font-mono font-semibold transition"
@@ -664,12 +667,12 @@ export function CrmTab({ tours, slots, bookings, currentUser, operatorToken, onE
                       </div>
 
                       <div className="space-y-1">
-                        <label className="block text-xs font-bold text-slate-700">İştirakçı Sayı (Bilet) *</label>
+                        <label className="block text-xs font-bold text-slate-700">{t('vendorBookings.crmTab.addModal.participantCountLabel')}</label>
                         <input
                           type="number"
                           required
                           min="1"
-                          placeholder="Yer sayı"
+                          placeholder={t('vendorBookings.crmTab.addModal.participantCountPlaceholder')}
                           value={manualParticipantsCount}
                           onChange={(e) => { const raw = e.target.value; setManualParticipantsCount(raw === '' ? '' : Math.max(1, Number(raw))); }}
                           className="w-full bg-slate-50 border border-slate-200 p-2.5 text-xs rounded-xl focus:outline-none focus:border-emerald-600 focus:bg-white font-mono font-semibold transition"
@@ -677,7 +680,7 @@ export function CrmTab({ tours, slots, bookings, currentUser, operatorToken, onE
                       </div>
 
                       <div className="space-y-1">
-                        <label className="block text-xs font-bold text-slate-705 text-slate-700 font-sans">Ödəniş Statusu</label>
+                        <label className="block text-xs font-bold text-slate-705 text-slate-700 font-sans">{t('vendorBookings.crmTab.addModal.paymentStatusLabel')}</label>
                         <select
                           value={manualPaymentStatus}
                           onChange={(e) => {
@@ -686,15 +689,15 @@ export function CrmTab({ tours, slots, bookings, currentUser, operatorToken, onE
                           }}
                           className="w-full bg-slate-50 border border-slate-200 p-2.5 text-xs rounded-xl focus:outline-none focus:border-emerald-600 transition cursor-pointer font-bold"
                         >
-                          <option value="Ödənilməyib">Ödənilməyib</option>
-                          <option value="Ödənilib">Ödənilib</option>
+                          <option value="Ödənilməyib">{t('vendorBookings.crmTab.filters.unpaidOption')}</option>
+                          <option value="Ödənilib">{t('vendorBookings.crmTab.filters.paidOption')}</option>
                         </select>
                       </div>
 
                       <div className="space-y-1">
-                        <label className="block text-xs font-bold text-slate-700">Operator Qeydi (İstəyə uyğun)</label>
+                        <label className="block text-xs font-bold text-slate-700">{t('vendorBookings.crmTab.addModal.operatorNoteLabel')}</label>
                         <textarea
-                          placeholder="Məs: Sumqayıtdan minəcək, vegetarian menyu..."
+                          placeholder={t('vendorBookings.crmTab.addModal.operatorNotePlaceholder')}
                           value={manualOperatorNote}
                           onChange={(e) => setManualOperatorNote(e.target.value)}
                           rows={2}
@@ -714,14 +717,14 @@ export function CrmTab({ tours, slots, bookings, currentUser, operatorToken, onE
                           onClick={() => setIsAddParticipantOpen(false)}
                           className="w-1/2 p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-705 text-slate-700 font-bold text-xs rounded-xl transition cursor-pointer"
                         >
-                          İmtina Et
+                          {t('vendorBookings.crmTab.addModal.cancelButton')}
                         </button>
                         <button
                           type="submit"
                           disabled={isSubmittingManualBooking}
                           className="w-1/2 p-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition shadow-md cursor-pointer disabled:opacity-50"
                         >
-                          {isSubmittingManualBooking ? 'Yadda saxlanılır...' : 'Yadda Saxla'}
+                          {isSubmittingManualBooking ? t('vendorBookings.crmTab.addModal.saving') : t('vendorBookings.crmTab.addModal.saveButton')}
                         </button>
                       </div>
                     </form>
@@ -729,15 +732,15 @@ export function CrmTab({ tours, slots, bookings, currentUser, operatorToken, onE
                 </div>
               )}
 
-              <QrScannerModal 
-                 isOpen={isQrScannerOpen} 
-                 onClose={() => setIsQrScannerOpen(false)} 
-                 onScan={handleQrScan} 
+              <QrScannerModal
+                 isOpen={isQrScannerOpen}
+                 onClose={() => setIsQrScannerOpen(false)}
+                 onScan={handleQrScan}
               />
 
           {crmTourId && slots.filter(s => s.tourId === crmTourId).length === 0 && (
             <div className="p-8 text-center bg-white border border-slate-200 rounded-xl text-slate-400 italic text-xs">
-              Bu tur üçün heç bir fəal təqvim tapılmadı. Zəhmət olmasa digər tur seçin və ya yeni təqvim yaradın.
+              {t('vendorBookings.crmTab.noActiveCalendar')}
             </div>
           )}
         </div>

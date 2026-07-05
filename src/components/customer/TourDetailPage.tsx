@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Tour, TourSlot, Booking, Review, User } from '../../types';
 import { REVIEWS_ENABLED } from '../../config/features';
 import { computeFeaturedTourIds } from '../../utils/featuredTours';
+import { useLanguage } from '../../i18n/LanguageContext';
 import {
   Calendar,
   Check,
@@ -83,6 +84,7 @@ export function TourDetailPage({
   handlePackingExperienceSelect,
   togglePackingItemChecked
 }: TourDetailPageProps) {
+  const { t } = useLanguage();
   const [isDescExpanded, setIsDescExpanded] = useState<boolean>(false);
   const [selectedSlot, setSelectedSlot] = useState<TourSlot | null>(null);
   const [bookingQty, setBookingQty] = useState<number>(1);
@@ -164,11 +166,11 @@ export function TourDetailPage({
       if (selectedTour.equipmentIncluded && usingOwnEquipment) {
         const discount = selectedTour.equipmentRentalPrice || 10;
         perPerson = Math.max(0, perPerson - discount);
-        descParts.push(`Öz avadanlığı endirimi (-${discount} ${selectedTour.priceCurrency || 'AZN'})`);
+        descParts.push(t('tourDetailPage.priceCalc.ownEquipmentDiscount', { discount, currency: selectedTour.priceCurrency || 'AZN' }));
       } else if (!selectedTour.equipmentIncluded && rentEquipment) {
         const rental = selectedTour.equipmentRentalPrice || 15;
         perPerson = perPerson + rental;
-        descParts.push(`Avadanlıq kirayəsi (+${rental} ${selectedTour.priceCurrency || 'AZN'})`);
+        descParts.push(t('tourDetailPage.priceCalc.equipmentRental', { rental, currency: selectedTour.priceCurrency || 'AZN' }));
       }
     }
 
@@ -211,18 +213,18 @@ export function TourDetailPage({
 
   const handleSendVerificationCode = () => {
     if (!bookingCustomerName.trim()) {
-      if (onShowNotification) onShowNotification('Sifarişi tamamlamaq üçün Ad və Soyadınızı daxil edin.', 'warning');
+      if (onShowNotification) onShowNotification(t('tourDetailPage.booking.validation.nameRequired'), 'warning');
       return;
     }
     if (!bookingCustomerPhone.trim()) {
-      if (onShowNotification) onShowNotification('Sifarişi tamamlamaq üçün WhatsApp əlaqə nömrənizi daxil edin.', 'warning');
+      if (onShowNotification) onShowNotification(t('tourDetailPage.booking.validation.phoneRequired'), 'warning');
       return;
     }
 
     // Clean Phone value
     const cleanPhone = bookingCustomerPhone.replace(/\D/g, '');
     if (cleanPhone.length < 7) {
-      if (onShowNotification) onShowNotification('Mötəbər bir WhatsApp nömrəsi daxil edin (məsələn: +994 50 123 45 67).', 'warning');
+      if (onShowNotification) onShowNotification(t('tourDetailPage.booking.validation.phoneInvalid'), 'warning');
       return;
     }
 
@@ -234,25 +236,25 @@ export function TourDetailPage({
     setShowIncomingOtpBanner(true);
 
     if (onShowNotification) {
-      onShowNotification(`Təsdiq kodu (${generatedCode}) WhatsApp nömrənizə göndərildi!`, 'success');
+      onShowNotification(t('tourDetailPage.booking.validation.otpSent', { code: generatedCode }), 'success');
     }
   };
 
   const handleVerifyOtp = () => {
     if (!userInputOtp.trim()) {
-      if (onShowNotification) onShowNotification('Zəhmət olmasa daxil olan 4 rəqəmli kodu yazın.', 'warning');
+      if (onShowNotification) onShowNotification(t('tourDetailPage.booking.validation.otpEmpty'), 'warning');
       return;
     }
     if (userInputOtp === verificationOtpCode) {
       setIsPhoneVerified(true);
       setShowIncomingOtpBanner(false);
       if (onShowNotification) {
-        onShowNotification('Əla! WhatsApp nömrəniz uğurla təsdiqləndi. İndi rezervasiyanı tamamlaya bilərsiniz! ✅', 'success');
+        onShowNotification(t('tourDetailPage.booking.validation.otpVerified'), 'success');
       }
     } else {
       setIsPhoneVerified(false);
       if (onShowNotification) {
-        onShowNotification('Təsdiq kodu yanlışdır! Zəhmət olmasa yenidən yoxlayın.', 'error');
+        onShowNotification(t('tourDetailPage.booking.validation.otpWrong'), 'error');
       }
     }
   };
@@ -328,12 +330,12 @@ export function TourDetailPage({
     } catch (e: any) {
       setIsProcessingPayment(false);
       setIsRedirecting(false);
-      setBookingSubmitError(e?.message || 'Rezervasiya göndərilərkən xəta baş verdi. Zəhmət olmasa yenidən cəhd edin.');
+      setBookingSubmitError(e?.message || t('tourDetailPage.booking.validation.submitError'));
       return;
     }
 
     if (onShowNotification) {
-      onShowNotification('Statistika qeydə alındı! WhatsApp-a yönləndirilirsiniz...', 'info');
+      onShowNotification(t('tourDetailPage.booking.notifications.statsRecorded'), 'info');
     }
 
     // 3. Exactly 1-second wait before auto-direction: "Müştəri WhatsApp-a yönləndirilməzdən tam bir saniyə öncə arxa planda klik statistikasını tutmalıyq."
@@ -342,15 +344,25 @@ export function TourDetailPage({
       setIsRedirecting(false);
 
       // Raw message formatting
-      let msgText = `Salam, mən saytınızdan '${selectedTour.name}' üçün rezervasiya etmək istəyirəm.\nTarix: ${selectedSlot.startDate}.\nYer sayı: ${finalQty} nəfər.\nSifariş ID: #${bookingRef}.\nAd Soyad: ${bookingCustomerName.trim() || currentUser.name}.\nƏlaqə nömrəsi: ${bookingCustomerPhone.trim() || currentUser.phone}`;
+      let msgText = t('tourDetailPage.booking.waMessage.intro', {
+        tourName: selectedTour.name,
+        date: selectedSlot.startDate,
+        qty: finalQty,
+        bookingRef,
+        customerName: bookingCustomerName.trim() || currentUser.name,
+        customerPhone: bookingCustomerPhone.trim() || currentUser.phone
+      });
 
       if (selectedTour.category === 'active' || selectedTour.isActiveLife) {
-        msgText += `\n\n📌 *İdman Qeydiyyat Növü:* ${bookingRegType === 'team' ? `Komandalı qeydiyyat (Komanda adı: ${bookingTeamName || 'Göstərilməyib'})` : 'Fərdi qeydiyyat'}`;
+        const regTypeText = bookingRegType === 'team'
+          ? t('tourDetailPage.booking.waMessage.teamRegType', { teamName: bookingTeamName || t('tourDetailPage.booking.waMessage.teamNameNotProvided') })
+          : t('tourDetailPage.booking.waMessage.individualRegType');
+        msgText += t('tourDetailPage.booking.waMessage.regTypeLine', { regType: regTypeText });
 
         if (bookingRegType === 'team') {
           const filledMembers = bookingTeamMembers.filter(m => m.name.trim());
           if (filledMembers.length > 0) {
-            msgText += `\n👥 *Komanda Üzvləri:*`;
+            msgText += t('tourDetailPage.booking.waMessage.teamMembersHeader');
             filledMembers.forEach((m, i) => {
               msgText += `\n  - ${i + 2}. ${m.name} (${m.phone})`;
             });
@@ -358,12 +370,20 @@ export function TourDetailPage({
         }
 
         if (selectedTour.equipmentIncluded) {
-          msgText += `\n🎒 *Avadanlıq:* ${usingOwnEquipment ? 'Öz şəxsi avadanlığım var (Endirimli)' : 'Təşkilatçının daxil etdiyi pulsuz avadanlıq'}`;
+          msgText += t('tourDetailPage.booking.waMessage.equipmentLine', {
+            equipment: usingOwnEquipment
+              ? t('tourDetailPage.booking.waMessage.ownEquipmentDiscounted')
+              : t('tourDetailPage.booking.waMessage.organizerFreeEquipment')
+          });
         } else {
-          msgText += `\n🎒 *Avadanlıq:* ${rentEquipment ? 'Kirayə etmək istəyirəm (Ödənişli)' : 'Öz şəxsi avadanlığım var'}`;
+          msgText += t('tourDetailPage.booking.waMessage.equipmentLine', {
+            equipment: rentEquipment
+              ? t('tourDetailPage.booking.waMessage.rentPaid')
+              : t('tourDetailPage.booking.waMessage.ownEquipment')
+          });
         }
 
-        msgText += `\n⚖️ *Təhlükəsizlik razılığı:* Təsdiq edildi ✅`;
+        msgText += t('tourDetailPage.booking.waMessage.safetyLine');
       }
 
       // Driver/Guide specific direct whatsapp number or fallback +994706717804
@@ -397,7 +417,7 @@ export function TourDetailPage({
             {/* Header Section */}
             <div className="mb-8 space-y-4">
               <div className="flex space-x-2 text-xs text-label-tertiary font-medium">
-                <span><strong className="text-label-primary cursor-pointer pointer-events-auto hover:underline" onClick={(e) => { e.stopPropagation(); const org = users.find(u => u.id === selectedTour.vendorId); if (org) { setSelectedOrganizer(org); setActiveView('organizer'); setSelectedTour(null); } }}>{selectedTour.vendorName}</strong> tərəfindən</span>
+                <span><strong className="text-label-primary cursor-pointer pointer-events-auto hover:underline" onClick={(e) => { e.stopPropagation(); const org = users.find(u => u.id === selectedTour.vendorId); if (org) { setSelectedOrganizer(org); setActiveView('organizer'); setSelectedTour(null); } }}>{selectedTour.vendorName}</strong> {t('tourDetailPage.header.by')}</span>
               </div>
               <h1 className="text-3xl sm:text-4xl font-extrabold text-label-primary tracking-tight leading-tight">
                 {selectedTour.name}
@@ -405,12 +425,12 @@ export function TourDetailPage({
               <div className="flex flex-wrap items-center justify-between gap-4 mt-2">
                 <div className="flex items-center gap-4">
                   {isFeaturedThisMonth && (
-                    <div className="bg-amber-500 text-white border border-amber-600 text-xs font-extrabold px-2 py-1 rounded shadow-sm shrink-0">🔥 Ayın Ən Çox Satılanı</div>
+                    <div className="bg-amber-500 text-white border border-amber-600 text-xs font-extrabold px-2 py-1 rounded shadow-sm shrink-0">🔥 {t('tourDetailPage.header.bestSellerBadge')}</div>
                   )}
                   {REVIEWS_ENABLED && (
                     <div className="flex items-center gap-1 font-bold text-label-primary text-sm shrink-0">
                       <Star className="w-4 h-4 fill-amber-500 text-amber-500" />
-                      4.9 <span className="text-label-tertiary font-normal underline decoration-slate-300">({getReviewsCount(selectedTour.id)} rəy)</span>
+                      4.9 <span className="text-label-tertiary font-normal underline decoration-slate-300">({t('tourDetailPage.header.reviewsCount', { count: getReviewsCount(selectedTour.id) })})</span>
                     </div>
                   )}
                   <div className="flex items-center gap-1 font-bold text-label-primary text-sm shrink-0">
@@ -427,10 +447,10 @@ export function TourDetailPage({
                     }`}
                   >
                     <Heart className={`w-4 h-4 ${wishlist.includes(selectedTour.id) ? 'fill-rose-600 text-rose-600' : ''}`} />
-                    {wishlist.includes(selectedTour.id) ? 'İstəklərdə' : 'İstəklərə əlavə et'}
+                    {wishlist.includes(selectedTour.id) ? t('tourDetailPage.header.inWishlist') : t('tourDetailPage.header.addToWishlist')}
                   </button>
                   <button onClick={() => handleShareTour(selectedTour)} className="flex items-center gap-2 border border-slate-200 rounded-full px-4 py-2 hover:bg-slate-50 text-slate-700 font-extrabold text-sm transition cursor-pointer shadow-sm">
-                    <Share2 className="w-4 h-4" /> Paylaş
+                    <Share2 className="w-4 h-4" /> {t('tourDetailPage.header.share')}
                   </button>
                 </div>
               </div>
@@ -464,18 +484,18 @@ export function TourDetailPage({
                           
                           <div className="absolute inset-x-0 bottom-0 top-0 flex items-end justify-end p-4 pointer-events-none">
                             <button className="bg-white/95 text-slate-900 px-4 py-2 border border-slate-200 rounded-lg shadow-sm text-sm font-extrabold flex items-center gap-2 pointer-events-auto hover:bg-slate-50 transition cursor-pointer">
-                              <Grid2X2 className="w-4 h-4" /> Hamısına bax
+                              <Grid2X2 className="w-4 h-4" /> {t('tourDetailPage.gallery.viewAll')}
                             </button>
                           </div>
                         </div>
                       </div>
-                      
+
                       {/* Mobile Gallery (Carousel) */}
                       <div className="md:hidden relative h-[300px] rounded-2xl overflow-hidden shadow-sm block bg-slate-100">
                          <img src={allMedia[0]} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
                          <div className="absolute bottom-3 right-3 pointer-events-auto">
                            <button onClick={() => setLightboxIndex(0)} className="bg-white/95 text-slate-900 px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm flex items-center gap-1.5 cursor-pointer border border-slate-200">
-                             <Grid2X2 className="w-3.5 h-3.5" /> Bütün şəkillərə bax
+                             <Grid2X2 className="w-3.5 h-3.5" /> {t('tourDetailPage.gallery.viewAllImages')}
                            </button>
                          </div>
                       </div>
@@ -487,16 +507,16 @@ export function TourDetailPage({
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-6 py-6 border-b border-slate-200">
                   <div className="flex flex-col gap-1.5">
                     <Calendar className="w-6 h-6 text-slate-700 mb-1" />
-                    <span className="text-sm font-extrabold text-slate-900">{(selectedTour.cancellationHours ?? 48) === 0 ? 'Ləğv edilmir' : 'Ödənişsiz ləğv'}</span>
+                    <span className="text-sm font-extrabold text-slate-900">{(selectedTour.cancellationHours ?? 48) === 0 ? t('tourDetailPage.quickInfo.noCancellation') : t('tourDetailPage.quickInfo.freeCancellation')}</span>
                     <span className="text-xs text-slate-500 leading-snug">
                       {(selectedTour.cancellationHours ?? 48) === 0
-                        ? 'Bu tur üçün ləğvetmə mümkün deyil'
-                        : `${selectedTour.cancellationHours ?? 48} saat əvvələ qədər ödənişsiz ləğv et`}
+                        ? t('tourDetailPage.quickInfo.noCancellationDesc')
+                        : t('tourDetailPage.quickInfo.freeCancellationDesc', { hours: selectedTour.cancellationHours ?? 48 })}
                     </span>
                   </div>
                   <div className="flex flex-col gap-1.5">
                     <Clock className="w-6 h-6 text-slate-700 mb-1" />
-                    <span className="text-sm font-extrabold text-slate-900">Müddət: {selectedTour.durationHours ?? (selectedTour.durationDays * 8)} saat</span>
+                    <span className="text-sm font-extrabold text-slate-900">{t('tourDetailPage.quickInfo.duration', { hours: selectedTour.durationHours ?? (selectedTour.durationDays * 8) })}</span>
                     <button
                       type="button"
                       onClick={() => {
@@ -504,20 +524,20 @@ export function TourDetailPage({
                       }}
                       className="text-xs text-slate-500 leading-snug text-left underline decoration-dotted underline-offset-2 hover:text-slate-700 cursor-pointer"
                     >
-                      Başlama vaxtlarını görmək üçün yoxlayın.
+                      {t('tourDetailPage.quickInfo.checkStartTimes')}
                     </button>
                   </div>
                   <div className="flex flex-col gap-1.5">
                     <Globe className="w-6 h-6 text-slate-700 mb-1" />
-                    <span className="text-sm font-extrabold text-slate-900">Peşəkar tur bələdçisi</span>
+                    <span className="text-sm font-extrabold text-slate-900">{t('tourDetailPage.quickInfo.professionalGuide')}</span>
                     <span className="text-xs text-slate-500 leading-snug">
-                      {selectedTour.languages && selectedTour.languages.length > 0 ? selectedTour.languages.join(', ') : 'Azərbaycanca'}
+                      {selectedTour.languages && selectedTour.languages.length > 0 ? selectedTour.languages.join(', ') : t('tourDetailPage.quickInfo.azerbaijaniLanguage')}
                     </span>
                   </div>
                   <div className="flex flex-col gap-1.5">
                     <Users className="w-6 h-6 text-slate-700 mb-1" />
-                    <span className="text-sm font-extrabold text-slate-900">Özəl qrup turları</span>
-                    <span className="text-xs text-slate-500 leading-snug">Sifariş zamanı seçilə bilər</span>
+                    <span className="text-sm font-extrabold text-slate-900">{t('tourDetailPage.quickInfo.privateGroupTours')}</span>
+                    <span className="text-xs text-slate-500 leading-snug">{t('tourDetailPage.quickInfo.selectableAtBooking')}</span>
                   </div>
                 </div>
 
@@ -526,10 +546,10 @@ export function TourDetailPage({
                   <div id="tour-slots-calendar" className="scroll-mt-32 animate-fadeIn">
                     <h4 className="text-sm font-bold text-slate-800 tracking-wide flex items-center gap-2">
                       <Calendar className="w-4 h-4 text-slate-500" />
-                      Yürüş Təqvimi və Qiymətlər
+                      {t('tourDetailPage.slotsCalendar.title')}
                     </h4>
                     <p className="text-[11px] text-slate-400 mt-1 mb-2">
-                      Bələdçi tərəfindən müəyyən edilmiş tarixlər və boş yer limitləri.
+                      {t('tourDetailPage.slotsCalendar.subtitle')}
                     </p>
 
                     <div className="space-y-2.5 max-h-48 overflow-y-auto pr-1">
@@ -546,14 +566,14 @@ export function TourDetailPage({
                             }`}
                           >
                             <div className="space-y-1">
-                              <span className="font-bold text-slate-700 block">📅 Tarix: {slot.startDate}</span>
+                              <span className="font-bold text-slate-700 block">📅 {t('tourDetailPage.slotsCalendar.date', { date: slot.startDate })}</span>
                               <span className="text-slate-400 block text-[10px]">
-                                {slot.startDate !== slot.endDate && `Bitmə Tarixi: ${slot.endDate}`}
+                                {slot.startDate !== slot.endDate && t('tourDetailPage.slotsCalendar.endDate', { date: slot.endDate })}
                               </span>
                             </div>
 
                             <div className="text-center">
-                              <span className="text-[10px] text-slate-400 block">Boş Yer</span>
+                              <span className="text-[10px] text-slate-400 block">{t('tourDetailPage.slotsCalendar.remainingSpots')}</span>
                               <strong className={`${isFull ? 'text-red-500' : 'text-slate-700'}`}>
                                 {remainingSpots} / {slot.capacity}
                               </strong>
@@ -561,7 +581,7 @@ export function TourDetailPage({
 
                             <div className="flex items-center gap-4">
                               <span className="text-base font-extrabold text-sky-705">
-                                {getConvertedPriceInfo(slot.price, selectedTour.priceCurrency).both} / nəfər
+                                {t('tourDetailPage.slotsCalendar.pricePerPerson', { price: getConvertedPriceInfo(slot.price, selectedTour.priceCurrency).both })}
                               </span>
                               {!isFull ? (
                                 <button
@@ -569,10 +589,10 @@ export function TourDetailPage({
                                   onClick={() => handleOpenBooking(slot)}
                                   className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded transition"
                                 >
-                                  Rezerv et
+                                  {t('tourDetailPage.slotsCalendar.reserve')}
                                 </button>
                               ) : (
-                                <span className="text-[11px] text-red-500 font-bold tracking-wider">DOLUB</span>
+                                <span className="text-[11px] text-red-500 font-bold tracking-wider">{t('tourDetailPage.slotsCalendar.full')}</span>
                               )}
                             </div>
                           </div>
@@ -596,44 +616,44 @@ export function TourDetailPage({
                           <div className="w-14 h-14 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto shadow-inner">
                             <MessageCircle className="w-8 h-8 fill-current" />
                           </div>
-                          <h3 className="text-lg font-extrabold text-slate-800">WhatsApp Rezervasiyası Yaradıldı!</h3>
+                          <h3 className="text-lg font-extrabold text-slate-800">{t('tourDetailPage.bookingSuccess.whatsapp.title')}</h3>
                           <p className="text-xs text-slate-500 max-w-sm mx-auto leading-relaxed">
-                            Biletiniz sistemdə müvəqqəti qeydiyyata alındı <strong>(Gözləmədə)</strong>. İştirakınızı tam təsdiqləmək üçün aşağıdakı düyməyə basaraq operatora yazın və ödəniş qəbzini (m10/Kart) göndərin.
+                            {t('tourDetailPage.bookingSuccess.whatsapp.descPart1')} <strong>{t('tourDetailPage.bookingSuccess.whatsapp.pendingLabel')}</strong>. {t('tourDetailPage.bookingSuccess.whatsapp.descPart2')}
                           </p>
 
                           <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 text-left max-w-sm mx-auto space-y-2 text-xs">
                             <div className="flex justify-between">
-                              <span className="text-slate-400">Sifariş ID:</span>
+                              <span className="text-slate-400">{t('tourDetailPage.bookingSuccess.orderId')}</span>
                               <strong className="font-mono text-slate-705 text-slate-800">#{bookingSuccessData.bookingRef}</strong>
                             </div>
                             <div className="flex justify-between">
-                              <span className="text-slate-400">Tur marşrutu:</span>
+                              <span className="text-slate-400">{t('tourDetailPage.bookingSuccess.tourRoute')}</span>
                               <strong className="text-slate-700 text-right">{bookingSuccessData.tourName}</strong>
                             </div>
                             <div className="flex justify-between">
-                              <span className="text-slate-400">Tarix:</span>
+                              <span className="text-slate-400">{t('tourDetailPage.bookingSuccess.date')}</span>
                               <strong className="text-slate-700">{bookingSuccessData.date}</strong>
                             </div>
                             <div className="flex justify-between">
-                              <span className="text-slate-400">Ödəniləcək Məbləğ:</span>
+                              <span className="text-slate-400">{t('tourDetailPage.bookingSuccess.amountDue')}</span>
                               <strong className="text-emerald-650 text-sm font-extrabold text-emerald-600">{bookingSuccessData.amount} AZN</strong>
                             </div>
                             <div className="flex justify-between">
-                              <span className="text-slate-400">Sistem qeydiyyat növü:</span>
-                              <span className="bg-amber-100 text-amber-800 text-[10px] font-extrabold px-1.5 py-0.5 rounded">GÖZLƏYİR (WHATSAPP)</span>
+                              <span className="text-slate-400">{t('tourDetailPage.bookingSuccess.systemRegType')}</span>
+                              <span className="bg-amber-100 text-amber-800 text-[10px] font-extrabold px-1.5 py-0.5 rounded">{t('tourDetailPage.bookingSuccess.pendingWhatsapp')}</span>
                             </div>
                           </div>
 
                           {/* Action Button: Open WhatsApp pre-drafted message */}
                           <div className="flex flex-col gap-2 max-w-sm mx-auto pt-2">
-                            <a 
+                            <a
                               href={`https://wa.me/${bookingSuccessData.waNumber}?text=${encodeURIComponent(bookingSuccessData.waMessage)}`}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="w-full py-3 bg-whatsapp-500 hover:bg-whatsapp-600 hover:scale-[1.02] transform transition-all text-white font-extrabold text-xs rounded-xl shadow-lg shadow-whatsapp-500/20 flex items-center justify-center gap-2 cursor-pointer no-underline"
                             >
                               <MessageCircle className="w-4 h-4 fill-current" />
-                              WhatsApp ilə Mesajı Göndər ↗
+                              {t('tourDetailPage.bookingSuccess.sendViaWhatsapp')} ↗
                             </a>
 
                             {/* Copy to clipboard fallback button */}
@@ -641,20 +661,20 @@ export function TourDetailPage({
                               type="button"
                               onClick={() => {
                                 navigator.clipboard.writeText(bookingSuccessData.waMessage);
-                                if (onShowNotification) onShowNotification('Sifariş mətni buferə kopyalandı! WhatsApp-da bəhs etdiyiniz nömrəyə asanlıqla yapışdıra bilərsiniz.', 'success');
+                                if (onShowNotification) onShowNotification(t('tourDetailPage.bookingSuccess.copiedNotification'), 'success');
                               }}
                               className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-[11px] rounded-lg transition flex items-center justify-center gap-1.5 cursor-pointer border border-slate-200"
                             >
-                              <Copy className="w-3.5 h-3.5" /> Mətni Kopyala & WhatsApp-a Keç
+                              <Copy className="w-3.5 h-3.5" /> {t('tourDetailPage.bookingSuccess.copyAndGoToWhatsapp')}
                             </button>
                           </div>
 
                           {/* WhatsApp dispatch simulation console */}
                           <div className="bg-slate-950 p-4 rounded-lg text-left max-w-sm mx-auto border border-emerald-950 font-mono text-[10px] space-y-1 text-slate-450 text-slate-400 shadow-inner">
                             <div className="text-emerald-400">// WHATSAPP DISPATCH HANDLES READY</div>
-                            <div>Bələdçi Nömrəsi: {bookingSuccessData.waNumber}</div>
+                            <div>{t('tourDetailPage.bookingSuccess.guideNumber')} {bookingSuccessData.waNumber}</div>
                             <div className="text-amber-400">Status: Awaiting Receipt validation via WhatsApp / SMS</div>
-                            <div className="text-slate-500">// Ödəniş qəbzi alındıqdan sonra dərhal "Təsdiqləndi" biletiniz və SMS gələcəkdir.</div>
+                            <div className="text-slate-500">// {t('tourDetailPage.bookingSuccess.consoleFooter')}</div>
                           </div>
                         </>
                       ) : (
@@ -662,30 +682,30 @@ export function TourDetailPage({
                           <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto text-xl">
                             ✓
                           </div>
-                          <h3 className="text-lg font-bold text-slate-800">Uğurlu Satınalma!</h3>
+                          <h3 className="text-lg font-bold text-slate-800">{t('tourDetailPage.bookingSuccess.purchase.title')}</h3>
                           <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                            Təbriklər, ödənişiniz uğurla tamamlandı. Dağ yürüşünə biletiniz və SMS bildiriş təsdiqi göndərildi!
+                            {t('tourDetailPage.bookingSuccess.purchase.desc')}
                           </p>
 
                           <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 text-left max-w-sm mx-auto space-y-2 text-xs">
                             <div className="flex justify-between">
-                              <span className="text-slate-400">Bilet nömrəsi:</span>
+                              <span className="text-slate-400">{t('tourDetailPage.bookingSuccess.ticketNumber')}</span>
                               <strong className="font-mono text-slate-700">#{bookingSuccessData.bookingId}</strong>
                             </div>
                             <div className="flex justify-between">
-                              <span className="text-slate-400">Turun adı:</span>
+                              <span className="text-slate-400">{t('tourDetailPage.bookingSuccess.tourName')}</span>
                               <strong className="text-slate-700 text-right">{bookingSuccessData.tourName}</strong>
                             </div>
                             <div className="flex justify-between">
-                              <span className="text-slate-400">Tarix:</span>
+                              <span className="text-slate-400">{t('tourDetailPage.bookingSuccess.date')}</span>
                               <strong className="text-slate-700">{bookingSuccessData.date}</strong>
                             </div>
                             <div className="flex justify-between">
-                              <span className="text-slate-400">Ödənilən Məbləğ:</span>
+                              <span className="text-slate-400">{t('tourDetailPage.bookingSuccess.amountPaid')}</span>
                               <strong className="text-emerald-600">{bookingSuccessData.amount} AZN</strong>
                             </div>
                             <div className="flex justify-between">
-                              <span className="text-slate-400">Ödəniş Metodu:</span>
+                              <span className="text-slate-400">{t('tourDetailPage.bookingSuccess.paymentMethod')}</span>
                               <span className="font-mono text-xs text-slate-700 font-bold">{bookingSuccessData.method}</span>
                             </div>
                           </div>
@@ -695,7 +715,7 @@ export function TourDetailPage({
                             <div className="text-emerald-400">// SMS INTEGRATION TRANSMISSION OK</div>
                             <div>To: {currentUser.phone}</div>
                             <div>Sender: GEDƏKGÖRƏK</div>
-                            <div className="text-slate-300">"Hörmətli {currentUser.name}, {bookingSuccessData.tourName} turuna olan {bookingQty} ədəd biletiniz uğurla alındı. Bilet ID: {bookingSuccessData.bookingId}. Çıxış tarixində iştirakınız təsdiqlənmişdir."</div>
+                            <div className="text-slate-300">{t('tourDetailPage.bookingSuccess.smsBody', { name: currentUser.name, tourName: bookingSuccessData.tourName, qty: bookingQty, bookingId: bookingSuccessData.bookingId })}</div>
                           </div>
                         </>
                       )}
@@ -709,7 +729,7 @@ export function TourDetailPage({
                           }}
                           className="bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs px-4 py-2 rounded-lg transition cursor-pointer"
                         >
-                          Bağla
+                          {t('tourDetailPage.bookingSuccess.close')}
                         </button>
                       </div>
                     </div>
@@ -718,19 +738,19 @@ export function TourDetailPage({
                     <div className="space-y-4">
                       <div className="flex justify-between items-center bg-slate-50 p-3 rounded-lg">
                         <div className="text-xs">
-                          <span className="text-slate-400 block">Seçilən Tarix</span>
+                          <span className="text-slate-400 block">{t('tourDetailPage.checkout.selectedDate')}</span>
                           <strong className="text-slate-700">{selectedSlot?.startDate}</strong>
                         </div>
                         <div className="text-xs text-right">
-                          <span className="text-slate-400 block">Tur Qiyməti</span>
-                          <strong className="text-emerald-600 font-bold">{getConvertedPriceInfo(selectedSlot?.price || 0, selectedTour.priceCurrency).both} / nəfər</strong>
+                          <span className="text-slate-400 block">{t('tourDetailPage.checkout.tourPrice')}</span>
+                          <strong className="text-emerald-600 font-bold">{t('tourDetailPage.checkout.pricePerPerson', { price: getConvertedPriceInfo(selectedSlot?.price || 0, selectedTour.priceCurrency).both })}</strong>
                         </div>
                       </div>
 
                       {/* Participant quantity wrapper */}
                       {bookingRegType !== 'team' ? (
                         <div>
-                          <label className="block text-xs font-semibold text-slate-500 mb-1">İştirakçı sayı:</label>
+                          <label className="block text-xs font-semibold text-slate-500 mb-1">{t('tourDetailPage.checkout.participantCount')}</label>
                           <div className="flex items-center gap-3">
                             <button
                               type="button"
@@ -750,14 +770,14 @@ export function TourDetailPage({
                               +
                             </button>
                             <span className="text-[10px] text-slate-400 italic">
-                              (Maksimum {selectedSlot ? Math.max(0, selectedSlot.capacity - selectedSlot.bookedCount) : 0} yer mövcuddur)
+                              {t('tourDetailPage.checkout.maxSpotsAvailable', { count: selectedSlot ? Math.max(0, selectedSlot.capacity - selectedSlot.bookedCount) : 0 })}
                             </span>
                           </div>
                         </div>
                       ) : (
                         <div className="bg-amber-50 text-amber-900 text-xs p-3 rounded-xl border border-amber-200 font-bold flex items-center justify-between">
-                          <span>📋 Komandalı Qeydiyyat Kontingenti:</span>
-                          <span className="text-xs font-black text-amber-800 bg-white px-2 py-0.5 rounded shadow-sm">6 Nəfərlik Komanda (Sabit)</span>
+                          <span>📋 {t('tourDetailPage.checkout.teamContingentLabel')}</span>
+                          <span className="text-xs font-black text-amber-800 bg-white px-2 py-0.5 rounded shadow-sm">{t('tourDetailPage.checkout.teamContingentValue')}</span>
                         </div>
                       )}
 
@@ -765,13 +785,13 @@ export function TourDetailPage({
                       {(selectedTour.category === 'active' || selectedTour.isActiveLife) && (
                         <div className="bg-amber-50/70 border border-amber-200 rounded-xl p-4.5 space-y-4 shadow-sm animate-fadeIn">
                           <h4 className="text-xs font-bold text-amber-900 tracking-wider flex items-center gap-1.5 border-b border-amber-200 pb-2">
-                            🏅 Aktiv İdman Qeydiyyat Seçimləri
+                            🏅 {t('tourDetailPage.activeSports.title')}
                           </h4>
 
                           {/* Individual vs Team Registration (Volleyball specific or other dynamic games) */}
                           {selectedTour.allowTeamRegistration && (
                             <div className="space-y-2">
-                              <label className="block text-[10px] font-bold text-slate-500 tracking-wider">Qeydiyyat Tipi:</label>
+                              <label className="block text-[10px] font-bold text-slate-500 tracking-wider">{t('tourDetailPage.activeSports.regTypeLabel')}</label>
                               <div className="grid grid-cols-2 gap-2.5">
                                 <button
                                   type="button"
@@ -785,8 +805,8 @@ export function TourDetailPage({
                                       : 'bg-white border-slate-200 hover:bg-slate-50'
                                   }`}
                                 >
-                                  <span className="font-extrabold text-xs text-slate-800">👤 Fərdi Gəlirəm</span>
-                                  <span className="text-[9px] text-slate-400 mt-1 block">Tək qeydiyyat. Sistem sizi boş komanda yerlərinə yerləşdirəcək.</span>
+                                  <span className="font-extrabold text-xs text-slate-800">👤 {t('tourDetailPage.activeSports.individualOption')}</span>
+                                  <span className="text-[9px] text-slate-400 mt-1 block">{t('tourDetailPage.activeSports.individualOptionDesc')}</span>
                                 </button>
                                 <button
                                   type="button"
@@ -800,8 +820,8 @@ export function TourDetailPage({
                                       : 'bg-white border-slate-200 hover:bg-slate-50'
                                   }`}
                                 >
-                                  <span className="font-extrabold text-xs text-slate-800">🏐 Komandamla Gəlirəm</span>
-                                  <span className="text-[9px] text-slate-400 mt-1 block">Siz daxil olmaqla cəmi 6 nəfərlik tam komanda qeydiyyatı.</span>
+                                  <span className="font-extrabold text-xs text-slate-800">🏐 {t('tourDetailPage.activeSports.teamOption')}</span>
+                                  <span className="text-[9px] text-slate-400 mt-1 block">{t('tourDetailPage.activeSports.teamOptionDesc')}</span>
                                 </button>
                               </div>
                             </div>
@@ -812,11 +832,11 @@ export function TourDetailPage({
                             <div className="bg-white/95 border border-amber-200 p-4 rounded-xl space-y-3.5 shadow-xs animate-fadeIn">
                               <div>
                                 <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                                  Komandanızın Adı: <span className="text-red-500">*</span>
+                                  {t('tourDetailPage.activeSports.teamNameLabel')} <span className="text-red-500">*</span>
                                 </label>
                                 <input
                                   type="text"
-                                  placeholder="Məsələn: Gəncə Qartalları"
+                                  placeholder={t('tourDetailPage.activeSports.teamNamePlaceholder')}
                                   value={bookingTeamName}
                                   onChange={(e) => setBookingTeamName(e.target.value)}
                                   className="w-full px-3 py-1.5 text-xs border border-slate-250 bg-white rounded-lg text-slate-800 focus:ring-1 focus:ring-amber-500 outline-none font-medium"
@@ -825,14 +845,14 @@ export function TourDetailPage({
 
                               <div className="space-y-2">
                                 <label className="block text-[10px] font-black text-slate-500 tracking-widest border-b border-slate-100 pb-1.5">
-                                  Digər 5 Komanda Üzvünün Məlumatları:
+                                  {t('tourDetailPage.activeSports.otherMembersLabel')}
                                 </label>
                                 {bookingTeamMembers.map((member, idx) => (
                                   <div key={idx} className="grid grid-cols-2 gap-2 pb-2 border-b border-dashed border-slate-100 last:border-0 last:pb-0">
                                     <div>
                                       <input
                                         type="text"
-                                        placeholder={`${idx + 2}. Üzvün Ad Soyadı`}
+                                        placeholder={t('tourDetailPage.activeSports.memberNamePlaceholder', { index: idx + 2 })}
                                         value={member.name}
                                         onChange={(e) => {
                                           const next = [...bookingTeamMembers];
@@ -845,7 +865,7 @@ export function TourDetailPage({
                                     <div>
                                       <input
                                         type="tel"
-                                        placeholder="Telefon Nömrəsi"
+                                        placeholder={t('tourDetailPage.activeSports.memberPhonePlaceholder')}
                                         value={member.phone}
                                         onChange={(e) => {
                                           const next = [...bookingTeamMembers];
@@ -863,8 +883,8 @@ export function TourDetailPage({
 
                           {/* Dynamic Equipment Checkbox Options */}
                           <div className="bg-white/90 p-3.5 rounded-xl border border-amber-100 space-y-3">
-                            <span className="block text-[10px] font-bold text-slate-500">Avadanlıq & Təchizat Seçimi:</span>
-                            
+                            <span className="block text-[10px] font-bold text-slate-500">{t('tourDetailPage.equipment.sectionLabel')}</span>
+
                             {selectedTour.equipmentIncluded ? (
                               <div className="flex items-start gap-2.5">
                                 <input
@@ -875,7 +895,7 @@ export function TourDetailPage({
                                   className="mt-1 w-4.5 h-4.5 text-emerald-600 border-slate-300 rounded focus:ring-emerald-500 cursor-pointer"
                                 />
                                 <label htmlFor="usingOwnEquipment" className="text-xs text-slate-705 text-slate-700 leading-normal cursor-pointer select-none">
-                                  <strong>💼 Öz şəxsi avadanlığım var.</strong> {selectedTour.equipmentRentalPrice ? `Təşkilatçının daxil etdiyi pulsuz avadanlıqlara ehtiyac duymuram. Bununla da bilet başına -${selectedTour.equipmentRentalPrice} ${selectedTour.priceCurrency || 'AZN'} iştirak haqqı endirimi tətbiq olunacaqdır.` : 'Təşkilatçının avadanlığına ehtiyac duymuram.'}
+                                  <strong>💼 {t('tourDetailPage.equipment.ownEquipmentTitle')}</strong> {selectedTour.equipmentRentalPrice ? t('tourDetailPage.equipment.ownEquipmentDiscountDesc', { price: selectedTour.equipmentRentalPrice, currency: selectedTour.priceCurrency || 'AZN' }) : t('tourDetailPage.equipment.ownEquipmentNoDiscountDesc')}
                                 </label>
                               </div>
                             ) : (
@@ -888,7 +908,7 @@ export function TourDetailPage({
                                   className="mt-1 w-4.5 h-4.5 text-emerald-600 border-slate-300 rounded focus:ring-emerald-500 cursor-pointer"
                                 />
                                 <label htmlFor="rentEquipment" className="text-xs text-slate-705 text-slate-700 leading-normal cursor-pointer select-none">
-                                  <strong>🎒 Avadanlıq qanuni kirayələmək istəyirəm.</strong> Təşkilatçı mənə zəruri avadanlıq dəstini ({selectedTour.requiredEquipment || 'Xizək, kaska və s.'}) təmin edəcəkdir (+{selectedTour.equipmentRentalPrice || 15} {selectedTour.priceCurrency || 'AZN'} / kişi başı əlavə edilir).
+                                  <strong>🎒 {t('tourDetailPage.equipment.rentTitle')}</strong> {t('tourDetailPage.equipment.rentDesc', { equipment: selectedTour.requiredEquipment || t('tourDetailPage.equipment.defaultEquipment'), price: selectedTour.equipmentRentalPrice || 15, currency: selectedTour.priceCurrency || 'AZN' })}
                                 </label>
                               </div>
                             )}
@@ -905,10 +925,10 @@ export function TourDetailPage({
                             />
                             <div className="text-xs text-slate-700 leading-normal">
                               <label htmlFor="safetyWaiverInputCheck" className="font-extrabold block text-rose-900 cursor-pointer select-none mb-0.5">
-                                ⚖️ Təhlükəsizlik və Tibbi Öhudəlik Bəyannaməsi <span className="text-red-500 font-extrabold">*</span>
+                                ⚖️ {t('tourDetailPage.safetyWaiver.title')} <span className="text-red-500 font-extrabold">*</span>
                               </label>
                               <span className="text-[10px] leading-relaxed block text-rose-950/85">
-                                Macəra idman növü zamanı yarana biləcək xüsusi fiziki risk və gərginliklərlə tanış oldum. Xroniki xəstəliyimin olmadığını, fiziki hazırlığımın ({(selectedTour.difficulty as string) === 'beginner' || selectedTour.difficulty === 'easy' ? 'Başlanğıc' : selectedTour.difficulty === 'hard' ? 'Professional' : 'Orta'}) idman turu tələblərinə cavab verdiyimi təsdiq edirəm. Təşkilati qaydalara və bələdçinin təlimatlarına tam tabe olacağıma bəyan edirəm.
+                                {t('tourDetailPage.safetyWaiver.body', { level: (selectedTour.difficulty as string) === 'beginner' || selectedTour.difficulty === 'easy' ? t('tourDetailPage.safetyWaiver.levelBeginner') : selectedTour.difficulty === 'hard' ? t('tourDetailPage.safetyWaiver.levelProfessional') : t('tourDetailPage.safetyWaiver.levelIntermediate') })}
                               </span>
                             </div>
                           </div>
@@ -919,20 +939,20 @@ export function TourDetailPage({
                       <div className="bg-slate-50 border border-slate-150 p-4 rounded-xl space-y-4">
                         <div className="flex items-center justify-between">
                           <span className="text-[10px] font-extrabold text-emerald-700 bg-emerald-50 px-2 py-1 rounded border border-emerald-100 tracking-wide">
-                            Qeydiyyatsız Sürətli Rezervasiya
+                            {t('tourDetailPage.guestForm.noRegistrationBadge')}
                           </span>
-                          <span className="text-slate-400 font-medium text-[11px]">Bilet Alışı</span>
+                          <span className="text-slate-400 font-medium text-[11px]">{t('tourDetailPage.guestForm.ticketPurchase')}</span>
                         </div>
 
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                           <div>
                             <label className="block text-xs font-semibold text-slate-600 mb-1">
-                              Adınız və Soyadınız: <span className="text-red-500">*</span>
+                              {t('tourDetailPage.guestForm.fullNameLabel')} <span className="text-red-500">*</span>
                             </label>
                             <input
                               type="text"
                               required
-                              placeholder="Məsələn: Zahir Tanrıverdi"
+                              placeholder={t('tourDetailPage.guestForm.fullNamePlaceholder')}
                               value={bookingCustomerName}
                               onChange={(e) => setBookingCustomerName(e.target.value)}
                               disabled={isPhoneVerified}
@@ -942,12 +962,12 @@ export function TourDetailPage({
 
                           <div>
                             <label className="block text-xs font-semibold text-slate-600 mb-1">
-                              WhatsApp Əlaqə Nömrəniz: <span className="text-red-500">*</span>
+                              {t('tourDetailPage.guestForm.phoneLabel')} <span className="text-red-500">*</span>
                             </label>
                             <input
                               type="tel"
                               required
-                              placeholder="Məsələn: +994 50 123 45 67"
+                              placeholder={t('tourDetailPage.guestForm.phonePlaceholder')}
                               value={bookingCustomerPhone}
                               onChange={(e) => setBookingCustomerPhone(e.target.value)}
                               disabled={isPhoneVerified}
@@ -965,7 +985,7 @@ export function TourDetailPage({
                               className="w-full py-2 bg-slate-900 text-white hover:bg-slate-800 font-extrabold text-[11px] rounded-lg transition-all flex items-center justify-center gap-2 cursor-pointer"
                             >
                               <MessageCircle className="w-3.5 h-3.5 fill-current text-white" />
-                              WhatsApp-a Təsdiq Kodu Göndər
+                              {t('tourDetailPage.otp.sendButton')}
                             </button>
                           ) : (
                             <div className="space-y-3">
@@ -974,12 +994,12 @@ export function TourDetailPage({
                                   <div className="flex items-center justify-between text-[9px] text-slate-400 font-bold mb-1 tracking-wider">
                                     <div className="flex items-center gap-1">
                                       <span className="bg-emerald-600 text-white rounded p-0.5 px-1 font-extrabold text-[8px]">WA</span>
-                                      <span>WhatsApp Göndərildi</span>
+                                      <span>{t('tourDetailPage.otp.whatsappSent')}</span>
                                     </div>
-                                    <span>İndi</span>
+                                    <span>{t('tourDetailPage.otp.now')}</span>
                                   </div>
                                   <div className="text-[11px] leading-relaxed text-slate-105 text-slate-100">
-                                    <span className="font-normal text-slate-350">Hörmətli müştəri, bilet sifarişi üçün WhatsApp təsdiq kodunuz:</span> <strong className="text-emerald-400 font-mono text-sm tracking-widest">{verificationOtpCode}</strong>
+                                    <span className="font-normal text-slate-350">{t('tourDetailPage.otp.bannerLabel')}</span> <strong className="text-emerald-400 font-mono text-sm tracking-widest">{verificationOtpCode}</strong>
                                   </div>
                                 </div>
                               )}
@@ -987,13 +1007,13 @@ export function TourDetailPage({
                               {!isPhoneVerified ? (
                                 <div className="bg-white p-3 rounded-lg border border-slate-200 shadow-sm space-y-2.5">
                                   <div className="text-[11px] text-slate-500 leading-normal">
-                                    Kod WhatsApp ilə nömrənizə göndərildi. Zəhmət olmasa daxil edin:
+                                    {t('tourDetailPage.otp.enterCodePrompt')}
                                   </div>
                                   <div className="flex gap-2.5">
                                     <input
                                       type="text"
                                       maxLength={4}
-                                      placeholder="4 Rəqəmli Kod"
+                                      placeholder={t('tourDetailPage.otp.codePlaceholder')}
                                       value={userInputOtp}
                                       onChange={(e) => setUserInputOtp(e.target.value.replace(/\D/g, ''))}
                                       className="flex-1 px-3 py-2 text-xs text-center font-bold font-mono tracking-widest border border-slate-200 bg-slate-50 rounded-lg text-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-500"
@@ -1003,7 +1023,7 @@ export function TourDetailPage({
                                       onClick={handleVerifyOtp}
                                       className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-lg transition-all cursor-pointer"
                                     >
-                                      Kodu Təsdiqlə
+                                      {t('tourDetailPage.otp.verifyButton')}
                                     </button>
                                   </div>
                                   <div className="text-right">
@@ -1012,7 +1032,7 @@ export function TourDetailPage({
                                       onClick={handleSendVerificationCode}
                                       className="text-[10px] text-sky-600 hover:underline font-bold cursor-pointer"
                                     >
-                                      Kodu yenidən göndər
+                                      {t('tourDetailPage.otp.resendButton')}
                                     </button>
                                   </div>
                                 </div>
@@ -1020,7 +1040,7 @@ export function TourDetailPage({
                                 <div className="bg-emerald-50 border border-emerald-150 rounded-lg p-3 flex items-center justify-between text-xs text-emerald-800">
                                   <div className="flex items-center gap-1.5 font-bold">
                                     <CheckCircle className="w-4 h-4 text-emerald-600" />
-                                    <span>Nömrəniz təsdiqləndi! ({bookingCustomerPhone})</span>
+                                    <span>{t('tourDetailPage.otp.verifiedLabel', { phone: bookingCustomerPhone })}</span>
                                   </div>
                                   <button
                                     type="button"
@@ -1030,7 +1050,7 @@ export function TourDetailPage({
                                     }}
                                     className="text-[10px] text-slate-400 hover:text-red-500 underline cursor-pointer"
                                   >
-                                    Nömrəni dəyişdir
+                                    {t('tourDetailPage.otp.changeNumber')}
                                   </button>
                                 </div>
                               )}
@@ -1043,11 +1063,11 @@ export function TourDetailPage({
                       <div className="bg-emerald-50 border border-emerald-150/60 rounded-xl p-4 space-y-2 text-slate-750">
                         <div className="flex items-center gap-2 text-emerald-800 font-extrabold text-xs">
                           <MessageCircle className="w-4 h-4 text-emerald-600 fill-current animate-pulse" />
-                          <span>WhatsApp Rezervasiya Sistemi</span>
-                          <span className="bg-emerald-600 text-white text-[8px] font-extrabold px-1.5 py-0.5 rounded tracking-wider">AKTİVDİR</span>
+                          <span>{t('tourDetailPage.waExplanation.title')}</span>
+                          <span className="bg-emerald-600 text-white text-[8px] font-extrabold px-1.5 py-0.5 rounded tracking-wider">{t('tourDetailPage.waExplanation.activeLabel')}</span>
                         </div>
                         <p className="text-[11px] text-slate-600 leading-relaxed">
-                          Qeydiyyat və bilet təsdiqi birbaşa bələdçinin <strong>WhatsApp</strong> nömrəsi üzərindən həyata keçirilir. Rezervasiya tamamlandıqda unikal sifariş kodunuz generasya olunacaq və bələdçinin {selectedTour.whatsapp_number || '+994706717804'} nömrəli WhatsApp hesabına yönləndiriləcəksiniz.
+                          {t('tourDetailPage.waExplanation.bodyPart1')} <strong>WhatsApp</strong> {t('tourDetailPage.waExplanation.bodyPart2', { number: selectedTour.whatsapp_number || '+994706717804' })}
                         </p>
                       </div>
 
@@ -1064,9 +1084,9 @@ export function TourDetailPage({
                         return (
                           <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex items-center justify-between">
                             <div>
-                              <span className="text-xs text-slate-400 block font-medium tracking-tight">Cəmi Məbləğ</span>
+                              <span className="text-xs text-slate-400 block font-medium tracking-tight">{t('tourDetailPage.totalCost.label')}</span>
                               <span className="text-slate-500 text-[10px] font-mono block">
-                                {priceDetails.qty} nəfər x {singleOriginal}
+                                {t('tourDetailPage.totalCost.breakdown', { qty: priceDetails.qty, price: singleOriginal })}
                               </span>
                               {priceDetails.desc && (
                                 <span className="text-[10px] text-amber-600 block mt-0.5 font-bold">
@@ -1098,13 +1118,13 @@ export function TourDetailPage({
                       <div className="flex gap-3 justify-end items-center pt-4 border-t border-slate-100">
                         {!isPhoneVerified && (
                           <span className="text-[10px] text-red-500 font-bold bg-red-50 px-2 py-1 rounded">
-                            ⚠️ Rezerv üçün əvvəlcə nömrəni təsdiqləyin
+                            ⚠️ {t('tourDetailPage.checkoutActions.verifyPhoneWarning')}
                           </span>
                         )}
 
                         {((selectedTour.category === 'active' || selectedTour.isActiveLife) && !safetyAcknowledged) && (
                           <span className="text-[10px] text-red-500 font-bold bg-rose-50 px-2 py-1 rounded">
-                            ⚠️ Sazişi bəyan edin
+                            ⚠️ {t('tourDetailPage.checkoutActions.acceptWaiverWarning')}
                           </span>
                         )}
 
@@ -1116,7 +1136,7 @@ export function TourDetailPage({
                           }}
                           className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 font-medium text-xs rounded-lg transition"
                         >
-                          Geri
+                          {t('tourDetailPage.checkoutActions.back')}
                         </button>
 
                         <button
@@ -1131,12 +1151,12 @@ export function TourDetailPage({
                                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                               </svg>
-                              <span>Qeydə alınır (1s)...</span>
+                              <span>{t('tourDetailPage.checkoutActions.recordingInProgress')}</span>
                             </>
                           ) : (
                             <>
                               <MessageCircle className="w-4 h-4 text-white fill-current animate-pulse" />
-                              <span>WhatsApp ilə Rezervasiya et</span>
+                              <span>{t('tourDetailPage.checkoutActions.bookViaWhatsapp')}</span>
                             </>
                           )}
                         </button>
@@ -1149,15 +1169,15 @@ export function TourDetailPage({
 
                 {/* Qiymətə daxildir / daxil deyil (Modern Grid) — turun dəyərini istifadəçi ilk açılışda görsün deyə ən yuxarıda */}
                 <div className="space-y-4 py-4">
-                  <h2 className="text-xl font-extrabold text-slate-900">Qiymətə daxildir</h2>
+                  <h2 className="text-xl font-extrabold text-slate-900">{t('tourDetailPage.priceIncludes.title')}</h2>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {/* Daxildir */}
                     <div className="bg-emerald-50/40 border border-emerald-100 rounded-2xl p-5 space-y-3.5">
-                      <h3 className="text-xs font-black text-emerald-700 tracking-wider uppercase">Daxildir</h3>
+                      <h3 className="text-xs font-black text-emerald-700 tracking-wider uppercase">{t('tourDetailPage.priceIncludes.includedHeader')}</h3>
                       <div className="space-y-3">
                         {(selectedTour.includes && selectedTour.includes.length > 0
                           ? selectedTour.includes
-                          : ['Peşəkar canlı tur bələdçisi', 'Yerli vergilər və xərclər']
+                          : [t('tourDetailPage.priceIncludes.defaultIncluded1'), t('tourDetailPage.priceIncludes.defaultIncluded2')]
                         ).map((item, idx) => (
                           <div key={`inc-${idx}`} className="flex items-start gap-3">
                             <CheckCircle className="w-5 h-5 text-emerald-500 shrink-0" />
@@ -1167,13 +1187,13 @@ export function TourDetailPage({
                         {selectedTour.mealType && (
                           <div className="flex items-start gap-3">
                             <CheckCircle className="w-5 h-5 text-emerald-500 shrink-0" />
-                            <span className="text-slate-700 text-sm font-medium">Qida: {selectedTour.mealType}</span>
+                            <span className="text-slate-700 text-sm font-medium">{t('tourDetailPage.priceIncludes.mealLabel', { meal: selectedTour.mealType })}</span>
                           </div>
                         )}
                         {selectedTour.flightIncluded && (
                           <div className="flex items-start gap-3">
                             <CheckCircle className="w-5 h-5 text-emerald-500 shrink-0" />
-                            <span className="text-slate-700 text-sm font-medium">Aviabilet və transfer daxildir</span>
+                            <span className="text-slate-700 text-sm font-medium">{t('tourDetailPage.priceIncludes.flightIncluded')}</span>
                           </div>
                         )}
                       </div>
@@ -1181,11 +1201,11 @@ export function TourDetailPage({
 
                     {/* Daxil deyil */}
                     <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 space-y-3.5">
-                      <h3 className="text-xs font-black text-slate-400 tracking-wider uppercase">Daxil deyil</h3>
+                      <h3 className="text-xs font-black text-slate-400 tracking-wider uppercase">{t('tourDetailPage.priceIncludes.notIncludedHeader')}</h3>
                       <div className="space-y-3">
                         {(selectedTour.notIncluded && selectedTour.notIncluded.length > 0
                           ? selectedTour.notIncluded
-                          : ['Şəxsi suvenirlər']
+                          : [t('tourDetailPage.priceIncludes.defaultNotIncluded1')]
                         ).map((item, idx) => (
                           <div key={`exc-${idx}`} className="flex items-start gap-3">
                             <Minus className="w-5 h-5 text-slate-300 shrink-0" />
@@ -1195,7 +1215,7 @@ export function TourDetailPage({
                         {!selectedTour.flightIncluded && selectedTour.isInternational && (
                           <div className="flex items-start gap-3">
                             <Minus className="w-5 h-5 text-slate-300 shrink-0" />
-                            <span className="text-slate-500 text-sm font-medium">Aviabiletlər (Ayrı alınmalıdır)</span>
+                            <span className="text-slate-500 text-sm font-medium">{t('tourDetailPage.priceIncludes.flightsSeparate')}</span>
                           </div>
                         )}
                       </div>
@@ -1205,14 +1225,14 @@ export function TourDetailPage({
 
                 {/* Highlights */}
                 <div className="space-y-4 py-4 border-t border-slate-200">
-                  <h2 className="text-xl font-extrabold text-slate-900">Önə Çıxanlar</h2>
+                  <h2 className="text-xl font-extrabold text-slate-900">{t('tourDetailPage.highlights.title')}</h2>
                   <div className="flex flex-col gap-4">
                     {(selectedTour.highlights && selectedTour.highlights.length > 0
                       ? selectedTour.highlights
                       : [
-                          `Peşəkar bələdçilərlə ${selectedTour.region} regionunun nəfəskəsici təbiətini kəşf edin.`,
-                          `Seçilmiş səviyyənizə uyğun ${selectedTour.difficulty} çətinlikdə macəra yaşayın.`,
-                          ...(selectedTour.isInternational ? [`${selectedTour.destinationCity} şəhərində gündəlik istiqamətinizi izləyən ağıllı marşrut proqramı.`] : [])
+                          t('tourDetailPage.highlights.defaultHighlight1', { region: selectedTour.region }),
+                          t('tourDetailPage.highlights.defaultHighlight2', { difficulty: selectedTour.difficulty }),
+                          ...(selectedTour.isInternational ? [t('tourDetailPage.highlights.defaultHighlight3', { city: selectedTour.destinationCity })] : [])
                         ]
                     ).map((highlight, idx) => (
                       <div key={idx} className="flex items-start gap-4">
@@ -1225,7 +1245,7 @@ export function TourDetailPage({
 
                 {/* Full description */}
                 <div id="tour-full-description" className="space-y-4 py-4 border-t border-slate-200 scroll-mt-24">
-                  <h2 className="text-xl font-extrabold text-slate-900">Tam təsvir</h2>
+                  <h2 className="text-xl font-extrabold text-slate-900">{t('tourDetailPage.fullDescription.title')}</h2>
                   <div className="relative">
                     <div
                       className={`overflow-hidden transition-all duration-300 ease-in-out ${
@@ -1247,7 +1267,7 @@ export function TourDetailPage({
                       className="group inline-flex items-center gap-1.5 text-sm font-extrabold text-slate-900 hover:text-emerald-700 cursor-pointer transition-colors mt-1"
                     >
                       <span className="transition-transform duration-300 group-hover:translate-y-0.5">
-                        {isDescExpanded ? 'Daha az oxu' : 'Daha çox oxu'}
+                        {isDescExpanded ? t('tourDetailPage.fullDescription.readLess') : t('tourDetailPage.fullDescription.readMore')}
                       </span>
                       <ChevronDown
                         className={`w-4 h-4 transition-transform duration-300 group-hover:translate-y-0.5 ${
@@ -1261,7 +1281,7 @@ export function TourDetailPage({
                 {/* Meeting Point */}
                 {selectedTour.meetingPoint && (
                   <div className="space-y-4 py-4 border-t border-slate-200">
-                    <h2 className="text-xl font-extrabold text-slate-900">Görüş yeri</h2>
+                    <h2 className="text-xl font-extrabold text-slate-900">{t('tourDetailPage.meetingPoint.title')}</h2>
                     <p className="text-sm font-medium text-slate-700 leading-relaxed">
                       {selectedTour.meetingPoint}
                     </p>
@@ -1281,14 +1301,14 @@ export function TourDetailPage({
 
                 {/* Important Information */}
                 <div className="space-y-4 py-4 border-t border-slate-200">
-                  <h2 className="text-xl font-extrabold text-slate-900">Mühüm məlumatlar</h2>
+                  <h2 className="text-xl font-extrabold text-slate-900">{t('tourDetailPage.importantInfo.title')}</h2>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 mt-4">
                     <div>
-                      <h3 className="font-bold text-slate-800 text-sm mb-3">Özünüzlə gətirin</h3>
+                      <h3 className="font-bold text-slate-800 text-sm mb-3">{t('tourDetailPage.importantInfo.bringHeader')}</h3>
                       <ul className="space-y-2">
                         {(selectedTour.importantInfo?.bring && selectedTour.importantInfo.bring.length > 0
                           ? selectedTour.importantInfo.bring
-                          : [selectedTour.requiredEquipment || 'Rahat ayaqqabı', 'Pasport və ya şəxsiyyət vəsiqəsi', 'Hava şəraitinə uyğun geyim']
+                          : [selectedTour.requiredEquipment || t('tourDetailPage.importantInfo.defaultBring1'), t('tourDetailPage.importantInfo.defaultBring2'), t('tourDetailPage.importantInfo.defaultBring3')]
                         ).map((item, idx) => (
                           <li key={idx} className="flex items-start gap-3 text-sm text-slate-700 font-medium">
                             <Check className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" /> {item}
@@ -1297,11 +1317,11 @@ export function TourDetailPage({
                       </ul>
                     </div>
                     <div>
-                      <h3 className="font-bold text-slate-800 text-sm mb-3">İcazə verilmir</h3>
+                      <h3 className="font-bold text-slate-800 text-sm mb-3">{t('tourDetailPage.importantInfo.notAllowedHeader')}</h3>
                       <ul className="space-y-2">
                         {(selectedTour.importantInfo?.notAllowed && selectedTour.importantInfo.notAllowed.length > 0
                           ? selectedTour.importantInfo.notAllowed
-                          : ['Böyük çamadanlar və çantalar', 'Müşayiətsiz yetkinlik yaşına çatmayanlar']
+                          : [t('tourDetailPage.importantInfo.defaultNotAllowed1'), t('tourDetailPage.importantInfo.defaultNotAllowed2')]
                         ).map((item, idx) => (
                           <li key={idx} className="flex items-start gap-3 text-sm text-slate-700 font-medium">
                             <X className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" /> {item}
@@ -1339,7 +1359,7 @@ export function TourDetailPage({
                       return (
                         <div className="mt-6 mb-2 border border-slate-200 rounded-2xl p-5 bg-gradient-to-r from-slate-50 to-white shadow-sm">
                           <h4 className="font-extrabold text-slate-800 mb-4 text-sm flex items-center gap-2">
-                            👥 Təşkilatçının Komandası
+                            👥 {t('tourDetailPage.organizerTeam.title')}
                           </h4>
                           <div className="flex gap-4 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-none sm:scrollbar-thin">
                             {organizer.guides.map((g, i) => (
@@ -1350,7 +1370,7 @@ export function TourDetailPage({
                                   </div>
                                   <div className="flex-1 overflow-hidden">
                                      <span className="text-sm font-bold text-slate-800 block truncate" title={g.name}>{g.name}</span>
-                                     <span className="text-[10px] text-emerald-600 font-bold block line-clamp-2 tracking-wide mt-0.5" title={g.specialty}>{g.specialty || 'Bələdçi'}</span>
+                                     <span className="text-[10px] text-emerald-600 font-bold block line-clamp-2 tracking-wide mt-0.5" title={g.specialty}>{g.specialty || t('tourDetailPage.organizerTeam.defaultSpecialty')}</span>
                                   </div>
                                 </div>
                                 <p className="text-xs text-slate-600 font-medium leading-relaxed line-clamp-3" title={g.bio}>{g.bio}</p>
@@ -1371,38 +1391,38 @@ export function TourDetailPage({
                           <span className="text-xl">✈️</span>
                           <div>
                             <h4 className="text-xs font-black text-indigo-950 tracking-widest leading-none">
-                              XARİCİ SƏYAHƏTİN SEHRLİ PLANLAŞDIRICISI
+                              {t('tourDetailPage.internationalPlanner.title')}
                             </h4>
                             <p className="text-[10px] text-slate-500 font-bold mt-1.5 leading-none">
-                              {selectedTour.destinationCountry} və {selectedTour.destinationCity} üçün rəqəmsal bələdçi paneli
+                              {t('tourDetailPage.internationalPlanner.subtitle', { country: selectedTour.destinationCountry, city: selectedTour.destinationCity })}
                             </p>
                           </div>
                         </div>
                         <span className="text-[9px] font-black text-white bg-indigo-600 px-2.5 py-1 rounded tracking-widest">
-                          AĞILLI BƏLƏDÇİ
+                          {t('tourDetailPage.internationalPlanner.smartGuideBadge')}
                         </span>
                       </div>
 
                       {/* PART 1: WEATHER FORECAST SPECIALLY INTEGRATED FOR DESTINATION */}
                       <div className="space-y-2">
                         <h5 className="text-[10px] font-black text-indigo-900 tracking-wider flex items-center gap-1">
-                          ☀️ Təyinat Məntəqəsinin Gündəlik Hava Proqnozu
+                          ☀️ {t('tourDetailPage.internationalPlanner.weatherTitle')}
                         </h5>
-                        
+
                         <div className="bg-white p-3.5 rounded-xl border border-slate-150 shadow-4xs grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
                           {selectedTour.itinerary && selectedTour.itinerary.map((it, idx) => {
                             const weathers = [
-                              { temp: '24°C', tag: 'Açıq Səma', emoji: '☀️' },
-                              { temp: '22°C', tag: 'Parlaq Gün', emoji: '🌤️' },
-                              { temp: '25°C', tag: 'Az buludlu', emoji: '⛅' },
-                              { temp: '21°C', tag: 'Möhtəşəm hava', emoji: '☀️' },
-                              { temp: '23°C', tag: 'Sərin meh', emoji: '🌬️' },
-                              { temp: '24°C', tag: 'Gözəl hava', emoji: '☀️' },
+                              { temp: '24°C', tag: t('tourDetailPage.internationalPlanner.weatherClearSky'), emoji: '☀️' },
+                              { temp: '22°C', tag: t('tourDetailPage.internationalPlanner.weatherBrightDay'), emoji: '🌤️' },
+                              { temp: '25°C', tag: t('tourDetailPage.internationalPlanner.weatherPartlyCloudy'), emoji: '⛅' },
+                              { temp: '21°C', tag: t('tourDetailPage.internationalPlanner.weatherGreatWeather'), emoji: '☀️' },
+                              { temp: '23°C', tag: t('tourDetailPage.internationalPlanner.weatherCoolBreeze'), emoji: '🌬️' },
+                              { temp: '24°C', tag: t('tourDetailPage.internationalPlanner.weatherNiceWeather'), emoji: '☀️' },
                             ];
                             const w = weathers[idx % weathers.length];
                             return (
                               <div key={idx} className="bg-slate-50/50 p-2 rounded-lg border border-slate-100 flex flex-col items-center">
-                                <span className="text-[9px] font-extrabold text-slate-400 block tracking-tight">GÜN {it.day}</span>
+                                <span className="text-[9px] font-extrabold text-slate-400 block tracking-tight">{t('tourDetailPage.internationalPlanner.dayLabel', { day: it.day })}</span>
                                 <span className="text-xl my-1">{w.emoji}</span>
                                 <span className="text-xs font-black text-slate-800 leading-none">{w.temp}</span>
                                 <span className="text-[9px] text-slate-500 font-medium block truncate mt-0.5 max-w-[90px]">{w.tag}</span>
@@ -1415,9 +1435,9 @@ export function TourDetailPage({
                       {/* PART 2: THE SPOTS COVERED IN THESE DAYS */}
                       <div className="space-y-2">
                         <h5 className="text-[10px] font-black text-indigo-900 tracking-wider flex items-center gap-1.5">
-                          📍 Günlərə Görə Baş Çəkəcəyiniz Məkanlar (Gəzməli Yerlər)
+                          📍 {t('tourDetailPage.internationalPlanner.placesTitle')}
                         </h5>
-                        
+
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                           {selectedTour.itinerary && selectedTour.itinerary.map((day, di) => {
                             let mainPlace = selectedTour.destinationCity;
@@ -1462,26 +1482,26 @@ export function TourDetailPage({
                   {selectedTour.isInternational && (
                     <div className="bg-gradient-to-r from-amber-500/10 to-teal-800/5 border border-amber-200 p-5 rounded-xl space-y-4">
                       <h4 className="text-xs font-black text-amber-900 tracking-wider flex items-center gap-1.5 border-b pb-1.5 border-amber-200">
-                        🏨 Səyahət, Mehmanxana və VIP Rezervasiya Təfərrüatları
+                        🏨 {t('tourDetailPage.hotelLogistics.title')}
                       </h4>
-                      
+
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-1 text-xs">
-                          <span className="text-slate-400 block font-bold text-[9px]">MEHMANXANA NÖVÜ</span>
+                          <span className="text-slate-400 block font-bold text-[9px]">{t('tourDetailPage.hotelLogistics.hotelTypeLabel')}</span>
                           <span className="text-slate-900 font-bold block">{selectedTour.hotelName}</span>
                           <span className="text-amber-500 text-xs tracking-widest font-bold block">
                             {Array(Number(selectedTour.hotelStars || 5)).fill('★').join('')}
                           </span>
                         </div>
                         <div className="space-y-1 text-xs">
-                          <span className="text-slate-400 block font-bold text-[9px]">QİDALANMA TƏMİNATI</span>
-                          <span className="text-primary-900 font-extrabold block">🍽️ {selectedTour.mealType || 'Səhər yeməyi'}</span>
+                          <span className="text-slate-400 block font-bold text-[9px]">{t('tourDetailPage.hotelLogistics.mealPlanLabel')}</span>
+                          <span className="text-primary-900 font-extrabold block">🍽️ {selectedTour.mealType || t('tourDetailPage.hotelLogistics.defaultMeal')}</span>
                         </div>
 
                         <div className="space-y-1 text-xs">
-                          <span className="text-slate-400 block font-bold text-[9px]">UÇUŞ BİLETLƏRİ</span>
+                          <span className="text-slate-400 block font-bold text-[9px]">{t('tourDetailPage.hotelLogistics.flightTicketsLabel')}</span>
                           <span className="text-slate-700 block text-[11px] font-medium leading-relaxed">
-                            {selectedTour.flightIncluded ? '✈️ Aviabilet ümumi qiymətə daxildir' : '❌ Aviabilet müştəri tərəfindən ayrıca alınmalıdır'}
+                            {selectedTour.flightIncluded ? t('tourDetailPage.hotelLogistics.flightIncluded') : t('tourDetailPage.hotelLogistics.flightNotIncluded')}
                           </span>
                           {selectedTour.flightDetails && (
                             <span className="text-[10px] text-slate-500 italic block mt-0.5">{selectedTour.flightDetails}</span>
@@ -1489,8 +1509,8 @@ export function TourDetailPage({
                         </div>
 
                         <div className="space-y-1 text-xs">
-                          <span className="text-slate-400 block font-bold text-[9px]">YERDAXİLİ TRANSFER</span>
-                          <span className="text-slate-700 block text-[11px] font-medium leading-relaxed">🚍 {selectedTour.transferDetails || 'Hava limanından otelə komfortlu transfer daxildir.'}</span>
+                          <span className="text-slate-400 block font-bold text-[9px]">{t('tourDetailPage.hotelLogistics.transferLabel')}</span>
+                          <span className="text-slate-700 block text-[11px] font-medium leading-relaxed">🚍 {selectedTour.transferDetails || t('tourDetailPage.hotelLogistics.defaultTransfer')}</span>
                         </div>
                       </div>
 
@@ -1498,7 +1518,7 @@ export function TourDetailPage({
                       {selectedTour.roomTypes && selectedTour.roomTypes.length > 0 && (
                         <div className="bg-white p-3 rounded-lg border border-amber-150 space-y-2 mt-2">
                           <span className="text-[10px] text-amber-900 font-extrabold block tracking-wide">
-                            🏨 Otaq Tiplərinə görə qiymət tənzimləməsi (Əlavələr):
+                            🏨 {t('tourDetailPage.hotelLogistics.roomTypesTitle')}
                           </span>
                           <div className="grid grid-cols-3 gap-2 text-center">
                             {selectedTour.roomTypes.map((room, ri) => (
@@ -1519,7 +1539,7 @@ export function TourDetailPage({
                   {selectedTour.isInternational && selectedTour.itinerary && selectedTour.itinerary.length > 0 && (
                     <div className="space-y-4">
                       <h4 className="text-xs font-black text-slate-500 tracking-widest border-b pb-1.5 flex items-center gap-1.5">
-                        ⏳ Günbəgün Ətraflı Səyahət Proqramı
+                        ⏳ {t('tourDetailPage.itineraryDetail.title')}
                       </h4>
 
                       <div className="space-y-5">
@@ -1527,10 +1547,10 @@ export function TourDetailPage({
                           <div key={di} className="relative pl-6 border-l-2 border-amber-500/40 space-y-2">
                             {/* Marker */}
                             <div className="absolute -left-[7px] top-1.5 w-3 h-3 rounded-full bg-amber-500 border-2 border-white ring-2 ring-amber-500/20" />
-                            
+
                             <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2">
                               <span className="text-xs font-black text-amber-900 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-sm">
-                                📅 {day.day}-ci GÜN
+                                📅 {t('tourDetailPage.itineraryDetail.dayNumber', { day: day.day })}
                               </span>
                               <h5 className="text-xs font-extrabold text-ink-900 flex-1 sm:ml-3">
                                 {day.title}
@@ -1590,7 +1610,7 @@ export function TourDetailPage({
                               <span className="text-xl font-extrabold text-label-critical bg-surface-critical-weak px-1.5 rounded-md">
                                 {getConvertedPriceInfo(selectedTour.discountPrice!, selectedTour.priceCurrency).both}
                               </span>
-                              <span className="text-label-secondary font-medium text-sm">adam başı</span>
+                              <span className="text-label-secondary font-medium text-sm">{t('tourDetailPage.pricingHeader.perPerson')}</span>
                             </div>
                           </>
                         ) : (
@@ -1598,17 +1618,17 @@ export function TourDetailPage({
                             <span className="text-3xl font-extrabold text-label-primary">
                               {getConvertedPriceInfo(basePrice, selectedTour.priceCurrency).both}
                             </span>
-                            <span className="text-label-secondary font-medium text-sm">adam başı</span>
+                            <span className="text-label-secondary font-medium text-sm">{t('tourDetailPage.pricingHeader.perPerson')}</span>
                           </div>
                         );
                       })()
                     ) : (
                       <div className="flex items-baseline gap-2">
-                        <span className="text-2xl font-bold text-slate-400">Məlumat yoxdur</span>
+                        <span className="text-2xl font-bold text-slate-400">{t('tourDetailPage.pricingHeader.noData')}</span>
                       </div>
                     )}
                   </div>
-                  
+
                   {/* Selectors */}
                   <div className="space-y-4">
                     <div className="flex flex-col border border-slate-300 rounded-xl shadow-xs hover:border-slate-400 transition-colors">
@@ -1621,7 +1641,7 @@ export function TourDetailPage({
                         >
                           <div className="flex items-center gap-3">
                             <Users className="w-5 h-5 text-emerald-700" />
-                            <span className="text-sm font-extrabold text-slate-800">Böyük × {bookingQty}</span>
+                            <span className="text-sm font-extrabold text-slate-800">{t('tourDetailPage.participantsDropdown.adultsCount', { count: bookingQty })}</span>
                           </div>
                           <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${showParticipantsDropdown ? 'rotate-180' : ''}`} />
                         </button>
@@ -1633,7 +1653,7 @@ export function TourDetailPage({
                             <div className="fixed inset-0 z-10" onClick={() => setShowParticipantsDropdown(false)} />
                             <div className="absolute left-0 right-0 top-full z-20 bg-white border border-slate-200 rounded-xl shadow-lg p-4 mt-1">
                               <div className="flex items-center justify-between">
-                                <span className="text-sm font-bold text-slate-700">Böyük</span>
+                                <span className="text-sm font-bold text-slate-700">{t('tourDetailPage.participantsDropdown.adults')}</span>
                                 <div className="flex items-center gap-3">
                                   <button
                                     type="button"
@@ -1656,7 +1676,7 @@ export function TourDetailPage({
                               </div>
                               {selectedSlot && (
                                 <p className="text-[10px] text-slate-400 italic mt-2">
-                                  (Maksimum {maxParticipants} yer mövcuddur)
+                                  {t('tourDetailPage.participantsDropdown.maxSpotsAvailable', { count: maxParticipants })}
                                 </p>
                               )}
                               <button
@@ -1664,7 +1684,7 @@ export function TourDetailPage({
                                 onClick={() => setShowParticipantsDropdown(false)}
                                 className="mt-3 w-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold py-2 rounded-lg transition-colors"
                               >
-                                Təsdiqlə
+                                {t('tourDetailPage.participantsDropdown.confirm')}
                               </button>
                             </div>
                             </>
@@ -1681,7 +1701,7 @@ export function TourDetailPage({
                         >
                           <div className="flex items-center gap-3">
                             <Calendar className="w-5 h-5 text-emerald-700" />
-                            <span className="text-sm font-extrabold text-slate-800">{selectedSlot ? `Tarix: ${selectedSlot.startDate}` : 'Tarix seçin'}</span>
+                            <span className="text-sm font-extrabold text-slate-800">{selectedSlot ? t('tourDetailPage.dateDropdown.selectedDate', { date: selectedSlot.startDate }) : t('tourDetailPage.dateDropdown.selectDate')}</span>
                           </div>
                           <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${showDateDropdown ? 'rotate-180' : ''}`} />
                         </button>
@@ -1691,7 +1711,7 @@ export function TourDetailPage({
                           <div className="fixed inset-0 z-10" onClick={() => setShowDateDropdown(false)} />
                           <div className="absolute left-0 right-0 top-full z-20 bg-white border border-slate-200 rounded-xl shadow-lg p-2 mt-1 max-h-64 overflow-y-auto">
                             {slots.filter(s => s.tourId === selectedTour.id).length === 0 ? (
-                              <p className="text-xs text-slate-400 font-medium p-3 text-center">Hazırda aktiv tarix yoxdur.</p>
+                              <p className="text-xs text-slate-400 font-medium p-3 text-center">{t('tourDetailPage.dateDropdown.noActiveDate')}</p>
                             ) : (
                               [...slots.filter(s => s.tourId === selectedTour.id)]
                                 .sort((a, b) => a.startDate.localeCompare(b.startDate))
@@ -1724,7 +1744,7 @@ export function TourDetailPage({
                                     >
                                       <span className="text-xs font-bold text-slate-700">📅 {slot.startDate}</span>
                                       <span className={`text-[10px] font-bold ${isDisabled ? 'text-red-400' : 'text-slate-400'}`}>
-                                        {isPast ? 'Bitib' : remainingSpots <= 0 ? 'Dolub' : `${remainingSpots} yer`}
+                                        {isPast ? t('tourDetailPage.dateDropdown.ended') : remainingSpots <= 0 ? t('tourDetailPage.dateDropdown.full') : t('tourDetailPage.dateDropdown.spotsLeft', { count: remainingSpots })}
                                       </span>
                                     </button>
                                   );
@@ -1747,7 +1767,7 @@ export function TourDetailPage({
                       onClick={() => setShowTourSlots(true)}
                       className="w-full bg-primary-500 hover:bg-primary-600 text-white text-base md:text-lg font-black py-3.5 rounded-full shadow-md transition-all active:scale-95 cursor-pointer block text-center disabled:opacity-40 disabled:cursor-not-allowed"
                     >
-                      Yerləri yoxla
+                      {t('tourDetailPage.sidebar.checkAvailability')}
                     </button>
                   )}
 
@@ -1758,11 +1778,11 @@ export function TourDetailPage({
                         <Check className="w-3.5 h-3.5 text-emerald-700" />
                       </div>
                       <div className="space-y-0.5">
-                        <h4 className="text-sm font-extrabold text-slate-800">{(selectedTour.cancellationHours ?? 48) === 0 ? 'Ləğv edilmir' : 'Ödənişsiz ləğv'}</h4>
+                        <h4 className="text-sm font-extrabold text-slate-800">{(selectedTour.cancellationHours ?? 48) === 0 ? t('tourDetailPage.quickInfo.noCancellation') : t('tourDetailPage.quickInfo.freeCancellation')}</h4>
                         <p className="text-xs text-slate-500 font-medium leading-snug">
                           {(selectedTour.cancellationHours ?? 48) === 0
-                            ? 'Bu tur üçün ləğvetmə mümkün deyil'
-                            : `Tam geri ödəmə üçün ${selectedTour.cancellationHours ?? 48} saat əvvələ qədər ləğv edin`}
+                            ? t('tourDetailPage.quickInfo.noCancellationDesc')
+                            : t('tourDetailPage.sidebar.fullRefundDesc', { hours: selectedTour.cancellationHours ?? 48 })}
                         </p>
                       </div>
                     </div>
@@ -1771,8 +1791,8 @@ export function TourDetailPage({
                         <Check className="w-3.5 h-3.5 text-emerald-700" />
                       </div>
                       <div className="space-y-0.5">
-                        <h4 className="text-sm font-extrabold text-slate-800">İndi rezerv et, sonra ödə</h4>
-                        <p className="text-xs text-slate-500 font-medium leading-snug">Səyahət planlarınızı çevik saxlayın — yerinizi bron edin və bu gün heç nə ödəməyin.</p>
+                        <h4 className="text-sm font-extrabold text-slate-800">{t('tourDetailPage.sidebar.reserveNowPayLaterTitle')}</h4>
+                        <p className="text-xs text-slate-500 font-medium leading-snug">{t('tourDetailPage.sidebar.reserveNowPayLaterDesc')}</p>
                       </div>
                     </div>
                   </div>
@@ -1781,10 +1801,10 @@ export function TourDetailPage({
             </div>
 
           </div> {/* Closes TWO COLUMN WRAPPER */}
-            
+
           {/* YOU MIGHT ALSO LIKE SECTION */}
           <div className="mt-16 pt-16 border-t border-slate-200">
-            <h2 className="text-2xl font-extrabold text-label-primary mb-8">Bunlar da maraqlı ola bilər...</h2>
+            <h2 className="text-2xl font-extrabold text-label-primary mb-8">{t('tourDetailPage.relatedTours.title')}</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 w-full">
                 {tours
                   .filter(t => t.id !== selectedTour.id)
@@ -1833,14 +1853,14 @@ export function TourDetailPage({
                           )}
 
                           <div className="mt-auto pt-4 border-t border-slate-100 flex items-end justify-between">
-                            <span className="text-xs text-label-tertiary font-medium">{tour.durationHours ?? (tour.durationDays * 8)} saat</span>
+                            <span className="text-xs text-label-tertiary font-medium">{t('tourDetailPage.relatedTours.hours', { hours: tour.durationHours ?? (tour.durationDays * 8) })}</span>
                             {minPrice ? (
                               <div className="flex flex-col items-end">
-                                <span className="text-[10px] text-label-tertiary font-medium">Başlayan qiymətlər</span>
+                                <span className="text-[10px] text-label-tertiary font-medium">{t('tourDetailPage.relatedTours.startingPrices')}</span>
                                 <span className="text-base font-extrabold text-label-primary">{getConvertedPriceInfo(minPrice, tour.priceCurrency).both}</span>
                               </div>
                             ) : (
-                               <span className="text-xs font-bold text-label-tertiary">Satılıb qurtarıb</span>
+                               <span className="text-xs font-bold text-label-tertiary">{t('tourDetailPage.relatedTours.soldOut')}</span>
                             )}
                           </div>
                         </div>

@@ -1,6 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import OperatorLogin from './OperatorLogin';
+import { LanguageProvider } from '../i18n/LanguageContext';
+
+function renderWithLanguage(ui: Parameters<typeof render>[0]) {
+  return render(<LanguageProvider>{ui}</LanguageProvider>);
+}
 
 describe('OperatorLogin', () => {
   beforeEach(() => {
@@ -8,7 +13,7 @@ describe('OperatorLogin', () => {
   });
 
   it('renders username/password fields and submit button', () => {
-    render(<OperatorLogin onLogin={vi.fn()} />);
+    renderWithLanguage(<OperatorLogin onLogin={vi.fn()} />);
     expect(screen.getByPlaceholderText('istifadeci_adi')).toBeInTheDocument();
     expect(screen.getByPlaceholderText('••••••••')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Daxil ol/i })).toBeInTheDocument();
@@ -22,7 +27,7 @@ describe('OperatorLogin', () => {
       json: async () => ({ success: true, token: 'fake-jwt', user: fakeUser }),
     }) as any;
 
-    render(<OperatorLogin onLogin={onLogin} />);
+    renderWithLanguage(<OperatorLogin onLogin={onLogin} />);
     fireEvent.change(screen.getByPlaceholderText('istifadeci_adi'), { target: { value: 'gedekgorek' } });
     fireEvent.change(screen.getByPlaceholderText('••••••••'), { target: { value: 'password123' } });
     fireEvent.click(screen.getByRole('button', { name: /Daxil ol/i }));
@@ -38,7 +43,7 @@ describe('OperatorLogin', () => {
       json: async () => ({ error: 'İstifadəçi adı/e-poçt və ya şifrə yanlışdır!' }),
     }) as any;
 
-    render(<OperatorLogin onLogin={onLogin} />);
+    renderWithLanguage(<OperatorLogin onLogin={onLogin} />);
     fireEvent.change(screen.getByPlaceholderText('istifadeci_adi'), { target: { value: 'wrong' } });
     fireEvent.change(screen.getByPlaceholderText('••••••••'), { target: { value: 'wrong' } });
     fireEvent.click(screen.getByRole('button', { name: /Daxil ol/i }));

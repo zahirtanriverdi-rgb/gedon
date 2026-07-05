@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { CloudRain, Sun, Thermometer, Calendar } from 'lucide-react';
 import { fetchWeatherForDate, WeatherInfo } from '../utils/weather';
+import { useLanguage } from '../i18n/LanguageContext';
 
 interface TourWeatherForecastProps {
   dates: string[];
@@ -9,6 +10,7 @@ interface TourWeatherForecastProps {
 }
 
 export const TourWeatherForecast: React.FC<TourWeatherForecastProps> = ({ dates, region, variant = 'compact' }) => {
+  const { t } = useLanguage();
   const [forecasts, setForecasts] = useState<Record<string, WeatherInfo>>({});
   const [loading, setLoading] = useState(true);
 
@@ -29,7 +31,7 @@ export const TourWeatherForecast: React.FC<TourWeatherForecastProps> = ({ dates,
           results[date] = {
             tempMin: 12,
             tempMax: 22,
-            label: 'Buludlu',
+            label: t('miscWidgets.tourWeatherForecast.fallbackLabel'),
             emoji: '⛅',
             isRealLive: false
           };
@@ -58,11 +60,12 @@ export const TourWeatherForecast: React.FC<TourWeatherForecastProps> = ({ dates,
       const monthNum = parseInt(parts[1], 10);
       const day = parseInt(parts[2], 10);
       
-      const azeriMonths = [
-        'Yanvar', 'Fevral', 'Mart', 'Aprel', 'May', 'İyun', 
-        'İyul', 'Avqust', 'Sentyabr', 'Oktyabr', 'Noyabr', 'Dekabr'
+      const monthKeys = [
+        'january', 'february', 'march', 'april', 'may', 'june',
+        'july', 'august', 'september', 'october', 'november', 'december'
       ];
-      return `${day} ${azeriMonths[monthNum - 1]} ${year}`;
+      const monthName = t(`miscWidgets.tourWeatherForecast.months.${monthKeys[monthNum - 1]}`);
+      return `${day} ${monthName} ${year}`;
     } catch (e) {
       return dateStr;
     }
@@ -72,7 +75,7 @@ export const TourWeatherForecast: React.FC<TourWeatherForecastProps> = ({ dates,
     return (
       <div className="text-[10px] text-slate-400 font-bold bg-slate-50 border border-slate-100 p-2 rounded-lg flex items-center gap-1">
         <Calendar className="w-3.5 h-3.5 text-slate-400" />
-        <span>Gələcək tarix təyin edilməyib</span>
+        <span>{t('miscWidgets.tourWeatherForecast.noFutureDates')}</span>
       </div>
     );
   }
@@ -81,7 +84,7 @@ export const TourWeatherForecast: React.FC<TourWeatherForecastProps> = ({ dates,
     return (
       <div className="flex items-center gap-2 py-1">
         <div className="w-3.5 h-3.5 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
-        <span className="text-[10px] font-bold text-emerald-700 animate-pulse tracking-wide font-sans">ONLAYN HAVA PROQNOZU YÜKLƏNİR...</span>
+        <span className="text-[10px] font-bold text-emerald-700 animate-pulse tracking-wide font-sans">{t('miscWidgets.tourWeatherForecast.loading')}</span>
       </div>
     );
   }
@@ -89,7 +92,7 @@ export const TourWeatherForecast: React.FC<TourWeatherForecastProps> = ({ dates,
   if (variant === 'compact') {
     return (
       <div className="space-y-1.5 pt-1">
-        <span className="text-[9px] font-black text-slate-400 block tracking-wider font-sans">AKTİV TARİXLƏR VƏ HAVA TƏXMİNLƏRİ:</span>
+        <span className="text-[9px] font-black text-slate-400 block tracking-wider font-sans">{t('miscWidgets.tourWeatherForecast.activeDatesLabel')}</span>
         <div className="space-y-1 max-h-24 overflow-y-auto pr-1">
           {dates.map((date, idx) => {
             const forecast = forecasts[date];
@@ -108,7 +111,7 @@ export const TourWeatherForecast: React.FC<TourWeatherForecastProps> = ({ dates,
                 {/* Weather forecast */}
                 <div className="flex items-center gap-1">
                   <span className="text-sm shrink-0" title={forecast.label}>{forecast.emoji}</span>
-                  <span className="text-slate-600 font-extrabold text-[10px]" title="Min...Max Temperatur">
+                  <span className="text-slate-600 font-extrabold text-[10px]" title={t('miscWidgets.tourWeatherForecast.minMaxTempTitle')}>
                     {forecast.tempMin}° / {forecast.tempMax}°C
                   </span>
                   <span className="text-slate-400 font-medium text-[9px] hidden sm:inline">
@@ -130,11 +133,11 @@ export const TourWeatherForecast: React.FC<TourWeatherForecastProps> = ({ dates,
         <div className="flex items-center gap-1.5">
           <Calendar className="w-4 h-4 text-sky-600" />
           <h4 className="text-[11px] font-extrabold text-sky-900 tracking-widest">
-            TARİXLƏRƏ GÖRƏ ONLAYN HAVA PROQNOZU:
+            {t('miscWidgets.tourWeatherForecast.detailedHeading')}
           </h4>
         </div>
         <span className="text-[8px] font-black text-sky-600 bg-sky-100 border border-sky-200/40 rounded px-1.5 py-0.5 tracking-wider animate-pulse">
-          CANLI OPEN-METEO 📡
+          {t('miscWidgets.tourWeatherForecast.liveOpenMeteo')}
         </span>
       </div>
 
@@ -148,7 +151,7 @@ export const TourWeatherForecast: React.FC<TourWeatherForecastProps> = ({ dates,
               className="flex items-center justify-between bg-white border border-slate-150 p-2.5 rounded-xl hover:border-sky-300/80 hover:shadow-2xs transition group"
             >
               <div className="flex flex-col">
-                <span className="text-[10px] text-slate-400 font-extrabold tracking-wider">TUR TARİXİ</span>
+                <span className="text-[10px] text-slate-400 font-extrabold tracking-wider">{t('miscWidgets.tourWeatherForecast.tourDate')}</span>
                 <span className="text-[11px] font-black text-slate-800">{formatAzeriDate(date)}</span>
               </div>
               <div className="flex items-center gap-2 text-right">

@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { User } from '../types';
 import { Lock, Mail } from 'lucide-react';
+import { useLanguage } from '../i18n/LanguageContext';
 
 interface AdminLoginProps {
   onLogin: (user: User, token: string) => void;
 }
 
 export default function AdminLogin({ onLogin }: AdminLoginProps) {
+  const { t } = useLanguage();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -24,12 +26,12 @@ export default function AdminLogin({ onLogin }: AdminLoginProps) {
       });
       const data = await response.json();
       if (!response.ok) {
-        setError(data.error || 'E-poçt və ya şifrə yanlışdır.');
+        setError(data.error || t('miscWidgets.adminLogin.invalidCredentials'));
         return;
       }
       onLogin(data.user, data.token);
     } catch (e: any) {
-      setError('Giriş zamanı server ilə əlaqə mümkün olmadı. Backend serverin işlədiyini yoxlayın.');
+      setError(t('miscWidgets.adminLogin.connectionError'));
     } finally {
       setIsLoading(false);
     }
@@ -42,8 +44,8 @@ export default function AdminLogin({ onLogin }: AdminLoginProps) {
           <div className="w-12 h-12 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center mx-auto mb-3">
             <Lock className="w-6 h-6" />
           </div>
-          <h2 className="text-xl font-bold text-white mb-1">Admin Girişi</h2>
-          <p className="text-xs text-slate-400">Platforma idarəetmə paneli</p>
+          <h2 className="text-xl font-bold text-white mb-1">{t('miscWidgets.adminLogin.title')}</h2>
+          <p className="text-xs text-slate-400">{t('miscWidgets.adminLogin.subtitle')}</p>
         </div>
         <div className="p-6">
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -55,21 +57,21 @@ export default function AdminLogin({ onLogin }: AdminLoginProps) {
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center gap-1.5">
                 <Mail className="w-3.5 h-3.5" />
-                E-poçt
+                {t('miscWidgets.adminLogin.emailLabel')}
               </label>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition text-sm text-slate-800 font-medium"
-                placeholder="admin@nümunə.az"
+                placeholder={t('miscWidgets.adminLogin.emailPlaceholder')}
                 required
               />
             </div>
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1.5 flex items-center gap-1.5">
                 <Lock className="w-3.5 h-3.5" />
-                Şifrə
+                {t('miscWidgets.adminLogin.passwordLabel')}
               </label>
               <input
                 type="password"
@@ -85,12 +87,12 @@ export default function AdminLogin({ onLogin }: AdminLoginProps) {
               disabled={isLoading}
               className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl shadow-sm text-sm transition-all disabled:opacity-70 flex justify-center mt-2"
             >
-              {isLoading ? 'Giriş edilir...' : 'Daxil ol'}
+              {isLoading ? t('miscWidgets.adminLogin.loggingIn') : t('miscWidgets.adminLogin.login')}
             </button>
           </form>
           <div className="mt-6 border-t border-slate-100 pt-5">
             <div className="text-[10px] text-slate-400 text-center">
-              Yalnız platforma administratorları üçün nəzərdə tutulub.
+              {t('miscWidgets.adminLogin.footerNote')}
             </div>
           </div>
         </div>

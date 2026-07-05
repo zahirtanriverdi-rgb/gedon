@@ -19,6 +19,7 @@ import { SearchDropdown } from '../SearchDropdown';
 import { TourWeatherForecast } from '../TourWeatherForecast';
 import { ReviewSubmissionPanel } from './ReviewSubmissionPanel';
 import { computeFeaturedTourIds } from '../../utils/featuredTours';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 type ConvertedPriceInfo = {
   azn: number;
@@ -144,6 +145,7 @@ export function ToursHomeView({
   onSelectTour,
   setActiveView
 }: ToursHomeViewProps) {
+  const { t: tt } = useLanguage();
   const featuredTourIds = React.useMemo(() => computeFeaturedTourIds(tours, slots), [tours, slots]);
   return (
         // -mx-5 cancels the parent <main>'s fixed px-5 (20px) so this container can
@@ -222,7 +224,7 @@ export function ToursHomeView({
                     : 'bg-white text-brand-text-main border-slate-200 hover:border-slate-300 hover:bg-slate-50'
                 }`}
               >
-                🌍 Bütün Turlar
+                🌍 {tt('customerHome.toursHomeView.categories.all')}
               </button>
               <button
                 onClick={() => setSelectedCategory('peak')}
@@ -232,7 +234,7 @@ export function ToursHomeView({
                     : 'bg-white text-brand-text-main border-slate-200 hover:border-slate-300 hover:bg-slate-50'
                 }`}
               >
-                🏔️ Zirvə
+                🏔️ {tt('customerHome.toursHomeView.categories.peak')}
               </button>
               <button
                 onClick={() => setSelectedCategory('camp')}
@@ -242,7 +244,7 @@ export function ToursHomeView({
                     : 'bg-white text-brand-text-main border-slate-200 hover:border-slate-300 hover:bg-slate-50'
                 }`}
               >
-                ⛺ Kamp
+                ⛺ {tt('customerHome.toursHomeView.categories.camp')}
               </button>
               <button
                 onClick={() => setSelectedCategory('hiking')}
@@ -252,7 +254,7 @@ export function ToursHomeView({
                     : 'bg-white text-brand-text-main border-slate-200 hover:border-slate-300 hover:bg-slate-50'
                 }`}
               >
-                🥾 Hiking
+                🥾 {tt('customerHome.toursHomeView.categories.hiking')}
               </button>
               <button
                 onClick={() => setSelectedCategory('active')}
@@ -262,8 +264,8 @@ export function ToursHomeView({
                     : 'bg-white text-brand-text-main border-slate-200 hover:border-slate-300 hover:bg-slate-50'
                 }`}
               >
-                🏃‍♂️ Aktiv Həyat
-                <span className="absolute -top-2 -right-1 bg-white border border-border-primary text-label-secondary text-[9px] px-1.5 py-0.5 rounded-full font-black scale-90 shadow-sm">YENİ</span>
+                🏃‍♂️ {tt('customerHome.toursHomeView.categories.active')}
+                <span className="absolute -top-2 -right-1 bg-white border border-border-primary text-label-secondary text-[9px] px-1.5 py-0.5 rounded-full font-black scale-90 shadow-sm">{tt('customerHome.toursHomeView.categories.newBadge')}</span>
               </button>
               <button
                 onClick={() => setSelectedCategory('international')}
@@ -273,8 +275,8 @@ export function ToursHomeView({
                     : 'bg-white text-brand-text-main border-slate-200 hover:border-slate-300 hover:bg-slate-50'
                 }`}
               >
-                ✈️ Xarici Turlar
-                <span className="absolute -top-2 -right-1 bg-accent-orange-100 text-accent-orange-700 text-[9px] px-1.5 py-0.5 rounded-full font-black scale-90 shadow-sm">HOT</span>
+                ✈️ {tt('customerHome.toursHomeView.categories.international')}
+                <span className="absolute -top-2 -right-1 bg-accent-orange-100 text-accent-orange-700 text-[9px] px-1.5 py-0.5 rounded-full font-black scale-90 shadow-sm">{tt('customerHome.toursHomeView.categories.hotBadge')}</span>
               </button>
             </div>
 
@@ -283,7 +285,7 @@ export function ToursHomeView({
               onClick={() => setIsFiltersExpanded(!isFiltersExpanded)}
               className="mt-0 mb-1 text-[11px] font-bold text-brand-accent hover:text-accent-orange-600 flex items-center gap-1 transition-colors"
             >
-              {isFiltersExpanded ? 'Gizlət' : 'Geniş Axtarış Filtrləri'} 
+              {isFiltersExpanded ? tt('customerHome.toursHomeView.filters.hide') : tt('customerHome.toursHomeView.filters.showAdvanced')}
               <svg className={`w-3 h-3 transition-transform ${isFiltersExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
               </svg>
@@ -294,23 +296,23 @@ export function ToursHomeView({
               <div className="w-full max-w-4xl bg-white p-10 rounded-2xl border border-slate-200 shadow-lg mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6 animate-fadeIn">
                 {/* Difficulty Filter */}
                 <div>
-                  <label className="block text-[10px] font-bold text-brand-text-muted mb-1">Çətinlik dərəcəsi</label>
+                  <label className="block text-[10px] font-bold text-brand-text-muted mb-1">{tt('customerHome.toursHomeView.filters.difficultyLabel')}</label>
                   <select
                     value={selectedDifficulty}
                     onChange={(e) => setSelectedDifficulty(e.target.value)}
                     className="w-full px-3 py-2 bg-brand-bg-light border border-slate-200 rounded-lg text-xs font-medium text-brand-text-main focus:outline-none focus:ring-1 focus:ring-brand-cta cursor-pointer"
                   >
                     <option value="all">{t('allLevels')}</option>
-                    <option value="easy">Asan (Easy)</option>
-                    <option value="medium">Orta (Medium)</option>
-                    <option value="hard">Çətin (Hard)</option>
-                    <option value="extreme">Ekstremal (Extreme)</option>
+                    <option value="easy">{tt('customerHome.toursHomeView.filters.difficultyOptions.easy')}</option>
+                    <option value="medium">{tt('customerHome.toursHomeView.filters.difficultyOptions.medium')}</option>
+                    <option value="hard">{tt('customerHome.toursHomeView.filters.difficultyOptions.hard')}</option>
+                    <option value="extreme">{tt('customerHome.toursHomeView.filters.difficultyOptions.extreme')}</option>
                   </select>
                 </div>
 
                 {/* Region Filter */}
                 <div>
-                  <label className="block text-[10px] font-bold text-brand-text-muted mb-1">Regionlar</label>
+                  <label className="block text-[10px] font-bold text-brand-text-muted mb-1">{tt('customerHome.toursHomeView.filters.regionsLabel')}</label>
                   <select
                     value={selectedRegion}
                     onChange={(e) => setSelectedRegion(e.target.value)}
@@ -325,7 +327,7 @@ export function ToursHomeView({
 
                 {/* Tarix Filtri (Təqvim) */}
                 <div className="relative">
-                  <label className="block text-[10px] font-bold text-brand-text-muted mb-1">Tarix seçimi (Təqvim)</label>
+                  <label className="block text-[10px] font-bold text-brand-text-muted mb-1">{tt('customerHome.toursHomeView.filters.dateLabel')}</label>
                   <button
                     type="button"
                     id="calendar-toggle-btn"
@@ -337,9 +339,9 @@ export function ToursHomeView({
                     }`}
                   >
                     <span className="truncate">
-                      {calendarDateStart 
+                      {calendarDateStart
                         ? `${calendarDateStart}${calendarDateEnd ? ` ➡️ ${calendarDateEnd}` : ''}`
-                        : 'Müəyyən tarix'
+                        : tt('customerHome.toursHomeView.filters.specificDate')
                       }
                     </span>
                     <Calendar className="w-3.5 h-3.5 flex-shrink-0 opacity-70" />
@@ -374,8 +376,8 @@ export function ToursHomeView({
                       </div>
 
                       <div className="grid grid-cols-7 gap-1 mb-2 text-center text-[10px] font-bold text-brand-text-muted">
-                        {['B.e','Ç.a','Ç','C.a','C','Ş','B'].map(day => (
-                          <div key={day}>{day}</div>
+                        {tt('customerHome.toursHomeView.filters.calendar.weekDays').split(',').map((day, idx) => (
+                          <div key={`${day}-${idx}`}>{day}</div>
                         ))}
                       </div>
 
@@ -423,7 +425,7 @@ export function ToursHomeView({
                                   handleCalendarDayClick(fullDayStr);
                                 }}
                                 className={cellClass}
-                                title={hasActiveSlots ? 'Aktiv Səfərlər var 🌿' : 'Səfər yoxdur'}
+                                title={hasActiveSlots ? tt('customerHome.toursHomeView.filters.calendar.hasActiveTrips') : tt('customerHome.toursHomeView.filters.calendar.noTrips')}
                               >
                                 <div className="relative flex flex-col items-center">
                                   <span>{d}</span>
@@ -448,7 +450,7 @@ export function ToursHomeView({
                            }}
                            className="w-full mt-3 py-1.5 bg-rose-50 text-rose-700 hover:bg-rose-100 font-bold text-[10px] rounded-lg transition"
                         >
-                          Sıfırla
+                          {tt('customerHome.toursHomeView.filters.calendar.reset')}
                         </button>
                       )}
                     </div>
@@ -457,26 +459,26 @@ export function ToursHomeView({
 
                 {/* Sıralama Dropdown Menu */}
                 <div>
-                  <label className="block text-[10px] font-black text-brand-text-muted tracking-wider mb-1">SIRALAMA</label>
+                  <label className="block text-[10px] font-black text-brand-text-muted tracking-wider mb-1">{tt('customerHome.toursHomeView.filters.sortLabel')}</label>
                   <select
                     value={sortBy}
                     onChange={(e) => setSortBy(e.target.value)}
                     className="w-full px-3 py-2 bg-brand-bg-light border border-slate-200 rounded-lg text-xs font-bold text-brand-text-main focus:outline-none focus:ring-1 focus:ring-brand-cta cursor-pointer"
                   >
-                    <option value="default">Varsayılan Sıralama</option>
-                    <option value="price-asc">Qiymətə: Ucuzdan bahaya</option>
-                    <option value="price-desc">Qiymətə: Bahadan ucuza</option>
-                    <option value="diff-asc">Çətinliyə: Asandan çətinə</option>
-                    <option value="diff-desc">Çətinliyə: Çətindən asana</option>
-                    <option value="date-asc">Tarixə: Ən yaxın tarix</option>
-                    <option value="date-desc">Tarixə: Ən uzaq tarix</option>
+                    <option value="default">{tt('customerHome.toursHomeView.filters.sortOptions.default')}</option>
+                    <option value="price-asc">{tt('customerHome.toursHomeView.filters.sortOptions.priceAsc')}</option>
+                    <option value="price-desc">{tt('customerHome.toursHomeView.filters.sortOptions.priceDesc')}</option>
+                    <option value="diff-asc">{tt('customerHome.toursHomeView.filters.sortOptions.diffAsc')}</option>
+                    <option value="diff-desc">{tt('customerHome.toursHomeView.filters.sortOptions.diffDesc')}</option>
+                    <option value="date-asc">{tt('customerHome.toursHomeView.filters.sortOptions.dateAsc')}</option>
+                    <option value="date-desc">{tt('customerHome.toursHomeView.filters.sortOptions.dateDesc')}</option>
                   </select>
                 </div>
 
                 {/* Max Price Range Slider */}
                 <div className="flex flex-col justify-end">
                   <div className="flex justify-between text-[10px] font-bold text-brand-text-muted mb-1.5">
-                    <span>Maksimum Qiymət</span>
+                    <span>{tt('customerHome.toursHomeView.filters.maxPrice')}</span>
                     <span className="text-brand-cta font-extrabold">{maxPrice} ₼</span>
                   </div>
                   <div className="py-1">
@@ -538,7 +540,7 @@ export function ToursHomeView({
                             type="button"
                             onClick={(e) => handleToggleWishlist(tour.id, e)}
                             className="absolute top-1 right-1 bg-white/90 hover:bg-white p-1 rounded-full shadow-sm transition cursor-pointer"
-                            title={wishlist.includes(tour.id) ? 'İstəklərdən çıxar' : 'İstəklərə əlavə et'}
+                            title={wishlist.includes(tour.id) ? tt('customerHome.toursHomeView.wishlist.remove') : tt('customerHome.toursHomeView.wishlist.add')}
                           >
                             <Heart className={`w-2.5 h-2.5 ${wishlist.includes(tour.id) ? 'fill-rose-600 text-rose-600' : 'text-brand-text-main'}`} />
                           </button>
@@ -611,47 +613,47 @@ export function ToursHomeView({
             const minPrice = priceList.length > 0 ? Math.min(...priceList) : 25;
             const isSportActive = tour.category === 'active' || tour.isActiveLife;
             const diffColors: Record<TourDifficulty, { bg: string, text: string, label: string }> = {
-              easy: { bg: 'bg-emerald-50 text-emerald-850 border border-emerald-100', text: 'text-emerald-800', label: 'Asan' },
-              medium: { bg: 'bg-brand-bg-light text-brand-text-main border border-slate-200', text: 'text-brand-text-main', label: 'Orta' },
-              hard: { bg: 'bg-orange-50 text-orange-850 border border-orange-100', text: 'text-orange-800', label: 'Çətin' },
-              extreme: { bg: 'bg-red-50 text-red-850 border border-red-100', text: 'text-red-800', label: 'Ekstremal' }
+              easy: { bg: 'bg-emerald-50 text-emerald-850 border border-emerald-100', text: 'text-emerald-800', label: tt('customerHome.toursHomeView.difficulty.easy') },
+              medium: { bg: 'bg-brand-bg-light text-brand-text-main border border-slate-200', text: 'text-brand-text-main', label: tt('customerHome.toursHomeView.difficulty.medium') },
+              hard: { bg: 'bg-orange-50 text-orange-850 border border-orange-100', text: 'text-orange-800', label: tt('customerHome.toursHomeView.difficulty.hard') },
+              extreme: { bg: 'bg-red-50 text-red-850 border border-red-100', text: 'text-red-800', label: tt('customerHome.toursHomeView.difficulty.extreme') }
             };
 
             const badges: Record<TourCategory, { emoji: string, label: string }> = {
-              peak: { emoji: '🏔️', label: 'Zirvə' },
-              camp: { emoji: '⛺', label: 'Kamp' },
-              hiking: { emoji: '🥾', label: 'Hiking' },
-              international: { emoji: '✈️', label: 'Xarici' },
-              active: { emoji: '🏃‍♂️', label: 'Aktiv Həyat' }
+              peak: { emoji: '🏔️', label: tt('customerHome.toursHomeView.categories.peak') },
+              camp: { emoji: '⛺', label: tt('customerHome.toursHomeView.categories.camp') },
+              hiking: { emoji: '🥾', label: tt('customerHome.toursHomeView.categories.hiking') },
+              international: { emoji: '✈️', label: tt('customerHome.toursHomeView.badges.international') },
+              active: { emoji: '🏃‍♂️', label: tt('customerHome.toursHomeView.categories.active') }
             };
 
             // Dynamic Active Lifestyle Difficulty override with color codes
             let difficultyBg = diffColors[tour.difficulty]?.bg || 'bg-slate-100 text-brand-text-main';
-            let difficultyLabel = diffColors[tour.difficulty]?.label || 'Orta';
+            let difficultyLabel = diffColors[tour.difficulty]?.label || tt('customerHome.toursHomeView.difficulty.medium');
 
             if (isSportActive) {
               const activeDiff = tour.activeDifficulty || (tour.difficulty === 'easy' ? 'beginner' : tour.difficulty === 'hard' || tour.difficulty === 'extreme' ? 'professional' : 'medium');
               if (activeDiff === 'beginner' || activeDiff === 'easy') {
                 difficultyBg = 'bg-emerald-100 text-brand-primary border border-emerald-300 font-bold';
-                difficultyLabel = '🟢 Başlanğıc';
+                difficultyLabel = `🟢 ${tt('customerHome.toursHomeView.activeDifficulty.beginner')}`;
               } else if (activeDiff === 'medium') {
                 difficultyBg = 'bg-yellow-100 text-amber-800 border border-yellow-300 font-bold';
-                difficultyLabel = '🟡 Orta';
+                difficultyLabel = `🟡 ${tt('customerHome.toursHomeView.activeDifficulty.medium')}`;
               } else {
                 difficultyBg = 'bg-red-150 bg-red-100 text-red-700 border border-red-200 font-extrabold';
-                difficultyLabel = '🔴 Professional';
+                difficultyLabel = `🔴 ${tt('customerHome.toursHomeView.activeDifficulty.professional')}`;
               }
-              
+
               // Dynamic Sports badge
               if (tour.category === 'active' || tour.isActiveLife) {
-                 const tBadge = { emoji: '🏃‍♂️', label: 'Aktiv İdman' };
-                 if (tour.activityType === 'volleyball') { tBadge.emoji = '🏐'; tBadge.label = 'Voleybol Turniri'; }
-                 else if (tour.activityType === 'running') { tBadge.emoji = '🏃‍♂️'; tBadge.label = 'Qaçış Marafonu'; }
-                 else if (tour.activityType === 'ski' || tour.activityType === 'skiing') { tBadge.emoji = '⛷️'; tBadge.label = 'Xizək'; }
-                 else if (tour.activityType === 'rafting') { tBadge.emoji = '🚣‍♂️'; tBadge.label = 'Rafting'; }
-                 else if (tour.activityType === 'bike' || tour.activityType === 'cycling') { tBadge.emoji = '🚴‍♂️'; tBadge.label = 'Velo-Tur'; }
-                 else if (tour.activityType === 'canyon') { tBadge.emoji = '🧗‍♂️'; tBadge.label = 'Kanyoninq'; }
-                 else if (tour.activityType === 'other') { tBadge.emoji = '🏆'; tBadge.label = 'İdman Festivalı'; }
+                 const tBadge = { emoji: '🏃‍♂️', label: tt('customerHome.toursHomeView.sportsBadges.activeSport') };
+                 if (tour.activityType === 'volleyball') { tBadge.emoji = '🏐'; tBadge.label = tt('customerHome.toursHomeView.sportsBadges.volleyball'); }
+                 else if (tour.activityType === 'running') { tBadge.emoji = '🏃‍♂️'; tBadge.label = tt('customerHome.toursHomeView.sportsBadges.running'); }
+                 else if (tour.activityType === 'ski' || tour.activityType === 'skiing') { tBadge.emoji = '⛷️'; tBadge.label = tt('customerHome.toursHomeView.sportsBadges.ski'); }
+                 else if (tour.activityType === 'rafting') { tBadge.emoji = '🚣‍♂️'; tBadge.label = tt('customerHome.toursHomeView.sportsBadges.rafting'); }
+                 else if (tour.activityType === 'bike' || tour.activityType === 'cycling') { tBadge.emoji = '🚴‍♂️'; tBadge.label = tt('customerHome.toursHomeView.sportsBadges.bike'); }
+                 else if (tour.activityType === 'canyon') { tBadge.emoji = '🧗‍♂️'; tBadge.label = tt('customerHome.toursHomeView.sportsBadges.canyon'); }
+                 else if (tour.activityType === 'other') { tBadge.emoji = '🏆'; tBadge.label = tt('customerHome.toursHomeView.sportsBadges.other'); }
                  badges['active'] = tBadge;
               }
             }
@@ -673,11 +675,11 @@ export function ToursHomeView({
                   <div className="absolute top-3 left-3 flex gap-1.5 flex-wrap">
                     {featuredTourIds.has(tour.id) && (
                       <span className="text-[10px] font-extrabold tracking-tight px-2 py-0.5 rounded-md shadow-xs bg-brand-accent text-white">
-                        🔥 Ayın Ən Çox Satılanı
+                        🔥 {tt('customerHome.toursHomeView.bestSellerOfMonth')}
                       </span>
                     )}
                     <span className={`text-[10px] font-bold tracking-tight px-2 py-0.5 rounded-md shadow-xs ${tour.isInternational ? 'bg-brand-accent text-white' : 'bg-brand-text-main/90 text-white'}`}>
-                      {badges[tour.category]?.emoji || '✈️'} {badges[tour.category]?.label || 'Xarici'}
+                      {badges[tour.category]?.emoji || '✈️'} {badges[tour.category]?.label || tt('customerHome.toursHomeView.badges.international')}
                     </span>
                     <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md shadow-xs ${difficultyBg}`}>
                       {difficultyLabel}
@@ -689,7 +691,7 @@ export function ToursHomeView({
                       type="button"
                       onClick={(e) => handleToggleWishlist(tour.id, e)}
                       className="bg-white hover:bg-slate-50 p-1.5 rounded-full shadow-md transition-all hover:scale-110 flex items-center justify-center border border-slate-100 cursor-pointer"
-                      title={wishlist.includes(tour.id) ? 'İstəklərdən çıxar' : 'İstəklərə əlavə et'}
+                      title={wishlist.includes(tour.id) ? tt('customerHome.toursHomeView.wishlist.remove') : tt('customerHome.toursHomeView.wishlist.add')}
                     >
                       <Heart className={`w-3.5 h-3.5 ${wishlist.includes(tour.id) ? 'fill-rose-600 text-rose-600' : 'text-brand-text-main'}`} />
                     </button>
@@ -697,14 +699,14 @@ export function ToursHomeView({
                       type="button"
                       onClick={(e) => handleShareTour(tour, e)}
                       className="bg-white hover:bg-slate-50 text-brand-text-main hover:text-brand-primary p-1.5 rounded-full shadow-md transition-all hover:scale-110 flex items-center justify-center border border-slate-100 cursor-pointer"
-                      title="Dostlarınla Paylaş"
+                      title={tt('customerHome.toursHomeView.shareTitle')}
                     >
                       <Share2 className="w-3.5 h-3.5" />
                     </button>
                   </div>
                   {tour.isInternational && (
                     <div className="absolute bottom-10 right-3 bg-brand-accent text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow-sm">
-                      ✈️ Aviabilet {tour.flightIncluded ? 'Daxildir' : 'Daxil deyil'}
+                      ✈️ {tt('customerHome.toursHomeView.flightTicket')} {tour.flightIncluded ? tt('customerHome.toursHomeView.included') : tt('customerHome.toursHomeView.notIncluded')}
                     </div>
                   )}
                   <div className="absolute bottom-3 right-3 bg-white/90 backdrop-blur-xs text-brand-text-main px-2 py-0.5 rounded border border-slate-250 text-[10px] font-semibold">
@@ -719,21 +721,21 @@ export function ToursHomeView({
                       {isSportActive ? (
                         <>
                           <span className="text-amber-600 font-bold">🏅</span>
-                          <span>Aktiv İdman • {tour.activityType === 'volleyball' ? 'Voleybol 🏐' : tour.activityType === 'ski' ? 'Xizəkçilik ⛷️' : tour.activityType === 'rafting' ? 'Rafting 🚣‍♂️' : tour.activityType === 'running' ? 'Marafon 🏃‍♂️' : tour.activityType === 'bike' ? 'Velosiped 🚴‍♂️' : 'Macəra 🏆'}</span>
+                          <span>{tt('customerHome.toursHomeView.sportsBadges.activeSport')} • {tour.activityType === 'volleyball' ? tt('customerHome.toursHomeView.activityTypeLabels.volleyball') : tour.activityType === 'ski' ? tt('customerHome.toursHomeView.activityTypeLabels.ski') : tour.activityType === 'rafting' ? tt('customerHome.toursHomeView.activityTypeLabels.rafting') : tour.activityType === 'running' ? tt('customerHome.toursHomeView.activityTypeLabels.running') : tour.activityType === 'bike' ? tt('customerHome.toursHomeView.activityTypeLabels.bike') : tt('customerHome.toursHomeView.activityTypeLabels.other')}</span>
                         </>
                       ) : tour.isInternational ? (
                         <>
                           <Plane className="w-3 h-3 text-amber-500 animate-pulse" />
-                          <span>{tour.durationNights || Number(tour.durationDays) - 1} Gecə / {tour.durationDays} Gündüz xarici paket</span>
+                          <span>{tt('customerHome.toursHomeView.durationInternational', { nights: tour.durationNights || Number(tour.durationDays) - 1, days: tour.durationDays })}</span>
                         </>
                       ) : (
                         <>
                           <Compass className="w-3 h-3 text-brand-primary" />
-                          <span>{tour.durationDays} Günlük yürüş</span>
+                          <span>{tt('customerHome.toursHomeView.durationDomestic', { days: tour.durationDays })}</span>
                         </>
                       )}
                       <span className="text-slate-300">•</span>
-                      <span>{tourSlots.length} Aktiv Tarix</span>
+                      <span>{tt('customerHome.toursHomeView.activeDates', { count: tourSlots.length })}</span>
                     </div>
 
                     <h3 className="font-bold text-brand-text-main text-sm leading-snug group-hover:text-brand-primary transition tracking-tight flex items-center gap-1">
@@ -748,17 +750,17 @@ export function ToursHomeView({
                     {isSportActive && (
                       <div className="bg-amber-50/60 border border-amber-100 p-2.5 rounded-xl text-[10px] text-brand-text-main flex flex-col gap-1 my-1">
                         <div className="flex justify-between font-bold text-brand-text-main">
-                          <span>🔞 Yaş: <span className="text-amber-800 font-black">{tour.ageLimit || '18-45 yaş'}</span></span>
-                          <span className="text-brand-primary font-extrabold">{tour.equipmentIncluded ? '🎒 Təchizat pulsuz' : '🎒 Təchizat kirayəsi'}</span>
+                          <span>🔞 {tt('customerHome.toursHomeView.ageLabel')}: <span className="text-amber-800 font-black">{tour.ageLimit || tt('customerHome.toursHomeView.ageDefault')}</span></span>
+                          <span className="text-brand-primary font-extrabold">{tour.equipmentIncluded ? `🎒 ${tt('customerHome.toursHomeView.equipmentFree')}` : `🎒 ${tt('customerHome.toursHomeView.equipmentRental')}`}</span>
                         </div>
                         {tour.requiredEquipment && (
                           <div className="text-[9px] text-brand-text-muted truncate">
-                            🎒 Lazımdır: <strong className="text-brand-text-main font-semibold">{tour.requiredEquipment}</strong>
+                            🎒 {tt('customerHome.toursHomeView.requiredLabel')}: <strong className="text-brand-text-main font-semibold">{tour.requiredEquipment}</strong>
                           </div>
                         )}
                         {tour.meetingPoint && (
                           <div className="text-[9px] text-brand-text-muted truncate">
-                            📍 Görüş: <strong className="text-brand-text-main font-semibold">{tour.meetingPoint}</strong>
+                            📍 {tt('customerHome.toursHomeView.meetingLabel')}: <strong className="text-brand-text-main font-semibold">{tour.meetingPoint}</strong>
                           </div>
                         )}
                       </div>
@@ -773,8 +775,8 @@ export function ToursHomeView({
                           </span>
                         </div>
                         <div className="flex justify-between text-[9px] text-brand-text-muted font-bold">
-                          <span>🍽️ Qidalanma: {tour.mealType || 'Səhər yeməyi'}</span>
-                          <span className="text-brand-primary">✈️ {tour.flightIncluded ? 'Uçuş daxildir' : 'Uçuş daxil deyil'}</span>
+                          <span>🍽️ {tt('customerHome.toursHomeView.mealLabel')}: {tour.mealType || tt('customerHome.toursHomeView.mealDefault')}</span>
+                          <span className="text-brand-primary">✈️ {tour.flightIncluded ? tt('customerHome.toursHomeView.flightIncluded') : tt('customerHome.toursHomeView.flightNotIncluded')}</span>
                         </div>
                       </div>
                     )}
@@ -803,7 +805,7 @@ export function ToursHomeView({
                       return (
                         <div className="flex flex-col justify-center gap-1.5 min-w-0">
                           {REVIEWS_ENABLED && (
-                            <div className="flex items-center gap-0.5" title={`${getAverageRating(tour.id)} rəy xalı`}>
+                            <div className="flex items-center gap-0.5" title={tt('customerHome.toursHomeView.ratingScoreTitle', { rating: getAverageRating(tour.id) })}>
                               {[1, 2, 3, 4, 5].map((starIdx) => {
                                 const isFilled = starIdx <= starRating;
                                 return (
@@ -814,12 +816,12 @@ export function ToursHomeView({
                                 );
                               })}
                               <span className="text-xs font-bold text-brand-text-main ml-1">{getAverageRating(tour.id)}</span>
-                              <span className="text-brand-text-muted text-[10px] font-medium">({getReviewsCount(tour.id)} rəy)</span>
+                              <span className="text-brand-text-muted text-[10px] font-medium">({tt('customerHome.toursHomeView.reviewsCount', { count: getReviewsCount(tour.id) })})</span>
                             </div>
                           )}
                           {isTopSeller && (
-                            <span className="bg-amber-50/70 text-brand-accent border border-amber-100 text-[9px] font-semibold px-1.5 py-0.5 rounded-md flex items-center gap-0.5 w-fit" title="Bu ayın ən çox bilet satılan turu!">
-                              🔥 {selectedMonth} ayının ən çox satılanı
+                            <span className="bg-amber-50/70 text-brand-accent border border-amber-100 text-[9px] font-semibold px-1.5 py-0.5 rounded-md flex items-center gap-0.5 w-fit" title={tt('customerHome.toursHomeView.topSellerTitle')}>
+                              🔥 {tt('customerHome.toursHomeView.bestSellerOfMonthNamed', { month: selectedMonth })}
                             </span>
                           )}
                         </div>
@@ -827,7 +829,7 @@ export function ToursHomeView({
                     })()}
 
                     <div className="text-right shrink-0 border-l border-slate-100 pl-4 flex flex-col justify-center">
-                      <span className="text-[9px] text-brand-text-muted block tracking-wider font-semibold">QİYMƏT</span>
+                      <span className="text-[9px] text-brand-text-muted block tracking-wider font-semibold">{tt('customerHome.toursHomeView.priceLabel')}</span>
                       {tour.discountPrice && tour.discountPrice > 0 && tour.discountPrice < (tour.price ?? minPrice) ? (
                         <div className="flex flex-col items-end">
                           <span className="line-through text-label-tertiary text-xs">
@@ -842,7 +844,7 @@ export function ToursHomeView({
                           <strong className="text-brand-text-main text-2xl font-extrabold leading-tight">
                             {getConvertedPriceInfo(tour.price ?? minPrice, tour.priceCurrency).both}
                           </strong>
-                          <span className="text-brand-text-muted text-[10px] font-medium">/ nəfər</span>
+                          <span className="text-brand-text-muted text-[10px] font-medium">{tt('customerHome.toursHomeView.perPerson')}</span>
                         </div>
                       )}
                     </div>
@@ -855,10 +857,10 @@ export function ToursHomeView({
                         type="button"
                         onClick={(e) => handleQuickWhatsApp(tour, e)}
                         className="flex-1 bg-whatsapp-500 hover:bg-whatsapp-600 text-white font-black text-[10px] py-2 px-2.5 rounded-lg transition-all hover:shadow-2xs tracking-wider flex items-center justify-center gap-1 cursor-pointer"
-                        title="Bələdçinin nömrəsinə WhatsApp ilə birbaşa keçid et"
+                        title={tt('customerHome.toursHomeView.whatsappTitle')}
                       >
                         <MessageCircle className="w-3.5 h-3.5" />
-                        WhatsApp Rezerv
+                        {tt('customerHome.toursHomeView.whatsappReserve')}
                       </button>
                     </div>
                   </div>
