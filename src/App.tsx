@@ -673,6 +673,11 @@ export default function App() {
   // data that no longer exists now that tours/slots/bookings/reviews are server-backed,
   // and neither was wired up to any button in the UI.
 
+  // Once a vendor/admin is logged in, the portal takes over the full viewport with its
+  // own sidebar+topbar chrome (DashboardSidebarLayout) instead of the site's marketing
+  // header/footer — those still apply to the customer view and the pre-login screens.
+  const isDashboardMode = (selectedRole === 'vendor' && !!loggedInVendor) || (selectedRole === 'admin' && !!loggedInAdmin);
+
   return (
     <div
       className="min-h-screen font-sans text-slate-700 flex flex-col justify-between"
@@ -683,6 +688,8 @@ export default function App() {
         backgroundColor: 'var(--color-bg-page)',
       }}
     >
+      {!isDashboardMode && (
+      <>
       {/* Main Elegant Header — flush with the page background at scrollY 0, gains a
           border/shadow only once the user scrolls (sticky/scrolled state) */}
       <header className={`bg-white sticky top-0 z-40 h-[var(--header-height)] border-b transition-shadow duration-200 ${
@@ -837,24 +844,10 @@ export default function App() {
                 </div>
               </div>
             ) : (
+              // Reached only pre-login (OperatorLogin/AdminLogin) — once logged in,
+              // isDashboardMode takes over and this header isn't rendered at all.
               <nav className="flex items-center gap-4">
                 <LanguageSwitcher />
-                {loggedInVendor && (
-                  <button
-                    onClick={handleOperatorLogout}
-                    className="text-xs font-semibold py-1 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-all ml-4"
-                  >
-                    {t('app.nav.logout')}
-                  </button>
-                )}
-                {loggedInAdmin && (
-                  <button
-                    onClick={handleAdminLogout}
-                    className="text-xs font-semibold py-1 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-all ml-4"
-                  >
-                    {t('app.nav.logout')}
-                  </button>
-                )}
               </nav>
             )}
           </div>
@@ -916,58 +909,8 @@ export default function App() {
               <OperatorLogin onLogin={handleOperatorLogin} />
             )}
 
-            {selectedRole === 'vendor' && loggedInVendor && (
-              <VendorPortal
-                tours={tours}
-                slots={slots}
-                bookings={bookings}
-                currentUser={activeUser}
-                operatorToken={operatorToken}
-                onAddSlot={handleAddSlot}
-                onDeleteSlot={handleDeleteSlot}
-                onAddTour={handleAddTour}
-                onEditTour={handleEditTour}
-                onDeleteTour={handleDeleteTour}
-                onShowNotification={showNotification}
-                onApproveBooking={handleApproveBooking}
-                onEditBooking={handleEditBooking}
-                onAddBooking={handleAddBooking}
-                onUpdateSlotBookedCount={handleUpdateSlotBookedCount}
-                exchangeRates={exchangeRates}
-                onUpdateExchangeRates={handleUpdateExchangeRates}
-                onToggleFeatured={handleToggleFeatured}
-                onUserUpdated={handleVendorProfileUpdated}
-              />
-            )}
-
             {selectedRole === 'admin' && !loggedInAdmin && (
               <AdminLogin onLogin={handleAdminLogin} />
-            )}
-
-            {selectedRole === 'admin' && loggedInAdmin && (
-              <AdminPortal
-                tours={tours}
-                slots={slots}
-                bookings={bookings}
-                users={users}
-                currentUser={activeUser}
-                platformConfig={platformConfig}
-                onUpdatePriceCalculatorConfig={handleUpdatePriceCalculatorConfig}
-                onApproveTour={handleApproveTour}
-                onRejectTour={handleRejectTour}
-                onEditTour={handleEditTour}
-                onDeleteTour={handleDeleteTour}
-                onAddSlot={handleAddSlot}
-                onDeleteSlot={handleDeleteSlot}
-                onShowNotification={showNotification}
-                exchangeRates={exchangeRates}
-                onUpdateExchangeRates={handleUpdateExchangeRates}
-                onUpdateUser={handleUpdateUser}
-                onCreateVendor={handleCreateVendor}
-                onDeleteVendor={handleDeleteVendor}
-                onUpdateTourStatus={handleUpdateTourStatus}
-                authToken={authToken}
-              />
             )}
 
             </>
@@ -990,6 +933,84 @@ export default function App() {
           </div>
         </div>
       </footer>
+      </>
+      )}
+
+      {isDashboardMode && (
+        <>
+          {isMarketplaceDataLoading && (
+            <div className="min-h-screen flex flex-col items-center justify-center gap-4">
+              <RefreshCw className="w-8 h-8 text-brand-primary animate-spin" />
+              <p className="text-sm font-semibold text-slate-500">{t('app.state.marketplaceLoading')}</p>
+            </div>
+          )}
+
+          {!isMarketplaceDataLoading && marketplaceDataError && (
+            <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-rose-50">
+              <ShieldAlert className="w-8 h-8 text-rose-500" />
+              <p className="text-sm font-semibold text-rose-700 text-center max-w-md px-4">{marketplaceDataError}</p>
+              <button
+                onClick={loadMarketplaceData}
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg transition"
+              >
+                {t('app.state.retry')}
+              </button>
+            </div>
+          )}
+
+          {!isMarketplaceDataLoading && !marketplaceDataError && selectedRole === 'vendor' && loggedInVendor && (
+            <VendorPortal
+              tours={tours}
+              slots={slots}
+              bookings={bookings}
+              currentUser={activeUser}
+              operatorToken={operatorToken}
+              onAddSlot={handleAddSlot}
+              onDeleteSlot={handleDeleteSlot}
+              onAddTour={handleAddTour}
+              onEditTour={handleEditTour}
+              onDeleteTour={handleDeleteTour}
+              onShowNotification={showNotification}
+              onApproveBooking={handleApproveBooking}
+              onEditBooking={handleEditBooking}
+              onAddBooking={handleAddBooking}
+              onUpdateSlotBookedCount={handleUpdateSlotBookedCount}
+              exchangeRates={exchangeRates}
+              onUpdateExchangeRates={handleUpdateExchangeRates}
+              onToggleFeatured={handleToggleFeatured}
+              onUserUpdated={handleVendorProfileUpdated}
+              onLogout={handleOperatorLogout}
+            />
+          )}
+
+          {!isMarketplaceDataLoading && !marketplaceDataError && selectedRole === 'admin' && loggedInAdmin && (
+            <AdminPortal
+              tours={tours}
+              slots={slots}
+              bookings={bookings}
+              users={users}
+              currentUser={activeUser}
+              platformConfig={platformConfig}
+              onUpdatePriceCalculatorConfig={handleUpdatePriceCalculatorConfig}
+              onApproveTour={handleApproveTour}
+              onRejectTour={handleRejectTour}
+              onEditTour={handleEditTour}
+              onDeleteTour={handleDeleteTour}
+              onAddSlot={handleAddSlot}
+              onDeleteSlot={handleDeleteSlot}
+              onShowNotification={showNotification}
+              exchangeRates={exchangeRates}
+              onUpdateExchangeRates={handleUpdateExchangeRates}
+              onUpdateUser={handleUpdateUser}
+              onCreateVendor={handleCreateVendor}
+              onDeleteVendor={handleDeleteVendor}
+              onUpdateTourStatus={handleUpdateTourStatus}
+              authToken={authToken}
+              onLogout={handleAdminLogout}
+            />
+          )}
+        </>
+      )}
 
       {/* Floating Alert Toast Notification overlay */}
       {notification && (

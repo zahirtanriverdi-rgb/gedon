@@ -9,10 +9,20 @@ import { EditTourModal } from './vendor/EditTourModal';
 import { TicketModal } from './vendor/TicketModal';
 import { CrmTab } from './vendor/CrmTab';
 import { MyToursTab } from './vendor/MyToursTab';
+import DashboardSidebarLayout, { DashboardNavItem } from './layout/DashboardSidebarLayout';
+import StatCard from './layout/StatCard';
+import LanguageSwitcher from './LanguageSwitcher';
 import {
   Users,
   DollarSign,
-  Briefcase
+  Briefcase,
+  LayoutList,
+  BarChart3,
+  PlusCircle,
+  Activity,
+  Plane,
+  CalendarPlus,
+  User as UserIcon
 } from 'lucide-react';
 
 // Shown in place of a tour create/edit form once the vendor's subscription has expired
@@ -47,6 +57,7 @@ interface VendorPortalProps {
   onUpdateExchangeRates: (newRates: { USD: number; EUR: number }) => void;
   onToggleFeatured?: (tourId: string, isManuallyFeatured: boolean) => Promise<void>;
   onUserUpdated?: (updatedUser: User) => void;
+  onLogout: () => void;
 }
 
 export default function VendorPortal({
@@ -68,7 +79,8 @@ export default function VendorPortal({
   exchangeRates,
   onUpdateExchangeRates,
   onToggleFeatured,
-  onUserUpdated
+  onUserUpdated,
+  onLogout
 }: VendorPortalProps) {
   const { t } = useLanguage();
   const [activeSubTab, setActiveSubTab] = useState<'my-tours' | 'add-tour' | 'add-intl-tour' | 'add-slot' | 'profile' | 'crm'>('my-tours');
@@ -167,9 +179,53 @@ export default function VendorPortal({
   const isSubscriptionExpiredOrInGracePeriod = isExpired;
   const subscriptionExpiredMessage = t('vendorMisc.vendorPortal.subscriptionExpiredMessage', { days: graceDaysLeft });
 
+  // Sidebar nav items — 'add-tour' covers two categories (hiking-default vs. active/sports)
+  // sharing the same activeSubTab value, so the active pill needs its own derived id.
+  const navItems: DashboardNavItem[] = [
+    { id: 'my-tours', label: t('vendorMisc.vendorPortal.tabMyTours'), icon: LayoutList },
+    { id: 'crm', label: t('vendorMisc.vendorPortal.tabCrm'), icon: BarChart3 },
+    { id: 'add-tour', label: t('vendorMisc.vendorPortal.tabAddTour'), icon: PlusCircle },
+    { id: 'add-active-tour', label: t('vendorMisc.vendorPortal.tabAddActiveTour'), icon: Activity },
+    { id: 'add-intl-tour', label: t('vendorMisc.vendorPortal.tabAddIntlTour'), icon: Plane },
+    { id: 'add-slot', label: t('vendorMisc.vendorPortal.tabAddSlot'), icon: CalendarPlus },
+    { id: 'profile', label: t('vendorMisc.vendorPortal.tabProfile'), icon: UserIcon },
+  ];
+  const activeNavId = activeSubTab === 'add-tour'
+    ? (newTourCategory === 'active' ? 'add-active-tour' : 'add-tour')
+    : activeSubTab;
+  const handleNavSelect = (id: string) => {
+    if (id === 'add-tour') {
+      setActiveSubTab('add-tour');
+      if (newTourCategory === 'active') setNewTourCategory('hiking');
+    } else if (id === 'add-active-tour') {
+      setActiveSubTab('add-tour');
+      setNewTourCategory('active');
+    } else {
+      setActiveSubTab(id as typeof activeSubTab);
+    }
+  };
+  const activeNavItem = navItems.find((item) => item.id === activeNavId);
+
   return (
-    <div className="space-y-6">
-      
+    <DashboardSidebarLayout
+      wordmark="GedəkGörək"
+      subtitle={t('vendorMisc.vendorPortal.sidebarSubtitle')}
+      navItems={navItems}
+      activeId={activeNavId}
+      onSelect={handleNavSelect}
+      title={activeNavItem?.label ?? ''}
+      rightSlot={
+        <>
+          <LanguageSwitcher />
+          <button
+            onClick={onLogout}
+            className="text-xs font-semibold py-1 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-all"
+          >
+            {t('app.nav.logout')}
+          </button>
+        </>
+      }
+    >
       {/* Subscription Banner */}
       {subDate && (isAutoDeactivated || isExpired || isWarning) && (
         <div className={`p-4 rounded-xl border flex items-center justify-between shadow-xs ${isAutoDeactivated ? 'bg-red-50 border-red-200' : isExpired ? 'bg-orange-50 border-orange-200' : 'bg-amber-50 border-amber-200'}`}>
@@ -190,131 +246,27 @@ export default function VendorPortal({
 
       {/* Metrics Row */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        
-        {/* Metric 1 */}
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs flex items-center justify-between">
-          <div className="space-y-1">
-            <span className="text-[10px] text-slate-400 font-bold tracking-widest">{t('vendorMisc.vendorPortal.metricMyTours')}</span>
-            <h4 className="text-xl font-extrabold text-slate-900">{t('vendorMisc.vendorPortal.metricMyToursValue', { count: myTours.length })}</h4>
-            <p className="text-[10px] text-slate-500">{t('vendorMisc.vendorPortal.metricMyToursSubtitle')}</p>
-          </div>
-          <div className="p-2.5 bg-[#eff6ff] border border-[#dbeafe] text-[#1d4ed8] rounded-lg">
-            <Briefcase className="w-5 h-5" />
-          </div>
-        </div>
-
-        {/* Metric 2 */}
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs flex items-center justify-between">
-          <div className="space-y-1">
-            <span className="text-[10px] text-slate-400 font-bold tracking-widest">{t('vendorMisc.vendorPortal.metricRevenue')}</span>
-            <h4 className="text-xl font-extrabold text-emerald-750">{myTotalGrossRevenue.toFixed(2)} AZN</h4>
-            <p className="text-[10px] text-slate-500">{t('vendorMisc.vendorPortal.metricRevenueSubtitle')}</p>
-          </div>
-          <div className="p-2.5 bg-emerald-50 border border-emerald-100 text-emerald-700 rounded-lg">
-            <DollarSign className="w-5 h-5" />
-          </div>
-        </div>
-
-        {/* Metric 3 */}
-        <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs flex items-center justify-between">
-          <div className="space-y-1">
-            <span className="text-[10px] text-slate-400 font-bold tracking-widest">{t('vendorMisc.vendorPortal.metricTickets')}</span>
-            <h4 className="text-xl font-extrabold text-primary-700">{t('vendorMisc.vendorPortal.metricTicketsValue', { count: myBookings.length })}</h4>
-            <p className="text-[10px] text-slate-500">{t('vendorMisc.vendorPortal.metricTicketsSubtitle')}</p>
-          </div>
-          <div className="p-2.5 bg-violet-50 border border-violet-100 text-violet-700 rounded-lg">
-            <Users className="w-5 h-5" />
-          </div>
-        </div>
-
-      </div>
-
-      {/* Internal Navigation tabs */}
-      <div className="flex border-b border-slate-200 bg-white/50 backdrop-blur-xs rounded-t-xl px-2 overflow-x-auto scrollbar-thin">
-        <button
-          onClick={() => setActiveSubTab('my-tours')}
-          className={`px-5 py-3 border-b-2 text-xs font-bold transition whitespace-nowrap ${
-            activeSubTab === 'my-tours' 
-              ? 'border-emerald-700 text-emerald-800' 
-              : 'border-transparent text-zinc-500 hover:text-zinc-700'
-          }`}
-        >
-          🗄️ {t('vendorMisc.vendorPortal.tabMyTours')}
-        </button>
-
-        <button
-          onClick={() => setActiveSubTab('crm')}
-          className={`px-5 py-3 border-b-2 text-xs font-bold transition whitespace-nowrap flex items-center gap-1.5 ${
-            activeSubTab === 'crm' 
-              ? 'border-emerald-700 text-emerald-800' 
-              : 'border-transparent text-zinc-500 hover:text-zinc-700'
-          }`}
-        >
-          📊 {t('vendorMisc.vendorPortal.tabCrm')}
-        </button>
-
-        <button
-          onClick={() => {
-            setActiveSubTab('add-tour');
-            if (newTourCategory === 'active') {
-              setNewTourCategory('hiking');
-            }
-          }}
-          className={`px-5 py-3 border-b-2 text-xs font-bold transition whitespace-nowrap ${
-            activeSubTab === 'add-tour' && newTourCategory !== 'active'
-              ? 'border-emerald-700 text-emerald-800' 
-              : 'border-transparent text-zinc-500 hover:text-zinc-700'
-          }`}
-        >
-          ➕ {t('vendorMisc.vendorPortal.tabAddTour')}
-        </button>
-
-        <button
-          onClick={() => {
-            setActiveSubTab('add-tour');
-            setNewTourCategory('active');
-          }}
-          className={`px-5 py-3 border-b-2 text-xs font-bold transition whitespace-nowrap flex items-center gap-1 ${
-            activeSubTab === 'add-tour' && newTourCategory === 'active'
-              ? 'border-emerald-700 text-emerald-800' 
-              : 'border-transparent text-zinc-500 hover:text-zinc-700'
-          }`}
-        >
-          🏃‍♂️ {t('vendorMisc.vendorPortal.tabAddActiveTour')}
-        </button>
-
-        <button
-          onClick={() => setActiveSubTab('add-intl-tour')}
-          className={`px-5 py-3 border-b-2 text-xs font-bold transition whitespace-nowrap flex items-center gap-1 ${
-            activeSubTab === 'add-intl-tour' 
-              ? 'border-emerald-700 text-emerald-800' 
-              : 'border-transparent text-zinc-500 hover:text-zinc-700'
-          }`}
-        >
-          ✈️ <span className="text-emerald-750 font-black animate-pulse">{t('vendorMisc.vendorPortal.tabAddIntlTour')}</span>
-        </button>
-
-        <button
-          onClick={() => setActiveSubTab('add-slot')}
-          className={`px-5 py-3 border-b-2 text-xs font-bold transition whitespace-nowrap ${
-            activeSubTab === 'add-slot' 
-              ? 'border-emerald-700 text-emerald-800' 
-              : 'border-transparent text-zinc-500 hover:text-zinc-700'
-          }`}
-        >
-          📅 {t('vendorMisc.vendorPortal.tabAddSlot')}
-        </button>
-
-        <button
-          onClick={() => setActiveSubTab('profile')}
-          className={`px-5 py-3 border-b-2 text-xs font-bold transition whitespace-nowrap ${
-            activeSubTab === 'profile' 
-              ? 'border-emerald-700 text-emerald-800' 
-              : 'border-transparent text-zinc-500 hover:text-zinc-700'
-          }`}
-        >
-          👤 {t('vendorMisc.vendorPortal.tabProfile')}
-        </button>
+        <StatCard
+          label={t('vendorMisc.vendorPortal.metricMyTours')}
+          value={t('vendorMisc.vendorPortal.metricMyToursValue', { count: myTours.length })}
+          subtitle={t('vendorMisc.vendorPortal.metricMyToursSubtitle')}
+          icon={Briefcase}
+          color="primary"
+        />
+        <StatCard
+          label={t('vendorMisc.vendorPortal.metricRevenue')}
+          value={`${myTotalGrossRevenue.toFixed(2)} AZN`}
+          subtitle={t('vendorMisc.vendorPortal.metricRevenueSubtitle')}
+          icon={DollarSign}
+          color="gold"
+        />
+        <StatCard
+          label={t('vendorMisc.vendorPortal.metricTickets')}
+          value={t('vendorMisc.vendorPortal.metricTicketsValue', { count: myBookings.length })}
+          subtitle={t('vendorMisc.vendorPortal.metricTicketsSubtitle')}
+          icon={Users}
+          color="pink"
+        />
       </div>
 
       {/* Subtab Contents */}
@@ -438,6 +390,6 @@ export default function VendorPortal({
       />
     )}
 
-    </div>
+    </DashboardSidebarLayout>
   );
 }

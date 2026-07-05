@@ -3,6 +3,9 @@ import { Tour, TourSlot, Booking, User, PlatformConfig, PriceCalculatorConfig } 
 import { TourForm } from './vendor/TourForm';
 import { InternationalTourForm } from './vendor/InternationalTourForm';
 import { useLanguage } from '../i18n/LanguageContext';
+import DashboardSidebarLayout, { DashboardNavItem } from './layout/DashboardSidebarLayout';
+import StatCard from './layout/StatCard';
+import LanguageSwitcher from './LanguageSwitcher';
 import {
   Building,
   Calculator,
@@ -20,7 +23,11 @@ import {
   Plus,
   MessageCircle,
   Wifi,
-  WifiOff
+  WifiOff,
+  LayoutDashboard,
+  Compass,
+  Building2,
+  Settings
 } from 'lucide-react';
 
 function isTourInternational(t: Tour): boolean {
@@ -103,6 +110,7 @@ interface AdminPortalProps {
   onDeleteVendor?: (vendorId: string, adminPassword: string) => Promise<void>;
   onUpdateTourStatus?: (tourId: string, isActive: boolean) => Promise<void>;
   authToken?: string | null;
+  onLogout: () => void;
 }
 
 export default function AdminPortal({
@@ -126,9 +134,11 @@ export default function AdminPortal({
   onCreateVendor,
   onDeleteVendor,
   onUpdateTourStatus,
-  authToken
+  authToken,
+  onLogout
 }: AdminPortalProps) {
   const { t } = useLanguage();
+  const [activeSection, setActiveSection] = useState<'dashboard' | 'tours' | 'vendors' | 'settings'>('dashboard');
 
   // Price calculator cost elements (destinations + rates) — editable draft, synced from
   // platformConfig whenever it changes elsewhere, saved explicitly via the button below.
@@ -397,67 +407,97 @@ export default function AdminPortal({
     }
   };
 
+  const navItems: DashboardNavItem[] = [
+    { id: 'dashboard', label: t('adminPortal.sidebar.dashboard'), icon: LayoutDashboard },
+    { id: 'tours', label: t('adminPortal.sidebar.tours'), icon: Compass },
+    { id: 'vendors', label: t('adminPortal.sidebar.vendors'), icon: Building2 },
+    { id: 'settings', label: t('adminPortal.sidebar.settings'), icon: Settings },
+  ];
+  const activeNavItem = navItems.find((item) => item.id === activeSection);
+
   return (
-    <div className="space-y-6">
-      
+    <DashboardSidebarLayout
+      wordmark="GedəkGörək"
+      subtitle={t('adminPortal.sidebar.subtitle')}
+      navItems={navItems}
+      activeId={activeSection}
+      onSelect={(id) => setActiveSection(id as typeof activeSection)}
+      title={activeNavItem?.label ?? ''}
+      rightSlot={
+        <>
+          <LanguageSwitcher />
+          <button
+            onClick={onLogout}
+            className="text-xs font-semibold py-1 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-all"
+          >
+            {t('app.nav.logout')}
+          </button>
+        </>
+      }
+    >
+      {activeSection === 'dashboard' && (
+      <>
       {/* Metrics board */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        
-        {/* Metric 1: Successful Bookings */}
-        <div className="bg-white p-5 rounded-xl border border-slate-200 text-slate-900 flex items-center justify-between shadow-xs">
-          <div className="space-y-1 bg-transparent">
-            <span className="text-[10px] text-slate-400 font-bold tracking-widest">{t('adminPortal.metrics.successfulBookings')}</span>
-            <h4 className="text-lg font-extrabold text-slate-900">{t('adminPortal.metrics.ticketCount', { count: totalPaidBookingsCount })}</h4>
-            <p className="text-[10px] text-slate-500">{t('adminPortal.metrics.successfulBookingsHint')}</p>
-          </div>
-          <div className="p-2.5 bg-violet-50 border border-violet-100 text-violet-700 rounded-lg">
-            <DollarSign className="w-4 h-4" />
-          </div>
-        </div>
-
-        {/* Metric 2: Gross Merchandise Volume */}
-        <div className="bg-white p-5 rounded-xl border border-slate-200 text-slate-900 flex items-center justify-between shadow-xs">
-          <div className="space-y-1 bg-transparent">
-            <span className="text-[10px] text-slate-400 font-bold tracking-widest">{t('adminPortal.metrics.turnover')}</span>
-            <h4 className="text-lg font-extrabold text-slate-900">{totalVolume.toFixed(2)} AZN</h4>
-            <p className="text-[10px] text-slate-500">{t('adminPortal.metrics.turnoverHint')}</p>
-          </div>
-          <div className="p-2.5 bg-emerald-50 border border-emerald-100 text-emerald-800 rounded-lg">
-            <TrendingUp className="w-4 h-4" />
-          </div>
-        </div>
-
-        {/* Metric 3: Vendors register */}
-        <div className="bg-white p-5 rounded-xl border border-slate-200 text-slate-900 flex items-center justify-between shadow-xs">
-          <div className="space-y-1 bg-transparent">
-            <span className="text-[10px] text-slate-400 font-bold tracking-widest">{t('adminPortal.metrics.partnerCompanies')}</span>
-            <h4 className="text-lg font-extrabold text-slate-900">{t('adminPortal.metrics.operatorCount', { count: totalVendors })}</h4>
-            <p className="text-[10px] text-slate-500">{t('adminPortal.metrics.partnerCompaniesHint')}</p>
-          </div>
-          <div className="p-2.5 bg-amber-50 border border-amber-100 text-amber-800 rounded-lg">
-            <Building className="w-4 h-4" />
-          </div>
-        </div>
-
-        {/* Metric 4: Platform Members */}
-        <div className="bg-white p-5 rounded-xl border border-slate-200 text-slate-900 flex items-center justify-between shadow-xs">
-          <div className="space-y-1 bg-transparent">
-            <span className="text-[10px] text-slate-400 font-bold tracking-widest">{t('adminPortal.metrics.registeredCustomers')}</span>
-            <h4 className="text-lg font-extrabold text-slate-900">{t('adminPortal.metrics.activeCount', { count: totalCustomers })}</h4>
-            <p className="text-[10px] text-slate-500 font-semibold text-slate-400">{t('adminPortal.metrics.registeredCustomersHint')}</p>
-          </div>
-          <div className="p-2.5 bg-[#eff6ff] border border-[#dbeafe] text-[#1d4ed8] rounded-lg">
-            <UserCheck className="w-4 h-4" />
-          </div>
-        </div>
-
+        <StatCard
+          label={t('adminPortal.metrics.successfulBookings')}
+          value={t('adminPortal.metrics.ticketCount', { count: totalPaidBookingsCount })}
+          subtitle={t('adminPortal.metrics.successfulBookingsHint')}
+          icon={DollarSign}
+          color="primary"
+        />
+        <StatCard
+          label={t('adminPortal.metrics.turnover')}
+          value={`${totalVolume.toFixed(2)} AZN`}
+          subtitle={t('adminPortal.metrics.turnoverHint')}
+          icon={TrendingUp}
+          color="gold"
+        />
+        <StatCard
+          label={t('adminPortal.metrics.partnerCompanies')}
+          value={t('adminPortal.metrics.operatorCount', { count: totalVendors })}
+          subtitle={t('adminPortal.metrics.partnerCompaniesHint')}
+          icon={Building}
+          color="pink"
+        />
+        <StatCard
+          label={t('adminPortal.metrics.registeredCustomers')}
+          value={t('adminPortal.metrics.activeCount', { count: totalCustomers })}
+          subtitle={t('adminPortal.metrics.registeredCustomersHint')}
+          icon={UserCheck}
+          color="blue"
+        />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
-        {/* Left Column: Platform settings & approvals */}
-        <div className="lg:col-span-2 space-y-6">
-          
+      {/* Financial Ledger */}
+      <div className="bg-ink-900 p-5 rounded-xl border border-slate-850 text-slate-300 space-y-4 shadow-md">
+        <h4 className="text-xs font-bold text-emerald-400 tracking-widest font-mono flex items-center gap-1.5 border-b border-slate-800 pb-2">
+          <Activity className="w-3.5 h-3.5 animate-pulse text-emerald-400" />
+          {t('adminPortal.ledger.title')}
+        </h4>
+
+        <p className="text-[11px] text-slate-400 leading-normal">
+          {t('adminPortal.ledger.description')}
+        </p>
+
+        <div className="space-y-2.5 font-mono text-[9px] max-h-96 overflow-y-auto scrollbar-none">
+          {bookings.filter(b => b.status === 'paid').map((b, i) => {
+            return (
+              <div key={b.id || i} className="p-2.5 bg-slate-900/60 border border-slate-800/80 rounded text-slate-400 space-y-1">
+                <span className="text-amber-500 tracking-wider font-bold">LOG_TRANSACT_#{b.id} OK</span>
+                <div className="text-slate-300">{t('adminPortal.ledger.grossAmount')}: {b.totalAmount.toFixed(2)} AZN</div>
+                <div className="text-sky-400">{t('adminPortal.ledger.vendorIncome')}: {b.totalAmount.toFixed(2)} AZN</div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      </>
+      )}
+
+      {activeSection === 'settings' && (
+        <div className="space-y-6">
+
           {/* Section: Price Calculator Cost Elements */}
           <div className="bg-white p-5 rounded-xl border border-slate-200 space-y-4 shadow-xs">
             <h3 className="text-xs font-bold text-slate-400 tracking-widest flex items-center gap-1.5">
@@ -708,6 +748,12 @@ export default function AdminPortal({
             </div>
           </div>
 
+        </div>
+      )}
+
+      {activeSection === 'vendors' && (
+        <div className="space-y-6">
+
           {/* Section: Subscription Management (Operator Planlaması) */}
           <div className="bg-white p-5 rounded-xl border border-slate-200 space-y-4 shadow-xs">
             <h3 className="text-xs font-bold text-slate-400 tracking-widest flex items-center gap-1.5">
@@ -948,6 +994,12 @@ export default function AdminPortal({
             </div>
           </div>
 
+        </div>
+      )}
+
+      {activeSection === 'tours' && (
+        <div className="space-y-6">
+
           {/* Section: Queue of pending tours */}
           <div className="bg-white p-5 rounded-xl border border-slate-200 space-y-4 shadow-xs">
             <h3 className="text-xs font-bold text-slate-400 tracking-widest">{t('adminPortal.pendingQueue.title')}</h3>
@@ -1107,34 +1159,7 @@ export default function AdminPortal({
           </div>
 
         </div>
-
-        {/* Right Column: Mini Logs */}
-        <div className="space-y-6">
-          <div className="bg-ink-900 p-5 rounded-xl border border-slate-850 text-slate-300 space-y-4 h-full shadow-md">
-            <h4 className="text-xs font-bold text-emerald-400 tracking-widest font-mono flex items-center gap-1.5 border-b border-slate-800 pb-2">
-              <Activity className="w-3.5 h-3.5 animate-pulse text-emerald-400" />
-              {t('adminPortal.ledger.title')}
-            </h4>
-
-            <p className="text-[11px] text-slate-400 leading-normal">
-              {t('adminPortal.ledger.description')}
-            </p>
-
-            <div className="space-y-2.5 font-mono text-[9px] max-h-96 overflow-y-auto scrollbar-none">
-              {bookings.filter(b => b.status === 'paid').map((b, i) => {
-                return (
-                  <div key={b.id || i} className="p-2.5 bg-slate-900/60 border border-slate-800/80 rounded text-slate-400 space-y-1">
-                    <span className="text-amber-500 tracking-wider font-bold">LOG_TRANSACT_#{b.id} OK</span>
-                    <div className="text-slate-300">{t('adminPortal.ledger.grossAmount')}: {b.totalAmount.toFixed(2)} AZN</div>
-                    <div className="text-sky-400">{t('adminPortal.ledger.vendorIncome')}: {b.totalAmount.toFixed(2)} AZN</div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-
-      </div>
+      )}
 
       {/* Edit Tour Modal Overlay — same TourForm/InternationalTourForm the vendor uses, so
           admin reviews/edits tours through an identical interface. Approve/Reject act on the
@@ -1363,6 +1388,6 @@ export default function AdminPortal({
         </div>
       )}
 
-    </div>
+    </DashboardSidebarLayout>
   );
 }

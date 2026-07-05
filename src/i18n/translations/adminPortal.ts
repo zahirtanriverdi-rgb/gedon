@@ -15,6 +15,13 @@ export const adminPortal = {
         activeCount: '{{count}} Aktiv',
         registeredCustomersHint: 'Turları axtaran kəslər',
       },
+      sidebar: {
+        subtitle: 'Admin Paneli',
+        dashboard: 'Ana Səhifə',
+        tours: 'Turlar',
+        vendors: 'Tərəfdaşlar',
+        settings: 'Ayarlar',
+      },
       priceCalculator: {
         title: 'QİYMƏT HESABLAYICISI — XƏRC ELEMENTLƏRİ',
         description: 'Müştərilərin "Qrup üçün qiymət hesabla" alətində gördüyü avtobus, bələdçi, yemək və avadanlıq tariflərini buradan idarə edin. Dəyişiklik "Yadda saxla" ilə tətbiq olunan kimi hesablayıcıya dərhal təsir edir.',
@@ -51,7 +58,7 @@ export const adminPortal = {
       },
       whatsappConnection: {
         title: 'WhatsApp Doğrulama Bağlantısı',
-        description: 'Müştərilərin rezervasiya zamanı nömrələrini təsdiqləməsi və real WhatsApp kodu alması üçün bu paneldən bir nömrəni WhatsApp Web kimi qoşun. Qoşulu nömrə arxa planda "bu nömrədə WhatsApp var?" yoxlamalarını və kod göndərilməsini icra edir.',
+        description: 'Müştərilərin rezervasiya zamanı nömrələrini təsdiqləyə bilməsi üçün bu paneldən bir nömrəni WhatsApp Web kimi qoşun. Qoşulu nömrə arxa planda müştərinin yazdığı nömrədə aktiv WhatsApp hesabı olub-olmadığını yoxlayır — kod göndərilmir, yoxlamanın müsbət nəticəsi özü təsdiq sayılır.',
         statusLabel: 'Status:',
         statusConnected: 'Qoşulu',
         statusConnecting: 'Qoşulur...',
@@ -233,6 +240,13 @@ export const adminPortal = {
         activeCount: '{{count}} Active',
         registeredCustomersHint: 'People searching for tours',
       },
+      sidebar: {
+        subtitle: 'Admin Panel',
+        dashboard: 'Dashboard',
+        tours: 'Tours',
+        vendors: 'Vendors',
+        settings: 'Settings',
+      },
       priceCalculator: {
         title: 'PRICE CALCULATOR — COST ELEMENTS',
         description: 'Manage the bus, guide, food, and equipment rates customers see in the "Calculate group price" tool. Changes take effect in the calculator immediately once applied via "Save".',
@@ -269,7 +283,7 @@ export const adminPortal = {
       },
       whatsappConnection: {
         title: 'WhatsApp Verification Connection',
-        description: 'Connect a phone number here as a WhatsApp Web session so customers can verify their number and receive a real WhatsApp code when booking. The connected number handles "does this number have WhatsApp?" checks and code delivery in the background.',
+        description: 'Connect a phone number here as a WhatsApp Web session so customers can verify their number when booking. The connected number checks in the background whether the number the customer entered has an active WhatsApp account — no code is sent, a positive check IS the verification.',
         statusLabel: 'Status:',
         statusConnected: 'Connected',
         statusConnecting: 'Connecting...',
@@ -451,6 +465,13 @@ export const adminPortal = {
         activeCount: '{{count}} активных',
         registeredCustomersHint: 'Люди, ищущие туры',
       },
+      sidebar: {
+        subtitle: 'Панель администратора',
+        dashboard: 'Главная',
+        tours: 'Туры',
+        vendors: 'Партнёры',
+        settings: 'Настройки',
+      },
       priceCalculator: {
         title: 'КАЛЬКУЛЯТОР ЦЕН — ЭЛЕМЕНТЫ РАСХОДОВ',
         description: 'Управляйте здесь тарифами на автобус, гида, питание и оборудование, которые клиенты видят в инструменте "Рассчитать цену для группы". Изменения вступают в силу в калькуляторе сразу после нажатия "Сохранить".',
@@ -487,7 +508,7 @@ export const adminPortal = {
       },
       whatsappConnection: {
         title: 'Подключение для верификации WhatsApp',
-        description: 'Подключите здесь номер как сессию WhatsApp Web, чтобы клиенты могли подтвердить свой номер и получить настоящий код WhatsApp при бронировании. Подключённый номер выполняет фоновые проверки "есть ли WhatsApp на этом номере" и отправку кода.',
+        description: 'Подключите здесь номер как сессию WhatsApp Web, чтобы клиенты могли подтвердить свой номер при бронировании. Подключённый номер в фоне проверяет, есть ли на введённом клиентом номере активный аккаунт WhatsApp — код не отправляется, положительная проверка сама по себе и есть подтверждение.',
         statusLabel: 'Статус:',
         statusConnected: 'Подключено',
         statusConnecting: 'Подключение...',

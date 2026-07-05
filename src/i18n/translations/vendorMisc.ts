@@ -29,6 +29,7 @@ export const vendorMisc = {
         tabAddIntlTour: 'Yeni Xarici Tur Yarat',
         tabAddSlot: 'Cari Tura Təqvim Əlavə Et',
         tabProfile: 'Profil Məlumatları',
+        sidebarSubtitle: 'Tərəfdaş Paneli',
       },
       profileTab: {
         strengthVeryWeak: 'Çox Zəif',
@@ -187,6 +188,7 @@ export const vendorMisc = {
         tabAddIntlTour: 'Create New International Tour',
         tabAddSlot: 'Add Calendar to Current Tour',
         tabProfile: 'Profile Details',
+        sidebarSubtitle: 'Vendor Panel',
       },
       profileTab: {
         strengthVeryWeak: 'Very Weak',
@@ -345,6 +347,7 @@ export const vendorMisc = {
         tabAddIntlTour: 'Создать новый зарубежный тур',
         tabAddSlot: 'Добавить календарь к текущему туру',
         tabProfile: 'Данные профиля',
+        sidebarSubtitle: 'Панель поставщика',
       },
       profileTab: {
         strengthVeryWeak: 'Очень слабый',
