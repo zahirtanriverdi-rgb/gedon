@@ -7,6 +7,7 @@ interface ProfileTabProps {
   operatorToken?: string | null;
   onShowNotification?: (message: string, type?: 'success' | 'info' | 'error' | 'warning') => void;
   onCancel: () => void;
+  onUserUpdated?: (updatedUser: User) => void;
 }
 
 function passwordStrength(password: string): { score: number; label: string; color: string } {
@@ -27,7 +28,7 @@ function passwordStrength(password: string): { score: number; label: string; col
   return { score, ...bands[score] };
 }
 
-export function ProfileTab({ currentUser, operatorToken, onShowNotification, onCancel }: ProfileTabProps) {
+export function ProfileTab({ currentUser, operatorToken, onShowNotification, onCancel, onUserUpdated }: ProfileTabProps) {
   const [profileName, setProfileName] = useState(currentUser.name || '');
   const [profileEmail, setProfileEmail] = useState(currentUser.email || '');
   const [profilePhone, setProfilePhone] = useState(currentUser.phone || '');
@@ -81,10 +82,16 @@ export function ProfileTab({ currentUser, operatorToken, onShowNotification, onC
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || 'Profil yenilənə bilmədi.');
 
-      Object.assign(currentUser, data.user || {
+      const updatedUser: User = data.user || {
+        ...currentUser,
         name: profileName, email: profileEmail, phone: profilePhone,
         companyName: profileCompanyName, avatar: profileAvatar, about: profileAbout, guides: profileGuides
-      });
+      };
+      Object.assign(currentUser, updatedUser);
+      // Push the saved user back into the app's shared `users` state — without this, the
+      // public Organizer Profile page (and any other view reading from that same array)
+      // keeps showing the pre-edit phone number since it never sees this change.
+      if (onUserUpdated) onUserUpdated(updatedUser);
 
       if (onShowNotification) onShowNotification('Profiliniz uğurla yadda saxlanıldı! ✨', 'success');
     } catch (err: any) {

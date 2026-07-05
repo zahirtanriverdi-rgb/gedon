@@ -33,6 +33,7 @@ interface VendorPortalProps {
   exchangeRates: { USD: number; EUR: number };
   onUpdateExchangeRates: (newRates: { USD: number; EUR: number }) => void;
   onToggleFeatured?: (tourId: string, isManuallyFeatured: boolean) => Promise<void>;
+  onUserUpdated?: (updatedUser: User) => void;
 }
 
 export default function VendorPortal({
@@ -53,7 +54,8 @@ export default function VendorPortal({
   onUpdateSlotBookedCount,
   exchangeRates,
   onUpdateExchangeRates,
-  onToggleFeatured
+  onToggleFeatured,
+  onUserUpdated
 }: VendorPortalProps) {
   const [activeSubTab, setActiveSubTab] = useState<'my-tours' | 'add-tour' | 'add-intl-tour' | 'add-slot' | 'profile' | 'crm'>('my-tours');
   const [tourSearchTerm, setTourSearchTerm] = useState('');
@@ -391,6 +393,7 @@ export default function VendorPortal({
         operatorToken={operatorToken}
         onShowNotification={onShowNotification}
         onCancel={() => setActiveSubTab('my-tours')}
+        onUserUpdated={onUserUpdated}
       />
     )}
 

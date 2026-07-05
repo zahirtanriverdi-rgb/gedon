@@ -466,6 +466,15 @@ export default function App() {
     }
   };
 
+  // ProfileTab (vendor self-service profile edit) does its own PUT /api/users/:id call so it
+  // can show its own success/error copy, but it must feed the result back through this so the
+  // shared `users` state (and thus the public OrganizerProfile, which reads from this same
+  // array) actually picks up the change — otherwise the edit only mutates ProfileTab's local
+  // `currentUser` object in place and every other view keeps showing the old value.
+  const handleVendorProfileUpdated = (updatedUser: User) => {
+    setUsers(prev => prev.map(u => u.id === updatedUser.id ? { ...u, ...updatedUser } : u));
+  };
+
   const handleAddSlot = async (newSlot: TourSlot) => {
     try {
       const response = await fetch(`/api/tours/${newSlot.tourId}/slots`, {
@@ -926,6 +935,7 @@ export default function App() {
                 exchangeRates={exchangeRates}
                 onUpdateExchangeRates={handleUpdateExchangeRates}
                 onToggleFeatured={handleToggleFeatured}
+                onUserUpdated={handleVendorProfileUpdated}
               />
             )}
 
