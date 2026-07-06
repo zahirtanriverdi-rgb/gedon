@@ -5,6 +5,8 @@ import { DynamicStringListInput } from './DynamicStringListInput';
 import { LocationAutocompleteInput } from './LocationAutocompleteInput';
 import { MultiDateCalendar, toIsoDate } from './MultiDateCalendar';
 import { TourDangerZone } from './TourDangerZone';
+import { WhatsAppVerifyField } from '../shared/WhatsAppVerifyField';
+import { handleNumberInput, useStepWizard } from './useTourFormWizard';
 import { useLanguage } from '../../i18n/LanguageContext';
 
 interface InternationalTourFormProps {
@@ -34,13 +36,6 @@ export function InternationalTourForm({ currentUser, tour, slots, onAddTour, onE
     { number: 3 as const, label: t('vendorTourForms.internationalTourForm.steps.pricing') },
   ];
 
-  // Number inputs are bound to `number | ''` state so clearing the field doesn't force a
-  // "0" back in — see the domestic TourForm.tsx for the same fix and rationale.
-  const handleNumberInput = (setter: (v: number | '') => void) => (e: React.ChangeEvent<HTMLInputElement>) => {
-    const raw = e.target.value;
-    setter(raw === '' ? '' : Number(raw));
-  };
-
   const [intlTourName, setIntlTourName] = useState<string>('');
   const [intlTourCountry, setIntlTourCountry] = useState<string>('Türkiyə');
   const [intlTourCity, setIntlTourCity] = useState<string>('');
@@ -52,6 +47,10 @@ export function InternationalTourForm({ currentUser, tour, slots, onAddTour, onE
   const [intlMeetingPointLat, setIntlMeetingPointLat] = useState<number | undefined>(undefined);
   const [intlMeetingPointLng, setIntlMeetingPointLng] = useState<number | undefined>(undefined);
   const [intlIsActive, setIntlIsActive] = useState<boolean>(true);
+  const [intlTourWhatsApp, setIntlTourWhatsApp] = useState<string>(currentUser.whatsapp_number || currentUser.phone || '');
+  // New tours require a fresh live-WhatsApp check on the guide number; editing an existing tour
+  // starts pre-verified since that number was already checked when the tour was first created.
+  const [isIntlWhatsAppVerified, setIsIntlWhatsAppVerified] = useState<boolean>(!!tour);
 
   const [intlTourFlightIncluded, setIntlTourFlightIncluded] = useState<boolean>(true);
   const [intlTourFlightDetails, setIntlTourFlightDetails] = useState<string>('');
@@ -86,9 +85,7 @@ export function InternationalTourForm({ currentUser, tour, slots, onAddTour, onE
   const [isSavingForm, setIsSavingForm] = useState(false);
   const [formSubmitError, setFormSubmitError] = useState<string | null>(null);
 
-  const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
-  const goToNextStep = () => setCurrentStep((s) => (s < 3 ? ((s + 1) as 1 | 2 | 3) : s));
-  const goToPrevStep = () => setCurrentStep((s) => (s > 1 ? ((s - 1) as 1 | 2 | 3) : s));
+  const { currentStep, goToNextStep, goToPrevStep } = useStepWizard();
 
   // Per-field invalid markers for fields HTML5 `required` can't cover (tag lists, image upload).
   const [fieldErrors, setFieldErrors] = useState<Record<string, boolean>>({});
@@ -103,6 +100,7 @@ export function InternationalTourForm({ currentUser, tour, slots, onAddTour, onE
     if (step === 1) {
       if (!intlLanguages.trim()) missing.push({ key: 'languages', label: t('vendorTourForms.internationalTourForm.validation.fieldLanguages') });
       if (intlBringItems.filter(Boolean).length === 0) missing.push({ key: 'bringItems', label: t('vendorTourForms.internationalTourForm.validation.fieldBringItems') });
+      if (!isIntlWhatsAppVerified) missing.push({ key: 'whatsappVerification', label: t('vendorTourForms.internationalTourForm.validation.fieldWhatsappVerification') });
     } else if (step === 3) {
       if (!intlTourImage) missing.push({ key: 'image', label: t('vendorTourForms.internationalTourForm.validation.fieldImage') });
       if (intlIncludes.filter(Boolean).length === 0) missing.push({ key: 'includes', label: t('vendorTourForms.internationalTourForm.validation.fieldIncludes') });
@@ -117,7 +115,7 @@ export function InternationalTourForm({ currentUser, tour, slots, onAddTour, onE
     if (missing.length === 0) {
       setFieldErrors((prev) => {
         const next = { ...prev };
-        for (const key of ['languages', 'bringItems', 'image', 'includes', 'notIncludes', 'highlights']) delete next[key];
+        for (const key of ['languages', 'bringItems', 'whatsappVerification', 'image', 'includes', 'notIncludes', 'highlights']) delete next[key];
         return next;
       });
       return true;
@@ -144,6 +142,8 @@ export function InternationalTourForm({ currentUser, tour, slots, onAddTour, onE
     setIntlMeetingPointLat(tour.meetingPointLat);
     setIntlMeetingPointLng(tour.meetingPointLng);
     setIntlIsActive(tour.isActive !== false);
+    setIntlTourWhatsApp(tour.whatsapp_number || currentUser.whatsapp_number || currentUser.phone || '');
+    setIsIntlWhatsAppVerified(true);
 
     setIntlTourFlightIncluded(tour.flightIncluded !== false);
     setIntlTourFlightDetails(tour.flightDetails || '');
@@ -234,7 +234,7 @@ export function InternationalTourForm({ currentUser, tour, slots, onAddTour, onE
       image: finalImage,
       images: [finalImage],
       isActive: intlIsActive,
-      whatsapp_number: currentUser.whatsapp_number || currentUser.phone || '',
+      whatsapp_number: intlTourWhatsApp || currentUser.whatsapp_number || currentUser.phone || '',
       isInternational: true,
       destinationCountry: intlTourCountry,
       destinationCity: intlTourCity,
@@ -422,6 +422,17 @@ export function InternationalTourForm({ currentUser, tour, slots, onAddTour, onE
                 setIntlMeetingPointLng(lng);
               }}
               placeholder={t('vendorTourForms.internationalTourForm.fields.meetingPoint.placeholder')}
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-700 mb-1">{t('vendorTourForms.internationalTourForm.fields.whatsapp.label')}</label>
+            <WhatsAppVerifyField
+              value={intlTourWhatsApp}
+              onChange={setIntlTourWhatsApp}
+              isVerified={isIntlWhatsAppVerified}
+              onVerifiedChange={setIsIntlWhatsAppVerified}
+              onShowNotification={onShowNotification}
             />
           </div>
 

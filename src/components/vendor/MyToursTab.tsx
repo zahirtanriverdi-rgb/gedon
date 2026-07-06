@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Tour, TourSlot } from '../../types';
 import { useLanguage } from '../../i18n/LanguageContext';
-import { Calendar, Edit, Search, Star } from 'lucide-react';
+import { Edit, Search, Star } from 'lucide-react';
 import { computeFeaturedTourIds } from '../../utils/featuredTours';
 
 interface MyToursTabProps {
@@ -169,7 +169,7 @@ export function MyToursTab({ tours, slots, myTours, myTourIds, tourSearchTerm, o
                       <button
                         type="button"
                         onClick={() => onEditClick(tour)}
-                        className="flex items-center gap-1 py-1 px-2.5 bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-[10px] rounded-md transition-all cursor-pointer shadow-xs"
+                        className="flex items-center gap-1 min-h-[44px] px-2.5 bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-[10px] rounded-md transition-all cursor-pointer shadow-xs"
                       >
                         <Edit className="w-2.5 h-2.5" />
                         <span>{t('vendorMisc.myToursTab.editButton')}</span>
@@ -179,7 +179,7 @@ export function MyToursTab({ tours, slots, myTours, myTourIds, tourSearchTerm, o
                           type="button"
                           onClick={() => handleFeaturedClick(tour)}
                           disabled={togglingFeaturedId === tour.id}
-                          className={`flex items-center gap-1 py-1 px-2.5 font-extrabold text-[10px] rounded-md transition-all cursor-pointer shadow-xs disabled:opacity-50 ${
+                          className={`flex items-center gap-1 min-h-[44px] px-2.5 font-extrabold text-[10px] rounded-md transition-all cursor-pointer shadow-xs disabled:opacity-50 ${
                             tour.isManuallyFeatured
                               ? 'bg-amber-100 hover:bg-amber-200 text-amber-800 border border-amber-300'
                               : 'bg-white hover:bg-amber-50 text-amber-700 border border-amber-200'

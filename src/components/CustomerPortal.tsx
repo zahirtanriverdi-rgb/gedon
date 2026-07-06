@@ -334,6 +334,9 @@ export default function CustomerPortal({
   const [packingExperienceMap, setPackingExperienceMap] = useState<Record<string, 'beginner' | 'pro' | null>>({});
   const [packingAnalyzingMap, setPackingAnalyzingMap] = useState<Record<string, boolean>>({});
   const [checkedPackingItems, setCheckedPackingItems] = useState<Record<string, boolean>>({});
+  // Real Gemini packing advice per tour, keyed by tourId — null/absent means the AI call hasn't
+  // completed (or failed), in which case PackingListSection falls back to its static lists.
+  const [packingAiResultMap, setPackingAiResultMap] = useState<Record<string, { basics: string[]; pro_gear: string[] } | null>>({});
 
   // Quick WhatsApp reserve helper — opens the same guest-booking/OTP popup as the full tour
   // page (see quickBookTour below) instead of redirecting straight to a wa.me link, so the
@@ -343,13 +346,37 @@ export default function CustomerPortal({
     setQuickBookTour(tour);
   };
 
-  // Simulate an AI "thinking" delay before revealing the packing list for the chosen experience level
-  const handlePackingExperienceSelect = (tourId: string, choice: 'beginner' | 'pro') => {
+  // Calls the real Gemini packing-advice endpoint for this tour (once per tour, cached in
+  // packingAiResultMap) while showing the "analyzing" state; falls back to the static curated
+  // lists in PackingListSection if the call fails or GEMINI_API_KEY isn't configured.
+  const handlePackingExperienceSelect = async (tourId: string, choice: 'beginner' | 'pro') => {
     setPackingExperienceMap(prev => ({ ...prev, [tourId]: choice }));
+
+    if (packingAiResultMap[tourId] !== undefined) return; // already fetched (or already failed) for this tour
+
     setPackingAnalyzingMap(prev => ({ ...prev, [tourId]: true }));
-    setTimeout(() => {
+    try {
+      const tour = tours.find(t => t.id === tourId);
+      const res = await fetch('/api/gemini/packing', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          tourDetails: {
+            name: tour?.name,
+            region: tour?.region,
+            difficulty: tour?.difficulty,
+            category: tour?.category,
+            durationDays: tour?.durationDays,
+          },
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      setPackingAiResultMap(prev => ({ ...prev, [tourId]: (res.ok && data?.packing_advice) ? data.packing_advice : null }));
+    } catch {
+      setPackingAiResultMap(prev => ({ ...prev, [tourId]: null }));
+    } finally {
       setPackingAnalyzingMap(prev => ({ ...prev, [tourId]: false }));
-    }, 1200);
+    }
   };
 
   const togglePackingItemChecked = (key: string) => {
@@ -434,7 +461,7 @@ export default function CustomerPortal({
     const matchesActive = tour.isActive !== false;
 
     // 6b. Subscription check (bypassed for now to prevent tours from disappearing)
-    let subscriptionValid = true;
+    const subscriptionValid = true;
 
     // 7. Month Filter (matches if any tour slot starts with selectedMonth)
     const matchesMonth = !selectedMonth || tourSlots.some(s => s.startDate.startsWith(selectedMonth));
@@ -787,6 +814,7 @@ export default function CustomerPortal({
           setLightboxIndex={setLightboxIndex}
           packingExperienceMap={packingExperienceMap}
           packingAnalyzingMap={packingAnalyzingMap}
+          packingAiResultMap={packingAiResultMap}
           checkedPackingItems={checkedPackingItems}
           handlePackingExperienceSelect={handlePackingExperienceSelect}
           togglePackingItemChecked={togglePackingItemChecked}
@@ -828,6 +856,7 @@ export default function CustomerPortal({
                 setLightboxIndex={setLightboxIndex}
                 packingExperienceMap={packingExperienceMap}
                 packingAnalyzingMap={packingAnalyzingMap}
+                packingAiResultMap={packingAiResultMap}
                 checkedPackingItems={checkedPackingItems}
                 handlePackingExperienceSelect={handlePackingExperienceSelect}
                 togglePackingItemChecked={togglePackingItemChecked}

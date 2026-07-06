@@ -219,7 +219,7 @@ export default function VendorPortal({
           <LanguageSwitcher />
           <button
             onClick={onLogout}
-            className="text-xs font-semibold py-1 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-all"
+            className="text-xs font-semibold min-h-[44px] px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-all"
           >
             {t('app.nav.logout')}
           </button>
@@ -245,7 +245,7 @@ export default function VendorPortal({
       )}
 
       {/* Metrics Row */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
         <StatCard
           label={t('vendorMisc.vendorPortal.metricMyTours')}
           value={t('vendorMisc.vendorPortal.metricMyToursValue', { count: myTours.length })}

@@ -22,7 +22,9 @@ export function addRecentSearch(term: string): string[] {
 
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-  } catch {}
+  } catch {
+    // localStorage unavailable (private browsing, quota, etc.) — recent searches just won't persist.
+  }
 
   return updated;
 }

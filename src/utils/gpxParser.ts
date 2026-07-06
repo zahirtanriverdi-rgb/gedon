@@ -18,7 +18,7 @@ export interface ParsedGpxRoute {
 /**
  * Calculates the Haversine distance in kilometers between two GPS points
  */
-export function calculateHaversineDistance(
+function calculateHaversineDistance(
   lat1: number,
   lon1: number,
   lat2: number,

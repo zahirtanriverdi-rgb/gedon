@@ -48,6 +48,16 @@ function getGeminiClient(): GoogleGenAI {
 // "request entity too large" 413 whose HTML error page breaks response.json() on the client)
 app.use(express.json({ limit: '50mb' }));
 
+// Malformed JSON bodies would otherwise fall through to Express's default HTML error page
+// (a full stack trace, including server file paths) instead of the JSON error shape every
+// other endpoint returns — breaking response.json() on the client and leaking server internals.
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  if (err instanceof SyntaxError && 'body' in err) {
+    return res.status(400).json({ error: "Göndərilən məlumat düzgün formatda deyil (JSON parse xətası)." });
+  }
+  next(err);
+});
+
 // JWT/bcrypt Authentication System
 //
 // JWT_SECRET must come from the environment in any real deployment. If it's missing we
@@ -118,6 +128,14 @@ function rowToUser(row: any) {
   };
 }
 
+// Shared by both login routes below: verifies the bcrypt hash and, on success, signs the same
+// shape of JWT (id/email/role, 24h expiry) both admin and vendor sessions use.
+function verifyPasswordAndIssueToken(user: any, password: string): { token: string } | null {
+  if (!user || !bcrypt.compareSync(password, user.password_hash)) return null;
+  const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: "24h" });
+  return { token };
+}
+
 // ADMIN LOGIN (JWT Sign & Return) — checks the real `users` table (Postgres/SQLite via
 // server/db.ts).
 app.post("/api/auth/admin/login", async (req, res) => {
@@ -132,14 +150,14 @@ app.post("/api/auth/admin/login", async (req, res) => {
       [email]
     );
     const user = rows[0];
-    if (!user || !bcrypt.compareSync(password, user.password_hash)) {
+    const auth = verifyPasswordAndIssueToken(user, password);
+    if (!auth) {
       return res.status(401).json({ error: "E-poçt və ya şifrə yanlışdır!" });
     }
 
-    const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: "24h" });
     return res.json({
       success: true,
-      token,
+      token: auth.token,
       user: rowToUser(user)
     });
   } catch (error: any) {
@@ -163,14 +181,14 @@ app.post("/api/auth/operator/login", async (req, res) => {
       [identifier, identifier]
     );
     const user = rows[0];
-    if (!user || !bcrypt.compareSync(password, user.password_hash)) {
+    const auth = verifyPasswordAndIssueToken(user, password);
+    if (!auth) {
       return res.status(401).json({ error: "İstifadəçi adı/e-poçt və ya şifrə yanlışdır!" });
     }
 
-    const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: "24h" });
     return res.json({
       success: true,
-      token,
+      token: auth.token,
       user: rowToUser(user)
     });
   } catch (error: any) {
@@ -270,6 +288,23 @@ app.delete("/api/admin/vendors/:id", authenticateUser, async (req: any, res) => 
   } catch (error: any) {
     console.error("[DELETE /api/admin/vendors/:id] error:", error);
     return res.status(500).json({ error: "Operator arxivləşdirilə bilmədi: " + error.message });
+  }
+});
+
+// GET /api/users — admin-only. Without this, the AdminPortal's "Tərəfdaşlar" list had no way
+// to ever learn about vendors archived/reactivated from another session — it just kept
+// replaying whatever was last cached in localStorage (or the bundled seed data), so an
+// archived vendor kept showing up as fully active and editable.
+app.get("/api/users", authenticateUser, async (req: any, res) => {
+  if (req.operator.role !== 'admin') {
+    return res.status(403).json({ error: "Yalnız adminlər istifadəçi siyahısını görə bilər." });
+  }
+  try {
+    const rows = await dbClient.query('SELECT * FROM users ORDER BY created_at DESC', []);
+    res.json({ users: rows.map(rowToUser) });
+  } catch (error: any) {
+    console.error("[GET /api/users] error:", error);
+    res.status(500).json({ error: "İstifadəçiləri gətirmək mümkün olmadı: " + error.message });
   }
 });
 
@@ -427,7 +462,9 @@ app.get("/api/exchange-rates/cbar", async (req, res) => {
           });
         }
       }
-    } catch (e) {}
+    } catch {
+      // Backup-date fallback also failed — fall through to the generic 500 below.
+    }
 
     return res.status(500).json({ error: "CBAR məzənnələrini gətirmək mümkün olmadı: " + error.message });
   }
@@ -463,11 +500,16 @@ app.post("/api/bookings/whatsapp-click", (req, res) => {
   });
 });
 
-// Endpoint to expose all tracked WhatsApp leads for admin/vendor analytic panels
-app.get("/api/bookings/whatsapp-leads", (req, res) => {
+// Endpoint to expose all tracked WhatsApp leads for admin/vendor analytic panels. Leads carry
+// the same customer-identifying data as bookings, so this requires a session — a vendor only
+// sees leads for their own tours, an admin sees everything.
+app.get("/api/bookings/whatsapp-leads", authenticateUser, (req: any, res) => {
+  const leads = req.operator.role === 'vendor'
+    ? serverBookings.filter((b) => b.vendorId === req.operator.id)
+    : serverBookings;
   res.json({
-    leads: serverBookings,
-    totalCount: serverBookings.length
+    leads,
+    totalCount: leads.length
   });
 });
 
@@ -504,8 +546,13 @@ app.post("/api/whatsapp/logout", authenticateUser, async (req: any, res) => {
   if (req.operator.role !== "admin") {
     return res.status(403).json({ error: "Yalnız adminlər WhatsApp bağlantısını idarə edə bilər." });
   }
-  await logoutWhatsApp();
-  return res.json({ success: true });
+  try {
+    await logoutWhatsApp();
+    return res.json({ success: true });
+  } catch (error: any) {
+    console.error("[POST /api/whatsapp/logout] error:", error);
+    return res.status(500).json({ error: "WhatsApp sessiyasından çıxış edilə bilmədi: " + error.message });
+  }
 });
 
 // GET /api/whatsapp/captcha — public, issues a one-time math challenge that must accompany
@@ -702,6 +749,12 @@ app.post("/api/tours", authenticateUser, async (req: any, res) => {
     if (!vendorId || !name || !category || !difficulty || !region || !durationDays) {
       return res.status(400).json({ error: "Zəhmət olmasa bütün məcburi sahələri doldurun (vendorId, name, category, difficulty, region, durationDays)." });
     }
+    if (!(Number(durationDays) > 0)) {
+      return res.status(400).json({ error: "Müddət (gün) müsbət ədəd olmalıdır." });
+    }
+    if (body.price !== undefined && !(Number(body.price) >= 0)) {
+      return res.status(400).json({ error: "Qiymət mənfi ola bilməz." });
+    }
 
     const id = body.id || `tour-${randomUUID()}`;
     const extra = splitTourBody(body);
@@ -770,6 +823,13 @@ app.put("/api/tours/:id", authenticateUser, async (req: any, res) => {
     }
 
     const body = req.body || {};
+
+    if (body.durationDays !== undefined && !(Number(body.durationDays) > 0)) {
+      return res.status(400).json({ error: "Müddət (gün) müsbət ədəd olmalıdır." });
+    }
+    if (body.price !== undefined && !(Number(body.price) >= 0)) {
+      return res.status(400).json({ error: "Qiymət mənfi ola bilməz." });
+    }
 
     if (isAdmin) {
       if (body.status === 'approved') {
@@ -947,6 +1007,12 @@ app.post("/api/tours/:tourId/slots", authenticateUser, async (req: any, res) => 
     if (!startDate || price === undefined || capacity === undefined) {
       return res.status(400).json({ error: "Zəhmət olmasa bütün məcburi sahələri doldurun (startDate, price, capacity)." });
     }
+    if (!(Number(price) >= 0)) {
+      return res.status(400).json({ error: "Qiymət mənfi ola bilməz." });
+    }
+    if (!(Number(capacity) > 0)) {
+      return res.status(400).json({ error: "Tutum müsbət ədəd olmalıdır." });
+    }
 
     const id = req.body.id || `slot-${randomUUID()}`;
     await dbClient.execute(
@@ -1044,18 +1110,18 @@ function splitBookingBody(body: Record<string, any>) {
   return extra;
 }
 
-// GET /api/bookings — list bookings, optionally filtered by vendorId / tourId / customerId / status
-// GET /api/bookings — same optional-auth scoping as GET /api/tours: a vendor token
-// restricts the result to that vendor's own bookings (ignoring any client-supplied
-// vendorId), an admin token or no token at all keeps the existing behavior.
-app.get("/api/bookings", async (req, res) => {
+// GET /api/bookings — list bookings, optionally filtered by vendorId / tourId / customerId / status.
+// Bookings carry customer names and phone numbers, so this requires a valid admin/vendor
+// session — a vendor token restricts the result to that vendor's own bookings (ignoring any
+// client-supplied vendorId), an admin token can see everything.
+app.get("/api/bookings", authenticateUser, async (req: any, res) => {
   try {
-    const user = getOptionalUser(req);
+    const user = req.operator;
     const { tourId, customerId, status } = req.query;
     const conditions: string[] = [];
     const params: any[] = [];
 
-    if (user && user.role === 'vendor') {
+    if (user.role === 'vendor') {
       conditions.push('vendor_id = ?');
       params.push(user.id);
     } else if (req.query.vendorId) {
@@ -1713,6 +1779,14 @@ async function startServer() {
   // if no admin has scanned the QR yet (or the connection later drops), so failures here are
   // only logged, never thrown.
   startWhatsApp().catch((err) => console.error("[WhatsApp] Başlanğıc qoşulma xətası:", err));
+
+  // Any /api/* path that didn't match one of the routes above is a genuine 404, not a page to
+  // render — without this, both the dev Vite middleware and the production static/SPA fallback
+  // below would happily serve index.html (200 + HTML) for a typo'd or removed endpoint, which
+  // breaks response.json() on the client instead of surfacing a clear error.
+  app.use('/api', (req, res) => {
+    res.status(404).json({ error: "Belə bir API endpoint mövcud deyil." });
+  });
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {

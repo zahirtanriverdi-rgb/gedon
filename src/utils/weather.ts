@@ -55,8 +55,8 @@ const regionCoords: Record<string, { lat: number; lon: number }> = {
 };
 
 // Find matching coordinates based on region name substring matching
-export function getCoordinatesForRegion(region: string): { lat: number; lon: number } {
-  const clean = region.toLowerCase().replace(/[\(\[\)\]]/g, ' ').trim();
+function getCoordinatesForRegion(region: string): { lat: number; lon: number } {
+  const clean = region.toLowerCase().replace(/[([)\]]/g, ' ').trim();
   const words = clean.split(/\s+/);
   
   for (const word of words) {
@@ -77,7 +77,7 @@ export function getCoordinatesForRegion(region: string): { lat: number; lon: num
 }
 
 // Map WMO Weather code to a labelKey (see WeatherInfo) and emoji
-export function getWMOTranslation(code: number): { labelKey: string; emoji: string } {
+function getWMOTranslation(code: number): { labelKey: string; emoji: string } {
   if (code === 0) return { labelKey: 'clearSky', emoji: '☀️' };
   if (code === 1 || code === 2 || code === 3) return { labelKey: 'partlyCloudy', emoji: '🌤️' };
   if (code === 45 || code === 48) return { labelKey: 'foggy', emoji: '🌫️' };
@@ -95,7 +95,7 @@ export function getWMOTranslation(code: number): { labelKey: string; emoji: stri
 }
 
 // Generate a highly realistic seasonal weather based on month if dates are outside the 16-day forecast range
-export function getSeasonalWeather(dateStr: string, region: string): WeatherInfo {
+function getSeasonalWeather(dateStr: string, region: string): WeatherInfo {
   // Try to extract month
   let month = 5; // Default May
   try {
@@ -103,7 +103,7 @@ export function getSeasonalWeather(dateStr: string, region: string): WeatherInfo
     if (parts.length >= 2) {
       month = parseInt(parts[1], 10);
     }
-  } catch (e) {
+  } catch {
     // ignore
   }
 

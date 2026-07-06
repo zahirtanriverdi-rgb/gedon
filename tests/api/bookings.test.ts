@@ -2,8 +2,20 @@ import { describe, it, expect } from 'vitest';
 import { BASE_URL } from './testUtils';
 
 describe('GET /api/bookings', () => {
-  it('returns 200 with a bookings array (public/unscoped view)', async () => {
+  // Bookings carry customer names and phone numbers, so this must not be public.
+  it('returns 401 without a token', async () => {
     const res = await fetch(`${BASE_URL}/api/bookings`);
+    expect(res.status).toBe(401);
+  });
+
+  it('returns 200 with a bookings array for an authenticated admin', async () => {
+    const loginRes = await fetch(`${BASE_URL}/api/auth/admin/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: 'admin@gedekgore.az', password: 'changeme123' }),
+    });
+    const { token } = await loginRes.json();
+    const res = await fetch(`${BASE_URL}/api/bookings`, { headers: { Authorization: `Bearer ${token}` } });
     expect(res.status).toBe(200);
     const data = await res.json();
     expect(Array.isArray(data.bookings)).toBe(true);

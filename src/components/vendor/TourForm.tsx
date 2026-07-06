@@ -6,6 +6,8 @@ import { DynamicStringListInput } from './DynamicStringListInput';
 import { MEETING_POINTS } from '../../data/meetingPoints';
 import { MultiDateCalendar, toIsoDate } from './MultiDateCalendar';
 import { TourDangerZone } from './TourDangerZone';
+import { WhatsAppVerifyField } from '../shared/WhatsAppVerifyField';
+import { handleNumberInput, useStepWizard } from './useTourFormWizard';
 import { useLanguage } from '../../i18n/LanguageContext';
 
 // Older guides saved before Guide.id existed have no stable identifier — fall back to their
@@ -40,14 +42,6 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
     { number: 3 as const, label: t('vendorTourForms.tourForm.steps.pricing') },
   ];
 
-  // Number inputs are bound to `number | ''` state (not plain `number`) so the field can be
-  // fully cleared: clearing the input sets state to '' instead of forcing a "0" back into the
-  // box. Number(tourX || 0)-style fallbacks elsewhere already treat '' like a missing value.
-  const handleNumberInput = (setter: (v: number | '') => void) => (e: React.ChangeEvent<HTMLInputElement>) => {
-    const raw = e.target.value;
-    setter(raw === '' ? '' : Number(raw));
-  };
-
   const [tourName, setTourName] = useState<string>('');
   const [tourDifficulty, setTourDifficulty] = useState<'easy' | 'medium' | 'hard' | 'extreme'>('medium');
   const [tourRegion, setTourRegion] = useState<string>('');
@@ -67,6 +61,9 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
   const [tourImages, setTourImages] = useState<string[]>([]);
   const [tourVideos, setTourVideos] = useState<string[]>([]);
   const [tourWhatsApp, setTourWhatsApp] = useState<string>('');
+  // New tours require a fresh live-WhatsApp check on the guide number; editing an existing tour
+  // starts pre-verified since that number was already checked when the tour was first created.
+  const [isWhatsAppVerified, setIsWhatsAppVerified] = useState<boolean>(!!tour);
   const [tourPrice, setTourPrice] = useState<number | ''>(35);
   const [tourDiscountPrice, setTourDiscountPrice] = useState<string>('');
   const [selectedDates, setSelectedDates] = useState<Date[]>([]);
@@ -92,9 +89,7 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
   const [isSavingForm, setIsSavingForm] = useState(false);
   const [formSubmitError, setFormSubmitError] = useState<string | null>(null);
 
-  const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
-  const goToNextStep = () => setCurrentStep((s) => (s < 3 ? ((s + 1) as 1 | 2 | 3) : s));
-  const goToPrevStep = () => setCurrentStep((s) => (s > 1 ? ((s - 1) as 1 | 2 | 3) : s));
+  const { currentStep, goToNextStep, goToPrevStep } = useStepWizard();
 
   // Per-field invalid markers for fields HTML5 `required` can't cover (tag lists, media) or
   // that we validate with a custom message instead of relying on native browser tooltips.
@@ -112,6 +107,7 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
       if (tourBringItems.filter(Boolean).length === 0) missing.push({ key: 'bringItems', label: t('vendorTourForms.tourForm.validation.fieldBringItems') });
     } else if (step === 2) {
       if (tourImages.length === 0) missing.push({ key: 'media', label: t('vendorTourForms.tourForm.validation.fieldMedia') });
+      if (!isWhatsAppVerified) missing.push({ key: 'whatsappVerification', label: t('vendorTourForms.tourForm.validation.fieldWhatsappVerification') });
     } else if (step === 3) {
       if (tourIncludes.filter(Boolean).length === 0) missing.push({ key: 'includes', label: t('vendorTourForms.tourForm.validation.fieldIncludes') });
       if (tourNotIncluded.filter(Boolean).length === 0) missing.push({ key: 'notIncluded', label: t('vendorTourForms.tourForm.validation.fieldNotIncluded') });
@@ -125,7 +121,7 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
     if (missing.length === 0) {
       setFieldErrors((prev) => {
         const next = { ...prev };
-        for (const key of ['languages', 'bringItems', 'media', 'includes', 'notIncluded', 'highlights']) delete next[key];
+        for (const key of ['languages', 'bringItems', 'media', 'whatsappVerification', 'includes', 'notIncluded', 'highlights']) delete next[key];
         return next;
       });
       return true;
@@ -193,6 +189,7 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
     setTourImages(tour.image && !existingGallery.includes(tour.image) ? [tour.image, ...existingGallery] : existingGallery);
     setTourVideos(tour.videos || []);
     setTourWhatsApp(tour.whatsapp_number || currentUser.whatsapp_number || currentUser.phone || '');
+    setIsWhatsAppVerified(true);
     setTourGpxData(tour.gpxData || '');
     setTourGpxFileName(tour.gpxFileName || '');
     setTourIsActive(tour.isActive !== false);
@@ -655,7 +652,13 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
 
           <div>
             <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">{t('vendorTourForms.tourForm.fields.whatsapp.label')}</label>
-            <input type="tel" required value={tourWhatsApp} onChange={(e) => setTourWhatsApp(e.target.value)} placeholder={t('vendorTourForms.tourForm.fields.whatsapp.placeholder')} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 font-bold" />
+            <WhatsAppVerifyField
+              value={tourWhatsApp}
+              onChange={setTourWhatsApp}
+              isVerified={isWhatsAppVerified}
+              onVerifiedChange={setIsWhatsAppVerified}
+              onShowNotification={onShowNotification}
+            />
           </div>
 
           <div>

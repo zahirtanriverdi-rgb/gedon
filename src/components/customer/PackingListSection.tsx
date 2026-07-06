@@ -27,6 +27,9 @@ interface PackingListSectionProps {
   tourId: string;
   packingExperienceMap: Record<string, 'beginner' | 'pro' | null>;
   packingAnalyzingMap: Record<string, boolean>;
+  // Real Gemini-generated advice for this specific tour, when the API call succeeded.
+  // null (call failed / GEMINI_API_KEY not configured) falls back to the static curated lists.
+  aiResult: { basics: string[]; pro_gear: string[] } | null;
   checkedPackingItems: Record<string, boolean>;
   onSelectExperience: (tourId: string, choice: 'beginner' | 'pro') => void;
   onToggleChecked: (key: string) => void;
@@ -36,13 +39,16 @@ export function PackingListSection({
   tourId,
   packingExperienceMap,
   packingAnalyzingMap,
+  aiResult,
   checkedPackingItems,
   onSelectExperience,
   onToggleChecked
 }: PackingListSectionProps) {
   const { t } = useLanguage();
-  const getPackingItems = (level: 'beginner' | 'pro'): string[] =>
-    PACKING_LISTS[level].map((_, index) => t(`customerHome.packingListSection.items.${level}.${index}`));
+  const getPackingItems = (level: 'beginner' | 'pro'): string[] => {
+    if (aiResult) return level === 'beginner' ? aiResult.basics : aiResult.pro_gear;
+    return PACKING_LISTS[level].map((_, index) => t(`customerHome.packingListSection.items.${level}.${index}`));
+  };
   return (
     <div className="bg-amber-50/45 border border-amber-200/60 rounded-2xl p-5 space-y-4 hover:border-amber-300/85 transition duration-300">
       <div className="flex items-start justify-between flex-wrap gap-3 border-b border-amber-200/40 pb-3">

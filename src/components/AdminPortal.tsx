@@ -333,11 +333,16 @@ export default function AdminPortal({
 
   const handleUpdateVendorAuth = (vendorId: string) => {
     if (onUpdateUser) {
-      if (!vendorUsername || !vendorPassword) {
+      if (!vendorUsername) {
         if (onShowNotification) onShowNotification(t('adminPortal.loginCredentials.emptyFieldsError'), 'error');
         return;
       }
-      onUpdateUser(vendorId, { username: vendorUsername, password: vendorPassword });
+      // Password is optional here — an admin renaming just the login shouldn't have to also
+      // set a new password. Only send it (and thus only overwrite the real hash) when the
+      // admin actually typed one.
+      const payload: { username: string; password?: string } = { username: vendorUsername };
+      if (vendorPassword) payload.password = vendorPassword;
+      onUpdateUser(vendorId, payload);
       setEditingVendorAuth(null);
       if (onShowNotification) onShowNotification(t('adminPortal.loginCredentials.updateSuccess'), 'success');
     }
@@ -428,7 +433,7 @@ export default function AdminPortal({
           <LanguageSwitcher />
           <button
             onClick={onLogout}
-            className="text-xs font-semibold py-1 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-all"
+            className="text-xs font-semibold min-h-[44px] px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-all"
           >
             {t('app.nav.logout')}
           </button>
@@ -827,7 +832,7 @@ export default function AdminPortal({
                             }
                           }
                         }}
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold p-1.5 px-3 rounded text-xs transition"
+                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold min-h-[44px] px-3 flex items-center justify-center rounded text-xs transition"
                       >
                         {t('adminPortal.subscriptions.extendOneMonth')}
                       </button>
@@ -847,7 +852,7 @@ export default function AdminPortal({
                             }
                           }
                         }}
-                        className={`font-bold p-1.5 px-3 rounded text-xs transition border ${
+                        className={`font-bold min-h-[44px] px-3 flex items-center justify-center rounded text-xs transition border ${
                           vendor.isManuallyDeactivated
                             ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200'
                             : 'bg-amber-50 hover:bg-amber-100 text-amber-700 border-amber-200'
@@ -859,7 +864,7 @@ export default function AdminPortal({
                         <button
                           type="button"
                           onClick={() => setDeletingVendor({ id: vendor.id, name: vendor.name })}
-                          className="bg-red-50 hover:bg-red-100 text-red-700 font-bold p-1.5 px-3 rounded text-xs transition border border-red-200"
+                          className="bg-red-50 hover:bg-red-100 text-red-700 font-bold min-h-[44px] px-3 flex items-center justify-center rounded text-xs transition border border-red-200"
                         >
                           {t('adminPortal.common.delete')}
                         </button>
@@ -949,9 +954,12 @@ export default function AdminPortal({
                         onClick={() => {
                            setEditingVendorAuth(vendor.id);
                            setVendorUsername(vendor.username || vendor.email);
-                           setVendorPassword(vendor.password || '');
+                           // Never pre-fill with vendor.password — that field is stale mock/seed
+                           // data, not the real (irreversibly-hashed) current password. Start
+                           // empty so the admin always types a genuine new password.
+                           setVendorPassword('');
                         }}
-                        className="bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold p-1.5 px-3 rounded text-xs transition"
+                        className="bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold min-h-[44px] px-3 flex items-center justify-center rounded text-xs transition"
                       >
                          {t('adminPortal.loginCredentials.changeLogin')}
                       </button>
@@ -976,13 +984,13 @@ export default function AdminPortal({
                        <div className="flex gap-2">
                          <button
                            onClick={() => handleUpdateVendorAuth(vendor.id)}
-                           className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold p-1.5 px-3 rounded text-xs transition"
+                           className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold min-h-[44px] px-3 flex items-center justify-center rounded text-xs transition"
                          >
                            {t('adminPortal.common.confirm')}
                          </button>
                          <button
                            onClick={() => setEditingVendorAuth(null)}
-                           className="bg-red-50 hover:bg-red-100 text-red-600 font-bold p-1.5 px-3 rounded text-xs transition"
+                           className="bg-red-50 hover:bg-red-100 text-red-600 font-bold min-h-[44px] px-3 flex items-center justify-center rounded text-xs transition"
                          >
                            {t('adminPortal.common.cancel')}
                          </button>

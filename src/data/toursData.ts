@@ -13,7 +13,7 @@ export const seedUsers: User[] = [
     phone: '+994 50 123 45 67',
     companyName: 'GedəkGörək LLC',
     balance: 450.0,
-    whatsapp_number: '+994706717804',
+    whatsapp_number: '+994501112233',
     avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
     about: 'GedəkGörək Azərbaycanda peşəkar dağçılıq, yürüş və düşərgə turları üzrə ixtisaslaşmış komandadır. Təbiətlə həmahəng, təhlükəsiz və yaddaqalan ekoturlar təşkil edirik.',
     aboutTranslations: {
@@ -43,59 +43,6 @@ export const seedUsers: User[] = [
     createdAt: '2026-01-10T11:00:00Z'
   },
   {
-    id: 'user-vendor-2',
-    name: 'NDA',
-    email: 'info@nda.az',
-    username: 'nda_admin',
-    password: 'password123',
-    role: 'vendor',
-    phone: '+994 70 987 65 43',
-    companyName: 'NDA EcoTours',
-    balance: 890.0,
-    whatsapp_number: '+994706717804',
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
-    about: 'NDA EcoTours olaraq biz təbiəti qorumaqla yanaşı, ekstrim və idman turlarını bir araya gətiririk. Yolsuzluq (off-road) və gəzinti maşrutlarının ustasıyıq.',
-    aboutTranslations: {
-      en: 'At NDA EcoTours, we combine caring for nature with extreme and sports tours. We are masters of off-road and hiking routes.',
-      ru: 'В NDA EcoTours мы сочетаем заботу о природе с экстремальными и спортивными турами. Мы — мастера внедорожных и пеших маршрутов.',
-    },
-    guides: [
-      {
-        name: 'Elnur Rüstəmov',
-        bio: 'Off-road sürücüsü və bələdçi.',
-        specialty: 'Yolsuzluq və dağ yolları',
-        translations: {
-          en: { bio: 'Off-road driver and guide.', specialty: 'Off-road and mountain routes' },
-          ru: { bio: 'Внедорожный водитель и гид.', specialty: 'Бездорожье и горные дороги' },
-        },
-      },
-      {
-        name: 'Səbinə Məmmədova',
-        bio: 'Yoqa və meditasiya təlimçisi. Təbiətdə yoqa turları üzrə ixtisaslaşıb.',
-        specialty: 'Meditasiya, Yoqa turları',
-        translations: {
-          en: { bio: 'Yoga and meditation instructor, specialized in outdoor yoga tours.', specialty: 'Meditation, Yoga tours' },
-          ru: { bio: 'Инструктор по йоге и медитации, специализируется на йога-турах на природе.', specialty: 'Медитация, йога-туры' },
-        },
-      }
-    ],
-    createdAt: '2026-02-15T09:30:00Z'
-  },
-  {
-    id: 'user-vendor-3',
-    name: 'Peak&Trails',
-    email: 'info@peakandtrails.az',
-    username: 'peak_trails',
-    password: 'password123',
-    role: 'vendor',
-    phone: '+994 55 125 45 45',
-    companyName: 'Peak&Trails LLC',
-    balance: 1200.0,
-    whatsapp_number: '+994706717804',
-    avatar: 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=150&auto=format&fit=crop&q=80',
-    createdAt: '2026-03-01T10:00:00Z'
-  },
-  {
     id: 'user-admin',
     name: 'Elnur Cəfərov',
     email: 'admin@gedekgore.az',
@@ -108,10 +55,10 @@ export const seedUsers: User[] = [
   },
   {
     id: 'user-customer-1',
-    name: 'Zahir Tanrıverdi',
-    email: 'zahir.tanriverdi@gmail.com',
+    name: 'Elvin Məmmədov',
+    email: 'customer@gedekgorek.az',
     role: 'customer',
-    phone: '+994 99 888 77 66',
+    phone: '+994 50 000 00 00',
     balance: 500.0,
     avatar: 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=150&auto=format&fit=crop&q=80',
     createdAt: '2026-03-01T12:00:00Z'
@@ -119,7 +66,7 @@ export const seedUsers: User[] = [
 ];
 
 const NOTE = '✔️ Önəmli qeyd: Təbiətə gedirik, yağışı, küləyi, palçığı dərd etməyən, hər şeyə mız qoyub, turu başqalarının da burnundan gətirməyən, əsl yol adamı olan, xoşniyyət, əyləncəli adamsansa, gəl 🌞';
-const CONTACT = '📲 Qeydiyyat və əlavə məlumat üçün: +994 70 671 78 04 (WhatsApp)';
+const CONTACT = '📲 Qeydiyyat və əlavə məlumat üçün: +994 50 111 22 33 (WhatsApp)';
 
 // Normalized Tours Template database
 export const seedTours: Tour[] = [

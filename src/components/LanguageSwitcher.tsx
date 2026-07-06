@@ -11,7 +11,7 @@ export default function LanguageSwitcher({ className = '' }: { className?: strin
           type="button"
           onClick={() => setLanguage(code)}
           aria-pressed={language === code}
-          className={`px-2 py-1 text-xs font-semibold rounded-md transition-colors ${
+          className={`min-h-[44px] px-3 flex items-center justify-center text-xs font-semibold rounded-md transition-colors ${
             language === code
               ? 'bg-[var(--color-primary)] text-white'
               : 'text-gray-500 hover:bg-gray-100'

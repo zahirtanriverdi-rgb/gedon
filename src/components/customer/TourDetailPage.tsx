@@ -57,6 +57,7 @@ interface TourDetailPageProps {
   setLightboxIndex: (updater: number | null | ((prev: number | null) => number | null)) => void;
   packingExperienceMap: Record<string, 'beginner' | 'pro' | null>;
   packingAnalyzingMap: Record<string, boolean>;
+  packingAiResultMap: Record<string, { basics: string[]; pro_gear: string[] } | null>;
   checkedPackingItems: Record<string, boolean>;
   handlePackingExperienceSelect: (tourId: string, choice: 'beginner' | 'pro') => void;
   togglePackingItemChecked: (key: string) => void;
@@ -86,6 +87,7 @@ export function TourDetailPage({
   setLightboxIndex,
   packingExperienceMap,
   packingAnalyzingMap,
+  packingAiResultMap,
   checkedPackingItems,
   handlePackingExperienceSelect,
   togglePackingItemChecked,
@@ -467,10 +469,10 @@ export function TourDetailPage({
         msgText += t('tourDetailPage.booking.waMessage.safetyLine');
       }
 
-      // Driver/Guide specific direct whatsapp number or fallback +994706717804
+      // Driver/Guide specific direct whatsapp number or fallback +994501112233
       const targetWa = selectedTour.whatsapp_number
         ? selectedTour.whatsapp_number.replace(/\s+/g, '')
-        : '+994706717804';
+        : '+994501112233';
 
       const waUrl = `https://wa.me/${targetWa}?text=${encodeURIComponent(msgText)}`;
 
@@ -1135,7 +1137,7 @@ export function TourDetailPage({
                           <span className="bg-emerald-600 text-white text-[8px] font-extrabold px-1.5 py-0.5 rounded tracking-wider">{t('tourDetailPage.waExplanation.activeLabel')}</span>
                         </div>
                         <p className="text-[11px] text-slate-600 leading-relaxed">
-                          {t('tourDetailPage.waExplanation.bodyPart1')} <strong>WhatsApp</strong> {t('tourDetailPage.waExplanation.bodyPart2', { number: selectedTour.whatsapp_number || '+994706717804' })}
+                          {t('tourDetailPage.waExplanation.bodyPart1')} <strong>WhatsApp</strong> {t('tourDetailPage.waExplanation.bodyPart2', { number: selectedTour.whatsapp_number || '+994501112233' })}
                         </p>
                       </div>
 
@@ -1542,6 +1544,7 @@ export function TourDetailPage({
                       tourId={selectedTour.id}
                       packingExperienceMap={packingExperienceMap}
                       packingAnalyzingMap={packingAnalyzingMap}
+                      aiResult={packingAiResultMap[selectedTour.id] || null}
                       checkedPackingItems={checkedPackingItems}
                       onSelectExperience={handlePackingExperienceSelect}
                       onToggleChecked={togglePackingItemChecked}

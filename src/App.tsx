@@ -1,9 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, Suspense, lazy } from 'react';
 import { Tour, TourSlot, Booking, Review, User, PlatformConfig, PriceCalculatorConfig, UserRole } from './types';
 import { seedUsers } from './data/toursData';
-import CustomerPortal from './components/CustomerPortal';
-import VendorPortal from './components/VendorPortal';
-import AdminPortal from './components/AdminPortal';
+// Lazy-loaded: each portal pulls in its own heavy dependency tree (vendor forms, jspdf/
+// html5-qrcode ticket generation, maplibre-gl GPS visualizer, etc.) that a visitor sitting in
+// only one role never needs — splitting them keeps the initial bundle to just the shell + the
+// role picker instead of shipping all three portals' code to every single visitor.
+const CustomerPortal = lazy(() => import('./components/CustomerPortal'));
+const VendorPortal = lazy(() => import('./components/VendorPortal'));
+const AdminPortal = lazy(() => import('./components/AdminPortal'));
 import OperatorLogin from './components/OperatorLogin';
 import AdminLogin from './components/AdminLogin';
 import { SearchDropdown } from './components/SearchDropdown';
@@ -32,6 +36,16 @@ async function parseApiResponse(response: Response): Promise<any> {
   } catch {
     throw new Error(`Server düzgün cavab qaytarmadı (HTTP ${response.status}). Backend loglarını yoxlayın.`);
   }
+}
+
+// Shown briefly while a lazy-loaded portal's own chunk (and its heavy dependencies — vendor
+// form components, jspdf, maplibre-gl, etc.) is fetched on first navigation into that role.
+function PortalLoadingFallback() {
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center gap-4">
+      <RefreshCw className="w-8 h-8 text-brand-primary animate-spin" />
+    </div>
+  );
 }
 
 export default function App() {
@@ -113,22 +127,23 @@ export default function App() {
     setIsMarketplaceDataLoading(true);
     setMarketplaceDataError(null);
     try {
-      // /api/tours and /api/bookings scope their response server-side when an
-      // Authorization header is present: a vendor token gets only that vendor's own
-      // rows, an admin token gets everything. No token (public/customer) keeps the
-      // existing unfiltered shape the marketplace browsing relies on.
+      // /api/tours scopes its response server-side when an Authorization header is present:
+      // a vendor token gets only that vendor's own rows, an admin token gets everything, no
+      // token (public/customer) keeps the existing unfiltered shape the marketplace browsing
+      // relies on. /api/bookings carries customer names/phone numbers, so it now requires a
+      // session — only fetched when one exists; anonymous browsing just has no bookings data.
       const authedGet = (url: string) => authToken ? fetch(url, { headers: { Authorization: `Bearer ${authToken}` } }) : fetch(url);
       const [toursRes, slotsRes, bookingsRes, reviewsRes] = await Promise.all([
         authedGet('/api/tours'),
         fetch('/api/slots'),
-        authedGet('/api/bookings'),
+        authToken ? authedGet('/api/bookings') : Promise.resolve(null),
         fetch('/api/reviews'),
       ]);
-      if (!toursRes.ok || !slotsRes.ok || !bookingsRes.ok || !reviewsRes.ok) {
+      if (!toursRes.ok || !slotsRes.ok || (bookingsRes && !bookingsRes.ok) || !reviewsRes.ok) {
         throw new Error('Server məlumatları qaytara bilmədi.');
       }
       const [toursData, slotsData, bookingsData, reviewsData] = await Promise.all([
-        toursRes.json(), slotsRes.json(), bookingsRes.json(), reviewsRes.json(),
+        toursRes.json(), slotsRes.json(), bookingsRes ? bookingsRes.json() : Promise.resolve({ bookings: [] }), reviewsRes.json(),
       ]);
       setTours(toursData.tours || []);
       setSlots(slotsData.slots || []);
@@ -170,7 +185,38 @@ export default function App() {
       return seedUsers;
     }
   });
-  
+
+  // Sync the vendor list from the real backend whenever an admin session is active. Without
+  // this, `users` only ever reflects localStorage/bundled seed data — an admin from another
+  // session (or the DB directly) archiving/reactivating a vendor would never show up here, so
+  // AdminPortal's "Tərəfdaşlar" list kept displaying archived vendors as fully active/editable.
+  // Server data wins for the real fields (isArchived, subscriptionValidUntil, username, etc.);
+  // local-only extras (guides, about) are preserved via the same merge pattern used above.
+  React.useEffect(() => {
+    if (!loggedInAdmin || !adminToken) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/users', { headers: { Authorization: `Bearer ${adminToken}` } });
+        if (!res.ok || cancelled) return;
+        const data = await res.json();
+        const serverVendors: User[] = (data.users || []).filter((u: User) => u.role === 'vendor');
+        setUsers(prev => {
+          const prevById = new Map<string, User>(prev.map(u => [u.id, u]));
+          const mergedVendors = serverVendors.map(sv => {
+            const local = prevById.get(sv.id);
+            return local ? { ...local, ...sv } : sv;
+          });
+          const nonVendors = prev.filter(u => u.role !== 'vendor');
+          return [...nonVendors, ...mergedVendors];
+        });
+      } catch {
+        // Non-fatal — Tərəfdaşlar just keeps showing the last-known (possibly stale) list.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [loggedInAdmin, adminToken]);
+
   // Default "Qrup üçün qiymət hesabla" cost elements — matches the values that used to be
   // hardcoded directly in PriceCalculator.tsx. Admins can now edit these from AdminPortal;
   // existing localStorage data saved before this field existed gets backfilled with these
@@ -209,7 +255,9 @@ export default function App() {
     try {
       const saved = localStorage.getItem('turlar_exchange_rates');
       if (saved) return JSON.parse(saved);
-    } catch (e) {}
+    } catch {
+      // Corrupt/missing cache — fall through to the hardcoded defaults below.
+    }
     return { USD: 1.70, EUR: 1.85 };
   });
 
@@ -237,7 +285,9 @@ export default function App() {
     setExchangeRates(newRates);
     try {
       localStorage.setItem('turlar_exchange_rates', JSON.stringify(newRates));
-    } catch (e) {}
+    } catch {
+      // localStorage unavailable — the in-memory rate is still updated above.
+    }
     showNotification(t('app.notifications.ratesUpdated'), 'success');
   };
 
@@ -692,10 +742,10 @@ export default function App() {
       <>
       {/* Main Elegant Header — flush with the page background at scrollY 0, gains a
           border/shadow only once the user scrolls (sticky/scrolled state) */}
-      <header className={`bg-white sticky top-0 z-40 h-[var(--header-height)] border-b transition-shadow duration-200 ${
+      <header className={`bg-white sticky top-0 z-40 min-h-[var(--header-height)] border-b transition-shadow duration-200 ${
         isHeaderScrolled ? 'border-border-primary shadow-sm' : 'border-transparent'
       }`}>
-        <div className="relative max-w-[var(--global-max-width)] mx-auto h-full px-8 flex flex-nowrap items-center justify-between gap-4">
+        <div className="relative max-w-[var(--global-max-width)] mx-auto min-h-[var(--header-height)] px-8 py-2 md:py-0 flex flex-wrap md:flex-nowrap items-center justify-between gap-4">
 
           {/* Logo Brand */}
           <div className="flex items-center gap-2 cursor-pointer" onClick={() => {
@@ -709,9 +759,12 @@ export default function App() {
             </div>
           </div>
 
-          {/* Sticky Search Bar (Only visible when scrolled in Customer mode) */}
+          {/* Sticky Search Bar (Only visible when scrolled in Customer mode) — on mobile this
+              wraps onto its own full-width row within the header (via flex-wrap above) instead
+              of floating absolutely over the page, so it can no longer overlap page content
+              scrolling underneath it. Desktop keeps the original single-row inline layout. */}
           {selectedRole === 'customer' && isScrolled && (
-            <div ref={globalSearchRef} className="flex absolute left-4 right-4 top-full mt-2 md:static md:left-auto md:right-auto md:top-auto md:mt-0 md:flex-1 md:max-w-xl md:mx-8 animate-fadeIn">
+            <div ref={globalSearchRef} className="flex order-3 w-full md:order-none md:w-auto md:flex-1 md:max-w-xl md:mx-8 animate-fadeIn">
               <div className="relative w-full bg-white shadow-sm rounded-full p-1.5 border border-slate-200 flex items-center">
                 <div className="pl-4 pr-2 flex items-center flex-1">
                    <input
@@ -884,7 +937,8 @@ export default function App() {
 
             {/* Directing to respective Portal */}
             {selectedRole === 'customer' && (
-              <CustomerPortal 
+              <Suspense fallback={<PortalLoadingFallback />}>
+              <CustomerPortal
                 tours={tours}
                 slots={slots}
                 bookings={bookings}
@@ -903,6 +957,7 @@ export default function App() {
                 appLanguage={appLanguage}
                 priceCalculatorConfig={platformConfig.priceCalculatorConfig}
               />
+              </Suspense>
             )}
 
             {selectedRole === 'vendor' && !loggedInVendor && (
@@ -959,6 +1014,7 @@ export default function App() {
           )}
 
           {!isMarketplaceDataLoading && !marketplaceDataError && selectedRole === 'vendor' && loggedInVendor && (
+            <Suspense fallback={<PortalLoadingFallback />}>
             <VendorPortal
               tours={tours}
               slots={slots}
@@ -981,9 +1037,11 @@ export default function App() {
               onUserUpdated={handleVendorProfileUpdated}
               onLogout={handleOperatorLogout}
             />
+            </Suspense>
           )}
 
           {!isMarketplaceDataLoading && !marketplaceDataError && selectedRole === 'admin' && loggedInAdmin && (
+            <Suspense fallback={<PortalLoadingFallback />}>
             <AdminPortal
               tours={tours}
               slots={slots}
@@ -1008,6 +1066,7 @@ export default function App() {
               authToken={authToken}
               onLogout={handleAdminLogout}
             />
+            </Suspense>
           )}
         </>
       )}

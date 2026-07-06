@@ -28,7 +28,7 @@ if (isPostgres) {
   dbClient = {
     async query(sql: string, params: any[] = []) {
       // Basic translation of named/ordinal params for Postgres ($1, $2) vs SQLite (?, ?)
-      let pgSql = sql.replace(/\?/g, (() => {
+      const pgSql = sql.replace(/\?/g, (() => {
         let i = 1;
         return () => `$${i++}`;
       })());
@@ -36,7 +36,7 @@ if (isPostgres) {
       return res.rows;
     },
     async execute(sql: string, params: any[] = []) {
-      let pgSql = sql.replace(/\?/g, (() => {
+      const pgSql = sql.replace(/\?/g, (() => {
         let i = 1;
         return () => `$${i++}`;
       })());

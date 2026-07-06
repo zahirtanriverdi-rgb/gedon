@@ -28,7 +28,9 @@ export function toggleWishlist(tourId: string): string[] {
     : [...current, tourId];
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-  } catch {}
+  } catch {
+    // localStorage unavailable (private browsing, quota, etc.) — wishlist just won't persist.
+  }
   window.dispatchEvent(new Event(WISHLIST_CHANGED_EVENT));
   return updated;
 }
