@@ -3,7 +3,7 @@ import { Tour, TourSlot, Booking, Review, User } from '../../types';
 import { REVIEWS_ENABLED } from '../../config/features';
 import { computeFeaturedTourIds } from '../../utils/featuredTours';
 import { useLanguage } from '../../i18n/LanguageContext';
-import { getLocalizedTourName, getLocalizedTourDescription, getLocalizedGuideBio, getLocalizedGuideSpecialty } from '../../i18n/tourLocalization';
+import { getLocalizedTourName, getLocalizedTourDescription, getLocalizedTourIncludes, getLocalizedTourNotIncluded, getLocalizedTourHighlights, getLocalizedGuideBio, getLocalizedGuideSpecialty } from '../../i18n/tourLocalization';
 import { DIAL_CODES, DEFAULT_DIAL_CODE, isoToFlagEmoji } from '../../data/dialCodes';
 import {
   Calendar,
@@ -1244,7 +1244,7 @@ export function TourDetailPage({
                       <h3 className="text-xs font-black text-emerald-700 tracking-wider uppercase">{t('tourDetailPage.priceIncludes.includedHeader')}</h3>
                       <div className="space-y-3">
                         {(selectedTour.includes && selectedTour.includes.length > 0
-                          ? selectedTour.includes
+                          ? getLocalizedTourIncludes(selectedTour, language)
                           : [t('tourDetailPage.priceIncludes.defaultIncluded1'), t('tourDetailPage.priceIncludes.defaultIncluded2')]
                         ).map((item, idx) => (
                           <div key={`inc-${idx}`} className="flex items-start gap-3">
@@ -1272,7 +1272,7 @@ export function TourDetailPage({
                       <h3 className="text-xs font-black text-slate-400 tracking-wider uppercase">{t('tourDetailPage.priceIncludes.notIncludedHeader')}</h3>
                       <div className="space-y-3">
                         {(selectedTour.notIncluded && selectedTour.notIncluded.length > 0
-                          ? selectedTour.notIncluded
+                          ? getLocalizedTourNotIncluded(selectedTour, language)
                           : [t('tourDetailPage.priceIncludes.defaultNotIncluded1')]
                         ).map((item, idx) => (
                           <div key={`exc-${idx}`} className="flex items-start gap-3">
@@ -1296,7 +1296,7 @@ export function TourDetailPage({
                   <h2 className="text-xl font-extrabold text-slate-900">{t('tourDetailPage.highlights.title')}</h2>
                   <div className="flex flex-col gap-4">
                     {(selectedTour.highlights && selectedTour.highlights.length > 0
-                      ? selectedTour.highlights
+                      ? getLocalizedTourHighlights(selectedTour, language)
                       : [
                           t('tourDetailPage.highlights.defaultHighlight1', { region: selectedTour.region }),
                           t('tourDetailPage.highlights.defaultHighlight2', { difficulty: selectedTour.difficulty }),

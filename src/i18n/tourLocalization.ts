@@ -14,6 +14,23 @@ export function getLocalizedTourDescription(tour: Tour, language: Language): str
   return tour.translations?.[language]?.description || tour.description;
 }
 
+export function getLocalizedTourIncludes(tour: Tour, language: Language): string[] {
+  if (language === 'az') return tour.includes;
+  return tour.translations?.[language]?.includes || tour.includes;
+}
+
+export function getLocalizedTourNotIncluded(tour: Tour, language: Language): string[] {
+  const source = tour.notIncluded || [];
+  if (language === 'az') return source;
+  return tour.translations?.[language]?.notIncluded || source;
+}
+
+export function getLocalizedTourHighlights(tour: Tour, language: Language): string[] {
+  const source = tour.highlights || [];
+  if (language === 'az') return source;
+  return tour.translations?.[language]?.highlights || source;
+}
+
 // Vendor "about" bio and guide bio/specialty are authored in Azerbaijani; hand-written EN/RU
 // translations live alongside them (see seedUsers in data/toursData.ts) rather than going
 // through machine translation, since earlier tests hallucinated on this kind of prose.

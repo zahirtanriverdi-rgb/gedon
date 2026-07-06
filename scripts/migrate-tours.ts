@@ -55,7 +55,13 @@ async function main() {
   console.log('[migrate] Backfilling en/ru translations via Gemini (this can take a while)...');
   let translated = 0;
   for (const tour of newTours) {
-    const translations = await translateTourContent(tour.name, tour.description || null);
+    const translations = await translateTourContent({
+      name: tour.name,
+      description: tour.description || null,
+      includes: tour.includes,
+      notIncluded: tour.notIncluded,
+      highlights: tour.highlights,
+    });
     if (Object.keys(translations).length) {
       const rows = await dbClient.query('SELECT extra_data FROM tours WHERE id = ?', [tour.id]);
       if (rows.length) {

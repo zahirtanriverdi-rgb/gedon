@@ -9,7 +9,7 @@ import jwt from "jsonwebtoken";
 import { randomUUID } from "crypto";
 import { initializeDatabase } from "./server/db";
 import dbClient from "./server/db";
-import { scheduleTourTranslation } from "./server/translate";
+import { scheduleTourTranslation, scheduleUserTranslation } from "./server/translate";
 import {
   startWhatsApp,
   getWhatsAppStatus,
@@ -318,6 +318,9 @@ app.put("/api/users/:id", authenticateUser, async (req: any, res) => {
     );
 
     const updatedRows = await dbClient.query('SELECT * FROM users WHERE id = ?', [req.params.id]);
+    if (body.about !== undefined || body.guides !== undefined) {
+      scheduleUserTranslation(req.params.id, about, extra.guides);
+    }
     res.json({ user: rowToUser(updatedRows[0]) });
   } catch (error: any) {
     console.error("[PUT /api/users/:id] error:", error);
@@ -722,7 +725,7 @@ app.post("/api/tours", authenticateUser, async (req: any, res) => {
     );
 
     const rows = await dbClient.query('SELECT * FROM tours WHERE id = ?', [id]);
-    scheduleTourTranslation(id, name, description || null);
+    scheduleTourTranslation(id, { name, description: description || null, includes: body.includes, notIncluded: body.notIncluded, highlights: body.highlights });
     res.status(201).json({ tour: rowToTour(rows[0]) });
   } catch (error: any) {
     console.error("[POST /api/tours] error:", error);
@@ -745,7 +748,7 @@ async function writeLiveTourRow(id: string, merged: Record<string, any>, status:
       JSON.stringify(extra), id
     ]
   );
-  scheduleTourTranslation(id, merged.name, merged.description || null);
+  scheduleTourTranslation(id, { name: merged.name, description: merged.description || null, includes: merged.includes, notIncluded: merged.notIncluded, highlights: merged.highlights });
 }
 
 // PUT /api/tours/:id — update a tour. Admins edit the live row directly and control approval
