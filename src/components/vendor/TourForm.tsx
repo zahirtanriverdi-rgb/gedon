@@ -66,6 +66,7 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
   const [isWhatsAppVerified, setIsWhatsAppVerified] = useState<boolean>(!!tour);
   const [tourPrice, setTourPrice] = useState<number | ''>(35);
   const [tourDiscountPrice, setTourDiscountPrice] = useState<string>('');
+  const [tourRating, setTourRating] = useState<number | ''>('');
   const [selectedDates, setSelectedDates] = useState<Date[]>([]);
   const [tourGpxData, setTourGpxData] = useState<string>('');
   const [tourGpxFileName, setTourGpxFileName] = useState<string>('');
@@ -182,6 +183,7 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
     setTourReturnDateTime(tour.returnDateTime || '');
     setTourBringItems(Array.isArray(tour.importantInfo?.bring) ? tour.importantInfo!.bring! : []);
     setTourNotAllowedItems(Array.isArray(tour.importantInfo?.notAllowed) ? tour.importantInfo!.notAllowed! : []);
+    setTourRating(tour.rating !== undefined && tour.rating !== null ? tour.rating : '');
     setTourImage(tour.image || '');
     // Legacy tours may have a cover (`image`) that isn't part of the gallery array yet —
     // fold it in so the cover badge has something to highlight in the unified media grid.
@@ -278,6 +280,7 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
       gpxFileName: tourGpxFileName || undefined,
       price: Number(tourPrice) || 0,
       discountPrice: tourDiscountPrice !== '' && Number(tourDiscountPrice) > 0 ? Number(tourDiscountPrice) : undefined,
+      rating: tourRating !== '' ? Math.min(5, Math.max(1, Number(tourRating))) : undefined,
       isActive: tourIsActive,
       isActiveLife: tourCategory === 'active',
       activityType: tourCategory === 'active' ? tourActivityType : undefined,
@@ -325,8 +328,6 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
           ...sharedFields,
           vendorId: currentUser.id,
           vendorName: currentUser.name,
-          rating: 0, // Real average will accumulate from customer reviews once payment verification ships — no more vendor/back-office self-assigned stars
-          reviewsCount: 0,
           isApproved: false,
           status: 'pending_approval',
         };
@@ -845,7 +846,7 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
         <div className="space-y-5">
           <div className="bg-primary-50/60 p-4 rounded-xl border border-emerald-100 space-y-3">
             <h4 className="text-[10px] font-extrabold text-emerald-800 tracking-widest">{t('vendorTourForms.tourForm.pricingSection.heading')}</h4>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:max-w-2xl">
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 sm:max-w-3xl">
               <div>
                 <label className="block text-[11px] font-bold text-slate-500 tracking-wide mb-1">{t('vendorTourForms.tourForm.fields.price.label')}</label>
                 <input type="number" min="1" required value={tourPrice} onChange={handleNumberInput(setTourPrice)} className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-800" />
@@ -862,6 +863,11 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
                   <option value={72}>{t('vendorTourForms.tourForm.fields.cancellationHours.option72')}</option>
                   <option value={0}>{t('vendorTourForms.tourForm.fields.cancellationHours.optionNone')}</option>
                 </select>
+              </div>
+              <div>
+                <label className="block text-[11px] font-bold text-amber-600 tracking-wide mb-1">{t('vendorTourForms.tourForm.fields.rating.label')}</label>
+                <input type="number" min="1" max="5" step="0.1" placeholder={t('vendorTourForms.tourForm.fields.rating.placeholder')} value={tourRating} onChange={handleNumberInput(setTourRating)} className="w-full px-3 py-2 bg-white border border-amber-200 rounded-lg text-xs font-bold text-amber-800 placeholder-amber-300" />
+                <p className="text-[9px] text-slate-400 mt-1">{t('vendorTourForms.tourForm.fields.rating.hint')}</p>
               </div>
             </div>
             <MultiDateCalendar selectedDates={selectedDates} onChange={setSelectedDates} />

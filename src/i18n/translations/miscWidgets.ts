@@ -56,6 +56,14 @@ export const miscWidgets = {
         trackingPanel: 'İZLƏMƏ PANELİ:',
         speed: 'Sürət:',
       },
+      tourRouteStatsCard: {
+        distance: 'Məsafə',
+        elevation: 'Yüksəklik',
+        duration: 'Müddət',
+        rating: 'Reytinq',
+        days: 'gün',
+        hours: 'saat',
+      },
       tourWeatherForecast: {
         noFutureDates: 'Gələcək tarix təyin edilməyib',
         loading: 'ONLAYN HAVA PROQNOZU YÜKLƏNİR...',
@@ -185,6 +193,14 @@ export const miscWidgets = {
         trackingPanel: 'TRACKING PANEL:',
         speed: 'Speed:',
       },
+      tourRouteStatsCard: {
+        distance: 'Distance',
+        elevation: 'Elevation',
+        duration: 'Duration',
+        rating: 'Rating',
+        days: 'days',
+        hours: 'h',
+      },
       tourWeatherForecast: {
         noFutureDates: 'No upcoming date set',
         loading: 'LOADING LIVE WEATHER FORECAST...',
@@ -313,6 +329,14 @@ export const miscWidgets = {
         cameraFree: 'Камера: СВОБОДНА',
         trackingPanel: 'ПАНЕЛЬ ОТСЛЕЖИВАНИЯ:',
         speed: 'Скорость:',
+      },
+      tourRouteStatsCard: {
+        distance: 'Дист.',
+        elevation: 'Высота',
+        duration: 'Длит.',
+        rating: 'Рейтинг',
+        days: 'дн.',
+        hours: 'ч.',
       },
       tourWeatherForecast: {
         noFutureDates: 'Будущая дата не указана',

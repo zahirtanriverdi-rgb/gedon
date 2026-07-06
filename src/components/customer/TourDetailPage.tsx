@@ -26,6 +26,8 @@ import { TourWeatherForecast } from '../TourWeatherForecast';
 import { GpsTrackVisualizer } from '../GpsTrackVisualizer';
 import { PackingListSection } from './PackingListSection';
 import { TourReviewsList } from './TourReviewsList';
+import { parseStoredGpxData } from '../../utils/gpxParser';
+import { TourRouteStatsCard } from '../tours/TourRouteStatsCard';
 
 type ConvertedPriceInfo = {
   azn: number;
@@ -1419,6 +1421,51 @@ export function TourDetailPage({
                       variant="detailed" 
                     />
                   )}
+
+                  {/* GPX-derived route stats + mini route map, sitting above the full 3D explorer below */}
+                  {(() => {
+                    const parsedGpx = parseStoredGpxData(selectedTour.gpxData);
+                    if (!parsedGpx) return null;
+
+                    const isSportActive = selectedTour.category === 'active' || selectedTour.isActiveLife;
+                    let difficultyBarColorClass = 'bg-sky-500';
+                    let difficultyPercent = 60;
+                    let difficultyLabel = t(`customerHome.toursHomeView.difficulty.${selectedTour.difficulty}`);
+                    if (selectedTour.difficulty === 'easy') { difficultyBarColorClass = 'bg-emerald-500'; difficultyPercent = 30; }
+                    else if (selectedTour.difficulty === 'hard') { difficultyBarColorClass = 'bg-rose-500'; difficultyPercent = 85; }
+                    else if (selectedTour.difficulty === 'extreme') { difficultyBarColorClass = 'bg-red-700'; difficultyPercent = 100; }
+
+                    if (isSportActive) {
+                      const activeDiff = selectedTour.activeDifficulty || (selectedTour.difficulty === 'easy' ? 'beginner' : selectedTour.difficulty === 'hard' || selectedTour.difficulty === 'extreme' ? 'professional' : 'medium');
+                      if (activeDiff === 'beginner' || activeDiff === 'easy') {
+                        difficultyBarColorClass = 'bg-emerald-500'; difficultyPercent = 30;
+                        difficultyLabel = `🟢 ${t('customerHome.toursHomeView.activeDifficulty.beginner')}`;
+                      } else if (activeDiff === 'medium') {
+                        difficultyBarColorClass = 'bg-sky-500'; difficultyPercent = 60;
+                        difficultyLabel = `🟡 ${t('customerHome.toursHomeView.activeDifficulty.medium')}`;
+                      } else {
+                        difficultyBarColorClass = 'bg-rose-500'; difficultyPercent = 85;
+                        difficultyLabel = `🔴 ${t('customerHome.toursHomeView.activeDifficulty.professional')}`;
+                      }
+                    }
+
+                    const durationLabel = selectedTour.durationHours
+                      ? `${selectedTour.durationHours} ${t('miscWidgets.tourRouteStatsCard.hours')}`
+                      : `${selectedTour.durationDays} ${t('miscWidgets.tourRouteStatsCard.days')}`;
+
+                    return (
+                      <div className="border border-slate-200 rounded-2xl p-4 bg-white shadow-sm">
+                        <TourRouteStatsCard
+                          parsed={parsedGpx}
+                          durationLabel={durationLabel}
+                          difficultyLabel={difficultyLabel}
+                          difficultyBarColorClass={difficultyBarColorClass}
+                          difficultyPercent={difficultyPercent}
+                          ratingValue={4.9}
+                        />
+                      </div>
+                    );
+                  })()}
 
                   {/* Stunning Interactive 3D/2D GPX Trail Explorer Map */}
                   {selectedTour.gpxData && (

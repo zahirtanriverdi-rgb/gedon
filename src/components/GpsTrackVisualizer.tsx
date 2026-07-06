@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ParsedGpxRoute } from '../utils/gpxParser';
+import { ParsedGpxRoute, parseStoredGpxData } from '../utils/gpxParser';
 import { 
   Play, 
   Pause, 
@@ -23,16 +23,7 @@ export const GpsTrackVisualizer: React.FC<GpsTrackVisualizerProps> = ({ gpxDataS
 
   // Parse track coordinates on change
   useEffect(() => {
-    try {
-      if (gpxDataString) {
-        const decoded = JSON.parse(gpxDataString);
-        if (decoded && decoded.points && decoded.points.length > 0) {
-          setParsed(decoded);
-        }
-      }
-    } catch (e) {
-      console.error('Failed to parse GPS route JSON:', e);
-    }
+    setParsed(parseStoredGpxData(gpxDataString));
   }, [gpxDataString]);
 
   if (!parsed) return null;

@@ -68,6 +68,7 @@ export const vendorTourForms = {
           },
           price: { label: 'Qiymət (AZN):' },
           discountPrice: { label: 'Endirimli Qiymət (opsional):', placeholder: 'Məs: 25' },
+          rating: { label: 'Reytinq (1-5, opsional):', placeholder: 'Məs: 4.8', hint: 'Boş saxlasanız defolt dəyər tətbiq olunur. Real rəylər toplandıqca reytinq avtomatik onlara keçir.' },
           cancellationHours: {
             label: 'Ləğv qaydası:',
             option24: '24 saat',
@@ -354,6 +355,7 @@ export const vendorTourForms = {
           },
           price: { label: 'Price (AZN):' },
           discountPrice: { label: 'Discount Price (optional):', placeholder: 'e.g.: 25' },
+          rating: { label: 'Rating (1-5, optional):', placeholder: 'e.g.: 4.8', hint: 'Leave blank to use the default value. Once real reviews accumulate, the rating switches to them automatically.' },
           cancellationHours: {
             label: 'Cancellation policy:',
             option24: '24 hours',
@@ -640,6 +642,7 @@ export const vendorTourForms = {
           },
           price: { label: 'Цена (AZN):' },
           discountPrice: { label: 'Цена со скидкой (опционально):', placeholder: 'Например: 25' },
+          rating: { label: 'Рейтинг (1-5, опционально):', placeholder: 'Например: 4.8', hint: 'Оставьте пустым для значения по умолчанию. Как только накопятся реальные отзывы, рейтинг автоматически перейдёт на них.' },
           cancellationHours: {
             label: 'Правило отмены:',
             option24: '24 часа',

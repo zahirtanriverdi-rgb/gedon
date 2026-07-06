@@ -17,6 +17,11 @@ import NotFoundPage from './NotFoundPage';
 import { getRecentSearches, addRecentSearch } from '../utils/recentSearches';
 import { getWishlist, toggleWishlist } from '../utils/wishlist';
 import { useLanguage } from '../i18n/LanguageContext';
+import { computeFeaturedTourIds } from '../utils/featuredTours';
+
+// Automatic rating boost applied to tours currently flagged as this month's bestseller
+// (computeFeaturedTourIds), on top of whichever base rating (vendor-set or review average) applies.
+const BESTSELLER_RATING_BOOST = 0.3;
 
 const MONTH_KEYS = [
   'january', 'february', 'march', 'april', 'may', 'june',
@@ -509,24 +514,37 @@ export default function CustomerPortal({
 
   const [upcomingScrollLeft, setUpcomingScrollLeft] = useState(0);
 
-  // Calculate Average rating - Supports manual back-office rating override if specified in tour.rating
+  const featuredTourIds = React.useMemo(() => computeFeaturedTourIds(tours, slots), [tours, slots]);
+
+  // Calculate Average rating - vendor-set tour.rating acts as the base while there are no real
+  // reviews yet; once real reviews come in they take over. Bestseller-of-the-month tours get a
+  // small automatic boost on top of whichever base applies.
   const getAverageRating = (tourId: string) => {
     const tour = tours.find(t => t.id === tourId);
-    if (tour && tour.rating !== undefined && tour.rating !== null) {
-      return tour.rating.toFixed(1);
-    }
     const tourReviews = reviews.filter(r => r.tourId === tourId);
-    if (tourReviews.length === 0) return "4.5"; // default fallback if none
-    const total = tourReviews.reduce((sum, r) => sum + r.rating, 0);
-    return (total / tourReviews.length).toFixed(1);
+
+    let base: number;
+    if (tourReviews.length > 0) {
+      base = tourReviews.reduce((sum, r) => sum + r.rating, 0) / tourReviews.length;
+    } else if (tour && tour.rating !== undefined && tour.rating !== null) {
+      base = tour.rating;
+    } else {
+      base = 4.5; // default fallback if neither a vendor rating nor reviews exist
+    }
+
+    if (featuredTourIds.has(tourId)) {
+      base = Math.min(5, base + BESTSELLER_RATING_BOOST);
+    }
+
+    return base.toFixed(1);
   };
 
   const getReviewsCount = (tourId: string) => {
+    const tourReviews = reviews.filter(r => r.tourId === tourId);
+    if (tourReviews.length > 0) return tourReviews.length;
     const tour = tours.find(t => t.id === tourId);
-    if (tour && tour.rating !== undefined && tour.rating !== null && tour.reviewsCount !== undefined) {
-      return tour.reviewsCount;
-    }
-    return reviews.filter(r => r.tourId === tourId).length;
+    if (tour && tour.reviewsCount !== undefined) return tour.reviewsCount;
+    return 0;
   };
 
   // Calendar event navigation logic helper

@@ -21,6 +21,8 @@ import { ReviewSubmissionPanel } from './ReviewSubmissionPanel';
 import { computeFeaturedTourIds } from '../../utils/featuredTours';
 import { useLanguage } from '../../i18n/LanguageContext';
 import { getLocalizedTourName, getLocalizedTourDescription } from '../../i18n/tourLocalization';
+import { parseStoredGpxData } from '../../utils/gpxParser';
+import { TourRouteStatsCard } from '../tours/TourRouteStatsCard';
 
 type ConvertedPriceInfo = {
   azn: number;
@@ -631,18 +633,26 @@ export function ToursHomeView({
             // Dynamic Active Lifestyle Difficulty override with color codes
             let difficultyBg = diffColors[tour.difficulty]?.bg || 'bg-slate-100 text-brand-text-main';
             let difficultyLabel = diffColors[tour.difficulty]?.label || tt('customerHome.toursHomeView.difficulty.medium');
+            let difficultyBarColorClass = 'bg-sky-500';
+            let difficultyPercent = 60;
+            if (tour.difficulty === 'easy') { difficultyBarColorClass = 'bg-emerald-500'; difficultyPercent = 30; }
+            else if (tour.difficulty === 'hard') { difficultyBarColorClass = 'bg-rose-500'; difficultyPercent = 85; }
+            else if (tour.difficulty === 'extreme') { difficultyBarColorClass = 'bg-red-700'; difficultyPercent = 100; }
 
             if (isSportActive) {
               const activeDiff = tour.activeDifficulty || (tour.difficulty === 'easy' ? 'beginner' : tour.difficulty === 'hard' || tour.difficulty === 'extreme' ? 'professional' : 'medium');
               if (activeDiff === 'beginner' || activeDiff === 'easy') {
                 difficultyBg = 'bg-emerald-100 text-brand-primary border border-emerald-300 font-bold';
                 difficultyLabel = `🟢 ${tt('customerHome.toursHomeView.activeDifficulty.beginner')}`;
+                difficultyBarColorClass = 'bg-emerald-500'; difficultyPercent = 30;
               } else if (activeDiff === 'medium') {
                 difficultyBg = 'bg-yellow-100 text-amber-800 border border-yellow-300 font-bold';
                 difficultyLabel = `🟡 ${tt('customerHome.toursHomeView.activeDifficulty.medium')}`;
+                difficultyBarColorClass = 'bg-sky-500'; difficultyPercent = 60;
               } else {
                 difficultyBg = 'bg-red-150 bg-red-100 text-red-700 border border-red-200 font-extrabold';
                 difficultyLabel = `🔴 ${tt('customerHome.toursHomeView.activeDifficulty.professional')}`;
+                difficultyBarColorClass = 'bg-rose-500'; difficultyPercent = 85;
               }
 
               // Dynamic Sports badge
@@ -658,6 +668,11 @@ export function ToursHomeView({
                  badges['active'] = tBadge;
               }
             }
+
+            const parsedGpx = parseStoredGpxData(tour.gpxData);
+            const routeDurationLabel = tour.durationHours
+              ? `${tour.durationHours} ${tt('miscWidgets.tourRouteStatsCard.hours')}`
+              : `${tour.durationDays} ${tt('miscWidgets.tourRouteStatsCard.days')}`;
 
             return (
               <div
@@ -682,9 +697,11 @@ export function ToursHomeView({
                     <span className={`text-[10px] font-bold tracking-tight px-2 py-0.5 rounded-md shadow-xs ${tour.isInternational ? 'bg-brand-accent text-white' : 'bg-brand-text-main/90 text-white'}`}>
                       {badges[tour.category]?.emoji || '✈️'} {badges[tour.category]?.label || tt('customerHome.toursHomeView.badges.international')}
                     </span>
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md shadow-xs ${difficultyBg}`}>
-                      {difficultyLabel}
-                    </span>
+                    {!parsedGpx && (
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md shadow-xs ${difficultyBg}`}>
+                        {difficultyLabel}
+                      </span>
+                    )}
                   </div>
                   {/* Wishlist + Share button overlay */}
                   <div className="absolute top-3 right-3 flex items-center gap-1.5 z-10">
@@ -788,17 +805,29 @@ export function ToursHomeView({
 
                     {/* Integrated Automatic Online Weather Forecasting */}
                     {tourSlots.length > 0 && (
-                      <TourWeatherForecast 
-                        dates={tourSlots.map(s => s.startDate)} 
-                        region={tour.region} 
-                        variant="compact" 
+                      <TourWeatherForecast
+                        dates={tourSlots.map(s => s.startDate)}
+                        region={tour.region}
+                        variant="compact"
                       />
                     )}
+
                   </div>
 
-                  {/* Rating & Price row — price is the primary signal, rating secondary, badge tertiary */}
+                  {/* Rating & Price row — price is the primary signal; the GPX stats+mini-map (or, lacking GPX, rating/bestseller badge) fills the space in front of it */}
                   <div className="flex items-stretch justify-between gap-3 mt-4 pt-3 border-t border-slate-100">
-                    {(() => {
+                    {parsedGpx ? (
+                      <div className="flex-1 min-w-0">
+                        <TourRouteStatsCard
+                          parsed={parsedGpx}
+                          durationLabel={routeDurationLabel}
+                          difficultyLabel={difficultyLabel}
+                          difficultyBarColorClass={difficultyBarColorClass}
+                          difficultyPercent={difficultyPercent}
+                          ratingValue={Number(getAverageRating(tour.id))}
+                        />
+                      </div>
+                    ) : (() => {
                       const tourMonths = getTourMonths(tour.id);
                       const isTopSeller = Number(getAverageRating(tour.id)) >= 4.5 || getReviewsCount(tour.id) >= 1 || tour.name.toLowerCase().includes('kəpəz') || tour.name.toLowerCase().includes('kuzun');
                       const selectedMonth = tourMonths.length > 0 ? tourMonths[0] : tt('miscWidgets.tourWeatherForecast.months.may');

@@ -156,3 +156,20 @@ export function parseGpsFile(fileName: string, xmlText: string): ParsedGpxRoute 
     },
   };
 }
+
+/**
+ * Safely decodes a Tour's stored `gpxData` JSON string back into a ParsedGpxRoute.
+ * Returns null if the field is empty or the JSON is malformed/missing points.
+ */
+export function parseStoredGpxData(gpxDataString?: string): ParsedGpxRoute | null {
+  if (!gpxDataString) return null;
+  try {
+    const decoded = JSON.parse(gpxDataString);
+    if (decoded && Array.isArray(decoded.points) && decoded.points.length > 0) {
+      return decoded as ParsedGpxRoute;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}

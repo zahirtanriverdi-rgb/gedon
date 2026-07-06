@@ -647,8 +647,8 @@ function rowToTour(row: any) {
     status,
     pendingData,
     priceCurrency: row.price_currency,
-    rating: Number(row.rating) || 0,
-    reviewsCount: Number(row.reviews_count) || 0,
+    rating: row.rating !== null && row.rating !== undefined ? Number(row.rating) : undefined,
+    reviewsCount: row.reviews_count !== null && row.reviews_count !== undefined ? Number(row.reviews_count) : undefined,
     createdAt: row.created_at,
   };
 }
@@ -804,8 +804,8 @@ app.post("/api/tours", authenticateUser, async (req: any, res) => {
         status,
         null,
         body.priceCurrency || 'AZN',
-        Number(body.rating) || 0,
-        Number(body.reviewsCount) || 0,
+        body.rating !== undefined && body.rating !== null && body.rating !== '' ? Number(body.rating) : null,
+        body.reviewsCount !== undefined && body.reviewsCount !== null && body.reviewsCount !== '' ? Number(body.reviewsCount) : null,
         JSON.stringify(extra)
       ]
     );
@@ -830,7 +830,8 @@ async function writeLiveTourRow(id: string, merged: Record<string, any>, status:
       merged.isActive ? 1 : 0, status === 'approved' ? 1 : 0, status,
       pendingData ? JSON.stringify(pendingData) : null,
       merged.priceCurrency || 'AZN',
-      Number(merged.rating) || 0, Number(merged.reviewsCount) || 0,
+      merged.rating !== undefined && merged.rating !== null && merged.rating !== '' ? Number(merged.rating) : null,
+      merged.reviewsCount !== undefined && merged.reviewsCount !== null && merged.reviewsCount !== '' ? Number(merged.reviewsCount) : null,
       JSON.stringify(extra), id
     ]
   );

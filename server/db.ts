@@ -303,7 +303,9 @@ async function seedIfEmpty() {
         id, vendorId, vendorName || null, name, slug, category, difficulty, region, Number(durationDays),
         description || null, image || null,
         isActive === false ? 0 : 1, isApproved ? 1 : 0, status, priceCurrency || 'AZN',
-        Number(rating) || 0, Number(reviewsCount) || 0, JSON.stringify(extra)
+        rating !== undefined && rating !== null ? Number(rating) : null,
+        reviewsCount !== undefined && reviewsCount !== null ? Number(reviewsCount) : null,
+        JSON.stringify(extra)
       ]
     );
   }

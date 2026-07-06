@@ -71,8 +71,8 @@ export interface Tour {
   image: string;
   images?: string[]; // Multiple photos/gallery
   videos?: string[]; // Multiple videos/gallery
-  rating: number;
-  reviewsCount: number;
+  rating?: number; // Vendor-set manual rating override, used until real reviews accumulate (see getAverageRating)
+  reviewsCount?: number;
   isApproved: boolean; // Derived from status === 'approved' (kept for backward compat)
   status: 'approved' | 'pending_approval' | 'rejected';
   pendingData?: Record<string, any>; // Proposed edit awaiting admin approval; live fields stay unchanged until merged

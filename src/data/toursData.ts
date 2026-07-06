@@ -83,8 +83,6 @@ export const seedTours: Tour[] = [
     vendorId: 'user-vendor-1',
     vendorName: 'GedəkGörək',
     image: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=800&auto=format&fit=crop&q=80',
-    rating: 0,
-    reviewsCount: 0,
     isApproved: true, status: 'approved'
   },
   {
@@ -99,8 +97,6 @@ export const seedTours: Tour[] = [
     vendorId: 'user-vendor-1',
     vendorName: 'GedəkGörək',
     image: 'https://images.unsplash.com/photo-1501555088652-021faa106b9b?w=800&auto=format&fit=crop&q=80',
-    rating: 0,
-    reviewsCount: 0,
     isApproved: true, status: 'approved'
   },
   {
@@ -115,8 +111,6 @@ export const seedTours: Tour[] = [
     vendorId: 'user-vendor-1',
     vendorName: 'GedəkGörək',
     image: 'https://images.unsplash.com/photo-1454496522488-7a8e488e8606?w=800&auto=format&fit=crop&q=80',
-    rating: 0,
-    reviewsCount: 0,
     isApproved: true, status: 'approved'
   },
   {
@@ -131,8 +125,6 @@ export const seedTours: Tour[] = [
     vendorId: 'user-vendor-1',
     vendorName: 'GedəkGörək',
     image: 'https://images.unsplash.com/photo-1519681393784-d120267933ba?w=800&auto=format&fit=crop&q=80',
-    rating: 0,
-    reviewsCount: 0,
     isApproved: true, status: 'approved',
     gpxFileName: 'kepez_zirve_yurusu.gpx',
     gpxData: '{"fileName":"kepez_zirve_yurusu.gpx","points":[[40.4180,46.3220,1500],[40.4120,46.3200,1520],[40.4040,46.3160,1560],[40.3960,46.3150,1630],[40.3890,46.3190,1720],[40.3840,46.3280,1850],[40.3810,46.3350,1960],[40.3780,46.3420,2080],[40.3750,46.3500,2180],[40.3710,46.3540,2270],[40.3670,46.3560,2380],[40.3640,46.3590,2480],[40.3610,46.3620,2580],[40.3580,46.3650,2690],[40.3560,46.3680,2780],[40.3540,46.3710,2870],[40.3525,46.3740,2950],[40.3515,46.3760,3010],[40.3511,46.3780,3066]],"stats":{"distanceKm":15.4,"highestPointM":3066,"lowestPointM":1500,"elevationGainM":1566,"elevationLossM":0}}'
@@ -149,8 +141,6 @@ export const seedTours: Tour[] = [
     vendorId: 'user-vendor-1',
     vendorName: 'GedəkGörək',
     image: 'https://images.unsplash.com/photo-1486915309851-b0cc1f8a0084?w=800&auto=format&fit=crop&q=80',
-    rating: 0,
-    reviewsCount: 0,
     isApproved: true, status: 'approved'
   },
   {
@@ -165,8 +155,6 @@ export const seedTours: Tour[] = [
     vendorId: 'user-vendor-1',
     vendorName: 'GedəkGörək',
     image: 'https://images.unsplash.com/photo-1544829099-b9a0c07fad1a?w=800&auto=format&fit=crop&q=80',
-    rating: 0,
-    reviewsCount: 0,
     isApproved: true, status: 'approved'
   },
   {
@@ -181,8 +169,6 @@ export const seedTours: Tour[] = [
     vendorId: 'user-vendor-1',
     vendorName: 'GedəkGörək',
     image: 'https://images.unsplash.com/photo-1454496522488-7a8e488e8606?w=800&auto=format&fit=crop&q=80',
-    rating: 0,
-    reviewsCount: 0,
     isApproved: true, status: 'approved'
   },
   {
@@ -197,8 +183,6 @@ export const seedTours: Tour[] = [
     vendorId: 'user-vendor-1',
     vendorName: 'GedəkGörək',
     image: 'https://images.unsplash.com/photo-1551632811-561732d1e306?w=800&auto=format&fit=crop&q=80',
-    rating: 0,
-    reviewsCount: 0,
     isApproved: true, status: 'approved'
   },
 
@@ -215,8 +199,6 @@ export const seedTours: Tour[] = [
     vendorId: 'user-vendor-1',
     vendorName: 'GedəkGörək',
     image: 'https://images.unsplash.com/photo-1526772662000-3f88f10405ff?w=800&auto=format&fit=crop&q=80',
-    rating: 0,
-    reviewsCount: 0,
     isApproved: true, status: 'approved'
   },
   {
@@ -231,8 +213,6 @@ export const seedTours: Tour[] = [
     vendorId: 'user-vendor-1',
     vendorName: 'GedəkGörək',
     image: 'https://images.unsplash.com/photo-1504280390367-361c6d9f38f4?w=800&auto=format&fit=crop&q=80',
-    rating: 0,
-    reviewsCount: 0,
     isApproved: true, status: 'approved'
   },
   {
@@ -247,8 +227,6 @@ export const seedTours: Tour[] = [
     vendorId: 'user-vendor-1',
     vendorName: 'GedəkGörək',
     image: 'https://images.unsplash.com/photo-1496545672447-f699b503d270?w=800&auto=format&fit=crop&q=80',
-    rating: 0,
-    reviewsCount: 0,
     isApproved: true, status: 'approved'
   },
   {
@@ -263,8 +241,6 @@ export const seedTours: Tour[] = [
     vendorId: 'user-vendor-1',
     vendorName: 'GedəkGörək',
     image: 'https://images.unsplash.com/photo-1510312305653-8ed496efae75?w=800&auto=format&fit=crop&q=80',
-    rating: 0,
-    reviewsCount: 0,
     isApproved: true, status: 'approved'
   },
   {
@@ -279,8 +255,6 @@ export const seedTours: Tour[] = [
     vendorId: 'user-vendor-1',
     vendorName: 'GedəkGörək',
     image: 'https://images.unsplash.com/photo-1561542320-9a18cd340469?w=800&auto=format&fit=crop&q=80',
-    rating: 0,
-    reviewsCount: 0,
     isApproved: true, status: 'approved'
   },
   {
@@ -295,8 +269,6 @@ export const seedTours: Tour[] = [
     vendorId: 'user-vendor-1',
     vendorName: 'GedəkGörək',
     image: 'https://images.unsplash.com/photo-1470246973918-29a93221c455?w=800&auto=format&fit=crop&q=80',
-    rating: 0,
-    reviewsCount: 0,
     isApproved: true, status: 'approved'
   },
 
@@ -313,8 +285,6 @@ export const seedTours: Tour[] = [
     vendorId: 'user-vendor-1',
     vendorName: 'GedəkGörək',
     image: 'https://images.unsplash.com/photo-1473448912268-2022ce9509d8?w=800&auto=format&fit=crop&q=80',
-    rating: 0,
-    reviewsCount: 0,
     isApproved: true, status: 'approved'
   },
   {
@@ -329,8 +299,6 @@ export const seedTours: Tour[] = [
     vendorId: 'user-vendor-1',
     vendorName: 'GedəkGörək',
     image: 'https://images.unsplash.com/photo-1511497584788-876760111969?w=800&auto=format&fit=crop&q=80',
-    rating: 0,
-    reviewsCount: 0,
     isApproved: true, status: 'approved'
   },
   {
@@ -345,8 +313,6 @@ export const seedTours: Tour[] = [
     vendorId: 'user-vendor-1',
     vendorName: 'GedəkGörək',
     image: 'https://images.unsplash.com/photo-1448375240586-882707db888b?w=800&auto=format&fit=crop&q=80',
-    rating: 0,
-    reviewsCount: 0,
     isApproved: true, status: 'approved'
   },
   {
@@ -361,8 +327,6 @@ export const seedTours: Tour[] = [
     vendorId: 'user-vendor-1',
     vendorName: 'GedəkGörək',
     image: 'https://images.unsplash.com/photo-1447752875215-b2761acb3c5d?w=800&auto=format&fit=crop&q=80',
-    rating: 0,
-    reviewsCount: 0,
     isApproved: true, status: 'approved'
   },
   {
@@ -377,8 +341,6 @@ export const seedTours: Tour[] = [
     vendorId: 'user-vendor-1',
     vendorName: 'GedəkGörək',
     image: 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=800&auto=format&fit=crop&q=80',
-    rating: 0,
-    reviewsCount: 0,
     isApproved: true, status: 'approved'
   },
   {
@@ -393,8 +355,6 @@ export const seedTours: Tour[] = [
     vendorId: 'user-vendor-1',
     vendorName: 'GedəkGörək',
     image: 'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=800&auto=format&fit=crop&q=80',
-    rating: 0,
-    reviewsCount: 0,
     isApproved: true, status: 'approved'
   },
   {
@@ -409,8 +369,6 @@ export const seedTours: Tour[] = [
     vendorId: 'user-vendor-1',
     vendorName: 'GedəkGörək',
     image: 'https://images.unsplash.com/photo-1426604966848-d7adac402bff?w=800&auto=format&fit=crop&q=80',
-    rating: 0,
-    reviewsCount: 0,
     isApproved: true, status: 'approved'
   },
   {
@@ -425,8 +383,6 @@ export const seedTours: Tour[] = [
     vendorId: 'user-vendor-1',
     vendorName: 'GedəkGörək',
     image: 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=800&auto=format&fit=crop&q=80',
-    rating: 0,
-    reviewsCount: 0,
     isApproved: true, status: 'approved'
   },
   {
@@ -441,8 +397,6 @@ export const seedTours: Tour[] = [
     vendorId: 'user-vendor-1',
     vendorName: 'GedəkGörək',
     image: 'https://images.unsplash.com/photo-1473448912268-2022ce9509d8?w=800&auto=format&fit=crop&q=80',
-    rating: 0,
-    reviewsCount: 0,
     isApproved: true, status: 'approved'
   },
   {
@@ -457,8 +411,6 @@ export const seedTours: Tour[] = [
     vendorId: 'user-vendor-1',
     vendorName: 'GedəkGörək',
     image: 'https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=800&auto=format&fit=crop&q=80',
-    rating: 0,
-    reviewsCount: 0,
     isApproved: true, status: 'approved'
   },
   {
@@ -473,8 +425,6 @@ export const seedTours: Tour[] = [
     vendorId: 'user-vendor-1',
     vendorName: 'GedəkGörək',
     image: 'https://images.unsplash.com/photo-1551836022-d5d88e9218df?w=800&auto=format&fit=crop&q=80',
-    rating: 0,
-    reviewsCount: 0,
     isApproved: true, status: 'approved'
   },
   {
@@ -489,8 +439,6 @@ export const seedTours: Tour[] = [
     vendorId: 'user-vendor-1',
     vendorName: 'GedəkGörək',
     image: 'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=800&auto=format&fit=crop&q=80',
-    rating: 0,
-    reviewsCount: 0,
     isApproved: true, status: 'approved'
   },
   {
@@ -505,8 +453,6 @@ export const seedTours: Tour[] = [
     vendorId: 'user-vendor-1',
     vendorName: 'GedəkGörək',
     image: 'https://images.unsplash.com/photo-1426604966848-d7adac402bff?w=800&auto=format&fit=crop&q=80',
-    rating: 0,
-    reviewsCount: 0,
     isApproved: true, status: 'approved'
   },
   {
@@ -521,8 +467,6 @@ export const seedTours: Tour[] = [
     vendorId: 'user-vendor-1',
     vendorName: 'GedəkGörək',
     image: 'https://images.unsplash.com/photo-1511497584788-876760111969?w=800&auto=format&fit=crop&q=80',
-    rating: 0,
-    reviewsCount: 0,
     isApproved: true, status: 'approved'
   },
   {
@@ -537,8 +481,6 @@ export const seedTours: Tour[] = [
     vendorId: 'user-vendor-1',
     vendorName: 'GedəkGörək',
     image: 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=800&auto=format&fit=crop&q=80',
-    rating: 0,
-    reviewsCount: 0,
     isApproved: true, status: 'approved'
   },
   {
@@ -553,8 +495,6 @@ export const seedTours: Tour[] = [
     vendorId: 'user-vendor-1',
     vendorName: 'GedəkGörək',
     image: 'https://images.unsplash.com/photo-1447752875215-b2761acb3c5d?w=800&auto=format&fit=crop&q=80',
-    rating: 0,
-    reviewsCount: 0,
     isApproved: true, status: 'approved'
   },
   {
@@ -569,8 +509,6 @@ export const seedTours: Tour[] = [
     vendorId: 'user-vendor-1',
     vendorName: 'GedəkGörək',
     image: 'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=800&auto=format&fit=crop&q=80',
-    rating: 0,
-    reviewsCount: 0,
     isApproved: true, status: 'approved'
   },
   {
@@ -585,8 +523,6 @@ export const seedTours: Tour[] = [
     vendorId: 'user-vendor-1',
     vendorName: 'GedəkGörək',
     image: 'https://images.unsplash.com/photo-1551836022-d5d88e9218df?w=800&auto=format&fit=crop&q=80',
-    rating: 0,
-    reviewsCount: 0,
     isApproved: true, status: 'approved'
   },
   {
@@ -601,8 +537,6 @@ export const seedTours: Tour[] = [
     vendorId: 'user-vendor-1',
     vendorName: 'GedəkGörək',
     image: 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=800&auto=format&fit=crop&q=80',
-    rating: 0,
-    reviewsCount: 0,
     isApproved: true, status: 'approved'
   },
   {
@@ -617,8 +551,6 @@ export const seedTours: Tour[] = [
     vendorId: 'user-vendor-1',
     vendorName: 'GedəkGörək',
     image: 'https://images.unsplash.com/photo-1510312305653-8ed496efae75?w=800&auto=format&fit=crop&q=80',
-    rating: 0,
-    reviewsCount: 0,
     isApproved: true, status: 'approved'
   },
   {
@@ -633,8 +565,6 @@ export const seedTours: Tour[] = [
     vendorId: 'user-vendor-1',
     vendorName: 'GedəkGörək',
     image: 'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=800&auto=format&fit=crop&q=80',
-    rating: 0,
-    reviewsCount: 0,
     isApproved: true, status: 'approved'
   },
   {
@@ -649,8 +579,6 @@ export const seedTours: Tour[] = [
     vendorId: 'user-vendor-1',
     vendorName: 'GedəkGörək',
     image: 'https://images.unsplash.com/photo-1447752875215-b2761acb3c5d?w=800&auto=format&fit=crop&q=80',
-    rating: 0,
-    reviewsCount: 0,
     isApproved: true, status: 'approved'
   },
   {
@@ -665,8 +593,6 @@ export const seedTours: Tour[] = [
     vendorId: 'user-vendor-1',
     vendorName: 'GedəkGörək',
     image: 'https://images.unsplash.com/photo-1454496522488-7a8e488e8606?w=800&auto=format&fit=crop&q=80',
-    rating: 0,
-    reviewsCount: 0,
     isApproved: true, status: 'approved'
   },
 
