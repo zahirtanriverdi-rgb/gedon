@@ -553,7 +553,7 @@ export function TourDetailPage({
                   return (
                     <>
                       <div className="hidden md:grid grid-cols-3 grid-rows-2 gap-2 h-[450px] relative rounded-2xl overflow-hidden shrink-0 bg-slate-100">
-                        <div className="col-span-2 row-span-2 cursor-pointer relative group" onClick={() => setLightboxIndex(0)}>
+                        <div className="col-span-2 row-span-2 cursor-pointer relative overflow-hidden group" onClick={() => setLightboxIndex(0)}>
                           <img src={allMedia[0]} className="w-full h-full object-cover transition duration-500 group-hover:scale-105" referrerPolicy="no-referrer" />
                           <div className="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition duration-300 pointer-events-none" />
                         </div>
