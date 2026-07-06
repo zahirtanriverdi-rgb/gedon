@@ -10,6 +10,7 @@ import { randomUUID } from "crypto";
 import { initializeDatabase } from "./server/db";
 import dbClient from "./server/db";
 import { scheduleTourTranslation, scheduleUserTranslation } from "./server/translate";
+import { generateUniqueSlug } from "./server/slugify";
 import {
   startWhatsApp,
   getWhatsAppStatus,
@@ -615,7 +616,7 @@ app.post("/api/whatsapp/verify-number", async (req, res) => {
 // the request body (itinerary, roomTypes, includes, etc.) is preserved as-is
 // inside the `extra_data` JSON column so the full Tour shape round-trips.
 const TOUR_CORE_FIELDS = [
-  'id', 'vendorId', 'vendorName', 'name', 'category', 'difficulty', 'region',
+  'id', 'vendorId', 'vendorName', 'name', 'slug', 'category', 'difficulty', 'region',
   'durationDays', 'description', 'image', 'isActive', 'isApproved', 'status',
   'priceCurrency', 'rating', 'reviewsCount', 'createdAt',
   // pendingData lives in its own `pending_data` column, never inside extra_data.
@@ -634,6 +635,7 @@ function rowToTour(row: any) {
     vendorId: row.vendor_id,
     vendorName: row.vendor_name,
     name: row.name,
+    slug: row.slug,
     category: row.category,
     difficulty: row.difficulty,
     region: row.region,
@@ -712,13 +714,43 @@ app.get("/api/tours", async (req, res) => {
   }
 });
 
+// SEO: robots.txt + a DB-generated sitemap.xml (not a static file — regenerated from the
+// live `tours` table on every request so newly-approved tours show up immediately).
+const SITE_URL = "https://gedekgorek.com";
+
+app.get("/robots.txt", (req, res) => {
+  res.type("text/plain").send(`User-agent: *\nAllow: /\nSitemap: ${SITE_URL}/sitemap.xml\n`);
+});
+
+app.get("/sitemap.xml", async (req, res) => {
+  try {
+    // Same "publicly visible" semantics as the anonymous branch of GET /api/tours, simplified
+    // (skips the vendor-subscription-grace-period join — sitemap freshness isn't as critical
+    // as the live listing, and a slightly stale sitemap entry is harmless).
+    const rows = await dbClient.query(
+      `SELECT slug FROM tours WHERE status = 'approved' AND slug IS NOT NULL AND slug != '' AND (is_active IS NULL OR is_active != 0)`
+    );
+    const staticPaths = ["", "/faq", "/calculator"];
+    const urls = [
+      ...staticPaths.map((p) => `<url><loc>${SITE_URL}${p}</loc></url>`),
+      ...rows.map((r: any) => `<url><loc>${SITE_URL}/tours/${r.slug}</loc></url>`),
+    ];
+    res.type("application/xml").send(
+      `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${urls.join("")}</urlset>`
+    );
+  } catch (error: any) {
+    console.error("[GET /sitemap.xml] error:", error);
+    res.status(500).type("application/xml").send(`<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"></urlset>`);
+  }
+});
+
 // GET /api/tours/:id — single tour. Same visibility rule as the list endpoint: a vendor may
 // fetch their own tour in any status, an admin may fetch anything, but an anonymous/customer
 // request (or a vendor token for someone else's tour) 404s unless the tour is 'approved' —
 // pending/rejected tours don't leak through direct-by-id lookups either.
 app.get("/api/tours/:id", async (req, res) => {
   try {
-    const rows = await dbClient.query('SELECT * FROM tours WHERE id = ?', [req.params.id]);
+    const rows = await dbClient.query('SELECT * FROM tours WHERE id = ? OR slug = ?', [req.params.id, req.params.id]);
     if (!rows.length) return res.status(404).json({ error: "Tur tapılmadı." });
     const tour = rowToTour(rows[0]);
 
@@ -757,14 +789,15 @@ app.post("/api/tours", authenticateUser, async (req: any, res) => {
     }
 
     const id = body.id || `tour-${randomUUID()}`;
+    const slug = await generateUniqueSlug(name, dbClient);
     const extra = splitTourBody(body);
     const status: 'approved' | 'pending_approval' = isAdmin && body.status === 'approved' ? 'approved' : 'pending_approval';
 
     await dbClient.execute(
-      `INSERT INTO tours (id, vendor_id, vendor_name, name, category, difficulty, region, duration_days, description, image, is_active, is_approved, status, pending_data, price_currency, rating, reviews_count, extra_data)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO tours (id, vendor_id, vendor_name, name, slug, category, difficulty, region, duration_days, description, image, is_active, is_approved, status, pending_data, price_currency, rating, reviews_count, extra_data)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        id, vendorId, body.vendorName || null, name, category, difficulty, region, Number(durationDays),
+        id, vendorId, body.vendorName || null, name, slug, category, difficulty, region, Number(durationDays),
         description || null, image || null,
         body.isActive === undefined ? 1 : (body.isActive ? 1 : 0),
         status === 'approved' ? 1 : 0,

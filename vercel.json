@@ -2,7 +2,7 @@
   "version": 2,
   "builds": [
     {
-      "src": "server.js",
+      "src": "dist/server.cjs",
       "use": "@vercel/node"
     },
     {
@@ -13,7 +13,15 @@
   "routes": [
     {
       "src": "/api/(.*)",
-      "dest": "server.js"
+      "dest": "dist/server.cjs"
+    },
+    {
+      "src": "/robots.txt",
+      "dest": "dist/server.cjs"
+    },
+    {
+      "src": "/sitemap.xml",
+      "dest": "dist/server.cjs"
     },
     {
       "src": "/(.*)",
@@ -21,10 +29,7 @@
     }
   ],
   "functions": {
-    "api/**/*.js": {
-      "maxDuration": 60
-    },
-    "server.js": {
+    "dist/server.cjs": {
       "maxDuration": 60
     }
   }

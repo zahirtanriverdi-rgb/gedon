@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 test('vendor can log in with valid credentials and reach the vendor portal', async ({ page }) => {
-  await page.goto('/?portal=vendor');
+  await page.goto('/vendor/login');
   await expect(page.getByText('Operator Girişi')).toBeVisible();
 
   await page.getByPlaceholder('istifadeci_adi').fill('gedekgorek');
@@ -12,7 +12,7 @@ test('vendor can log in with valid credentials and reach the vendor portal', asy
 });
 
 test('vendor login shows an error for wrong credentials', async ({ page }) => {
-  await page.goto('/?portal=vendor');
+  await page.goto('/vendor/login');
   await page.getByPlaceholder('istifadeci_adi').fill('gedekgorek');
   await page.getByPlaceholder('••••••••').fill('wrong-password');
   await page.getByRole('button', { name: 'Daxil ol' }).click();

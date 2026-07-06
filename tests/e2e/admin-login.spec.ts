@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 test('admin can log in with valid credentials and reach the admin portal', async ({ page }) => {
-  await page.goto('/?portal=admin');
+  await page.goto('/admin/login');
   await expect(page.getByText('Admin Girişi')).toBeVisible();
 
   await page.getByPlaceholder('admin@nümunə.az').fill('admin@gedekgore.az');

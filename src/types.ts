@@ -48,6 +48,9 @@ export interface ItineraryDay {
 export interface Tour {
   id: string;
   name: string;
+  // URL-friendly identifier used in /tours/:slug routes — generated once from `name` at
+  // creation time and never regenerated on edit, so shared/bookmarked links stay stable.
+  slug?: string;
   category: TourCategory;
   difficulty: TourDifficulty;
   description: string;

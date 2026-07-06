@@ -1,10 +1,20 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
+import { BrowserRouter } from 'react-router-dom';
+import { HelmetProvider } from 'react-helmet-async';
 import App from './App';
 import { LanguageProvider } from './i18n/LanguageContext';
 
 function renderApp() {
-  return render(<LanguageProvider><App /></LanguageProvider>);
+  return render(
+    <HelmetProvider>
+      <BrowserRouter>
+        <LanguageProvider>
+          <App />
+        </LanguageProvider>
+      </BrowserRouter>
+    </HelmetProvider>
+  );
 }
 
 function mockFetchByUrl(handlers: Record<string, any>) {

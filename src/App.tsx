@@ -1,4 +1,5 @@
 import React, { useState, Suspense, lazy } from 'react';
+import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { Tour, TourSlot, Booking, Review, User, PlatformConfig, PriceCalculatorConfig, UserRole } from './types';
 import { seedUsers } from './data/toursData';
 // Lazy-loaded: each portal pulls in its own heavy dependency tree (vendor forms, jspdf/
@@ -66,13 +67,9 @@ export default function App() {
     }, 4500);
   };
 
-  // Active Role State (Customer, Vendor, Admin) inside the Marketplace simulation.
-  // No client-side router is set up, so entry into the vendor/admin portals is via a
-  // `?portal=vendor` or `?portal=admin` query param read once on initial load.
-  const [selectedRole] = useState<UserRole>(() => {
-    const portal = new URLSearchParams(window.location.search).get('portal');
-    return portal === 'vendor' || portal === 'admin' ? portal : 'customer';
-  });
+  const navigate = useNavigate();
+  const location = useLocation();
+
   const [loggedInVendor, setLoggedInVendor] = useState<User | null>(null);
   // JWT from /api/auth/operator/login — kept in memory only (not localStorage), matches
   // the token's own short lifetime and is cleared on logout.
@@ -98,6 +95,19 @@ export default function App() {
     setLoggedInAdmin(null);
     setAdminToken(null);
   };
+
+  // Legacy entry points from before real routing existed (?portal=vendor / ?portal=admin
+  // query params) — redirect them to the equivalent path-based route once, on mount, so old
+  // bookmarks/links keep working instead of just landing on the plain customer homepage.
+  React.useEffect(() => {
+    const portal = new URLSearchParams(location.search).get('portal');
+    if (portal === 'vendor') {
+      navigate(loggedInVendor ? '/vendor/dashboard' : '/vendor/login', { replace: true });
+    } else if (portal === 'admin') {
+      navigate(loggedInAdmin ? '/admin/dashboard' : '/admin/login', { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Whichever role is currently logged in — server-side mutation endpoints for
   // tours/slots/bookings now require this as a Bearer token (see server.ts's
@@ -340,16 +350,16 @@ export default function App() {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Active Simulated User
-  const getActiveUser = (): User => {
-    if (selectedRole === 'vendor' && loggedInVendor) return loggedInVendor;
-    if (selectedRole === 'admin' && loggedInAdmin) return loggedInAdmin;
+  // Active Simulated User — resolved per role rather than off a single global "selectedRole"
+  // now that vendor/admin/customer are separate routes rendered independently.
+  const getActiveUserForRole = (role: UserRole): User => {
+    if (role === 'vendor' && loggedInVendor) return loggedInVendor;
+    if (role === 'admin' && loggedInAdmin) return loggedInAdmin;
     const safeUsers = Array.isArray(users) && users.length > 0 ? users : seedUsers;
-    const found = safeUsers.find(u => u.role === selectedRole);
+    const found = safeUsers.find(u => u.role === role);
     if (found) return found;
     return safeUsers[0] || seedUsers[0];
   };
-  const activeUser = getActiveUser();
 
   // Tours/slots/bookings/reviews are persisted server-side now (see loadMarketplaceData
   // above and the API-backed handlers below), so there's nothing to mirror to localStorage
@@ -430,8 +440,9 @@ export default function App() {
   };
 
   const handleUpdateUserBalance = (amount: number) => {
+    const customerUserId = getActiveUserForRole('customer').id;
     setUsers(prev => prev.map(u => {
-      if (u.id === activeUser.id) {
+      if (u.id === customerUserId) {
         return { ...u, balance: Math.max(0, u.balance + amount) };
       }
       return u;
@@ -723,23 +734,13 @@ export default function App() {
   // data that no longer exists now that tours/slots/bookings/reviews are server-backed,
   // and neither was wired up to any button in the UI.
 
-  // Once a vendor/admin is logged in, the portal takes over the full viewport with its
-  // own sidebar+topbar chrome (DashboardSidebarLayout) instead of the site's marketing
-  // header/footer — those still apply to the customer view and the pre-login screens.
-  const isDashboardMode = (selectedRole === 'vendor' && !!loggedInVendor) || (selectedRole === 'admin' && !!loggedInAdmin);
-
-  return (
-    <div
-      className="min-h-screen font-sans text-slate-700 flex flex-col justify-between"
-      id="app_root"
-      style={{
-        // Flat, uniform brand page background (--color-bg-page) — same color everywhere,
-        // not a gradient.
-        backgroundColor: 'var(--color-bg-page)',
-      }}
-    >
-      {!isDashboardMode && (
-      <>
+  // Wraps a route's content with the site's marketing header/footer chrome — shared by the
+  // customer marketplace and the pre-login vendor/admin screens (matches previous behavior:
+  // only the actual logged-in dashboards go full-viewport with no header/footer). `showCustomerNav`
+  // toggles between the full customer nav (wishlist/guide/calculator/lang) and the bare
+  // language switcher shown on the vendor/admin login screens.
+  const renderChrome = (content: React.ReactNode, showCustomerNav: boolean) => (
+    <>
       {/* Main Elegant Header — flush with the page background at scrollY 0, gains a
           border/shadow only once the user scrolls (sticky/scrolled state) */}
       <header className={`bg-white sticky top-0 z-40 min-h-[var(--header-height)] border-b transition-shadow duration-200 ${
@@ -751,7 +752,7 @@ export default function App() {
           <div className="flex items-center gap-2 cursor-pointer" onClick={() => {
             setGlobalSearchQuery('');
             setIsGlobalSearchFocused(false);
-            window.dispatchEvent(new CustomEvent('nav-home'));
+            navigate('/');
           }}>
             <div className="flex flex-col font-black text-brand-primary leading-tight text-xl tracking-tight">
               <span>GedəkGörək</span>
@@ -763,7 +764,7 @@ export default function App() {
               wraps onto its own full-width row within the header (via flex-wrap above) instead
               of floating absolutely over the page, so it can no longer overlap page content
               scrolling underneath it. Desktop keeps the original single-row inline layout. */}
-          {selectedRole === 'customer' && isScrolled && (
+          {showCustomerNav && isScrolled && (
             <div ref={globalSearchRef} className="flex order-3 w-full md:order-none md:w-auto md:flex-1 md:max-w-xl md:mx-8 animate-fadeIn">
               <div className="relative w-full bg-white shadow-sm rounded-full p-1.5 border border-slate-200 flex items-center">
                 <div className="pl-4 pr-2 flex items-center flex-1">
@@ -814,10 +815,10 @@ export default function App() {
 
           {/* Right Section */}
           <div className="flex items-center gap-1 sm:gap-2">
-            {selectedRole === 'customer' ? (
+            {showCustomerNav ? (
               <div className="flex items-center gap-1 sm:gap-2">
                 <button
-                  onClick={() => window.dispatchEvent(new CustomEvent('nav-wishlist'))}
+                  onClick={() => navigate('/wishlist')}
                   className="relative w-11 sm:w-auto sm:min-w-0 sm:px-2 h-16 sm:h-14 flex flex-col items-center justify-center gap-0.5 hover:text-emerald-600 transition group cursor-pointer bg-transparent border-none p-0"
                 >
                   <span className="relative w-11 h-8 sm:w-9 sm:h-7 flex items-center justify-center">
@@ -831,7 +832,7 @@ export default function App() {
                   <span className="hidden sm:block text-xs text-brand-text-main font-semibold">{t('app.nav.wishlist')}</span>
                 </button>
                 <button
-                  onClick={() => window.dispatchEvent(new CustomEvent('nav-faq'))}
+                  onClick={() => navigate('/faq')}
                   className="relative w-11 sm:w-auto sm:min-w-0 sm:px-2 h-16 sm:h-14 flex flex-col items-center justify-center gap-0.5 hover:text-emerald-600 transition group cursor-pointer bg-transparent border-none p-0"
                   title={t('app.nav.guideTitle')}
                 >
@@ -841,7 +842,7 @@ export default function App() {
                   <span className="hidden sm:block text-xs text-brand-text-main font-semibold whitespace-nowrap">{t('app.nav.guide')}</span>
                 </button>
                 <button
-                  onClick={() => window.dispatchEvent(new CustomEvent('nav-calculator'))}
+                  onClick={() => navigate('/calculator')}
                   className="w-11 sm:w-auto sm:min-w-0 sm:px-2 h-16 sm:h-14 flex flex-col items-center justify-center gap-0.5 hover:text-emerald-600 transition group cursor-pointer bg-transparent border-none p-0"
                 >
                   <span className="w-11 h-8 sm:w-9 sm:h-7 flex items-center justify-center">
@@ -868,25 +869,25 @@ export default function App() {
                   </button>
                   {isLangMenuOpen && (
                     <div className="absolute top-12 -right-4 w-44 bg-white border border-slate-200 shadow-xl rounded-xl overflow-hidden z-50 animate-fadeIn">
-                      <button 
+                      <button
                         className="w-full text-left px-4 py-3 text-[12px] font-semibold text-slate-700 hover:bg-slate-50 transition-colors border-b border-slate-100 flex items-center gap-2"
                         onClick={() => { setAppLanguage('az'); setDisplayCurrency('AZN'); setIsLangMenuOpen(false); }}
                       >
                         🇦🇿 Azərbaycanca (AZN)
                       </button>
-                      <button 
+                      <button
                         className="w-full text-left px-4 py-3 text-[12px] font-semibold text-slate-700 hover:bg-slate-50 transition-colors border-b border-slate-100 flex items-center gap-2"
                         onClick={() => { setAppLanguage('ru'); setDisplayCurrency('AZN'); setIsLangMenuOpen(false); }}
                       >
                         🇷🇺 Русский (AZN)
                       </button>
-                      <button 
+                      <button
                         className="w-full text-left px-4 py-3 text-[12px] font-semibold text-slate-700 hover:bg-slate-50 transition-colors border-b border-slate-100 flex items-center gap-2"
                         onClick={() => { setAppLanguage('en'); setDisplayCurrency('USD'); setIsLangMenuOpen(false); }}
                       >
                         🇬🇧 English (USD)
                       </button>
-                      <button 
+                      <button
                         className="w-full text-left px-4 py-3 text-[12px] font-semibold text-slate-700 hover:bg-slate-50 transition-colors flex items-center gap-2"
                         onClick={() => { setAppLanguage('en'); setDisplayCurrency('EUR'); setIsLangMenuOpen(false); }}
                       >
@@ -897,8 +898,8 @@ export default function App() {
                 </div>
               </div>
             ) : (
-              // Reached only pre-login (OperatorLogin/AdminLogin) — once logged in,
-              // isDashboardMode takes over and this header isn't rendered at all.
+              // Reached only on the pre-login vendor/admin screens — once logged in, those
+              // routes render VendorPortal/AdminPortal full-viewport with no header at all.
               <nav className="flex items-center gap-4">
                 <LanguageSwitcher />
               </nav>
@@ -909,70 +910,9 @@ export default function App() {
 
       {/* Main Workspace Frame */}
       <main className="max-w-[var(--global-max-width)] mx-auto px-5 py-8 flex-1 w-full space-y-6">
-        
         <div className="space-y-6 animate-fadeIn">
-
-            {isMarketplaceDataLoading && (
-              <div className="flex flex-col items-center justify-center py-24 gap-4">
-                <RefreshCw className="w-8 h-8 text-emerald-500 animate-spin" />
-                <p className="text-sm font-semibold text-slate-500">{t('app.state.marketplaceLoading')}</p>
-              </div>
-            )}
-
-            {!isMarketplaceDataLoading && marketplaceDataError && (
-              <div className="flex flex-col items-center justify-center py-24 gap-4 bg-rose-50 border border-rose-200 rounded-xl">
-                <ShieldAlert className="w-8 h-8 text-rose-500" />
-                <p className="text-sm font-semibold text-rose-700 text-center max-w-md px-4">{marketplaceDataError}</p>
-                <button
-                  onClick={loadMarketplaceData}
-                  className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg transition"
-                >
-                  {t('app.state.retry')}
-                </button>
-              </div>
-            )}
-
-            {!isMarketplaceDataLoading && !marketplaceDataError && (
-            <>
-
-            {/* Directing to respective Portal */}
-            {selectedRole === 'customer' && (
-              <Suspense fallback={<PortalLoadingFallback />}>
-              <CustomerPortal
-                tours={tours}
-                slots={slots}
-                bookings={bookings}
-                reviews={reviews}
-                users={users}
-                onAddBooking={handleAddBooking}
-                onAddReview={handleAddReview}
-                onUpdateSlotBookedCount={handleUpdateSlotBookedCount}
-                currentUser={activeUser}
-                onUpdateUserBalance={handleUpdateUserBalance}
-                onShowNotification={showNotification}
-                exchangeRates={exchangeRates}
-                searchQuery={globalSearchQuery}
-                onSearchChange={setGlobalSearchQuery}
-                displayCurrency={displayCurrency}
-                appLanguage={appLanguage}
-                priceCalculatorConfig={platformConfig.priceCalculatorConfig}
-              />
-              </Suspense>
-            )}
-
-            {selectedRole === 'vendor' && !loggedInVendor && (
-              <OperatorLogin onLogin={handleOperatorLogin} />
-            )}
-
-            {selectedRole === 'admin' && !loggedInAdmin && (
-              <AdminLogin onLogin={handleAdminLogin} />
-            )}
-
-            </>
-            )}
-
-          </div>
-
+          {content}
+        </div>
       </main>
 
       {/* Modern High Quality Footer */}
@@ -988,88 +928,187 @@ export default function App() {
           </div>
         </div>
       </footer>
-      </>
-      )}
+    </>
+  );
 
-      {isDashboardMode && (
-        <>
-          {isMarketplaceDataLoading && (
-            <div className="min-h-screen flex flex-col items-center justify-center gap-4">
-              <RefreshCw className="w-8 h-8 text-brand-primary animate-spin" />
-              <p className="text-sm font-semibold text-slate-500">{t('app.state.marketplaceLoading')}</p>
-            </div>
-          )}
+  // Loading/error state shown in place of a route's real content while marketplace data
+  // (tours/slots/bookings/reviews) is still being fetched or failed to load — 'chrome' is the
+  // compact in-page version used inside the customer/login layout, 'dashboard' is the
+  // full-viewport version used for the logged-in vendor/admin dashboards.
+  const marketplaceLoadingOrError = (variant: 'chrome' | 'dashboard'): React.ReactNode => {
+    if (isMarketplaceDataLoading) {
+      return variant === 'dashboard' ? (
+        <div className="min-h-screen flex flex-col items-center justify-center gap-4">
+          <RefreshCw className="w-8 h-8 text-brand-primary animate-spin" />
+          <p className="text-sm font-semibold text-slate-500">{t('app.state.marketplaceLoading')}</p>
+        </div>
+      ) : (
+        <div className="flex flex-col items-center justify-center py-24 gap-4">
+          <RefreshCw className="w-8 h-8 text-emerald-500 animate-spin" />
+          <p className="text-sm font-semibold text-slate-500">{t('app.state.marketplaceLoading')}</p>
+        </div>
+      );
+    }
+    if (marketplaceDataError) {
+      return variant === 'dashboard' ? (
+        <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-rose-50">
+          <ShieldAlert className="w-8 h-8 text-rose-500" />
+          <p className="text-sm font-semibold text-rose-700 text-center max-w-md px-4">{marketplaceDataError}</p>
+          <button onClick={loadMarketplaceData} className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg transition">
+            {t('app.state.retry')}
+          </button>
+        </div>
+      ) : (
+        <div className="flex flex-col items-center justify-center py-24 gap-4 bg-rose-50 border border-rose-200 rounded-xl">
+          <ShieldAlert className="w-8 h-8 text-rose-500" />
+          <p className="text-sm font-semibold text-rose-700 text-center max-w-md px-4">{marketplaceDataError}</p>
+          <button onClick={loadMarketplaceData} className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg transition">
+            {t('app.state.retry')}
+          </button>
+        </div>
+      );
+    }
+    return null;
+  };
 
-          {!isMarketplaceDataLoading && marketplaceDataError && (
-            <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-rose-50">
-              <ShieldAlert className="w-8 h-8 text-rose-500" />
-              <p className="text-sm font-semibold text-rose-700 text-center max-w-md px-4">{marketplaceDataError}</p>
-              <button
-                onClick={loadMarketplaceData}
-                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-lg transition"
-              >
-                {t('app.state.retry')}
-              </button>
-            </div>
-          )}
+  return (
+    <div
+      className="min-h-screen font-sans text-slate-700 flex flex-col justify-between"
+      id="app_root"
+      style={{
+        // Flat, uniform brand page background (--color-bg-page) — same color everywhere,
+        // not a gradient.
+        backgroundColor: 'var(--color-bg-page)',
+      }}
+    >
+      <Routes>
+        {/* Logged-in vendor/admin dashboards take over the full viewport with their own
+            sidebar+topbar chrome (DashboardSidebarLayout) instead of the site's marketing
+            header/footer — matches the old isDashboardMode behavior. */}
+        <Route
+          path="/vendor/dashboard/*"
+          element={
+            marketplaceLoadingOrError('dashboard') || (
+              loggedInVendor ? (
+                <Suspense fallback={<PortalLoadingFallback />}>
+                  <VendorPortal
+                    tours={tours}
+                    slots={slots}
+                    bookings={bookings}
+                    currentUser={getActiveUserForRole('vendor')}
+                    operatorToken={operatorToken}
+                    onAddSlot={handleAddSlot}
+                    onDeleteSlot={handleDeleteSlot}
+                    onAddTour={handleAddTour}
+                    onEditTour={handleEditTour}
+                    onDeleteTour={handleDeleteTour}
+                    onShowNotification={showNotification}
+                    onApproveBooking={handleApproveBooking}
+                    onEditBooking={handleEditBooking}
+                    onAddBooking={handleAddBooking}
+                    onUpdateSlotBookedCount={handleUpdateSlotBookedCount}
+                    exchangeRates={exchangeRates}
+                    onUpdateExchangeRates={handleUpdateExchangeRates}
+                    onToggleFeatured={handleToggleFeatured}
+                    onUserUpdated={handleVendorProfileUpdated}
+                    onLogout={handleOperatorLogout}
+                  />
+                </Suspense>
+              ) : (
+                <Navigate to="/vendor/login" replace />
+              )
+            )
+          }
+        />
 
-          {!isMarketplaceDataLoading && !marketplaceDataError && selectedRole === 'vendor' && loggedInVendor && (
-            <Suspense fallback={<PortalLoadingFallback />}>
-            <VendorPortal
-              tours={tours}
-              slots={slots}
-              bookings={bookings}
-              currentUser={activeUser}
-              operatorToken={operatorToken}
-              onAddSlot={handleAddSlot}
-              onDeleteSlot={handleDeleteSlot}
-              onAddTour={handleAddTour}
-              onEditTour={handleEditTour}
-              onDeleteTour={handleDeleteTour}
-              onShowNotification={showNotification}
-              onApproveBooking={handleApproveBooking}
-              onEditBooking={handleEditBooking}
-              onAddBooking={handleAddBooking}
-              onUpdateSlotBookedCount={handleUpdateSlotBookedCount}
-              exchangeRates={exchangeRates}
-              onUpdateExchangeRates={handleUpdateExchangeRates}
-              onToggleFeatured={handleToggleFeatured}
-              onUserUpdated={handleVendorProfileUpdated}
-              onLogout={handleOperatorLogout}
-            />
-            </Suspense>
-          )}
+        <Route
+          path="/admin/dashboard/*"
+          element={
+            marketplaceLoadingOrError('dashboard') || (
+              loggedInAdmin ? (
+                <Suspense fallback={<PortalLoadingFallback />}>
+                  <AdminPortal
+                    tours={tours}
+                    slots={slots}
+                    bookings={bookings}
+                    users={users}
+                    currentUser={getActiveUserForRole('admin')}
+                    platformConfig={platformConfig}
+                    onUpdatePriceCalculatorConfig={handleUpdatePriceCalculatorConfig}
+                    onApproveTour={handleApproveTour}
+                    onRejectTour={handleRejectTour}
+                    onEditTour={handleEditTour}
+                    onDeleteTour={handleDeleteTour}
+                    onAddSlot={handleAddSlot}
+                    onDeleteSlot={handleDeleteSlot}
+                    onShowNotification={showNotification}
+                    exchangeRates={exchangeRates}
+                    onUpdateExchangeRates={handleUpdateExchangeRates}
+                    onUpdateUser={handleUpdateUser}
+                    onCreateVendor={handleCreateVendor}
+                    onDeleteVendor={handleDeleteVendor}
+                    onUpdateTourStatus={handleUpdateTourStatus}
+                    authToken={authToken}
+                    onLogout={handleAdminLogout}
+                  />
+                </Suspense>
+              ) : (
+                <Navigate to="/admin/login" replace />
+              )
+            )
+          }
+        />
 
-          {!isMarketplaceDataLoading && !marketplaceDataError && selectedRole === 'admin' && loggedInAdmin && (
-            <Suspense fallback={<PortalLoadingFallback />}>
-            <AdminPortal
-              tours={tours}
-              slots={slots}
-              bookings={bookings}
-              users={users}
-              currentUser={activeUser}
-              platformConfig={platformConfig}
-              onUpdatePriceCalculatorConfig={handleUpdatePriceCalculatorConfig}
-              onApproveTour={handleApproveTour}
-              onRejectTour={handleRejectTour}
-              onEditTour={handleEditTour}
-              onDeleteTour={handleDeleteTour}
-              onAddSlot={handleAddSlot}
-              onDeleteSlot={handleDeleteSlot}
-              onShowNotification={showNotification}
-              exchangeRates={exchangeRates}
-              onUpdateExchangeRates={handleUpdateExchangeRates}
-              onUpdateUser={handleUpdateUser}
-              onCreateVendor={handleCreateVendor}
-              onDeleteVendor={handleDeleteVendor}
-              onUpdateTourStatus={handleUpdateTourStatus}
-              authToken={authToken}
-              onLogout={handleAdminLogout}
-            />
-            </Suspense>
+        <Route
+          path="/vendor/login"
+          element={renderChrome(
+            marketplaceLoadingOrError('chrome') || (
+              loggedInVendor ? <Navigate to="/vendor/dashboard" replace /> : <OperatorLogin onLogin={handleOperatorLogin} />
+            ),
+            false
           )}
-        </>
-      )}
+        />
+
+        <Route
+          path="/admin/login"
+          element={renderChrome(
+            marketplaceLoadingOrError('chrome') || (
+              loggedInAdmin ? <Navigate to="/admin/dashboard" replace /> : <AdminLogin onLogin={handleAdminLogin} />
+            ),
+            false
+          )}
+        />
+
+        <Route
+          path="/*"
+          element={renderChrome(
+            marketplaceLoadingOrError('chrome') || (
+              <Suspense fallback={<PortalLoadingFallback />}>
+                <CustomerPortal
+                  tours={tours}
+                  slots={slots}
+                  bookings={bookings}
+                  reviews={reviews}
+                  users={users}
+                  onAddBooking={handleAddBooking}
+                  onAddReview={handleAddReview}
+                  onUpdateSlotBookedCount={handleUpdateSlotBookedCount}
+                  currentUser={getActiveUserForRole('customer')}
+                  onUpdateUserBalance={handleUpdateUserBalance}
+                  onShowNotification={showNotification}
+                  exchangeRates={exchangeRates}
+                  searchQuery={globalSearchQuery}
+                  onSearchChange={setGlobalSearchQuery}
+                  displayCurrency={displayCurrency}
+                  appLanguage={appLanguage}
+                  priceCalculatorConfig={platformConfig.priceCalculatorConfig}
+                />
+              </Suspense>
+            ),
+            true
+          )}
+        />
+      </Routes>
 
       {/* Floating Alert Toast Notification overlay */}
       {notification && (

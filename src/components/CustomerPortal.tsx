@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
+import { Routes, Route, useLocation, useNavigate } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
 import { Tour, TourSlot, Booking, Review, User, PriceCalculatorConfig } from '../types';
 import FAQPage from './FAQPage';
-import OrganizerProfile from './OrganizerProfile';
 import { PriceCalculator } from './PriceCalculator';
 import { ImageLightbox } from './customer/ImageLightbox';
 import { WishlistView } from './customer/WishlistView';
@@ -10,6 +11,9 @@ import { ToursHomeView } from './customer/ToursHomeView';
 import { PackingListSection } from './customer/PackingListSection';
 import { TourReviewsList } from './customer/TourReviewsList';
 import { TourDetailPage } from './customer/TourDetailPage';
+import { TourDetailRoute } from './customer/TourDetailRoute';
+import { OrganizerRoute } from './customer/OrganizerRoute';
+import NotFoundPage from './NotFoundPage';
 import { getRecentSearches, addRecentSearch } from '../utils/recentSearches';
 import { getWishlist, toggleWishlist } from '../utils/wishlist';
 import { useLanguage } from '../i18n/LanguageContext';
@@ -149,9 +153,8 @@ export default function CustomerPortal({
   };
   const t = (key: keyof typeof translations.az) => translations[appLanguage]?.[key] || translations.az[key];
 
-  // Search & Filters State
-  const [activeView, setActiveView] = useState<'home' | 'faq' | 'organizer' | 'calculator' | 'wishlist'>('home');
-  const [selectedOrganizer, setSelectedOrganizer] = useState<User | null>(null);
+  const location = useLocation();
+  const navigate = useNavigate();
 
   // Wishlist ("İstəklərim") — localStorage-backed, no login required.
   const [wishlist, setWishlist] = useState<string[]>(() => getWishlist());
@@ -178,64 +181,33 @@ export default function CustomerPortal({
     return () => document.removeEventListener('mousedown', handleClickOutsideSearch);
   }, []);
 
+  // Route-driven replacement for the old "nav-home" custom event: whenever the user actually
+  // lands back on the home route (logo click -> navigate('/'), or the browser back button),
+  // fully reset search + filters so it's a genuinely blank homepage state, not just the view —
+  // otherwise a stale query/filter combo from before stays applied to the tour list underneath.
+  // Keyed on pathname so it only re-fires when the route actually changes to '/', not on every
+  // render while already there.
+  const isHomeRoute = location.pathname === '/';
   React.useEffect(() => {
-    const handleNavHome = () => {
-      setActiveView('home');
-      setSelectedTour(null);
-      setSelectedOrganizer(null);
-
-      // Fully reset search + filters so the logo click returns to a genuinely blank
-      // homepage state, not just the view — otherwise a stale query/filter combo from
-      // before stays applied to the (now invisible) tour list underneath.
-      setLocalSearchQuery('');
-      if (onSearchChange) onSearchChange('');
-      setIsSearchFocused(false);
-      setSelectedCategory('all');
-      setSelectedDifficulty('all');
-      setSelectedRegion('all');
-      setSelectedMonth('');
-      setSortBy('default');
-      setCalendarDateStart('');
-      setCalendarDateEnd('');
-      setShowCalendarWidget(false);
-      setIsFiltersExpanded(false);
-
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    };
-    window.addEventListener('nav-home', handleNavHome);
-    return () => window.removeEventListener('nav-home', handleNavHome);
-  }, []);
+    if (!isHomeRoute) return;
+    setLocalSearchQuery('');
+    if (onSearchChange) onSearchChange('');
+    setIsSearchFocused(false);
+    setSelectedCategory('all');
+    setSelectedDifficulty('all');
+    setSelectedRegion('all');
+    setSelectedMonth('');
+    setSortBy('default');
+    setCalendarDateStart('');
+    setCalendarDateEnd('');
+    setShowCalendarWidget(false);
+    setIsFiltersExpanded(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname]);
 
   React.useEffect(() => {
-    const handleNavWishlist = () => {
-      setActiveView('wishlist');
-      setSelectedTour(null);
-      setSelectedOrganizer(null);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    };
-    window.addEventListener('nav-wishlist', handleNavWishlist);
-    return () => window.removeEventListener('nav-wishlist', handleNavWishlist);
-  }, []);
-
-  React.useEffect(() => {
-    const handleNavCalculator = () => {
-      setActiveView('calculator');
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    };
-    window.addEventListener('nav-calculator', handleNavCalculator);
-    return () => window.removeEventListener('nav-calculator', handleNavCalculator);
-  }, []);
-
-  React.useEffect(() => {
-    const handleNavFaq = () => {
-      setActiveView('faq');
-      setSelectedTour(null);
-      setSelectedOrganizer(null);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    };
-    window.addEventListener('nav-faq', handleNavFaq);
-    return () => window.removeEventListener('nav-faq', handleNavFaq);
-  }, []);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [location.pathname]);
 
   // Use prop if provided, else use local state
   const currentSearchQuery = onSearchChange ? searchQuery : localSearchQuery;
@@ -293,42 +265,15 @@ export default function CustomerPortal({
     };
   }, [showCalendarWidget]);
 
-  // Selected Tour for details modal
-  const [selectedTour, setSelectedTour] = useState<Tour | null>(null);
+  // Lightbox index is shared across whichever TourDetailPage instance is currently mounted
+  // (the routed /tours/:slug page or the quick-book modal below) — each owns its own
+  // ImageLightbox render fed with its own known tour.
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
   // Tour opened via the home page's quick "WhatsApp ilə Rezerv et" card button — shown as a
-  // popup over the current page (unlike selectedTour, which replaces it) and jumps straight
-  // to the booking/OTP step instead of the gallery/description view.
+  // popup over the current page (unlike navigating to /tours/:slug, which replaces it) and
+  // jumps straight to the booking/OTP step instead of the gallery/description view.
   const [quickBookTour, setQuickBookTour] = useState<Tour | null>(null);
-
-  // Handle dynamic routing for tours based on URL
-  React.useEffect(() => {
-    const handlePopState = () => {
-      const path = window.location.pathname;
-      if (path.startsWith('/tours/')) {
-        const id = path.split('/tours/')[1];
-        const tour = tours.find(t => t.id === id && t.status === 'approved');
-        if (tour) {
-          setSelectedTour(tour);
-        } else {
-          setSelectedTour(null);
-        }
-      } else {
-        setSelectedTour(null);
-      }
-    };
-
-    // Check path on initial mount
-    // Note: Due to React strict mode this might fire twice, but that's harmless.
-    const _initialCheck = setTimeout(handlePopState, 0);
-
-    window.addEventListener('popstate', handlePopState);
-    return () => {
-      clearTimeout(_initialCheck);
-      window.removeEventListener('popstate', handlePopState);
-    };
-  }, [tours]);
 
   // AI Smart packing states
   const [packingExperienceMap, setPackingExperienceMap] = useState<Record<string, 'beginner' | 'pro' | null>>({});
@@ -700,126 +645,134 @@ export default function CustomerPortal({
 
   return (
     <>
-      {activeView === 'calculator' && (
-        <div className="bg-slate-50 min-h-screen">
-          <PriceCalculator onBack={() => setActiveView('home')} config={priceCalculatorConfig} />
-        </div>
-      )}
-
-      {activeView === 'faq' && (
-        <FAQPage onBack={() => setActiveView('home')} />
-      )}
-      
-      {activeView === 'organizer' && selectedOrganizer && (
-        <OrganizerProfile 
-          organizer={selectedOrganizer} 
-          tours={tours} 
-          onBack={() => {
-            setActiveView('home');
-            setSelectedOrganizer(null);
-          }} 
-          onTourClick={(tour) => setSelectedTour(tour)}
+      <Routes>
+        <Route
+          path="/"
+          element={
+            <>
+              <Helmet>
+                <title>GədəkGörək Marketplace | Azərbaycanda Turlar və Aktiv İstirahət</title>
+                <meta
+                  name="description"
+                  content="Azərbaycanın ən yaxşı hiking, kamp, zirvə və xarici turlarını kəşf edin — GədəkGörək ilə asanlıqla rezerv edin."
+                />
+              </Helmet>
+              <ToursHomeView
+                tours={tours}
+                slots={slots}
+                bookings={bookings}
+                reviews={reviews}
+                currentUser={currentUser}
+                onAddReview={onAddReview}
+                wishlist={wishlist}
+                t={t}
+                currentSearchQuery={currentSearchQuery}
+                handleSearchChange={handleSearchChange}
+                isSearchFocused={isSearchFocused}
+                setIsSearchFocused={setIsSearchFocused}
+                searchContainerRef={searchContainerRef}
+                recentSearches={recentSearches}
+                recordSearch={recordSearch}
+                appLanguage={appLanguage}
+                selectedCategory={selectedCategory}
+                setSelectedCategory={setSelectedCategory}
+                selectedDifficulty={selectedDifficulty}
+                setSelectedDifficulty={setSelectedDifficulty}
+                selectedRegion={selectedRegion}
+                setSelectedRegion={setSelectedRegion}
+                maxPrice={maxPrice}
+                setMaxPrice={setMaxPrice}
+                maxPriceLimit={maxPriceLimit}
+                isFiltersExpanded={isFiltersExpanded}
+                setIsFiltersExpanded={setIsFiltersExpanded}
+                uniqueRegions={uniqueRegions}
+                showCalendarWidget={showCalendarWidget}
+                setShowCalendarWidget={setShowCalendarWidget}
+                calendarDateStart={calendarDateStart}
+                calendarDateEnd={calendarDateEnd}
+                setCalendarDateStart={setCalendarDateStart}
+                setCalendarDateEnd={setCalendarDateEnd}
+                calendarContainerRef={calendarContainerRef}
+                currentMonthView={currentMonthView}
+                monthNames={monthNames}
+                handleCalendarPrevMonth={handleCalendarPrevMonth}
+                handleCalendarNextMonth={handleCalendarNextMonth}
+                handleCalendarDayClick={handleCalendarDayClick}
+                sortBy={sortBy}
+                setSortBy={setSortBy}
+                uniqueUpcomingTours={uniqueUpcomingTours}
+                upcomingScrollLeft={upcomingScrollLeft}
+                setUpcomingScrollLeft={setUpcomingScrollLeft}
+                handleToggleWishlist={handleToggleWishlist}
+                getConvertedPriceInfo={getConvertedPriceInfo}
+                sortedAndFilteredTours={sortedAndFilteredTours}
+                getTourMonths={getTourMonths}
+                getAverageRating={getAverageRating}
+                getReviewsCount={getReviewsCount}
+                handleShareTour={handleShareTour}
+                handleQuickWhatsApp={handleQuickWhatsApp}
+                onSelectTour={(tour) => navigate(`/tours/${tour.slug || tour.id}`)}
+                setActiveView={() => {}}
+              />
+            </>
+          }
         />
-      )}
 
-      {activeView === 'wishlist' && (
-        <WishlistView
-          wishlistTours={wishlistTours}
-          onBack={() => setActiveView('home')}
-          onSelectTour={(tour) => { setSelectedTour(tour); setActiveView('home'); }}
-          onToggleWishlist={handleToggleWishlist}
+        <Route
+          path="/tours/:slug"
+          element={
+            <TourDetailRoute
+              tours={tours}
+              slots={slots}
+              reviews={reviews}
+              users={users}
+              wishlist={wishlist}
+              currentUser={currentUser}
+              onAddBooking={onAddBooking}
+              onShowNotification={onShowNotification}
+              getConvertedPriceInfo={getConvertedPriceInfo}
+              getReviewsCount={getReviewsCount}
+              handleShareTour={handleShareTour}
+              handleToggleWishlist={handleToggleWishlist}
+              lightboxIndex={lightboxIndex}
+              setLightboxIndex={setLightboxIndex}
+              packingExperienceMap={packingExperienceMap}
+              packingAnalyzingMap={packingAnalyzingMap}
+              packingAiResultMap={packingAiResultMap}
+              checkedPackingItems={checkedPackingItems}
+              handlePackingExperienceSelect={handlePackingExperienceSelect}
+              togglePackingItemChecked={togglePackingItemChecked}
+            />
+          }
         />
-      )}
 
-      {activeView === 'home' && !selectedTour && (
-        <ToursHomeView
-          tours={tours}
-          slots={slots}
-          bookings={bookings}
-          reviews={reviews}
-          currentUser={currentUser}
-          onAddReview={onAddReview}
-          wishlist={wishlist}
-          t={t}
-          currentSearchQuery={currentSearchQuery}
-          handleSearchChange={handleSearchChange}
-          isSearchFocused={isSearchFocused}
-          setIsSearchFocused={setIsSearchFocused}
-          searchContainerRef={searchContainerRef}
-          recentSearches={recentSearches}
-          recordSearch={recordSearch}
-          appLanguage={appLanguage}
-          selectedCategory={selectedCategory}
-          setSelectedCategory={setSelectedCategory}
-          selectedDifficulty={selectedDifficulty}
-          setSelectedDifficulty={setSelectedDifficulty}
-          selectedRegion={selectedRegion}
-          setSelectedRegion={setSelectedRegion}
-          maxPrice={maxPrice}
-          setMaxPrice={setMaxPrice}
-          maxPriceLimit={maxPriceLimit}
-          isFiltersExpanded={isFiltersExpanded}
-          setIsFiltersExpanded={setIsFiltersExpanded}
-          uniqueRegions={uniqueRegions}
-          showCalendarWidget={showCalendarWidget}
-          setShowCalendarWidget={setShowCalendarWidget}
-          calendarDateStart={calendarDateStart}
-          calendarDateEnd={calendarDateEnd}
-          setCalendarDateStart={setCalendarDateStart}
-          setCalendarDateEnd={setCalendarDateEnd}
-          calendarContainerRef={calendarContainerRef}
-          currentMonthView={currentMonthView}
-          monthNames={monthNames}
-          handleCalendarPrevMonth={handleCalendarPrevMonth}
-          handleCalendarNextMonth={handleCalendarNextMonth}
-          handleCalendarDayClick={handleCalendarDayClick}
-          sortBy={sortBy}
-          setSortBy={setSortBy}
-          uniqueUpcomingTours={uniqueUpcomingTours}
-          upcomingScrollLeft={upcomingScrollLeft}
-          setUpcomingScrollLeft={setUpcomingScrollLeft}
-          handleToggleWishlist={handleToggleWishlist}
-          getConvertedPriceInfo={getConvertedPriceInfo}
-          sortedAndFilteredTours={sortedAndFilteredTours}
-          getTourMonths={getTourMonths}
-          getAverageRating={getAverageRating}
-          getReviewsCount={getReviewsCount}
-          handleShareTour={handleShareTour}
-          handleQuickWhatsApp={handleQuickWhatsApp}
-          onSelectTour={(tour) => setSelectedTour(tour)}
-          setActiveView={setActiveView}
-        />
-      )}
+        <Route path="/faq" element={<FAQPage onBack={() => navigate('/')} />} />
 
-      {/* DETAILED TOUR PAGE (Full Page Dynamic Route) */}
-      {activeView === 'home' && selectedTour && (
-        <TourDetailPage
-          key={selectedTour.id}
-          selectedTour={selectedTour}
-          tours={tours}
-          slots={slots}
-          reviews={reviews}
-          users={users}
-          wishlist={wishlist}
-          currentUser={currentUser}
-          onAddBooking={onAddBooking}
-          onShowNotification={onShowNotification}
-          getConvertedPriceInfo={getConvertedPriceInfo}
-          getReviewsCount={getReviewsCount}
-          handleShareTour={handleShareTour}
-          handleToggleWishlist={handleToggleWishlist}
-          setActiveView={setActiveView}
-          setSelectedOrganizer={setSelectedOrganizer}
-          setSelectedTour={setSelectedTour}
-          setLightboxIndex={setLightboxIndex}
-          packingExperienceMap={packingExperienceMap}
-          packingAnalyzingMap={packingAnalyzingMap}
-          packingAiResultMap={packingAiResultMap}
-          checkedPackingItems={checkedPackingItems}
-          handlePackingExperienceSelect={handlePackingExperienceSelect}
-          togglePackingItemChecked={togglePackingItemChecked}
+        <Route
+          path="/calculator"
+          element={
+            <div className="bg-slate-50 min-h-screen">
+              <PriceCalculator onBack={() => navigate('/')} config={priceCalculatorConfig} />
+            </div>
+          }
         />
-      )}
+
+        <Route
+          path="/wishlist"
+          element={
+            <WishlistView
+              wishlistTours={wishlistTours}
+              onBack={() => navigate('/')}
+              onSelectTour={(tour) => navigate(`/tours/${tour.slug || tour.id}`)}
+              onToggleWishlist={handleToggleWishlist}
+            />
+          }
+        />
+
+        <Route path="/organizer/:vendorId" element={<OrganizerRoute users={users} tours={tours} />} />
+
+        <Route path="*" element={<NotFoundPage />} />
+      </Routes>
 
       {/* Quick "WhatsApp ilə Rezerv et" popup — same TourDetailPage/booking/OTP flow as the full
           page, just opened as an overlay so the home page underneath stays put. */}
@@ -850,8 +803,13 @@ export default function CustomerPortal({
                 getReviewsCount={getReviewsCount}
                 handleShareTour={handleShareTour}
                 handleToggleWishlist={handleToggleWishlist}
-                setActiveView={setActiveView}
-                setSelectedOrganizer={setSelectedOrganizer}
+                setActiveView={() => {}}
+                setSelectedOrganizer={(organizer) => {
+                  if (organizer) {
+                    setQuickBookTour(null);
+                    navigate(`/organizer/${organizer.id}`);
+                  }
+                }}
                 setSelectedTour={() => setQuickBookTour(null)}
                 setLightboxIndex={setLightboxIndex}
                 packingExperienceMap={packingExperienceMap}
@@ -864,10 +822,9 @@ export default function CustomerPortal({
               />
             </div>
           </div>
+          <ImageLightbox tour={quickBookTour} lightboxIndex={lightboxIndex} onSetLightboxIndex={setLightboxIndex} />
         </div>
       )}
-
-      <ImageLightbox tour={selectedTour} lightboxIndex={lightboxIndex} onSetLightboxIndex={setLightboxIndex} />
     </>
   );
 }

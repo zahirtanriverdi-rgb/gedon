@@ -19,6 +19,12 @@ export const common = {
       required: 'Məcburidir',
       optional: 'İstəyə bağlı',
     },
+    notFoundPage: {
+      title: 'Səhifə tapılmadı',
+      heading: 'Səhifə tapılmadı',
+      description: 'Axtardığınız səhifə mövcud deyil, silinib və ya köçürülüb.',
+      backHome: 'Ana səhifəyə qayıt',
+    },
   },
   en: {
     common: {
@@ -39,6 +45,12 @@ export const common = {
       required: 'Required',
       optional: 'Optional',
     },
+    notFoundPage: {
+      title: 'Page not found',
+      heading: 'Page not found',
+      description: 'The page you are looking for doesn\'t exist, was removed, or moved.',
+      backHome: 'Back to home',
+    },
   },
   ru: {
     common: {
@@ -58,6 +70,12 @@ export const common = {
       viewAll: 'Смотреть все',
       required: 'Обязательно',
       optional: 'Необязательно',
+    },
+    notFoundPage: {
+      title: 'Страница не найдена',
+      heading: 'Страница не найдена',
+      description: 'Страница, которую вы ищете, не существует, была удалена или перемещена.',
+      backHome: 'Вернуться на главную',
     },
   },
 };

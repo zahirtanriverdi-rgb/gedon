@@ -5,6 +5,7 @@ import { DatabaseSync } from 'node:sqlite';
 import bcrypt from 'bcryptjs';
 import { seedUsers, seedTours, seedTourSlots } from '../src/data/toursData';
 import type { Tour } from '../src/types';
+import { generateUniqueSlug } from './slugify';
 
 // This abstracts the database layer, allowing seamless transition from Local SQLite to Production PostgreSQL.
 export interface DBClient {
@@ -170,6 +171,22 @@ export async function initializeDatabase() {
     `UPDATE tours SET status = 'pending_approval' WHERE status IS NULL`
   );
 
+  // Migration for databases created before `slug` existed — URL-friendly identifier used in
+  // /tours/:slug routes. Backfill runs on every startup but only touches rows that don't have
+  // one yet; the unique index is created afterwards so it never trips over the transient
+  // all-NULL state on a fresh ALTER TABLE.
+  try {
+    await dbClient.execute(`ALTER TABLE tours ADD COLUMN slug VARCHAR(255)`);
+  } catch {
+    // column already exists — safe to ignore
+  }
+  const slugless = await dbClient.query(`SELECT id, name FROM tours WHERE slug IS NULL OR slug = ''`);
+  for (const row of slugless) {
+    const slug = await generateUniqueSlug(row.name, dbClient, row.id);
+    await dbClient.execute(`UPDATE tours SET slug = ? WHERE id = ?`, [slug, row.id]);
+  }
+  await dbClient.execute(`CREATE UNIQUE INDEX IF NOT EXISTS idx_tours_slug ON tours(slug)`);
+
   // Tour Slots (Scheduling)
   await dbClient.execute(`
     CREATE TABLE IF NOT EXISTS tour_slots (
@@ -275,14 +292,15 @@ async function seedIfEmpty() {
     const {
       id, vendorId, vendorName, name, category, difficulty, region, durationDays,
       description, image, isActive, isApproved, priceCurrency, rating, reviewsCount,
-      ...extra
+      slug: _seedSlug, ...extra
     } = tour;
     const status = isApproved ? 'approved' : 'pending_approval';
+    const slug = await generateUniqueSlug(name, dbClient);
     await dbClient.execute(
-      `INSERT INTO tours (id, vendor_id, vendor_name, name, category, difficulty, region, duration_days, description, image, is_active, is_approved, status, price_currency, rating, reviews_count, extra_data)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO tours (id, vendor_id, vendor_name, name, slug, category, difficulty, region, duration_days, description, image, is_active, is_approved, status, price_currency, rating, reviews_count, extra_data)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        id, vendorId, vendorName || null, name, category, difficulty, region, Number(durationDays),
+        id, vendorId, vendorName || null, name, slug, category, difficulty, region, Number(durationDays),
         description || null, image || null,
         isActive === false ? 0 : 1, isApproved ? 1 : 0, status, priceCurrency || 'AZN',
         Number(rating) || 0, Number(reviewsCount) || 0, JSON.stringify(extra)
