@@ -12,3 +12,4 @@ database.sqlite
 /data/whatsapp-auth
 .claude/settings.local.json
 .claude/scheduled_tasks.lock
+.vercel
