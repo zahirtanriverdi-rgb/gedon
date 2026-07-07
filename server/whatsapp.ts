@@ -1,7 +1,8 @@
 import fs from "fs";
 import path from "path";
 import { randomUUID } from "crypto";
-import makeWASocket, {
+import {
+  makeWASocket,
   useMultiFileAuthState,
   fetchLatestBaileysVersion,
   DisconnectReason,
