@@ -19,7 +19,7 @@ import { ReviewSubmissionPanel } from './ReviewSubmissionPanel';
 import { computeFeaturedTourIds } from '../../utils/featuredTours';
 import { useLanguage } from '../../i18n/LanguageContext';
 import { getLocalizedTourName, getLocalizedTourDescription } from '../../i18n/tourLocalization';
-import { parseStoredGpxData, estimateHikingHours } from '../../utils/gpxParser';
+import { parseStoredGpxData, getRouteDurationHours } from '../../utils/gpxParser';
 import { TourStatsRow } from '../tours/TourStatsRow';
 import { matchesHikingSubcategory, HIKING_SUBCATEGORIES, HikingSubcategory } from '../../utils/hikingSubcategories';
 
@@ -698,7 +698,7 @@ export function ToursHomeView({
             // GPX-backed tours show the actual on-trail hiking time (estimated from the real
             // track), not the manually-entered trip-wide duration used elsewhere on the card.
             const routeDurationLabel = parsedGpx
-              ? `${estimateHikingHours(parsedGpx.stats)} ${tt('miscWidgets.tourRouteStatsCard.hours')}`
+              ? `${getRouteDurationHours(parsedGpx)} ${tt('miscWidgets.tourRouteStatsCard.hours')}`
               : tour.durationHours
                 ? `${tour.durationHours} ${tt('miscWidgets.tourRouteStatsCard.hours')}`
                 : `${tour.durationDays} ${tt('miscWidgets.tourRouteStatsCard.days')}`;

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Star } from 'lucide-react';
-import { ParsedGpxRoute } from '../../utils/gpxParser';
+import { ParsedGpxRoute, isRoundTripRoute } from '../../utils/gpxParser';
 import { RouteSparkline } from './RouteSparkline';
 import { useLanguage } from '../../i18n/LanguageContext';
 
@@ -11,6 +11,9 @@ interface TourRouteStatsCardProps {
   difficultyBarColorClass: string;
   difficultyPercent: number;
   ratingValue: number;
+  // The single-line stats row is too narrow on the compact grid card to fit "(gediş-dönüş)"
+  // without clipping the duration next to it — only show it where there's room (tour detail page).
+  showRoundTripNote?: boolean;
 }
 
 export const TourRouteStatsCard: React.FC<TourRouteStatsCardProps> = ({
@@ -20,18 +23,29 @@ export const TourRouteStatsCard: React.FC<TourRouteStatsCardProps> = ({
   difficultyBarColorClass,
   difficultyPercent,
   ratingValue,
+  showRoundTripNote = true,
 }) => {
   const { t } = useLanguage();
+  const roundTrip = showRoundTripNote && isRoundTripRoute(parsed);
 
   return (
     <div className="flex items-stretch gap-3">
       <div className="flex-1 min-w-0 flex flex-col justify-between gap-2">
-        <div className="flex items-center gap-1.5 text-xs font-extrabold text-label-primary leading-tight whitespace-nowrap overflow-hidden">
-          <span>{parsed.stats.distanceKm} km</span>
+        <div
+          className={`flex items-center gap-1.5 text-xs font-extrabold text-label-primary leading-tight overflow-hidden ${
+            roundTrip ? 'flex-wrap' : 'whitespace-nowrap'
+          }`}
+        >
+          <span className="whitespace-nowrap">
+            {parsed.stats.distanceKm} km
+            {roundTrip && (
+              <span className="font-medium text-label-tertiary"> ({t('miscWidgets.tourRouteStatsCard.roundTrip')})</span>
+            )}
+          </span>
           <span className="text-label-tertiary font-medium">•</span>
-          <span>{parsed.stats.elevationGainM} m</span>
+          <span className="whitespace-nowrap">{parsed.stats.elevationGainM} m</span>
           <span className="text-label-tertiary font-medium">•</span>
-          <span>{durationLabel}</span>
+          <span className="whitespace-nowrap">{durationLabel}</span>
         </div>
 
         <div className="flex items-end justify-between gap-3">

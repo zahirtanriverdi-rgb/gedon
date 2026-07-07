@@ -47,6 +47,7 @@ export const TourStatsRow: React.FC<TourStatsRowProps> = ({
           difficultyBarColorClass={difficultyBarColorClass}
           difficultyPercent={difficultyPercent}
           ratingValue={ratingValue}
+          showRoundTripNote={false}
         />
       </div>
     );

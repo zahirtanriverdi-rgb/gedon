@@ -26,7 +26,7 @@ import { TourWeatherForecast } from '../TourWeatherForecast';
 import { GpsTrackVisualizer } from '../GpsTrackVisualizer';
 import { PackingListSection } from './PackingListSection';
 import { TourReviewsList } from './TourReviewsList';
-import { parseStoredGpxData, estimateHikingHours } from '../../utils/gpxParser';
+import { parseStoredGpxData, getRouteDurationHours } from '../../utils/gpxParser';
 import { TourRouteStatsCard } from '../tours/TourRouteStatsCard';
 
 type ConvertedPriceInfo = {
@@ -1451,7 +1451,7 @@ export function TourDetailPage({
 
                     // Actual on-trail hiking time estimated from the real GPX track, not the
                     // manually-entered trip-wide duration (which includes transport/rest days).
-                    const durationLabel = `${estimateHikingHours(parsedGpx.stats)} ${t('miscWidgets.tourRouteStatsCard.hours')}`;
+                    const durationLabel = `${getRouteDurationHours(parsedGpx)} ${t('miscWidgets.tourRouteStatsCard.hours')}`;
 
                     return (
                       <div className="border border-slate-200 rounded-2xl p-4 bg-white shadow-sm">

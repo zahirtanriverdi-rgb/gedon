@@ -12,6 +12,10 @@ export interface ParsedGpxRoute {
     lowestPointM: number;
     elevationGainM: number;
     elevationLossM: number;
+    // Real elapsed time between the first and last recorded trackpoint timestamps
+    // (i.e. total trip time including any stops), when the GPX file has <time> tags.
+    // Undefined for KML or GPX files without timestamps.
+    totalTimeHours?: number;
   };
 }
 
@@ -44,9 +48,10 @@ export function parseGpsFile(fileName: string, xmlText: string): ParsedGpxRoute 
   const parser = new DOMParser();
   const xmlDoc = parser.parseFromString(xmlText, 'text/xml');
   const points: [number, number, number][] = [];
+  const trackTimestamps: number[] = [];
 
   const lowerName = fileName.toLowerCase();
-  
+
   if (lowerName.endsWith('.kml') || xmlText.includes('<kml') || xmlText.includes('<Placemark')) {
     // Parse KML
     const coordNodes = xmlDoc.getElementsByTagName('coordinates');
@@ -77,9 +82,15 @@ export function parseGpsFile(fileName: string, xmlText: string): ParsedGpxRoute 
         const lon = parseFloat(trkpt.getAttribute('lon') || '');
         const eleNode = trkpt.getElementsByTagName('ele')[0];
         const ele = eleNode ? parseFloat(eleNode.textContent || '0') : 0;
-        
+
         if (!isNaN(lat) && !isNaN(lon)) {
           points.push([lat, lon, isNaN(ele) ? 0 : ele]);
+        }
+
+        const timeNode = trkpt.getElementsByTagName('time')[0];
+        if (timeNode?.textContent) {
+          const ts = Date.parse(timeNode.textContent);
+          if (!isNaN(ts)) trackTimestamps.push(ts);
         }
       }
     } else {
@@ -144,6 +155,14 @@ export function parseGpsFile(fileName: string, xmlText: string): ParsedGpxRoute 
     finalPoints.push(points[points.length - 1]); // Always keep end point
   }
 
+  // Total elapsed time (not just moving time) between the first and last timestamped
+  // trackpoint — only meaningful if every point actually carried a <time> tag.
+  let totalTimeHours: number | undefined;
+  if (trackTimestamps.length === points.length && trackTimestamps.length > 1) {
+    const elapsedMs = trackTimestamps[trackTimestamps.length - 1] - trackTimestamps[0];
+    if (elapsedMs > 0) totalTimeHours = parseFloat((elapsedMs / 3_600_000).toFixed(2));
+  }
+
   return {
     fileName,
     points: finalPoints,
@@ -153,6 +172,7 @@ export function parseGpsFile(fileName: string, xmlText: string): ParsedGpxRoute 
       lowestPointM: Math.round(lowestPoint),
       elevationGainM: Math.round(elevationGain),
       elevationLossM: Math.round(elevationLoss),
+      ...(totalTimeHours !== undefined ? { totalTimeHours } : {}),
     },
   };
 }
@@ -166,6 +186,34 @@ export function parseGpsFile(fileName: string, xmlText: string): ParsedGpxRoute 
 export function estimateHikingHours(stats: ParsedGpxRoute['stats']): number {
   const rawHours = stats.distanceKm / 5 + stats.elevationGainM / 600;
   return Math.max(1, Math.round(rawHours * 2) / 2);
+}
+
+/**
+ * Returns the tour card's displayed duration for a GPX-backed route: the real total
+ * elapsed time recorded in the GPX (start-to-finish, including any stops — not just
+ * moving time) when the file has timestamps, otherwise falls back to the Naismith
+ * estimate above.
+ */
+export function getRouteDurationHours(parsed: ParsedGpxRoute): number {
+  if (parsed.stats.totalTimeHours !== undefined) {
+    return Math.max(0.5, Math.round(parsed.stats.totalTimeHours * 2) / 2);
+  }
+  return estimateHikingHours(parsed.stats);
+}
+
+/**
+ * Detects an out-and-back / circular route: the hiker ends up back near their starting
+ * point, so the recorded `distanceKm` already covers the full there-and-back distance
+ * rather than a one-way point-to-point trip (e.g. village A to village B). Compares the
+ * straight-line gap between the first and last point against the total recorded distance
+ * — a small gap relative to the total means the track loops back on itself.
+ */
+export function isRoundTripRoute(parsed: ParsedGpxRoute): boolean {
+  const first = parsed.points[0];
+  const last = parsed.points[parsed.points.length - 1];
+  if (!first || !last || parsed.stats.distanceKm <= 0) return false;
+  const gapKm = calculateHaversineDistance(first[0], first[1], last[0], last[1]);
+  return gapKm / parsed.stats.distanceKm < 0.15;
 }
 
 /**

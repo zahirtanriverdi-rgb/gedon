@@ -63,6 +63,7 @@ export const miscWidgets = {
         rating: 'Reytinq',
         days: 'gün',
         hours: 'saat',
+        roundTrip: 'gediş-dönüş',
       },
       tourStatsRow: {
         nights: '{{count}} gecə',
@@ -203,6 +204,7 @@ export const miscWidgets = {
         rating: 'Rating',
         days: 'days',
         hours: 'h',
+        roundTrip: 'round trip',
       },
       tourStatsRow: {
         nights: '{{count}} nights',
@@ -343,6 +345,7 @@ export const miscWidgets = {
         rating: 'Рейтинг',
         days: 'дн.',
         hours: 'ч.',
+        roundTrip: 'туда-обратно',
       },
       tourStatsRow: {
         nights: '{{count}} ночей',
