@@ -25,7 +25,7 @@ import {
 const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
-// CORS tənzimləməsi
+// CORS aktiv edilir
 app.use(cors());
 
 // Lazy initialize GoogleGenAI client
@@ -48,10 +48,10 @@ function getGeminiClient(): GoogleGenAI {
   return aiClient;
 }
 
-// Body parser (raised limit for base64 images/GPX data)
+// Body parser
 app.use(express.json({ limit: '50mb' }));
 
-// Malformed JSON error handler
+// Malformed JSON handler
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
   if (err instanceof SyntaxError && 'body' in err) {
     return res.status(400).json({ error: "Göndərilən məlumat düzgün formatda deyil (JSON parse xətası)." });
@@ -118,8 +118,7 @@ function verifyPasswordAndIssueToken(user: any, password: string): { token: stri
   return { token };
 }
 
-// ==================== API ROUTES (Bütün API-lar yuxarıda olmalıdır) ====================
-
+// ADMIN LOGIN
 app.post("/api/auth/admin/login", async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) {
@@ -132,10 +131,11 @@ app.post("/api/auth/admin/login", async (req, res) => {
     if (!auth) return res.status(401).json({ error: "E-poçt və ya şifrə yanlışdır!" });
     return res.json({ success: true, token: auth.token, user: rowToUser(user) });
   } catch (error: any) {
-    return res.status(500).json({ error: "Giriş xətası: " + error.message });
+    return res.status(500).json({ error: "Giriş zamanı server xətası baş verdi: " + error.message });
   }
 });
 
+// OPERATOR LOGIN
 app.post("/api/auth/operator/login", async (req, res) => {
   const { identifier, password } = req.body;
   if (!identifier || !password) {
@@ -151,22 +151,38 @@ app.post("/api/auth/operator/login", async (req, res) => {
     if (!auth) return res.status(401).json({ error: "İstifadəçi adı/e-poçt və ya şifrə yanlışdır!" });
     return res.json({ success: true, token: auth.token, user: rowToUser(user) });
   } catch (error: any) {
-    return res.status(500).json({ error: "Giriş xətası: " + error.message });
+    return res.status(500).json({ error: "Giriş zamanı server xətası baş verdi: " + error.message });
   }
 });
 
+// CREATE VENDOR
 app.post("/api/admin/vendors", authenticateUser, async (req: any, res) => {
-  if (req.operator.role !== 'admin') return res.status(403).json({ error: "İcazə yoxdur." });
+  if (req.operator.role !== 'admin') {
+    return res.status(403).json({ error: "Yalnız adminlər yeni operator hesabı yarada bilər." });
+  }
   try {
     const { companyName, login, password } = req.body || {};
-    if (!companyName || !login || !password) return res.status(400).json({ error: "Məlumatlar əskikdir." });
+    if (!companyName || !login || !password) {
+      return res.status(400).json({ error: "Şirkət adı, login və ilkin parol tələb olunur." });
+    }
+    if (String(password).length < 6) {
+      return res.status(400).json({ error: "Parol ən azı 6 simvol olmalıdır." });
+    }
     const trimmedLogin = String(login).trim();
     const isEmailLogin = trimmedLogin.includes('@');
     const email = isEmailLogin ? trimmedLogin : `${trimmedLogin.toLowerCase().replace(/[^a-z0-9._-]/g, '')}@vendor.gedekgorek.local`;
     const username = isEmailLogin ? null : trimmedLogin;
 
+    const existing = await dbClient.query(
+      `SELECT id FROM users WHERE email = ? OR (username IS NOT NULL AND username = ?)`,
+      [email, trimmedLogin]
+    );
+    if (existing.length > 0) {
+      return res.status(409).json({ error: "Bu login artıq istifadə olunur. Zəhmət olmasa başqa login seçin." });
+    }
     const passwordHash = await bcrypt.hash(String(password), 10);
     const id = `user-${randomUUID()}`;
+
     await dbClient.execute(
       `INSERT INTO users (id, name, email, username, password_hash, role, phone, company_name, balance, created_at) VALUES (?, ?, ?, ?, ?, 'vendor', '', ?, 0, CURRENT_TIMESTAMP)`,
       [id, companyName, email, username, passwordHash, companyName]
@@ -174,20 +190,117 @@ app.post("/api/admin/vendors", authenticateUser, async (req: any, res) => {
     const rows = await dbClient.query('SELECT * FROM users WHERE id = ?', [id]);
     return res.status(201).json({ success: true, user: rowToUser(rows[0]) });
   } catch (error: any) {
-    return res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: "Vendor hesabı yaradıla bilmədi: " + error.message });
   }
 });
 
+// DELETE VENDOR
+app.delete("/api/admin/vendors/:id", authenticateUser, async (req: any, res) => {
+  if (req.operator.role !== 'admin') return res.status(403).json({ error: "Yalnız adminlər operator hesabını silə bilər." });
+  try {
+    const { adminPassword } = req.body || {};
+    if (!adminPassword) return res.status(400).json({ error: "Təsdiq üçün öz parolunuzu daxil edin." });
+    const adminRows = await dbClient.query('SELECT * FROM users WHERE id = ?', [req.operator.id]);
+    const adminRow = adminRows[0];
+    if (!adminRow || !bcrypt.compareSync(String(adminPassword), adminRow.password_hash)) {
+      return res.status(401).json({ error: "Daxil etdiyiniz parol yanlışdır." });
+    }
+    const vendorRows = await dbClient.query('SELECT * FROM users WHERE id = ?', [req.params.id]);
+    const vendorRow = vendorRows[0];
+    if (!vendorRow || vendorRow.role !== 'vendor') return res.status(404).json({ error: "Operator tapılmadı." });
+    if (vendorRow.deleted_at) return res.status(409).json({ error: "Bu operator artıq arxivləşdirilib." });
+
+    await dbClient.execute('UPDATE users SET deleted_at = CURRENT_TIMESTAMP WHERE id = ?', [req.params.id]);
+    return res.json({ success: true });
+  } catch (error: any) {
+    return res.status(500).json({ error: "Operator arxivləşdirilə bilmədi: " + error.message });
+  }
+});
+
+// GET USERS
 app.get("/api/users", authenticateUser, async (req: any, res) => {
-  if (req.operator.role !== 'admin') return res.status(403).json({ error: "İcazə yoxdur." });
+  if (req.operator.role !== 'admin') return res.status(403).json({ error: "Yalnız adminlər istifadəçi siyahısını görə bilər." });
   try {
     const rows = await dbClient.query('SELECT * FROM users ORDER BY created_at DESC', []);
     return res.json({ users: rows.map(rowToUser) });
   } catch (error: any) {
-    return res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: "İstifadəçiləri gətirmək mümkün olmadı: " + error.message });
   }
 });
 
+// UPDATE USER
+app.put("/api/users/:id", authenticateUser, async (req: any, res) => {
+  try {
+    const rows = await dbClient.query('SELECT * FROM users WHERE id = ?', [req.params.id]);
+    if (!rows.length) return res.status(404).json({ error: "İstifadəçi tapılmadı." });
+    const existingRow = rows[0];
+    const isAdmin = req.operator.role === 'admin';
+    const isSelf = req.operator.id === req.params.id;
+    if (!isAdmin && !isSelf) return res.status(403).json({ error: "Bu istifadəçini yeniləmək icazəniz yoxdur." });
+
+    const body = req.body || {};
+    const name = body.name !== undefined ? body.name : existingRow.name;
+    const email = body.email !== undefined ? body.email : existingRow.email;
+    const phone = body.phone !== undefined ? body.phone : existingRow.phone;
+    const companyName = body.companyName !== undefined ? body.companyName : existingRow.company_name;
+    const avatar = body.avatar !== undefined ? body.avatar : existingRow.avatar;
+    const about = body.about !== undefined ? body.about : existingRow.about;
+
+    let extra: Record<string, any> = {};
+    try { extra = existingRow.extra_data ? JSON.parse(existingRow.extra_data) : {}; } catch { extra = {}; }
+    if (body.guides !== undefined) extra.guides = body.guides;
+
+    let username = existingRow.username;
+    let passwordHash = existingRow.password_hash;
+    let subscriptionValidUntil = existingRow.subscription_valid_until;
+    let isManuallyDeactivated = !!existingRow.is_manually_deactivated;
+    if (isAdmin) {
+      if (body.username !== undefined) username = body.username;
+      if (body.password) passwordHash = await bcrypt.hash(body.password, 10);
+      if (body.subscriptionValidUntil !== undefined) subscriptionValidUntil = body.subscriptionValidUntil;
+      if (body.isManuallyDeactivated !== undefined) isManuallyDeactivated = !!body.isManuallyDeactivated;
+    }
+
+    await dbClient.execute(
+      `UPDATE users SET name = ?, email = ?, username = ?, password_hash = ?, phone = ?, company_name = ?, avatar = ?, about = ?, subscription_valid_until = ?, extra_data = ?, is_manually_deactivated = ? WHERE id = ?`,
+      [name, email, username, passwordHash, phone, companyName, avatar, about, subscriptionValidUntil, JSON.stringify(extra), isManuallyDeactivated ? 1 : 0, req.params.id]
+    );
+    const updatedRows = await dbClient.query('SELECT * FROM users WHERE id = ?', [req.params.id]);
+    if (body.about !== undefined || body.guides !== undefined) {
+      scheduleUserTranslation(req.params.id, about, extra.guides);
+    }
+    return res.json({ user: rowToUser(updatedRows[0]) });
+  } catch (error: any) {
+    return res.status(500).json({ error: "İstifadəçi yenilənə bilmədi: " + error.message });
+  }
+});
+
+// CHANGE PASSWORD
+app.post("/api/auth/change-password", authenticateUser, async (req: any, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body || {};
+    if (!currentPassword || !newPassword) return res.status(400).json({ error: "Cari və yeni şifrəni daxil edin." });
+    if (String(newPassword).length < 6) return res.status(400).json({ error: "Yeni şifrə ən azı 6 simvol olmalıdır." });
+
+    const rows = await dbClient.query('SELECT * FROM users WHERE id = ?', [req.operator.id]);
+    if (!rows.length) return res.status(404).json({ error: "İstifadəçi tapılmadı." });
+    const user = rows[0];
+    if (!bcrypt.compareSync(currentPassword, user.password_hash)) return res.status(401).json({ error: "Cari şifrə yanlışdır." });
+
+    const newHash = await bcrypt.hash(newPassword, 10);
+    await dbClient.execute('UPDATE users SET password_hash = ? WHERE id = ?', [newHash, req.operator.id]);
+    return res.json({ success: true });
+  } catch (error: any) {
+    return res.status(500).json({ error: "Şifrə yenilənə bilmədi: " + error.message });
+  }
+});
+
+interface ServerBooking {
+  id: string; tourId: string; startDate: string; participantsCount: number; vendorId: string; booking_reference: string; status: 'Redirected_to_WhatsApp'; clickedAt: string;
+}
+const serverBookings: ServerBooking[] = [];
+
+// CBAR RATES
 app.get("/api/exchange-rates/cbar", async (req, res) => {
   try {
     const today = new Date();
@@ -199,67 +312,176 @@ app.get("/api/exchange-rates/cbar", async (req, res) => {
     let url = `https://cbar.az/currencies/${dateStr}.xml`;
     let response = await globalThis.fetch(url);
     if (!response.ok) {
-      url = "https://cbar.az/currencies/07.07.2026.xml"; // Günün tarixinə uyğun fallback
+      url = "https://cbar.az/currencies/22.05.2026.xml";
       response = await globalThis.fetch(url);
     }
+    if (!response.ok) throw new Error(`CBAR returned status ${response.status}`);
     const xmlText = await response.text();
     const usdMatch = xmlText.match(/<Valute Code="USD">[\s\S]*?<Value>([\d.]+)<\/Value>/);
     const eurMatch = xmlText.match(/<Valute Code="EUR">[\s\S]*?<Value>([\d.]+)<\/Value>/);
-    
-    return res.json({ 
-      success: true, 
-      USD: usdMatch ? parseFloat(usdMatch[1]) : 1.70, 
-      EUR: eurMatch ? parseFloat(eurMatch[1]) : 1.82, 
-      date: dateStr 
-    });
+    if (!usdMatch || !eurMatch) throw new Error("Could not parse USD/EUR values.");
+
+    return res.json({ success: true, USD: parseFloat(usdMatch[1]), EUR: parseFloat(eurMatch[1]), date: dateStr, source: url });
   } catch (error: any) {
-    return res.json({ success: true, USD: 1.70, EUR: 1.82, warning: "Sabit məzənnə tətbiq olundu." });
+    try {
+      const fallbackUrl = "https://cbar.az/currencies/22.05.2026.xml";
+      const resp = await globalThis.fetch(fallbackUrl);
+      if (resp.ok) {
+        const text = await resp.text();
+        const usdMatch = text.match(/<Valute Code="USD">[\s\S]*?<Value>([\d.]+)<\/Value>/);
+        const eurMatch = text.match(/<Valute Code="EUR">[\s\S]*?<Value>([\d.]+)<\/Value>/);
+        if (usdMatch && eurMatch) {
+          return res.json({ success: true, USD: parseFloat(usdMatch[1]), EUR: parseFloat(eurMatch[1]), date: "22.05.2026", source: fallbackUrl, warning: "Fetched from backup date" });
+        }
+      }
+    } catch {}
+    return res.status(500).json({ error: "CBAR məzənnələrini gətirmək mümkün olmadı: " + error.message });
   }
 });
 
-interface ServerBooking {
-  id: string; tourId: string; startDate: string; participantsCount: number; vendorId: string; booking_reference: string; status: 'Redirected_to_WhatsApp'; clickedAt: string;
-}
-const serverBookings: ServerBooking[] = [];
-
+// WHATSAPP CLICK
 app.post("/api/bookings/whatsapp-click", (req, res) => {
   const { tourId, startDate, participantsCount, vendorId, booking_reference } = req.body;
+  if (!tourId || !startDate || !participantsCount || !vendorId || !booking_reference) {
+    return res.status(400).json({ error: "Məlumatlar əskikdir" });
+  }
   const newLead: ServerBooking = {
-    id: `lead-${Date.now()}`, tourId, startDate, participantsCount: Number(participantsCount), vendorId, booking_reference, status: "Redirected_to_WhatsApp", clickedAt: new Date().toISOString()
+    id: `lead-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+    tourId, startDate, participantsCount: Number(participantsCount), vendorId, booking_reference, status: "Redirected_to_WhatsApp", clickedAt: new Date().toISOString()
   };
   serverBookings.push(newLead);
-  return res.json({ success: true, lead: newLead });
+  return res.json({ success: true, message: "Uğurla qeydə alındı", lead: newLead, totalLeadsForVendor: serverBookings.filter(b => b.vendorId === vendorId).length });
 });
 
+// WHATSAPP LEADS
 app.get("/api/bookings/whatsapp-leads", authenticateUser, (req: any, res) => {
   const leads = req.operator.role === 'vendor' ? serverBookings.filter((b) => b.vendorId === req.operator.id) : serverBookings;
   return res.json({ leads, totalCount: leads.length });
 });
 
-// WhatsApp endpoints
-app.get("/api/whatsapp/status", authenticateUser, (req: any, res) => res.json(getWhatsAppStatus()));
+// WHATSAPP MANAGEMENT
+app.get("/api/whatsapp/status", authenticateUser, (req: any, res) => {
+  if (req.operator.role !== "admin") return res.status(403).json({ error: "İcazə yoxdur." });
+  return res.json(getWhatsAppStatus());
+});
+
+app.post("/api/whatsapp/connect", authenticateUser, async (req: any, res) => {
+  if (req.operator.role !== "admin") return res.status(403).json({ error: "İcazə yoxdur." });
+  try {
+    await startWhatsApp();
+    return res.json(getWhatsAppStatus());
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
+app.post("/api/whatsapp/logout", authenticateUser, async (req: any, res) => {
+  if (req.operator.role !== "admin") return res.status(403).json({ error: "İcazə yoxdur." });
+  try {
+    await logoutWhatsApp();
+    return res.json({ success: true });
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message });
+  }
+});
+
 app.get("/api/whatsapp/captcha", (req, res) => res.json(generateCaptchaChallenge()));
 
-const TOUR_CORE_FIELDS = ['id', 'vendorId', 'vendorName', 'name', 'slug', 'category', 'difficulty', 'region', 'durationDays', 'description', 'image', 'isActive', 'isApproved', 'status', 'priceCurrency', 'rating', 'reviewsCount', 'createdAt'];
+app.post("/api/whatsapp/verify-number", async (req, res) => {
+  const { phone, captchaId, captchaAnswer } = req.body || {};
+  if (!phone || typeof phone !== "string" || phone.replace(/\D/g, "").length < 7) {
+    return res.status(400).json({ error: "Zəhmət olmasa düzgün WhatsApp nömrəsi daxil edin." });
+  }
+  if (!captchaId || captchaAnswer === undefined || captchaAnswer === null || captchaAnswer === "") {
+    return res.status(400).json({ error: "Zəhmət olmasa təhlükəsizlik sualını cavablandırın." });
+  }
+  if (!verifyCaptchaChallenge(String(captchaId), Number(captchaAnswer))) {
+    return res.status(400).json({ error: "Təhlükəsizlik sualının cavabı yanlışdır.", captchaFailed: true });
+  }
+  const rate = checkAndConsumeRateLimit(phone);
+  if (!rate.allowed) return res.status(429).json({ error: "Çox sayda cəhd edildi.", reason: rate.reason, retryAfterSec: rate.retryAfterSec });
+
+  try {
+    const hasWhatsapp = await isRegisteredOnWhatsApp(phone);
+    if (!hasWhatsapp) return res.status(422).json({ error: "Aktiv WhatsApp hesabı tapılmadı.", hasWhatsapp: false });
+    return res.json({ success: true, hasWhatsapp: true });
+  } catch (error: any) {
+    if (error.message === "WHATSAPP_NOT_CONNECTED") return res.status(503).json({ error: "Sistem hazır deyil." });
+    return res.status(500).json({ error: "Nömrə yoxlanıla bilmədi." });
+  }
+});
+
+// MARKETPLACE CORE TOURS API
+const TOUR_CORE_FIELDS = [
+  'id', 'vendorId', 'vendorName', 'name', 'slug', 'category', 'difficulty', 'region',
+  'durationDays', 'description', 'image', 'isActive', 'isApproved', 'status',
+  'priceCurrency', 'rating', 'reviewsCount', 'createdAt', 'pendingData'
+];
 
 function rowToTour(row: any) {
   let extra: Record<string, any> = {};
   try { extra = row.extra_data ? JSON.parse(row.extra_data) : {}; } catch { extra = {}; }
+  let pendingData: Record<string, any> | undefined;
+  try { pendingData = row.pending_data ? JSON.parse(row.pending_data) : undefined; } catch { pendingData = undefined; }
+  const status: 'approved' | 'pending_approval' | 'rejected' = row.status || (row.is_approved ? 'approved' : 'pending_approval');
   return {
     ...extra,
-    id: row.id, vendor_id: row.vendor_id, name: row.name, slug: row.slug, category: row.category, status: row.status || 'approved', createdAt: row.created_at
+    id: row.id,
+    vendorId: row.vendor_id,
+    vendorName: row.vendor_name,
+    name: row.name,
+    slug: row.slug,
+    category: row.category,
+    difficulty: row.difficulty,
+    region: row.region,
+    durationDays: Number(row.duration_days),
+    description: row.description,
+    image: row.image,
+    isActive: !!row.is_active,
+    isApproved: status === 'approved',
+    status,
+    pendingData,
+    priceCurrency: row.price_currency,
+    rating: row.rating !== null && row.rating !== undefined ? Number(row.rating) : undefined,
+    reviewsCount: row.reviews_count !== null && row.reviews_count !== undefined ? Number(row.reviews_count) : undefined,
+    createdAt: row.created_at,
   };
 }
 
 app.get("/api/tours", async (req, res) => {
   try {
     const user = getOptionalUser(req);
-    let rows;
+    const { category, isApproved, isActive } = req.query;
+    const conditions: string[] = [];
+    const params: any[] = [];
+
     if (user && user.role === 'vendor') {
-      rows = await dbClient.query('SELECT * FROM tours WHERE vendor_id = ?', [user.id]);
+      conditions.push('vendor_id = ?');
+      params.push(user.id);
+    } else if (user && user.role === 'admin') {
+      if (req.query.vendorId) {
+        conditions.push('vendor_id = ?');
+        params.push(String(req.query.vendorId));
+      }
     } else {
-      rows = await dbClient.query("SELECT * FROM tours WHERE status = 'approved'", []);
+      conditions.push("status = 'approved'");
+      const subscriptionGraceCutoff = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
+      conditions.push(
+        "vendor_id NOT IN (SELECT id FROM users WHERE deleted_at IS NOT NULL OR is_manually_deactivated = true OR (subscription_valid_until IS NOT NULL AND subscription_valid_until < ?))"
+      );
+      params.push(subscriptionGraceCutoff);
+      if (req.query.vendorId) {
+        conditions.push('vendor_id = ?');
+        params.push(String(req.query.vendorId));
+      }
     }
+    if (category) {
+      conditions.push('category = ?');
+      params.push(String(category));
+    }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+    const rows = await dbClient.query(`SELECT * FROM tours ${whereClause} ORDER BY created_at DESC`, params);
     return res.json({ tours: rows.map(rowToTour) });
   } catch (error: any) {
     return res.status(500).json({ error: error.message });
@@ -267,19 +489,15 @@ app.get("/api/tours", async (req, res) => {
 });
 
 // ==================== FRONTEND PAYLANMASI (Ən aşağıda olmalıdır) ====================
-
 const distPath = path.resolve(process.cwd(), "dist");
-
-// Statik faylları (JS, CSS, Şəkillər) Render üçün aktiv et
 app.use(express.static(distPath));
 
-// Hər hansı digər sorğu gələndə (məs. /turlar, /profil) index.html faylını qaytar ki, React Router işləyə bilsin
 app.get("*", (req, res) => {
   const indexPath = path.resolve(distPath, "index.html");
   if (fs.existsSync(indexPath)) {
     res.sendFile(indexPath);
   } else {
-    res.status(404).send("Frontend faylları (dist) tapılmadı. Zəhmət olmasa əvvəlcə layihəni build edin.");
+    res.status(404).send("Frontend faylları tapılmadı.");
   }
 });
 
