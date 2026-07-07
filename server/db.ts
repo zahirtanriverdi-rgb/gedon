@@ -165,7 +165,7 @@ export async function initializeDatabase() {
   // scoped to pending_data IS NULL — a tour with a genuine pending edit under review always
   // has pending_data set, and must not be silently flipped back to 'approved' by this backfill.
   await dbClient.execute(
-    `UPDATE tours SET status = 'approved' WHERE is_approved = 1 AND status = 'pending_approval' AND pending_data IS NULL`
+    `UPDATE tours SET status = 'approved' WHERE is_approved = true AND status = 'pending_approval' AND pending_data IS NULL`
   );
   await dbClient.execute(
     `UPDATE tours SET status = 'pending_approval' WHERE status IS NULL`

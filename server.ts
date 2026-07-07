@@ -693,7 +693,7 @@ app.get("/api/tours", async (req, res) => {
       // period has fully elapsed do their tours disappear from the public marketplace.
       const subscriptionGraceCutoff = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
       conditions.push(
-        "vendor_id NOT IN (SELECT id FROM users WHERE deleted_at IS NOT NULL OR is_manually_deactivated = 1 OR (subscription_valid_until IS NOT NULL AND subscription_valid_until < ?))"
+        "vendor_id NOT IN (SELECT id FROM users WHERE deleted_at IS NOT NULL OR is_manually_deactivated = true OR (subscription_valid_until IS NOT NULL AND subscription_valid_until < ?))"
       );
       params.push(subscriptionGraceCutoff);
       if (req.query.vendorId) {
@@ -728,7 +728,7 @@ app.get("/sitemap.xml", async (req, res) => {
     // (skips the vendor-subscription-grace-period join — sitemap freshness isn't as critical
     // as the live listing, and a slightly stale sitemap entry is harmless).
     const rows = await dbClient.query(
-      `SELECT slug FROM tours WHERE status = 'approved' AND slug IS NOT NULL AND slug != '' AND (is_active IS NULL OR is_active != 0)`
+      `SELECT slug FROM tours WHERE status = 'approved' AND slug IS NOT NULL AND slug != '' AND (is_active IS NULL OR is_active != false)`
     );
     const staticPaths = ["", "/faq", "/calculator"];
     const urls = [
