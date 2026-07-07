@@ -85,7 +85,7 @@ export async function initializeDatabase() {
       extra_data TEXT,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       deleted_at TIMESTAMP,
-      is_manually_deactivated BOOLEAN DEFAULT 0
+      is_manually_deactivated BOOLEAN DEFAULT false
     );
   `);
 
@@ -113,7 +113,7 @@ export async function initializeDatabase() {
   // Migration for databases created before `is_manually_deactivated` existed — lets an admin
   // hide a vendor's tours instantly, independent of their subscription_valid_until date.
   try {
-    await dbClient.execute(`ALTER TABLE users ADD COLUMN is_manually_deactivated BOOLEAN DEFAULT 0`);
+    await dbClient.execute(`ALTER TABLE users ADD COLUMN is_manually_deactivated BOOLEAN DEFAULT false`);
   } catch {
     // column already exists — safe to ignore
   }
@@ -134,8 +134,8 @@ export async function initializeDatabase() {
       duration_days INTEGER NOT NULL,
       description TEXT,
       image TEXT,
-      is_active BOOLEAN DEFAULT 1,
-      is_approved BOOLEAN DEFAULT 0,
+      is_active BOOLEAN DEFAULT true,
+      is_approved BOOLEAN DEFAULT false,
       status VARCHAR(20) DEFAULT 'pending_approval',
       pending_data TEXT,
       price_currency VARCHAR(10) DEFAULT 'AZN',
@@ -236,7 +236,7 @@ export async function initializeDatabase() {
       customer_name VARCHAR(255) NOT NULL,
       rating INTEGER NOT NULL,
       comment TEXT,
-      verified_attendee BOOLEAN DEFAULT 0,
+      verified_attendee BOOLEAN DEFAULT false,
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (tour_id) REFERENCES tours(id) ON DELETE CASCADE,
       FOREIGN KEY (booking_id) REFERENCES bookings(id) ON DELETE CASCADE
