@@ -12,17 +12,16 @@ import {
   ChevronLeft,
   ChevronRight,
   Plane,
-  Heart,
-  Star
+  Heart
 } from 'lucide-react';
 import { SearchDropdown } from '../SearchDropdown';
-import { TourWeatherForecast } from '../TourWeatherForecast';
 import { ReviewSubmissionPanel } from './ReviewSubmissionPanel';
 import { computeFeaturedTourIds } from '../../utils/featuredTours';
 import { useLanguage } from '../../i18n/LanguageContext';
 import { getLocalizedTourName, getLocalizedTourDescription } from '../../i18n/tourLocalization';
 import { parseStoredGpxData } from '../../utils/gpxParser';
-import { TourRouteStatsCard } from '../tours/TourRouteStatsCard';
+import { TourStatsRow } from '../tours/TourStatsRow';
+import { matchesHikingSubcategory, HIKING_SUBCATEGORIES, HikingSubcategory } from '../../utils/hikingSubcategories';
 
 type ConvertedPriceInfo = {
   azn: number;
@@ -150,6 +149,11 @@ export function ToursHomeView({
 }: ToursHomeViewProps) {
   const { t: tt, language } = useLanguage();
   const featuredTourIds = React.useMemo(() => computeFeaturedTourIds(tours, slots), [tours, slots]);
+  const [hikingSubcategory, setHikingSubcategory] = React.useState<HikingSubcategory>('all');
+  const visibleTours = React.useMemo(() => {
+    if (selectedCategory !== 'hiking' || hikingSubcategory === 'all') return sortedAndFilteredTours;
+    return sortedAndFilteredTours.filter((tour) => matchesHikingSubcategory(tour, hikingSubcategory));
+  }, [sortedAndFilteredTours, selectedCategory, hikingSubcategory]);
   return (
         // -mx-5 cancels the parent <main>'s fixed px-5 (20px) so this container can
         // reapply the same 20px on mobile/tablet but widen to 96px at >=1440px,
@@ -600,7 +604,28 @@ export function ToursHomeView({
 
       {/* Grid of Tours */}
       <div id="tours-list">
-      {sortedAndFilteredTours.length === 0 ? (
+      {selectedCategory === 'hiking' && (
+        <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-3 mb-1 -mx-1 px-1">
+          {HIKING_SUBCATEGORIES.map((sub) => {
+            const isActive = hikingSubcategory === sub.id;
+            return (
+              <button
+                key={sub.id}
+                type="button"
+                onClick={() => setHikingSubcategory(sub.id)}
+                className={`shrink-0 px-3.5 py-2 rounded-full text-xs font-bold transition-all border whitespace-nowrap ${
+                  isActive
+                    ? 'bg-brand-primary text-white border-brand-primary shadow-sm'
+                    : 'bg-white text-brand-text-main border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                }`}
+              >
+                {sub.emoji} {tt(sub.labelKey)}
+              </button>
+            );
+          })}
+        </div>
+      )}
+      {visibleTours.length === 0 ? (
         <div className="text-center py-16 bg-white rounded-xl border border-slate-200 p-8 space-y-3 shadow-xs">
           <AlertCircle className="w-8 h-8 text-slate-300 mx-auto" />
           <h3 className="text-sm font-bold text-brand-text-main">{t('noToursFound')}</h3>
@@ -610,7 +635,7 @@ export function ToursHomeView({
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {sortedAndFilteredTours.map((tour) => {
+          {visibleTours.map((tour) => {
             const tourSlots = slots.filter(s => s.tourId === tour.id);
             const priceList = tourSlots.map(s => s.price);
             const minPrice = priceList.length > 0 ? Math.min(...priceList) : 25;
@@ -688,53 +713,56 @@ export function ToursHomeView({
                     className="w-full h-full object-cover group-hover:scale-102 transition duration-500"
                     referrerPolicy="no-referrer"
                   />
-                  <div className="absolute top-3 left-3 flex gap-1.5 flex-wrap">
-                    {featuredTourIds.has(tour.id) && (
-                      <span className="text-[10px] font-extrabold tracking-tight px-2 py-0.5 rounded-md shadow-xs bg-brand-accent text-white">
-                        🔥 {tt('customerHome.toursHomeView.bestSellerOfMonth')}
+                  <div className="absolute top-3 left-3 right-3 flex items-start justify-between gap-2 z-10">
+                    <div className="flex gap-1.5 flex-wrap min-w-0 pr-1">
+                      {featuredTourIds.has(tour.id) && (
+                        <span className="text-[10px] font-extrabold tracking-tight px-2 py-0.5 rounded-md shadow-xs bg-brand-accent text-white">
+                          🔥 {tt('customerHome.toursHomeView.bestSellerOfMonth')}
+                        </span>
+                      )}
+                      <span className={`text-[10px] font-bold tracking-tight px-2 py-0.5 rounded-md shadow-xs ${tour.isInternational ? 'bg-brand-accent text-white' : 'bg-brand-text-main/90 text-white'}`}>
+                        {badges[tour.category]?.emoji || '✈️'} {badges[tour.category]?.label || tt('customerHome.toursHomeView.badges.international')}
                       </span>
-                    )}
-                    <span className={`text-[10px] font-bold tracking-tight px-2 py-0.5 rounded-md shadow-xs ${tour.isInternational ? 'bg-brand-accent text-white' : 'bg-brand-text-main/90 text-white'}`}>
-                      {badges[tour.category]?.emoji || '✈️'} {badges[tour.category]?.label || tt('customerHome.toursHomeView.badges.international')}
-                    </span>
-                    {!parsedGpx && (
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md shadow-xs ${difficultyBg}`}>
-                        {difficultyLabel}
-                      </span>
-                    )}
-                  </div>
-                  {/* Wishlist + Share button overlay */}
-                  <div className="absolute top-3 right-3 flex items-center gap-1.5 z-10">
-                    <button
-                      type="button"
-                      onClick={(e) => handleToggleWishlist(tour.id, e)}
-                      className="bg-white hover:bg-slate-50 p-1.5 rounded-full shadow-md transition-all hover:scale-110 flex items-center justify-center border border-slate-100 cursor-pointer"
-                      title={wishlist.includes(tour.id) ? tt('customerHome.toursHomeView.wishlist.remove') : tt('customerHome.toursHomeView.wishlist.add')}
-                    >
-                      <Heart className={`w-3.5 h-3.5 ${wishlist.includes(tour.id) ? 'fill-rose-600 text-rose-600' : 'text-brand-text-main'}`} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(e) => handleShareTour(tour, e)}
-                      className="bg-white hover:bg-slate-50 text-brand-text-main hover:text-brand-primary p-1.5 rounded-full shadow-md transition-all hover:scale-110 flex items-center justify-center border border-slate-100 cursor-pointer"
-                      title={tt('customerHome.toursHomeView.shareTitle')}
-                    >
-                      <Share2 className="w-3.5 h-3.5" />
-                    </button>
+                      {!parsedGpx && (
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md shadow-xs ${difficultyBg}`}>
+                          {difficultyLabel}
+                        </span>
+                      )}
+                    </div>
+                    {/* Wishlist + Share buttons — 44x44 touch target via padding, icon glyph stays small */}
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        type="button"
+                        onClick={(e) => handleToggleWishlist(tour.id, e)}
+                        className="bg-white hover:bg-slate-50 w-11 h-11 rounded-full shadow-md transition-all hover:scale-110 flex items-center justify-center border border-slate-100 cursor-pointer"
+                        title={wishlist.includes(tour.id) ? tt('customerHome.toursHomeView.wishlist.remove') : tt('customerHome.toursHomeView.wishlist.add')}
+                      >
+                        <Heart className={`w-3.5 h-3.5 ${wishlist.includes(tour.id) ? 'fill-rose-600 text-rose-600' : 'text-brand-text-main'}`} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => handleShareTour(tour, e)}
+                        className="bg-white hover:bg-slate-50 text-brand-text-main hover:text-brand-primary w-11 h-11 rounded-full shadow-md transition-all hover:scale-110 flex items-center justify-center border border-slate-100 cursor-pointer"
+                        title={tt('customerHome.toursHomeView.shareTitle')}
+                      >
+                        <Share2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
                   {tour.isInternational && (
                     <div className="absolute bottom-10 right-3 bg-brand-accent text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow-sm">
                       ✈️ {tt('customerHome.toursHomeView.flightTicket')} {tour.flightIncluded ? tt('customerHome.toursHomeView.included') : tt('customerHome.toursHomeView.notIncluded')}
                     </div>
                   )}
-                  <div className="absolute bottom-3 right-3 bg-white/90 backdrop-blur-xs text-brand-text-main px-2 py-0.5 rounded border border-slate-250 text-[10px] font-semibold">
-                    📍 {tour.region.split(',')[0]}
+                  <div className="absolute bottom-3 right-3 bg-white/90 backdrop-blur-xs text-brand-text-main pl-1.5 pr-2 py-0.5 rounded-full border border-slate-250 text-[10px] font-semibold flex items-center gap-1">
+                    <MapPin className="w-3 h-3 text-brand-primary shrink-0" />
+                    {tour.region.split(',')[0]}
                   </div>
                 </div>
 
                 {/* Tour Card Body */}
-                <div className="p-4 flex-1 flex flex-col justify-between">
-                  <div className="space-y-2">
+                <div className="p-3.5 flex-1 flex flex-col justify-between">
+                  <div className="space-y-1.5">
                     <div className="flex items-center gap-1.5 text-[10px] text-brand-text-muted font-bold tracking-wider">
                       {isSportActive ? (
                         <>
@@ -802,61 +830,22 @@ export function ToursHomeView({
                     <p className="text-xs text-brand-text-muted line-clamp-2 leading-relaxed">
                       {getLocalizedTourDescription(tour, language)}
                     </p>
-
-                    {/* Integrated Automatic Online Weather Forecasting */}
-                    {tourSlots.length > 0 && (
-                      <TourWeatherForecast
-                        dates={tourSlots.map(s => s.startDate)}
-                        region={tour.region}
-                        variant="compact"
-                      />
-                    )}
-
                   </div>
 
-                  {/* Rating & Price row — price is the primary signal; the GPX stats+mini-map (or, lacking GPX, rating/bestseller badge) fills the space in front of it */}
-                  <div className="flex items-stretch justify-between gap-3 mt-4 pt-3 border-t border-slate-100">
-                    {parsedGpx ? (
-                      <div className="flex-1 min-w-0">
-                        <TourRouteStatsCard
-                          parsed={parsedGpx}
-                          durationLabel={routeDurationLabel}
-                          difficultyLabel={difficultyLabel}
-                          difficultyBarColorClass={difficultyBarColorClass}
-                          difficultyPercent={difficultyPercent}
-                          ratingValue={Number(getAverageRating(tour.id))}
-                        />
-                      </div>
-                    ) : (() => {
-                      const tourMonths = getTourMonths(tour.id);
-                      const isTopSeller = Number(getAverageRating(tour.id)) >= 4.5 || getReviewsCount(tour.id) >= 1 || tour.name.toLowerCase().includes('kəpəz') || tour.name.toLowerCase().includes('kuzun');
-                      const selectedMonth = tourMonths.length > 0 ? tourMonths[0] : tt('miscWidgets.tourWeatherForecast.months.may');
-                      const starRating = Math.round(Number(getAverageRating(tour.id)));
-                      return (
-                        <div className="flex flex-col justify-center gap-1.5 min-w-0">
-                          {REVIEWS_ENABLED && (
-                            <div className="flex items-center gap-0.5" title={tt('customerHome.toursHomeView.ratingScoreTitle', { rating: getAverageRating(tour.id) })}>
-                              {[1, 2, 3, 4, 5].map((starIdx) => {
-                                const isFilled = starIdx <= starRating;
-                                return (
-                                  <Star
-                                    key={starIdx}
-                                    className={`w-3.5 h-3.5 ${isFilled ? 'fill-amber-400 text-amber-400' : 'text-slate-200'}`}
-                                  />
-                                );
-                              })}
-                              <span className="text-xs font-bold text-brand-text-main ml-1">{getAverageRating(tour.id)}</span>
-                              <span className="text-brand-text-muted text-[10px] font-medium">({tt('customerHome.toursHomeView.reviewsCount', { count: getReviewsCount(tour.id) })})</span>
-                            </div>
-                          )}
-                          {isTopSeller && (
-                            <span className="bg-amber-50/70 text-brand-accent border border-amber-100 text-[9px] font-semibold px-1.5 py-0.5 rounded-md flex items-center gap-0.5 w-fit" title={tt('customerHome.toursHomeView.topSellerTitle')}>
-                              🔥 {tt('customerHome.toursHomeView.bestSellerOfMonthNamed', { month: selectedMonth })}
-                            </span>
-                          )}
-                        </div>
-                      );
-                    })()}
+                  {/* Rating & Price row — price is the primary signal; the GPX stats+mini-map (or, lacking GPX, camp/rating fallback) fills the space in front of it */}
+                  <div className="flex items-stretch justify-between gap-3 mt-3 pt-2.5 border-t border-slate-100">
+                    <TourStatsRow
+                      tour={tour}
+                      parsedGpx={parsedGpx}
+                      durationLabel={routeDurationLabel}
+                      difficultyLabel={difficultyLabel}
+                      difficultyBarColorClass={difficultyBarColorClass}
+                      difficultyPercent={difficultyPercent}
+                      ratingValue={Number(getAverageRating(tour.id))}
+                      reviewsCount={getReviewsCount(tour.id)}
+                      isTopSeller={Number(getAverageRating(tour.id)) >= 4.5 || getReviewsCount(tour.id) >= 1 || tour.name.toLowerCase().includes('kəpəz') || tour.name.toLowerCase().includes('kuzun')}
+                      topSellerMonth={getTourMonths(tour.id)[0] || tt('miscWidgets.tourWeatherForecast.months.may')}
+                    />
 
                     <div className="text-right shrink-0 border-l border-slate-100 pl-4 flex flex-col justify-center">
                       <span className="text-[9px] text-brand-text-muted block tracking-wider font-semibold">{tt('customerHome.toursHomeView.priceLabel')}</span>

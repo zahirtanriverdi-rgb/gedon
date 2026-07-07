@@ -64,6 +64,9 @@ export const miscWidgets = {
         days: 'gün',
         hours: 'saat',
       },
+      tourStatsRow: {
+        nights: '{{count}} gecə',
+      },
       tourWeatherForecast: {
         noFutureDates: 'Gələcək tarix təyin edilməyib',
         loading: 'ONLAYN HAVA PROQNOZU YÜKLƏNİR...',
@@ -201,6 +204,9 @@ export const miscWidgets = {
         days: 'days',
         hours: 'h',
       },
+      tourStatsRow: {
+        nights: '{{count}} nights',
+      },
       tourWeatherForecast: {
         noFutureDates: 'No upcoming date set',
         loading: 'LOADING LIVE WEATHER FORECAST...',
@@ -337,6 +343,9 @@ export const miscWidgets = {
         rating: 'Рейтинг',
         days: 'дн.',
         hours: 'ч.',
+      },
+      tourStatsRow: {
+        nights: '{{count}} ночей',
       },
       tourWeatherForecast: {
         noFutureDates: 'Будущая дата не указана',

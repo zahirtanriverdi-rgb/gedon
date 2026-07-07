@@ -25,20 +25,13 @@ export const TourRouteStatsCard: React.FC<TourRouteStatsCardProps> = ({
 
   return (
     <div className="flex items-stretch gap-3">
-      <div className="flex-1 min-w-0 flex flex-col justify-between gap-2.5">
-        <div className="grid grid-cols-3 gap-1.5">
-          <div className="min-w-0">
-            <div className="text-xs font-extrabold text-label-primary leading-tight whitespace-nowrap">{parsed.stats.distanceKm} km</div>
-            <div className="text-[10px] text-label-tertiary font-medium leading-tight whitespace-nowrap">{t('miscWidgets.tourRouteStatsCard.distance')}</div>
-          </div>
-          <div className="min-w-0">
-            <div className="text-xs font-extrabold text-label-primary leading-tight whitespace-nowrap">{parsed.stats.elevationGainM} m</div>
-            <div className="text-[10px] text-label-tertiary font-medium leading-tight whitespace-nowrap">{t('miscWidgets.tourRouteStatsCard.elevation')}</div>
-          </div>
-          <div className="min-w-0">
-            <div className="text-xs font-extrabold text-label-primary leading-tight whitespace-nowrap">{durationLabel}</div>
-            <div className="text-[10px] text-label-tertiary font-medium leading-tight whitespace-nowrap">{t('miscWidgets.tourRouteStatsCard.duration')}</div>
-          </div>
+      <div className="flex-1 min-w-0 flex flex-col justify-between gap-2">
+        <div className="flex items-center gap-1.5 text-xs font-extrabold text-label-primary leading-tight whitespace-nowrap overflow-hidden">
+          <span>{parsed.stats.distanceKm} km</span>
+          <span className="text-label-tertiary font-medium">•</span>
+          <span>{parsed.stats.elevationGainM} m</span>
+          <span className="text-label-tertiary font-medium">•</span>
+          <span>{durationLabel}</span>
         </div>
 
         <div className="flex items-end justify-between gap-3">

@@ -14,6 +14,14 @@ export const customerHome = {
           newBadge: 'YENİ',
           hotBadge: 'HOT',
         },
+        hikingSubcategories: {
+          all: 'Hamısı',
+          peak: 'Zirvə yürüşləri',
+          waterfall: 'Şəlalə marşrutları',
+          camp: 'Kemp turları',
+          extreme: 'Ekstremal / çoxgünlük',
+          family: 'Ailə üçün asan yürüşlər',
+        },
         filters: {
           hide: 'Gizlət',
           showAdvanced: 'Geniş Axtarış Filtrləri',
@@ -198,6 +206,14 @@ export const customerHome = {
           newBadge: 'NEW',
           hotBadge: 'HOT',
         },
+        hikingSubcategories: {
+          all: 'All',
+          peak: 'Peak hikes',
+          waterfall: 'Waterfall routes',
+          camp: 'Camping tours',
+          extreme: 'Extreme / multi-day',
+          family: 'Easy family hikes',
+        },
         filters: {
           hide: 'Hide',
           showAdvanced: 'Advanced Search Filters',
@@ -381,6 +397,14 @@ export const customerHome = {
           international: 'Зарубежные туры',
           newBadge: 'НОВОЕ',
           hotBadge: 'ХИТ',
+        },
+        hikingSubcategories: {
+          all: 'Все',
+          peak: 'Восхождения на вершины',
+          waterfall: 'Маршруты к водопадам',
+          camp: 'Кемпинг-туры',
+          extreme: 'Экстрим / многодневные',
+          family: 'Лёгкие семейные походы',
         },
         filters: {
           hide: 'Скрыть',
