@@ -158,6 +158,17 @@ export function parseGpsFile(fileName: string, xmlText: string): ParsedGpxRoute 
 }
 
 /**
+ * Estimates on-trail hiking time from real route stats using Naismith's rule
+ * (~5 km/h on flat terrain, plus 1 extra hour per 600m of cumulative ascent),
+ * rounded to the nearest half hour (minimum 1h). This is what tour cards show for
+ * duration on GPX-backed tours instead of a manually typed, trip-wide hour count.
+ */
+export function estimateHikingHours(stats: ParsedGpxRoute['stats']): number {
+  const rawHours = stats.distanceKm / 5 + stats.elevationGainM / 600;
+  return Math.max(1, Math.round(rawHours * 2) / 2);
+}
+
+/**
  * Safely decodes a Tour's stored `gpxData` JSON string back into a ParsedGpxRoute.
  * Returns null if the field is empty or the JSON is malformed/missing points.
  */
