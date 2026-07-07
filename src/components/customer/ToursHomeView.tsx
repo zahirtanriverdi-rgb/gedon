@@ -754,8 +754,9 @@ export function ToursHomeView({
                       ✈️ {tt('customerHome.toursHomeView.flightTicket')} {tour.flightIncluded ? tt('customerHome.toursHomeView.included') : tt('customerHome.toursHomeView.notIncluded')}
                     </div>
                   )}
-                  <div className="absolute bottom-3 right-3 bg-white/90 backdrop-blur-xs text-brand-text-main px-2 py-0.5 rounded border border-slate-250 text-[10px] font-semibold">
-                    📍 {tour.region.split(',')[0]}
+                  <div className="absolute bottom-3 right-3 bg-white/90 backdrop-blur-xs text-brand-text-main pl-1.5 pr-2 py-0.5 rounded-full border border-slate-250 text-[10px] font-semibold flex items-center gap-1">
+                    <MapPin className="w-3 h-3 text-brand-primary shrink-0" />
+                    {tour.region.split(',')[0]}
                   </div>
                 </div>
 
