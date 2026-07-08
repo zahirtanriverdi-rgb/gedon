@@ -10,6 +10,11 @@ import { WhatsAppVerifyField } from '../shared/WhatsAppVerifyField';
 import { handleNumberInput, useStepWizard } from './useTourFormWizard';
 import { useLanguage } from '../../i18n/LanguageContext';
 
+const getBaseUrl = () => {
+  return import.meta.env.VITE_API_BASE_URL || 
+         (import.meta.env.DEV ? 'http://localhost:3000' : 'https://gedekgorek.onrender.com');
+};
+
 // Older guides saved before Guide.id existed have no stable identifier — fall back to their
 // name so tour-guide assignment still works for pre-existing profile data.
 const getGuideKey = (guide: Guide): string => guide.id || guide.name;
@@ -389,45 +394,41 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
     reader.readAsText(file);
   };
 
-  // Unified media dropzone: routes each dropped/selected file into the images or videos
-  // gallery based on its MIME type. Replaces the old three separate upload fields
-  // (cover photo / gallery photos / gallery videos).
-  const handleMediaFilesChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
+// Unified media upload to server
+const handleMediaFilesChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const files = e.target.files;
+  if (!files || files.length === 0) return;
 
-    const allFiles: File[] = Array.from(files);
-    const imageFiles = allFiles.filter((f) => f.type.startsWith('image/'));
-    const videoFiles = allFiles.filter((f) => f.type.startsWith('video/'));
-    const readAsDataUrl = (file: File) => new Promise<string>((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result as string);
-      reader.readAsDataURL(file);
+  const formData = new FormData();
+  Array.from(files).forEach(file => formData.append('files', file));
+
+  try {
+    const res = await fetch(`${getBaseUrl()}/api/upload`, {
+      method: 'POST',
+      body: formData,
     });
 
-    if (imageFiles.length > 0) {
-      Promise.all(imageFiles.map(readAsDataUrl)).then(base64s => {
-        setTourImages(prev => {
-          const next = [...prev, ...base64s];
-          // First images ever added automatically become the cover photo.
-          if (!tourImage && next.length > 0) setTourImage(next[0]);
-          return next;
-        });
-        clearFieldError('media');
-      });
+    const data = await res.json();
+
+    if (data.success && data.urls?.length > 0) {
+      const imageUrls = data.urls.filter((url: string) => url.match(/\.(jpg|jpeg|png|webp|gif)$/i));
+      const videoUrls = data.urls.filter((url: string) => url.match(/\.(mp4|webm|ogg)$/i));
+
+      setTourImages(prev => [...prev, ...imageUrls]);
+      setTourVideos(prev => [...prev, ...videoUrls]);
+
+      if (imageUrls.length > 0 && !tourImage) setTourImage(imageUrls[0]);
+
+      if (onShowNotification) {
+        onShowNotification(`✅ ${imageUrls.length} şəkil və ${videoUrls.length} video yükləndi`, 'success');
+      }
+      clearFieldError('media');
     }
-    if (videoFiles.length > 0) {
-      Promise.all(videoFiles.map(readAsDataUrl)).then(base64s => {
-        setTourVideos(prev => [...prev, ...base64s]);
-      });
-    }
-    if (onShowNotification && (imageFiles.length > 0 || videoFiles.length > 0)) {
-      const parts: string[] = [];
-      if (imageFiles.length > 0) parts.push(t('vendorTourForms.tourForm.notifications.mediaAddedImages', { count: imageFiles.length }));
-      if (videoFiles.length > 0) parts.push(t('vendorTourForms.tourForm.notifications.mediaAddedVideos', { count: videoFiles.length }));
-      onShowNotification(t('vendorTourForms.tourForm.notifications.mediaAdded', { parts: parts.join(t('vendorTourForms.tourForm.notifications.mediaAddedJoiner')) }), 'success');
-    }
-  };
+  } catch (err) {
+    console.error(err);
+    if (onShowNotification) onShowNotification("Şəkil yüklənərkən xəta baş verdi", 'error');
+  }
+};
 
   return (
     <div className="space-y-5">
