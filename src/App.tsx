@@ -322,7 +322,10 @@ export default function App() {
   const { language: appLanguage, setLanguage: setAppLanguage, t } = useLanguage();
   // Fixed 192px panel, right-aligned to the button (the language list is wider than the
   // trigger itself, unlike the tour share menu where the panel matches the button's width).
-  const langMenu = useExpandingMenu((rect) => ({ left: rect.right - 192, width: 192 }));
+  const langMenu = useExpandingMenu((rect) => ({ 
+  left: rect.right - 140, 
+  width: 140 
+}));
 
   // Wishlist ids live in localStorage (see utils/wishlist.ts); we mirror them here so the
   // header badge can react instantly when a tour is added/removed elsewhere, without a reload.
@@ -930,25 +933,25 @@ export default function App() {
                         className="w-full text-left px-4 py-3 text-[12px] font-semibold text-slate-700 hover:bg-slate-50 transition-colors border-b border-slate-100 flex items-center gap-2"
                         onClick={() => { setAppLanguage('az'); setDisplayCurrency('AZN'); langMenu.setOpen(false); }}
                       >
-                        🇦🇿 Azərbaycanca (AZN)
+                        🇦🇿 AZ (AZN)
                       </button>
                       <button
                         className="w-full text-left px-4 py-3 text-[12px] font-semibold text-slate-700 hover:bg-slate-50 transition-colors border-b border-slate-100 flex items-center gap-2"
                         onClick={() => { setAppLanguage('ru'); setDisplayCurrency('AZN'); langMenu.setOpen(false); }}
                       >
-                        🇷🇺 Русский (AZN)
+                        🇷🇺 RU (AZN)
                       </button>
                       <button
                         className="w-full text-left px-4 py-3 text-[12px] font-semibold text-slate-700 hover:bg-slate-50 transition-colors border-b border-slate-100 flex items-center gap-2"
                         onClick={() => { setAppLanguage('en'); setDisplayCurrency('USD'); langMenu.setOpen(false); }}
                       >
-                        🇬🇧 English (USD)
+                        🇬🇧 EN (USD)
                       </button>
                       <button
                         className="w-full text-left px-4 py-3 text-[12px] font-semibold text-slate-700 hover:bg-slate-50 transition-colors flex items-center gap-2"
                         onClick={() => { setAppLanguage('en'); setDisplayCurrency('EUR'); langMenu.setOpen(false); }}
                       >
-                        🇪🇺 English (EUR)
+                        🇪🇺 EN (EUR)
                       </button>
                     </div>,
                     document.body

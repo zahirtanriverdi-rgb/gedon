@@ -7,10 +7,10 @@ import { GoogleGenAI, Type } from "@google/genai";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { randomUUID } from "crypto";
-import { initializeDatabase } from "./server/db";
-import dbClient from "./server/db";
-import { scheduleTourTranslation, scheduleUserTranslation } from "./server/translate";
-import { generateUniqueSlug } from "./server/slugify";
+import { initializeDatabase } from "./server/db.ts";
+import dbClient from "./server/db.ts";
+import { scheduleTourTranslation, scheduleUserTranslation } from "./server/translate.ts";
+import { generateUniqueSlug } from "./server/slugify.ts";
 import {
   startWhatsApp,
   getWhatsAppStatus,
@@ -19,7 +19,7 @@ import {
   checkAndConsumeRateLimit,
   generateCaptchaChallenge,
   verifyCaptchaChallenge
-} from "./server/whatsapp";
+} from "./server/whatsapp.ts";
 
 const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;

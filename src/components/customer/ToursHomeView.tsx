@@ -510,7 +510,7 @@ export function ToursHomeView({
 
           {/* Horizontal Slider for Upcoming Tours (Minimal) */}
           {uniqueUpcomingTours.length > 0 && (
-              <div className="mb-3 mt-3 w-full max-w-[1400px] mx-auto animate-fadeIn relative">
+              <div className="mb-3 mt-0 w-full max-w-[1200px] mx-auto animate-fadeIn relative">
                 <div className="flex items-center justify-between mb-2 px-1">
                   <h3 className="text-sm font-extrabold text-brand-text-main tracking-tight flex items-center gap-1.5">
                     <Calendar className="w-4 h-4 text-brand-primary" />
@@ -608,7 +608,8 @@ export function ToursHomeView({
 
 
       {/* Grid of Tours */}
-      <div id="tours-list">
+      <div id="tours-list" className="space-y-16 mt-10">
+        
       {selectedCategory === 'hiking' && (
         <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-3 mb-1 -mx-1 px-1">
           {HIKING_SUBCATEGORIES.map((sub) => {
@@ -639,6 +640,9 @@ export function ToursHomeView({
           </p>
         </div>
       ) : (
+
+        
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {visibleTours.map((tour) => {
             const tourSlots = slots.filter(s => s.tourId === tour.id);
