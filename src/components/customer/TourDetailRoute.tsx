@@ -28,7 +28,6 @@ interface TourDetailRouteProps {
   onShowNotification?: (message: string, type?: 'success' | 'info' | 'error' | 'warning') => void;
   getConvertedPriceInfo: (price: number, currency?: 'AZN' | 'USD' | 'EUR') => ConvertedPriceInfo;
   getReviewsCount: (tourId: string) => number;
-  handleShareTour: (tour: Tour, e?: React.MouseEvent) => void;
   handleToggleWishlist: (tourId: string, e?: React.MouseEvent) => void;
   lightboxIndex: number | null;
   setLightboxIndex: (updater: number | null | ((prev: number | null) => number | null)) => void;
@@ -95,7 +94,6 @@ export function TourDetailRoute({ tours, lightboxIndex, setLightboxIndex, ...res
         tours={tours}
         {...rest}
         setLightboxIndex={setLightboxIndex}
-        setActiveView={() => {}}
         setSelectedOrganizer={(organizer) => {
           if (organizer) navigate(`/organizer/${organizer.id}`);
         }}

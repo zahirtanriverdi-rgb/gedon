@@ -10,10 +10,10 @@ export const seedUsers: User[] = [
     username: 'gedekgorek',
     password: 'password123',
     role: 'vendor',
-    phone: '+994 50 123 45 67',
+    phone: '+994 70 671 78 04',
     companyName: 'GedəkGörək LLC',
     balance: 450.0,
-    whatsapp_number: '+994501112233',
+    whatsapp_number: '+994 70 671 78 04',
     avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
     about: 'GedəkGörək Azərbaycanda peşəkar dağçılıq, yürüş və düşərgə turları üzrə ixtisaslaşmış komandadır. Təbiətlə həmahəng, təhlükəsiz və yaddaqalan ekoturlar təşkil edirik.',
     aboutTranslations: {
@@ -66,7 +66,7 @@ export const seedUsers: User[] = [
 ];
 
 const NOTE = '✔️ Önəmli qeyd: Təbiətə gedirik, yağışı, küləyi, palçığı dərd etməyən, hər şeyə mız qoyub, turu başqalarının da burnundan gətirməyən, əsl yol adamı olan, xoşniyyət, əyləncəli adamsansa, gəl 🌞';
-const CONTACT = '📲 Qeydiyyat və əlavə məlumat üçün: +994 50 111 22 33 (WhatsApp)';
+const CONTACT = '📲 Qeydiyyat və əlavə məlumat üçün: +994 70 671 78 04 (WhatsApp)';
 
 // Normalized Tours Template database
 export const seedTours: Tour[] = [

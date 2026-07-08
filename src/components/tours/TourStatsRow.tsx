@@ -3,6 +3,7 @@ import { Star } from 'lucide-react';
 import { Tour } from '../../types';
 import { ParsedGpxRoute } from '../../utils/gpxParser';
 import { TourRouteStatsCard } from './TourRouteStatsCard';
+import { DifficultyInfoButton } from './DifficultyInfoButton';
 import { useLanguage } from '../../i18n/LanguageContext';
 import { REVIEWS_ENABLED } from '../../config/features';
 
@@ -41,6 +42,7 @@ export const TourStatsRow: React.FC<TourStatsRowProps> = ({
     return (
       <div className="flex-1 min-w-0">
         <TourRouteStatsCard
+          tour={tour}
           parsed={parsedGpx}
           durationLabel={durationLabel}
           difficultyLabel={difficultyLabel}
@@ -71,7 +73,10 @@ export const TourStatsRow: React.FC<TourStatsRowProps> = ({
           <div className="w-16 h-1.5 rounded-full bg-slate-100 overflow-hidden shrink-0">
             <div className={`h-full rounded-full ${difficultyBarColorClass}`} style={{ width: `${difficultyPercent}%` }} />
           </div>
-          <span className="text-[10px] text-label-tertiary font-medium">{difficultyLabel}</span>
+          <span className="flex items-center gap-1 text-[10px] text-label-tertiary font-medium">
+            {difficultyLabel}
+            <DifficultyInfoButton scale="standard" activeKey={tour.difficulty} />
+          </span>
         </div>
       </div>
     );

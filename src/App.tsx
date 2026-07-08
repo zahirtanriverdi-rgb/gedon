@@ -1,4 +1,5 @@
 import React, { useState, Suspense, lazy } from 'react';
+import { createPortal } from 'react-dom';
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { Tour, TourSlot, Booking, Review, User, PlatformConfig, PriceCalculatorConfig, UserRole } from './types';
 import { seedUsers } from './data/toursData';
@@ -14,13 +15,16 @@ import AdminLogin from './components/AdminLogin';
 import { SearchDropdown } from './components/SearchDropdown';
 import { getRecentSearches, addRecentSearch } from './utils/recentSearches';
 import { getWishlist, WISHLIST_CHANGED_EVENT } from './utils/wishlist';
+import { getCompareList, COMPARE_CHANGED_EVENT } from './utils/compare';
 import { useLanguage } from './i18n/LanguageContext';
 import LanguageSwitcher from './components/LanguageSwitcher';
+import { useExpandingMenu } from './hooks/useExpandingMenu';
 import {
   ShieldAlert,
   RefreshCw,
   X,
   Heart,
+  Scale,
   Globe,
   Calculator,
   BookOpen
@@ -316,7 +320,9 @@ export default function App() {
   // Language selection lives in the global LanguageContext (src/i18n/LanguageContext.tsx) so
   // it's shared/persisted across the whole app, not just the customer marketplace header.
   const { language: appLanguage, setLanguage: setAppLanguage, t } = useLanguage();
-  const [isLangMenuOpen, setIsLangMenuOpen] = useState(false);
+  // Fixed 192px panel, right-aligned to the button (the language list is wider than the
+  // trigger itself, unlike the tour share menu where the panel matches the button's width).
+  const langMenu = useExpandingMenu((rect) => ({ left: rect.right - 192, width: 192 }));
 
   // Wishlist ids live in localStorage (see utils/wishlist.ts); we mirror them here so the
   // header badge can react instantly when a tour is added/removed elsewhere, without a reload.
@@ -329,6 +335,19 @@ export default function App() {
   const wishlistCount = React.useMemo(
     () => tours.filter(tour => wishlistIds.includes(tour.id) && tour.status === 'approved').length,
     [tours, wishlistIds]
+  );
+
+  // Compare list ids live in localStorage (see utils/compare.ts); mirrored here for the same
+  // reason as wishlistIds above — instant header badge updates without a reload.
+  const [compareIds, setCompareIds] = useState<string[]>(() => getCompareList());
+  React.useEffect(() => {
+    const syncCompare = () => setCompareIds(getCompareList());
+    window.addEventListener(COMPARE_CHANGED_EVENT, syncCompare);
+    return () => window.removeEventListener(COMPARE_CHANGED_EVENT, syncCompare);
+  }, []);
+  const compareCount = React.useMemo(
+    () => tours.filter(tour => compareIds.includes(tour.id) && tour.status === 'approved').length,
+    [tours, compareIds]
   );
 
   React.useEffect(() => {
@@ -818,11 +837,25 @@ export default function App() {
             {showCustomerNav ? (
               <div className="flex items-center gap-1 sm:gap-2">
                 <button
-                  onClick={() => navigate('/wishlist')}
+                  onClick={() => navigate('/compare')}
                   className="relative w-11 sm:w-auto sm:min-w-0 sm:px-2 h-16 sm:h-14 flex flex-col items-center justify-center gap-0.5 hover:text-emerald-600 transition group cursor-pointer bg-transparent border-none p-0"
                 >
                   <span className="relative w-11 h-8 sm:w-9 sm:h-7 flex items-center justify-center">
-                    <Heart className="w-6 h-6 sm:w-5 sm:h-5 stroke-[2px] transition-colors group-hover:fill-emerald-500 group-hover:stroke-emerald-500" />
+                    <Scale className="w-6 h-6 sm:w-5 sm:h-5 stroke-[2px] transition-colors group-hover:stroke-emerald-500" />
+                    {compareCount > 0 && (
+                      <span className="absolute -top-1 right-1 bg-rose-600 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">
+                        {compareCount}
+                      </span>
+                    )}
+                  </span>
+                  <span className="hidden sm:block text-xs text-brand-text-main font-semibold">{t('app.nav.compare')}</span>
+                </button>
+                <button
+                  onClick={() => navigate('/wishlist')}
+                  className="relative w-11 sm:w-auto sm:min-w-0 sm:px-2 h-16 sm:h-14 flex flex-col items-center justify-center gap-0.5 hover:text-emerald-600 transition group cursor-pointer bg-transparent border-none p-0"
+                >
+                  <span className="relative w-11 h-8 sm:w-9 sm:h-7 flex items-center justify-center rounded-full transition-colors group-hover:bg-emerald-50">
+                    <Heart className="w-6 h-6 sm:w-5 sm:h-5 stroke-[2px] transition-all duration-150 group-hover:fill-emerald-500 group-hover:stroke-emerald-500 group-hover:scale-110" />
                     {wishlistCount > 0 && (
                       <span className="absolute -top-1 right-1 bg-rose-600 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center">
                         {wishlistCount}
@@ -836,8 +869,8 @@ export default function App() {
                   className="relative w-11 sm:w-auto sm:min-w-0 sm:px-2 h-16 sm:h-14 flex flex-col items-center justify-center gap-0.5 hover:text-emerald-600 transition group cursor-pointer bg-transparent border-none p-0"
                   title={t('app.nav.guideTitle')}
                 >
-                  <span className="w-11 h-8 sm:w-9 sm:h-7 flex items-center justify-center">
-                    <BookOpen className="w-6 h-6 sm:w-5 sm:h-5 stroke-[2px] transition-colors group-hover:stroke-emerald-500" />
+                  <span className="w-11 h-8 sm:w-9 sm:h-7 flex items-center justify-center rounded-full transition-colors group-hover:bg-emerald-50">
+                    <BookOpen className="w-6 h-6 sm:w-5 sm:h-5 stroke-[2px] transition-all duration-150 group-hover:stroke-emerald-500 group-hover:scale-110" />
                   </span>
                   <span className="hidden sm:block text-xs text-brand-text-main font-semibold whitespace-nowrap">{t('app.nav.guide')}</span>
                 </button>
@@ -845,19 +878,31 @@ export default function App() {
                   onClick={() => navigate('/calculator')}
                   className="w-11 sm:w-auto sm:min-w-0 sm:px-2 h-16 sm:h-14 flex flex-col items-center justify-center gap-0.5 hover:text-emerald-600 transition group cursor-pointer bg-transparent border-none p-0"
                 >
-                  <span className="w-11 h-8 sm:w-9 sm:h-7 flex items-center justify-center">
-                    <Calculator className="w-6 h-6 sm:w-5 sm:h-5 stroke-[2px] transition-colors group-hover:stroke-emerald-500" />
+                  <span className="w-11 h-8 sm:w-9 sm:h-7 flex items-center justify-center rounded-full transition-colors group-hover:bg-emerald-50">
+                    <Calculator className="w-6 h-6 sm:w-5 sm:h-5 stroke-[2px] transition-all duration-150 group-hover:stroke-emerald-500 group-hover:scale-110" />
                   </span>
                   <span className="hidden sm:block text-xs text-brand-text-main font-semibold whitespace-nowrap">{t('app.nav.calculator')}</span>
                 </button>
                 <div className="relative">
                   <button
-                    onClick={() => setIsLangMenuOpen(!isLangMenuOpen)}
+                    ref={langMenu.buttonRef}
+                    onClick={() => langMenu.setOpen((v) => !v)}
                     className="w-11 sm:w-auto sm:min-w-0 sm:px-2 h-16 sm:h-14 flex flex-col items-center justify-center gap-0.5 hover:text-emerald-600 transition group cursor-pointer bg-transparent border-none p-0"
                     title={t('app.nav.changeLangCurrency')}
                   >
-                    <span className="w-11 h-8 sm:w-9 sm:h-7 flex items-center justify-center text-brand-text-muted">
-                      <Globe className="w-6 h-6 sm:w-5 sm:h-5 stroke-[2px]" />
+                    <span className={`w-11 h-8 sm:w-9 sm:h-7 flex items-center justify-center rounded-full transition-colors group-hover:bg-emerald-50 ${langMenu.open ? 'bg-emerald-50 text-emerald-600' : 'text-brand-text-muted'}`}>
+                      <span className="relative inline-block w-6 h-6 sm:w-5 sm:h-5">
+                        <Globe
+                          className={`absolute inset-0 w-full h-full stroke-[2px] transition-all duration-300 ease-out group-hover:stroke-emerald-500 group-hover:scale-110 ${
+                            langMenu.open ? 'opacity-0 rotate-90 scale-50' : 'opacity-100 rotate-0 scale-100'
+                          }`}
+                        />
+                        <X
+                          className={`absolute inset-0 w-full h-full stroke-[2px] text-emerald-600 transition-all duration-300 ease-out ${
+                            langMenu.open ? 'opacity-100 rotate-0 scale-100' : 'opacity-0 -rotate-90 scale-50'
+                          }`}
+                        />
+                      </span>
                     </span>
                     <span className="hidden sm:block text-xs text-brand-text-muted font-semibold">
                       {appLanguage === 'az' && displayCurrency === 'AZN' ? 'AZ / AZN ₼' :
@@ -867,33 +912,46 @@ export default function App() {
                        `${appLanguage.toUpperCase()} / ${displayCurrency}`}
                     </span>
                   </button>
-                  {isLangMenuOpen && (
-                    <div className="absolute top-12 -right-4 w-44 bg-white border border-slate-200 shadow-xl rounded-xl overflow-hidden z-50 animate-fadeIn">
+                  {langMenu.hasOpenedOnce && langMenu.coords && createPortal(
+                    <div
+                      ref={langMenu.panelRef}
+                      onClick={(e) => e.stopPropagation()}
+                      style={{
+                        top: langMenu.coords.top,
+                        left: langMenu.coords.left,
+                        width: langMenu.coords.width,
+                        maxHeight: langMenu.panelVisible ? langMenu.expandedHeight : 0,
+                      }}
+                      className={`fixed z-50 bg-white border border-slate-200 shadow-xl rounded-2xl overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+                        langMenu.panelVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'
+                      }`}
+                    >
                       <button
                         className="w-full text-left px-4 py-3 text-[12px] font-semibold text-slate-700 hover:bg-slate-50 transition-colors border-b border-slate-100 flex items-center gap-2"
-                        onClick={() => { setAppLanguage('az'); setDisplayCurrency('AZN'); setIsLangMenuOpen(false); }}
+                        onClick={() => { setAppLanguage('az'); setDisplayCurrency('AZN'); langMenu.setOpen(false); }}
                       >
                         🇦🇿 Azərbaycanca (AZN)
                       </button>
                       <button
                         className="w-full text-left px-4 py-3 text-[12px] font-semibold text-slate-700 hover:bg-slate-50 transition-colors border-b border-slate-100 flex items-center gap-2"
-                        onClick={() => { setAppLanguage('ru'); setDisplayCurrency('AZN'); setIsLangMenuOpen(false); }}
+                        onClick={() => { setAppLanguage('ru'); setDisplayCurrency('AZN'); langMenu.setOpen(false); }}
                       >
                         🇷🇺 Русский (AZN)
                       </button>
                       <button
                         className="w-full text-left px-4 py-3 text-[12px] font-semibold text-slate-700 hover:bg-slate-50 transition-colors border-b border-slate-100 flex items-center gap-2"
-                        onClick={() => { setAppLanguage('en'); setDisplayCurrency('USD'); setIsLangMenuOpen(false); }}
+                        onClick={() => { setAppLanguage('en'); setDisplayCurrency('USD'); langMenu.setOpen(false); }}
                       >
                         🇬🇧 English (USD)
                       </button>
                       <button
                         className="w-full text-left px-4 py-3 text-[12px] font-semibold text-slate-700 hover:bg-slate-50 transition-colors flex items-center gap-2"
-                        onClick={() => { setAppLanguage('en'); setDisplayCurrency('EUR'); setIsLangMenuOpen(false); }}
+                        onClick={() => { setAppLanguage('en'); setDisplayCurrency('EUR'); langMenu.setOpen(false); }}
                       >
                         🇪🇺 English (EUR)
                       </button>
-                    </div>
+                    </div>,
+                    document.body
                   )}
                 </div>
               </div>

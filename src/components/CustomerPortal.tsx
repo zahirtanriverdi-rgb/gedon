@@ -6,6 +6,8 @@ import FAQPage from './FAQPage';
 import { PriceCalculator } from './PriceCalculator';
 import { ImageLightbox } from './customer/ImageLightbox';
 import { WishlistView } from './customer/WishlistView';
+import { CompareView } from './customer/CompareView';
+import { CompareSwapModal } from './tours/CompareSwapModal';
 import { ReviewSubmissionPanel } from './customer/ReviewSubmissionPanel';
 import { ToursHomeView } from './customer/ToursHomeView';
 import { PackingListSection } from './customer/PackingListSection';
@@ -16,6 +18,7 @@ import { OrganizerRoute } from './customer/OrganizerRoute';
 import NotFoundPage from './NotFoundPage';
 import { getRecentSearches, addRecentSearch } from '../utils/recentSearches';
 import { getWishlist, toggleWishlist } from '../utils/wishlist';
+import { getCompareList, toggleCompareList, replaceInCompareList } from '../utils/compare';
 import { useLanguage } from '../i18n/LanguageContext';
 import { computeFeaturedTourIds } from '../utils/featuredTours';
 
@@ -166,6 +169,26 @@ export default function CustomerPortal({
   const handleToggleWishlist = (tourId: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     setWishlist(toggleWishlist(tourId));
+  };
+
+  // Tour comparison ("Müqayisə") — localStorage-backed, max 3 tours at once (see utils/compare.ts).
+  const [compareList, setCompareList] = useState<string[]>(() => getCompareList());
+  // Set when the customer tries to add a 4th tour while 3 are already selected — holds the
+  // tour they were trying to add so the swap modal knows what to insert once they pick a slot.
+  const [pendingCompareTourId, setPendingCompareTourId] = useState<string | null>(null);
+  const handleToggleCompare = (tourId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const result = toggleCompareList(tourId);
+    if (result.status === 'full') {
+      setPendingCompareTourId(tourId);
+      return;
+    }
+    setCompareList(result.list);
+  };
+  const handleCompareSwapSelect = (tourIdToRemove: string) => {
+    if (!pendingCompareTourId) return;
+    setCompareList(replaceInCompareList(tourIdToRemove, pendingCompareTourId));
+    setPendingCompareTourId(null);
   };
 
   const [localSearchQuery, setLocalSearchQuery] = useState('');
@@ -477,6 +500,19 @@ export default function CustomerPortal({
     return tours.filter(tour => wishlist.includes(tour.id) && tour.isActive !== false && tour.status === 'approved');
   }, [tours, wishlist]);
 
+  // Tours currently selected for comparison, kept in the order they were added to compareList.
+  const compareTours = React.useMemo(() => {
+    return compareList
+      .map(id => tours.find(tour => tour.id === id && tour.isActive !== false && tour.status === 'approved'))
+      .filter((tour): tour is Tour => Boolean(tour));
+  }, [tours, compareList]);
+  const pendingCompareCurrentTours = React.useMemo(() => {
+    if (!pendingCompareTourId) return [];
+    return compareList
+      .map(id => tours.find(tour => tour.id === id))
+      .filter((tour): tour is Tour => Boolean(tour));
+  }, [tours, compareList, pendingCompareTourId]);
+
   // Upcoming tours for the horizontal slider, one slot per tour (nearest date), shuffled
   // so different vendors' tours get an equal chance of appearing first.
   const uniqueUpcomingTours = React.useMemo(() => {
@@ -603,64 +639,6 @@ export default function CustomerPortal({
     return Array.from(uniqueMonths);
   };
 
-  // Share Tour layout helper
-  const handleShareTour = (tour: Tour, e?: React.MouseEvent) => {
-    if (e) {
-      e.stopPropagation(); // prevent opening details when clicking share on the card
-    }
-    const tourSlots = slots.filter(s => s.tourId === tour.id);
-    const minPrice = tourSlots.length > 0 ? Math.min(...tourSlots.map(s => s.price)) : 25;
-    
-    const shareUrl = window.location.origin;
-    const categoryLabel = tour.category === 'hiking' ? 'Yurus / Hiking' : tour.category === 'camp' ? 'Kamp' : 'Zirve';
-    const text = tGlobal('customerMisc.customerPortal.shareTourTemplate', {
-      tourName: tour.name,
-      region: tour.region,
-      durationDays: tour.durationDays,
-      minPrice,
-      category: categoryLabel,
-      vendorName: tour.vendorName,
-      descriptionExcerpt: tour.description.slice(0, 180),
-      shareUrl,
-    });
-
-    const shareViaWhatsApp = () => {
-      navigator.clipboard.writeText(text).then(() => {
-        if (onShowNotification) {
-          onShowNotification(tGlobal('customerMisc.customerPortal.shareCopiedNotification'), 'success');
-        }
-        setTimeout(() => {
-          const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
-          const win = window.open(whatsappUrl, '_blank');
-          if (win) win.focus();
-        }, 500);
-      }).catch(() => {
-        const whatsappUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
-        const win = window.open(whatsappUrl, '_blank');
-        if (win) win.focus();
-        if (onShowNotification) {
-          onShowNotification(tGlobal('customerMisc.customerPortal.shareWhatsAppActivatedNotification'), 'success');
-        }
-      });
-    };
-
-    if (navigator.share) {
-      navigator.share({
-        title: `GədəkGörək - ${tour.name}`,
-        text,
-        url: shareUrl,
-      }).catch((err) => {
-        // User cancelled the native share sheet — do nothing
-        if (err?.name === 'AbortError') return;
-        // Native share failed for another reason — fall back to WhatsApp
-        shareViaWhatsApp();
-      });
-      return;
-    }
-
-    shareViaWhatsApp();
-  };
-
   return (
     <>
       <Routes>
@@ -683,6 +661,8 @@ export default function CustomerPortal({
                 currentUser={currentUser}
                 onAddReview={onAddReview}
                 wishlist={wishlist}
+                compareList={compareList}
+                handleToggleCompare={handleToggleCompare}
                 t={t}
                 currentSearchQuery={currentSearchQuery}
                 handleSearchChange={handleSearchChange}
@@ -727,10 +707,10 @@ export default function CustomerPortal({
                 getTourMonths={getTourMonths}
                 getAverageRating={getAverageRating}
                 getReviewsCount={getReviewsCount}
-                handleShareTour={handleShareTour}
                 handleQuickWhatsApp={handleQuickWhatsApp}
                 onSelectTour={(tour) => navigate(`/tours/${tour.slug || tour.id}`)}
                 setActiveView={() => {}}
+                onShowNotification={onShowNotification}
               />
             </>
           }
@@ -750,7 +730,6 @@ export default function CustomerPortal({
               onShowNotification={onShowNotification}
               getConvertedPriceInfo={getConvertedPriceInfo}
               getReviewsCount={getReviewsCount}
-              handleShareTour={handleShareTour}
               handleToggleWishlist={handleToggleWishlist}
               lightboxIndex={lightboxIndex}
               setLightboxIndex={setLightboxIndex}
@@ -783,6 +762,24 @@ export default function CustomerPortal({
               onBack={() => navigate('/')}
               onSelectTour={(tour) => navigate(`/tours/${tour.slug || tour.id}`)}
               onToggleWishlist={handleToggleWishlist}
+              compareList={compareList}
+              onToggleCompare={handleToggleCompare}
+            />
+          }
+        />
+
+        <Route
+          path="/compare"
+          element={
+            <CompareView
+              compareTours={compareTours}
+              slots={slots}
+              onBack={() => navigate('/')}
+              onSelectTour={(tour) => navigate(`/tours/${tour.slug || tour.id}`)}
+              onRemoveFromCompare={(tourId) => handleToggleCompare(tourId)}
+              getConvertedPriceInfo={getConvertedPriceInfo}
+              getAverageRating={getAverageRating}
+              getReviewsCount={getReviewsCount}
             />
           }
         />
@@ -791,6 +788,14 @@ export default function CustomerPortal({
 
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
+
+      {pendingCompareTourId && (
+        <CompareSwapModal
+          currentTours={pendingCompareCurrentTours}
+          onSelectReplace={handleCompareSwapSelect}
+          onCancel={() => setPendingCompareTourId(null)}
+        />
+      )}
 
       {/* Quick "WhatsApp ilə Rezerv et" popup — same TourDetailPage/booking/OTP flow as the full
           page, just opened as an overlay so the home page underneath stays put. */}
@@ -819,9 +824,7 @@ export default function CustomerPortal({
                 onShowNotification={onShowNotification}
                 getConvertedPriceInfo={getConvertedPriceInfo}
                 getReviewsCount={getReviewsCount}
-                handleShareTour={handleShareTour}
                 handleToggleWishlist={handleToggleWishlist}
-                setActiveView={() => {}}
                 setSelectedOrganizer={(organizer) => {
                   if (organizer) {
                     setQuickBookTour(null);

@@ -1,10 +1,13 @@
 import React from 'react';
 import { Star } from 'lucide-react';
+import { Tour } from '../../types';
 import { ParsedGpxRoute, isRoundTripRoute } from '../../utils/gpxParser';
 import { RouteSparkline } from './RouteSparkline';
+import { DifficultyInfoButton } from './DifficultyInfoButton';
 import { useLanguage } from '../../i18n/LanguageContext';
 
 interface TourRouteStatsCardProps {
+  tour: Tour;
   parsed: ParsedGpxRoute;
   durationLabel: string;
   difficultyLabel: string;
@@ -17,6 +20,7 @@ interface TourRouteStatsCardProps {
 }
 
 export const TourRouteStatsCard: React.FC<TourRouteStatsCardProps> = ({
+  tour,
   parsed,
   durationLabel,
   difficultyLabel,
@@ -27,6 +31,14 @@ export const TourRouteStatsCard: React.FC<TourRouteStatsCardProps> = ({
 }) => {
   const { t } = useLanguage();
   const roundTrip = showRoundTripNote && isRoundTripRoute(parsed);
+
+  // Same active-vs-standard branching the callers use to pick difficultyLabel/Percent, just
+  // reduced to "which legend scale, which entry" for the info popover.
+  const isActiveScale = tour.category === 'active' || tour.isActiveLife;
+  const rawActiveDiff = tour.activeDifficulty || (tour.difficulty === 'easy' ? 'beginner' : tour.difficulty === 'hard' || tour.difficulty === 'extreme' ? 'professional' : 'medium');
+  const activeKey = isActiveScale
+    ? (rawActiveDiff === 'beginner' || rawActiveDiff === 'easy' ? 'beginner' : rawActiveDiff === 'medium' ? 'medium' : 'professional')
+    : tour.difficulty;
 
   return (
     <div className="flex items-stretch gap-3">
@@ -56,7 +68,10 @@ export const TourRouteStatsCard: React.FC<TourRouteStatsCardProps> = ({
                 style={{ width: `${difficultyPercent}%` }}
               />
             </div>
-            <span className="text-[10px] text-label-tertiary font-medium break-words">{difficultyLabel}</span>
+            <span className="flex items-center gap-1 text-[10px] text-label-tertiary font-medium break-words">
+              {difficultyLabel}
+              <DifficultyInfoButton scale={isActiveScale ? 'active' : 'standard'} activeKey={activeKey} />
+            </span>
           </div>
           <div className="flex flex-col items-end gap-0.5 shrink-0">
             <span className="flex items-center gap-1 font-bold text-sm text-label-primary">

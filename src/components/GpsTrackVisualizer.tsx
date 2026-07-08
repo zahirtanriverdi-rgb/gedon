@@ -1,16 +1,86 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { ParsedGpxRoute, parseStoredGpxData } from '../utils/gpxParser';
-import { 
-  Play, 
-  Pause, 
-  RotateCcw, 
-  X, 
-  Compass, 
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { ParsedGpxRoute, parseStoredGpxData, calculateHaversineDistance, getRouteDurationHours } from '../utils/gpxParser';
+import {
+  Play,
+  Pause,
+  RotateCcw,
+  X,
+  Compass,
   Layers,
-  Activity
+  Activity,
+  Camera,
+  Move
 } from 'lucide-react';
 import maplibregl from 'maplibre-gl';
 import { useLanguage } from '../i18n/LanguageContext';
+
+/**
+ * Interpolates a lat/lon/ele position at a given progress (0-1) along the route,
+ * based on real cumulative ground distance rather than raw point index — keeps
+ * playback speed constant across the track regardless of how densely points were
+ * recorded (steep switchbacks vs. flat straightaways).
+ */
+function interpolateAlongRoute(
+  progress: number,
+  points: [number, number, number][],
+  cumDistances: number[],
+  totalDistanceKm: number
+): { lat: number; lon: number; ele: number } {
+  const clamped = Math.min(1, Math.max(0, progress));
+  if (points.length === 1 || totalDistanceKm <= 0) {
+    const p = points[0];
+    return { lat: p[0], lon: p[1], ele: p[2] };
+  }
+
+  const targetDistance = clamped * totalDistanceKm;
+
+  // Binary search for the first cumulative distance >= targetDistance
+  let lo = 0;
+  let hi = cumDistances.length - 1;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (cumDistances[mid] < targetDistance) {
+      lo = mid + 1;
+    } else {
+      hi = mid;
+    }
+  }
+
+  const idx1 = Math.max(1, lo);
+  const idx0 = idx1 - 1;
+  const segStart = cumDistances[idx0];
+  const segEnd = cumDistances[idx1];
+  const segLength = segEnd - segStart;
+  const frac = segLength > 0 ? (targetDistance - segStart) / segLength : 0;
+
+  const p0 = points[idx0];
+  const p1 = points[idx1];
+
+  return {
+    lat: p0[0] + (p1[0] - p0[0]) * frac,
+    lon: p0[1] + (p1[1] - p0[1]) * frac,
+    ele: p0[2] + (p1[2] - p0[2]) * frac,
+  };
+}
+
+/** Great-circle initial bearing in degrees (0-360) from point A to point B */
+function computeBearingDeg(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const toDeg = (r: number) => (r * 180) / Math.PI;
+  const phi1 = toRad(lat1);
+  const phi2 = toRad(lat2);
+  const deltaLambda = toRad(lon2 - lon1);
+  const y = Math.sin(deltaLambda) * Math.cos(phi2);
+  const x = Math.cos(phi1) * Math.sin(phi2) - Math.sin(phi1) * Math.cos(phi2) * Math.cos(deltaLambda);
+  const theta = Math.atan2(y, x);
+  return (toDeg(theta) + 360) % 360;
+}
+
+/** Rotates `current` degrees towards `target` degrees by factor `t`, taking the shortest angular path */
+function lerpBearing(current: number, target: number, t: number): number {
+  const diff = ((target - current + 540) % 360) - 180;
+  return (current + diff * t + 360) % 360;
+}
 
 interface GpsTrackVisualizerProps {
   gpxDataString: string;
@@ -91,11 +161,56 @@ const GpsMapOverlay: React.FC<GpsMapOverlayProps> = ({ parsed, onClose }) => {
   const [isPlaying, setIsPlaying] = useState<boolean>(true);
   const [playbackSpeed, setPlaybackSpeed] = useState<number>(2.0);
   const [isFollowing, setIsFollowing] = useState<boolean>(true);
+  const [isFinished, setIsFinished] = useState<boolean>(false);
+
+  // Real ground-distance cumulative table, used to interpolate smoothly between
+  // GPX points (constant playback speed) instead of snapping point-to-point.
+  const { cumDistances, totalDistanceKm } = useMemo(() => {
+    const points = parsed.points;
+    const cum: number[] = [0];
+    for (let i = 1; i < points.length; i++) {
+      const [lat1, lon1] = points[i - 1];
+      const [lat2, lon2] = points[i];
+      cum.push(cum[i - 1] + calculateHaversineDistance(lat1, lon1, lat2, lon2));
+    }
+    return { cumDistances: cum, totalDistanceKm: cum[cum.length - 1] || 0 };
+  }, [parsed]);
+
+  // Precomputed SVG elevation profile (x = distance %, y = normalized elevation)
+  const elevationProfile = useMemo(() => {
+    const points = parsed.points;
+    if (points.length < 2 || totalDistanceKm <= 0) return { path: '', areaPath: '' };
+    const elevations = points.map(p => p[2]);
+    const minEle = Math.min(...elevations);
+    const maxEle = Math.max(...elevations);
+    const range = maxEle - minEle || 1;
+    const coords = points.map((p, i) => {
+      const x = (cumDistances[i] / totalDistanceKm) * 100;
+      const y = 30 - ((p[2] - minEle) / range) * 28 - 1;
+      return `${x.toFixed(2)},${y.toFixed(2)}`;
+    });
+    const path = `M${coords.join(' L')}`;
+    return { path, areaPath: `${path} L100,30 L0,30 Z` };
+  }, [parsed, cumDistances, totalDistanceKm]);
 
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const markerRef = useRef<maplibregl.Marker | null>(null);
   const isUserInteractingRef = useRef<boolean>(false);
+  const smoothedBearingRef = useRef<number>(0);
+  const introActiveRef = useRef<boolean>(true);
+  const elevationIndicatorRef = useRef<HTMLDivElement | null>(null);
+  // Once the user manually rotates the map, stop overriding their bearing so a "free look"
+  // rotate doesn't keep snapping back to the travel direction — only re-armed via the follow toggle.
+  const userRotatedRef = useRef<boolean>(false);
+
+  // Joystick: lets the user orbit the camera around the hiker marker by dragging a knob,
+  // independent of the map's own drag/rotate gestures (which pan/rotate the whole map instead).
+  const joystickBaseRef = useRef<HTMLDivElement | null>(null);
+  const joystickKnobRef = useRef<HTMLDivElement | null>(null);
+  const isJoystickActiveRef = useRef<boolean>(false);
+  const joystickBearingRef = useRef<number>(0);
+  const joystickPitchRef = useRef<number>(55);
 
   // Performance-critical DOM refs to bypass 60fps React state re-renders entirely
   const sliderRef = useRef<HTMLInputElement | null>(null);
@@ -123,21 +238,42 @@ const GpsMapOverlay: React.FC<GpsMapOverlayProps> = ({ parsed, onClose }) => {
     const marker = markerRef.current;
     if (!map || !marker || parsed.points.length === 0) return;
 
-    const pointsCount = parsed.points.length;
-    const idx = Math.min(
-      pointsCount - 1,
-      Math.max(0, Math.floor(progress * (pointsCount - 1)))
-    );
-    const activePt = parsed.points[idx];
-    const targetLngLat: [number, number] = [activePt[1], activePt[0]];
+    const current = interpolateAlongRoute(progress, parsed.points, cumDistances, totalDistanceKm);
+    const targetLngLat: [number, number] = [current.lon, current.lat];
 
-    // Move marker to current step coordinates
+    // Move marker to current interpolated position (smooth between GPX points, not snapped)
     marker.setLngLat(targetLngLat);
 
-    // Camera tracker helper - Only track coordinates smoothly, zero spin-nausea, maximum tile sharpness
-    if (!isUserInteractingRef.current && !isTransitioningRef.current && isFollowingRef.current) {
+    // Look a short real-world distance ahead to get a stable travel heading, then
+    // ease the camera bearing towards it (shortest angular path) to avoid GPS-noise jitter
+    if (totalDistanceKm > 0) {
+      const lookAheadKm = 0.05;
+      const aheadProgress = Math.min(1, progress + lookAheadKm / totalDistanceKm);
+      if (aheadProgress > progress) {
+        const ahead = interpolateAlongRoute(aheadProgress, parsed.points, cumDistances, totalDistanceKm);
+        if (ahead.lat !== current.lat || ahead.lon !== current.lon) {
+          const targetBearing = computeBearingDeg(current.lat, current.lon, ahead.lat, ahead.lon);
+          smoothedBearingRef.current = lerpBearing(smoothedBearingRef.current, targetBearing, 0.08);
+        }
+      }
+    }
+
+    // Joystick takes priority over everything else while the user is actively dragging it —
+    // lets them orbit around the hiker regardless of follow/interaction state.
+    if (isJoystickActiveRef.current) {
+      if (!isTransitioningRef.current) {
+        map.jumpTo({
+          center: targetLngLat,
+          bearing: joystickBearingRef.current,
+          pitch: joystickPitchRef.current
+        });
+      }
+    } else if (!introActiveRef.current && !isUserInteractingRef.current && !isTransitioningRef.current && isFollowingRef.current) {
+      // Camera tracker helper - track position smoothly, zero spin-nausea, maximum tile sharpness.
+      // Bearing is only force-applied until the user manually rotates the map (see userRotatedRef).
       map.jumpTo({
-        center: targetLngLat
+        center: targetLngLat,
+        ...(userRotatedRef.current ? {} : { bearing: smoothedBearingRef.current })
       });
     }
 
@@ -149,12 +285,15 @@ const GpsMapOverlay: React.FC<GpsMapOverlayProps> = ({ parsed, onClose }) => {
       percentageTextRef.current.textContent = `${Math.round(progress * 100)}%`;
     }
     if (distanceRef.current) {
-      const accumDistance = (parsed.stats.distanceKm * progress).toFixed(1);
+      const accumDistance = (totalDistanceKm * progress).toFixed(1);
       distanceRef.current.textContent = t('miscWidgets.gpsTrackVisualizer.distanceLabel', { distance: accumDistance });
     }
     if (altitudeRef.current) {
-      const currentAltitude = Math.round(activePt ? activePt[2] : parsed.stats.lowestPointM);
+      const currentAltitude = Math.round(current.ele);
       altitudeRef.current.textContent = t('miscWidgets.gpsTrackVisualizer.altitudeLabel', { altitude: currentAltitude });
+    }
+    if (elevationIndicatorRef.current) {
+      elevationIndicatorRef.current.style.left = `${progress * 100}%`;
     }
   };
 
@@ -207,8 +346,9 @@ const GpsMapOverlay: React.FC<GpsMapOverlayProps> = ({ parsed, onClose }) => {
       style: customSatelliteStyle,
       center: startCoord,
       zoom: 13.5,
-      pitch: mapMode === '3d' ? 62 : 0, 
-      bearing: 25
+      pitch: mapMode === '3d' ? 62 : 0,
+      bearing: 0,
+      canvasContextAttributes: { preserveDrawingBuffer: true } // required so the canvas can be captured for the screenshot export button
     });
 
     mapRef.current = map;
@@ -248,9 +388,16 @@ const GpsMapOverlay: React.FC<GpsMapOverlayProps> = ({ parsed, onClose }) => {
       }, 5000); // Resume automatic focal tracking 5 seconds after interaction ends
     };
 
+    // A manual rotate means the user wants to look somewhere other than "forward" —
+    // stop overriding their bearing (position tracking still resumes as normal above).
+    const onUserRotate = () => {
+      userRotatedRef.current = true;
+    };
+
     map.on('dragstart', startInteraction);
     map.on('zoomstart', startInteraction);
     map.on('rotatestart', startInteraction);
+    map.on('rotatestart', onUserRotate);
     map.on('pitchstart', startInteraction);
 
     map.on('dragend', endInteraction);
@@ -285,11 +432,22 @@ const GpsMapOverlay: React.FC<GpsMapOverlayProps> = ({ parsed, onClose }) => {
         maxzoom: 15
       });
 
-      // Enable terrain if in '3d' mode initially (Use optimal non-jagged exaggeration)
+      // Sky layer: fills the void beyond loaded terrain edges with a gradient instead of
+      // the vertical "curtain" artifact terrain rendering shows there when panning/zooming out
+      map.setSky({
+        'sky-color': '#88C6FC',
+        'sky-horizon-blend': 0.5,
+        'horizon-color': '#ffffff',
+        'horizon-fog-blend': 0.5,
+        'fog-color': '#ffffff',
+        'fog-ground-blend': 0.5
+      });
+
+      // Enable terrain if in '3d' mode initially (exaggerated enough for the relief to read clearly)
       if (mapMode === '3d') {
         map.setTerrain({
           source: 'terrain-dem',
-          exaggeration: 1.15
+          exaggeration: 1.3
         });
       }
 
@@ -368,6 +526,17 @@ const GpsMapOverlay: React.FC<GpsMapOverlayProps> = ({ parsed, onClose }) => {
       performFitBounds();
       fitTimeout = setTimeout(performFitBounds, 250);
 
+      // Start the camera already facing the direction of travel — avoids a separate
+      // cinematic flyTo to a different zoom/point, which required loading a second full
+      // set of tiles and made first paint noticeably slower on some networks.
+      if (totalDistanceKm > 0) {
+        const startPt = interpolateAlongRoute(0, parsed.points, cumDistances, totalDistanceKm);
+        const aheadProgress = Math.min(1, 0.05 / totalDistanceKm);
+        const aheadPt = interpolateAlongRoute(aheadProgress, parsed.points, cumDistances, totalDistanceKm);
+        smoothedBearingRef.current = computeBearingDeg(startPt.lat, startPt.lon, aheadPt.lat, aheadPt.lon);
+      }
+      introActiveRef.current = false;
+
       // Perform initial render update to populate progress elements
       updateMapAndMarkerVisuals(0);
     });
@@ -391,16 +560,14 @@ const GpsMapOverlay: React.FC<GpsMapOverlayProps> = ({ parsed, onClose }) => {
   // Immediately respond to manual switches between 2D and 3D mode with smooth transitions
   useEffect(() => {
     const map = mapRef.current;
-    if (!map) return;
+    // Also skip while the cinematic intro is still running (e.g. this effect firing on
+    // initial mount) — avoids requesting yet another throwaway viewport's worth of tiles
+    // before the intro's own flyTo settles, which was slowing down first paint.
+    if (!map || introActiveRef.current) return;
 
     const progress = progressRef.current;
-    const pointsCount = parsed.points.length;
-    const idx = Math.min(
-      pointsCount - 1,
-      Math.max(0, Math.floor(progress * (pointsCount - 1)))
-    );
-    const activePt = parsed.points[idx];
-    const targetLngLat: [number, number] = [activePt[1], activePt[0]];
+    const current = interpolateAlongRoute(progress, parsed.points, cumDistances, totalDistanceKm);
+    const targetLngLat: [number, number] = [current.lon, current.lat];
 
     // Temporarily halt automatic tick jumps to let easeTo animation slide smoothly
     isTransitioningRef.current = true;
@@ -408,7 +575,7 @@ const GpsMapOverlay: React.FC<GpsMapOverlayProps> = ({ parsed, onClose }) => {
     if (mapMode === '3d') {
       try {
         if (map.getSource('terrain-dem')) {
-          map.setTerrain({ source: 'terrain-dem', exaggeration: 1.15 });
+          map.setTerrain({ source: 'terrain-dem', exaggeration: 1.3 });
         }
       } catch (err) {
         console.warn('Terrain activation failed:', err);
@@ -416,7 +583,7 @@ const GpsMapOverlay: React.FC<GpsMapOverlayProps> = ({ parsed, onClose }) => {
       map.easeTo({
         center: targetLngLat,
         pitch: 55,
-        bearing: 30, // Beautiful angle pointing towards the lakes and summits
+        bearing: smoothedBearingRef.current, // keep facing the current travel direction
         duration: 1000,
         essential: true
       });
@@ -455,13 +622,24 @@ const GpsMapOverlay: React.FC<GpsMapOverlayProps> = ({ parsed, onClose }) => {
       const delta = (now - lastTime) / 1000;
       lastTime = now;
 
-      // Update simulation marker progression continuously 
-      let nextProgress = progressRef.current + (delta * 0.010 * playbackSpeedRef.current);
-      if (nextProgress >= 1.0) {
-        nextProgress = 0.0; // loops continuously
+      // Hold position updates while the cinematic intro flyTo is still swooping in
+      if (introActiveRef.current) {
+        frameId = requestAnimationFrame(tick);
+        return;
       }
-      progressRef.current = nextProgress;
 
+      // Update simulation marker progression continuously
+      const nextProgress = progressRef.current + (delta * 0.010 * playbackSpeedRef.current);
+
+      if (nextProgress >= 1.0) {
+        progressRef.current = 1.0;
+        updateMapAndMarkerVisuals(1.0);
+        setIsPlaying(false);
+        setIsFinished(true);
+        return; // stop the loop, show the completion summary instead of looping
+      }
+
+      progressRef.current = nextProgress;
       updateMapAndMarkerVisuals(nextProgress);
 
       frameId = requestAnimationFrame(tick);
@@ -471,14 +649,107 @@ const GpsMapOverlay: React.FC<GpsMapOverlayProps> = ({ parsed, onClose }) => {
     return () => cancelAnimationFrame(frameId);
   }, [isPlaying]);
 
+  const handleRestart = () => {
+    progressRef.current = 0;
+    setIsFinished(false);
+    setIsPlaying(true);
+    updateMapAndMarkerVisuals(0);
+  };
+
+  const handleScreenshot = () => {
+    const map = mapRef.current;
+    if (!map) return;
+    try {
+      const dataUrl = map.getCanvas().toDataURL('image/png');
+      const link = document.createElement('a');
+      link.href = dataUrl;
+      link.download = `${parsed.fileName ? parsed.fileName.replace(/\.[^/.]+$/, '') : 'route'}-3d-expedition.png`;
+      link.click();
+    } catch (err) {
+      console.warn('Screenshot capture failed:', err);
+    }
+  };
+
+  // Joystick radius in pixels the knob can travel from center before clamping
+  const JOYSTICK_RADIUS = 32;
+
+  const handleJoystickPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    const map = mapRef.current;
+    if (!map) return;
+    isJoystickActiveRef.current = true;
+    joystickBearingRef.current = map.getBearing();
+    joystickPitchRef.current = map.getPitch();
+    try {
+      (e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId);
+    } catch {
+      // no-op: some pointer types/browsers don't support capture — drag still works via bubbling
+    }
+  };
+
+  const handleJoystickPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isJoystickActiveRef.current || !joystickBaseRef.current || !joystickKnobRef.current) return;
+    const rect = joystickBaseRef.current.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    const rawDx = e.clientX - centerX;
+    const rawDy = e.clientY - centerY;
+    const dist = Math.min(JOYSTICK_RADIUS, Math.sqrt(rawDx * rawDx + rawDy * rawDy));
+    const angle = Math.atan2(rawDy, rawDx);
+    const dx = Math.cos(angle) * dist;
+    const dy = Math.sin(angle) * dist;
+
+    joystickKnobRef.current.style.transform = `translate(${dx}px, ${dy}px)`;
+
+    // Knob angle maps directly to compass bearing: up = north (0°), clockwise from there.
+    const bearingDeg = (Math.atan2(dx, -dy) * 180) / Math.PI;
+    joystickBearingRef.current = (bearingDeg + 360) % 360;
+
+    // Distance from center controls pitch: centered = looking down, pushed to the edge = looking
+    // toward the horizon — the further you push, the more "into" the view you tilt.
+    const magnitude = dist / JOYSTICK_RADIUS;
+    joystickPitchRef.current = 15 + magnitude * 55;
+  };
+
+  const handleJoystickPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    isJoystickActiveRef.current = false;
+    userRotatedRef.current = true; // keep the view the user chose instead of snapping back
+    if (joystickKnobRef.current) {
+      joystickKnobRef.current.style.transform = 'translate(0px, 0px)';
+    }
+    try {
+      (e.currentTarget as HTMLDivElement).releasePointerCapture(e.pointerId);
+    } catch {
+      // no-op: pointer capture may already be released
+    }
+  };
+
   return (
     <div className="fixed inset-0 bg-slate-950 z-[99999] flex flex-col text-slate-100 font-sans transition-all">
-      
+
       {/* Main Maplibre Map Container */}
       <div className="flex-1 relative w-full h-full bg-primary-50 overflow-hidden select-none">
-        
+
         {/* Map Canvas */}
         <div ref={mapContainerRef} className="w-full h-full text-slate-900" style={{ outline: 'none' }} />
+
+        {/* ORBIT JOYSTICK: drag the knob to rotate/tilt the camera around the hiker marker */}
+        <div
+          ref={joystickBaseRef}
+          onPointerDown={handleJoystickPointerDown}
+          onPointerMove={handleJoystickPointerMove}
+          onPointerUp={handleJoystickPointerUp}
+          onPointerCancel={handleJoystickPointerUp}
+          title={t('miscWidgets.gpsTrackVisualizer.joystickTitle')}
+          className="absolute bottom-24 left-1/2 -translate-x-1/2 z-[30] w-20 h-20 rounded-full bg-slate-950/60 border border-white/20 backdrop-blur-md shadow-xl flex items-center justify-center touch-none cursor-grab active:cursor-grabbing select-none"
+        >
+          <div
+            ref={joystickKnobRef}
+            className="w-9 h-9 rounded-full bg-sky-500 border-2 border-white/80 shadow-lg flex items-center justify-center pointer-events-none"
+          >
+            <Move className="w-4 h-4 text-white" />
+          </div>
+        </div>
 
         {/* BOTTOM-LEFT: CLEAN ROUNDED MAP METRICS CAPSULE PILL BADGE */}
         <div className="absolute bottom-4 left-4 bg-sky-600/95 text-white p-2.5 px-4 rounded-full font-extrabold text-[11px] uppercase tracking-wider flex items-center gap-2.5 z-[20] shadow-xl shadow-black/40 animate-pulse">
@@ -501,11 +772,73 @@ const GpsMapOverlay: React.FC<GpsMapOverlayProps> = ({ parsed, onClose }) => {
           <span>{t('miscWidgets.gpsTrackVisualizer.exitButton')}</span>
         </button>
 
+        {/* COMPLETION SUMMARY CARD - shown once playback reaches the end of the route */}
+        {isFinished && (
+          <div className="absolute inset-0 z-[60] flex items-center justify-center bg-slate-950/70 backdrop-blur-sm p-4">
+            <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-sm w-full text-center shadow-2xl">
+              <h3 className="text-lg font-black text-white mb-1">{t('miscWidgets.gpsTrackVisualizer.finishedTitle')}</h3>
+              <p className="text-xs text-slate-400 mb-5">{t('miscWidgets.gpsTrackVisualizer.finishedDescription')}</p>
+              <div className="grid grid-cols-2 gap-3 mb-6">
+                <div className="bg-slate-800 rounded-xl p-3">
+                  <div className="text-[10px] uppercase text-slate-500 font-bold mb-1">{t('miscWidgets.gpsTrackVisualizer.statDistance')}</div>
+                  <div className="text-sm font-black text-sky-400">{totalDistanceKm.toFixed(1)} km</div>
+                </div>
+                <div className="bg-slate-800 rounded-xl p-3">
+                  <div className="text-[10px] uppercase text-slate-500 font-bold mb-1">{t('miscWidgets.gpsTrackVisualizer.statElevationGain')}</div>
+                  <div className="text-sm font-black text-emerald-400">+{parsed.stats.elevationGainM} m</div>
+                </div>
+                <div className="bg-slate-800 rounded-xl p-3">
+                  <div className="text-[10px] uppercase text-slate-500 font-bold mb-1">{t('miscWidgets.gpsTrackVisualizer.statHighestPoint')}</div>
+                  <div className="text-sm font-black text-amber-400">{parsed.stats.highestPointM} m</div>
+                </div>
+                <div className="bg-slate-800 rounded-xl p-3">
+                  <div className="text-[10px] uppercase text-slate-500 font-bold mb-1">{t('miscWidgets.gpsTrackVisualizer.statDuration')}</div>
+                  <div className="text-sm font-black text-rose-400">{getRouteDurationHours(parsed)} h</div>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleRestart}
+                  className="flex-1 py-2.5 bg-sky-600 hover:bg-sky-500 text-white font-black text-xs uppercase rounded-xl cursor-pointer active:scale-[0.98] transition"
+                >
+                  {t('miscWidgets.gpsTrackVisualizer.restartButton')}
+                </button>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="flex-1 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-black text-xs uppercase rounded-xl cursor-pointer active:scale-[0.98] transition"
+                >
+                  {t('miscWidgets.gpsTrackVisualizer.closeButton')}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
       </div>
 
       {/* Simple controls bar under simulation viewer optimized for rapid touches */}
-      <div className="bg-slate-950 border-t border-slate-800 p-4 px-6 flex flex-col md:flex-row items-center justify-between gap-4 select-none z-[100]">
-        
+      <div className="bg-slate-950 border-t border-slate-800 p-4 px-6 flex flex-col gap-3 select-none z-[100]">
+
+        {/* Live elevation profile strip with a progress indicator synced to playback */}
+        {elevationProfile.path && (
+          <div className="relative w-full h-10 md:h-12">
+            <svg viewBox="0 0 100 30" preserveAspectRatio="none" className="w-full h-full">
+              <path d={elevationProfile.areaPath} fill="rgba(56,189,248,0.15)" stroke="none" />
+              <path d={elevationProfile.path} fill="none" stroke="#38bdf8" strokeWidth="1" vectorEffect="non-scaling-stroke" />
+            </svg>
+            <div
+              ref={elevationIndicatorRef}
+              className="absolute top-0 bottom-0 w-px bg-rose-500 pointer-events-none"
+              style={{ left: '0%', boxShadow: '0 0 6px rgba(244,63,94,0.8)' }}
+            >
+              <div className="absolute -top-1 -left-1 w-2.5 h-2.5 rounded-full bg-rose-500 border border-white/70" />
+            </div>
+          </div>
+        )}
+
+      <div className="flex flex-col md:flex-row items-center justify-between gap-4 w-full">
         {/* Play pause controls with 44px minimum touch layout */}
         <div className="flex items-center gap-2 flex-wrap">
           <button
@@ -521,27 +854,47 @@ const GpsMapOverlay: React.FC<GpsMapOverlayProps> = ({ parsed, onClose }) => {
 
           <button
             type="button"
-            onClick={() => {
-              progressRef.current = 0;
-              setIsPlaying(true);
-              updateMapAndMarkerVisuals(0);
-            }}
+            onClick={handleRestart}
             className="p-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-full cursor-pointer transition min-h-[44px] min-w-[44px] flex items-center justify-center"
             title={t('miscWidgets.gpsTrackVisualizer.resetTitle')}
           >
             <RotateCcw className="w-4 h-4" />
           </button>
 
-          {/* Map surface toggle switch (Corrected "i/ı" lettering) */}
           <button
             type="button"
-            onClick={() => setMapMode(mapMode === '3d' ? '2d' : '3d')}
-            className="px-3.5 py-2.5 bg-slate-800 hover:bg-slate-700 border border-slate-700/80 rounded-xl text-[11px] font-black text-white cursor-pointer active:scale-95 transition flex items-center gap-2 min-h-[44px]"
-            title={mapMode === '3d' ? t('miscWidgets.gpsTrackVisualizer.switchTo2d') : t('miscWidgets.gpsTrackVisualizer.switchTo3d')}
+            onClick={handleScreenshot}
+            className="p-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-full cursor-pointer transition min-h-[44px] min-w-[44px] flex items-center justify-center"
+            title={t('miscWidgets.gpsTrackVisualizer.screenshotTitle')}
           >
-            <Layers className="w-4 h-4 text-sky-400" />
-            <span>{mapMode === '3d' ? t('miscWidgets.gpsTrackVisualizer.mode2d') : t('miscWidgets.gpsTrackVisualizer.mode3d')}</span>
+            <Camera className="w-4 h-4" />
           </button>
+
+          {/* Map surface mode: segmented control shows BOTH options so the active one is obvious
+              at a glance, instead of a single button whose label was the opposite of the current mode */}
+          <div className="flex items-center gap-1 bg-slate-800 border border-slate-700/80 rounded-xl p-1 min-h-[44px]">
+            <Layers className="w-4 h-4 text-sky-400 ml-1.5 mr-0.5 shrink-0" />
+            <button
+              type="button"
+              onClick={() => setMapMode('2d')}
+              className={`px-3 py-2 rounded-lg text-[11px] font-black cursor-pointer transition ${
+                mapMode === '2d' ? 'bg-sky-600 text-white' : 'text-slate-400 hover:text-white'
+              }`}
+              title={t('miscWidgets.gpsTrackVisualizer.mode2dTitle')}
+            >
+              2D
+            </button>
+            <button
+              type="button"
+              onClick={() => setMapMode('3d')}
+              className={`px-3 py-2 rounded-lg text-[11px] font-black cursor-pointer transition ${
+                mapMode === '3d' ? 'bg-sky-600 text-white' : 'text-slate-400 hover:text-white'
+              }`}
+              title={t('miscWidgets.gpsTrackVisualizer.mode3dTitle')}
+            >
+              3D
+            </button>
+          </div>
 
           {/* Camera Follow mode toggle */}
           <button
@@ -551,7 +904,8 @@ const GpsMapOverlay: React.FC<GpsMapOverlayProps> = ({ parsed, onClose }) => {
               setIsFollowing(next);
               isFollowingRef.current = next;
               if (next) {
-                // Instantly align camera onto current hiker position
+                // Re-arm auto-bearing and instantly align camera onto current hiker position
+                userRotatedRef.current = false;
                 updateMapAndMarkerVisuals(progressRef.current);
               }
             }}
@@ -582,6 +936,7 @@ const GpsMapOverlay: React.FC<GpsMapOverlayProps> = ({ parsed, onClose }) => {
                 const val = parseFloat(e.target.value);
                 progressRef.current = val;
                 setIsPlaying(false); // Stop when scrubbing manually
+                setIsFinished(false);
                 updateMapAndMarkerVisuals(val);
               }}
               className="w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-sky-500"
@@ -609,6 +964,7 @@ const GpsMapOverlay: React.FC<GpsMapOverlayProps> = ({ parsed, onClose }) => {
           ))}
         </div>
 
+      </div>
       </div>
 
     </div>

@@ -8,11 +8,11 @@ import {
   Calendar,
   AlertCircle,
   MessageCircle,
-  Share2,
   ChevronLeft,
   ChevronRight,
   Plane,
-  Heart
+  Heart,
+  Scale
 } from 'lucide-react';
 import { SearchDropdown } from '../SearchDropdown';
 import { ReviewSubmissionPanel } from './ReviewSubmissionPanel';
@@ -21,6 +21,7 @@ import { useLanguage } from '../../i18n/LanguageContext';
 import { getLocalizedTourName, getLocalizedTourDescription } from '../../i18n/tourLocalization';
 import { parseStoredGpxData, getRouteDurationHours } from '../../utils/gpxParser';
 import { TourStatsRow } from '../tours/TourStatsRow';
+import { ShareMenuButton } from '../tours/ShareMenuButton';
 import { matchesHikingSubcategory, HIKING_SUBCATEGORIES, HikingSubcategory } from '../../utils/hikingSubcategories';
 
 type ConvertedPriceInfo = {
@@ -40,6 +41,8 @@ interface ToursHomeViewProps {
   currentUser: { id: string; name: string; phone: string; balance: number; email: string };
   onAddReview: (newReview: Review) => Promise<void>;
   wishlist: string[];
+  compareList: string[];
+  handleToggleCompare: (tourId: string, e?: React.MouseEvent) => void;
   t: (key: string) => string;
   currentSearchQuery: string;
   handleSearchChange: (val: string) => void;
@@ -84,10 +87,10 @@ interface ToursHomeViewProps {
   getTourMonths: (tourId: string) => string[];
   getAverageRating: (tourId: string) => string;
   getReviewsCount: (tourId: string) => number;
-  handleShareTour: (tour: Tour, e?: React.MouseEvent) => void;
   handleQuickWhatsApp: (tour: Tour, e: React.MouseEvent) => void;
   onSelectTour: (tour: Tour) => void;
   setActiveView: (view: 'home' | 'faq' | 'organizer' | 'calculator' | 'wishlist') => void;
+  onShowNotification?: (message: string, type?: 'success' | 'info' | 'error' | 'warning') => void;
 }
 
 export function ToursHomeView({
@@ -98,6 +101,8 @@ export function ToursHomeView({
   currentUser,
   onAddReview,
   wishlist,
+  compareList,
+  handleToggleCompare,
   t,
   currentSearchQuery,
   handleSearchChange,
@@ -142,10 +147,10 @@ export function ToursHomeView({
   getTourMonths,
   getAverageRating,
   getReviewsCount,
-  handleShareTour,
   handleQuickWhatsApp,
   onSelectTour,
-  setActiveView
+  setActiveView,
+  onShowNotification
 }: ToursHomeViewProps) {
   const { t: tt, language } = useLanguage();
   const featuredTourIds = React.useMemo(() => computeFeaturedTourIds(tours, slots), [tours, slots]);
@@ -733,8 +738,16 @@ export function ToursHomeView({
                         </span>
                       )}
                     </div>
-                    {/* Wishlist + Share buttons — 44x44 touch target via padding, icon glyph stays small */}
+                    {/* Compare + Wishlist + Share buttons — 44x44 touch target via padding, icon glyph stays small */}
                     <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        type="button"
+                        onClick={(e) => handleToggleCompare(tour.id, e)}
+                        className={`w-11 h-11 rounded-full shadow-md transition-all hover:scale-110 flex items-center justify-center border-2 cursor-pointer ${compareList.includes(tour.id) ? 'bg-amber-50 border-amber-500 hover:bg-amber-100' : 'bg-white hover:bg-slate-50 border-slate-100'}`}
+                        title={compareList.includes(tour.id) ? tt('customerHome.toursHomeView.compare.remove') : tt('customerHome.toursHomeView.compare.add')}
+                      >
+                        <Scale className={`w-3.5 h-3.5 ${compareList.includes(tour.id) ? 'text-amber-600' : 'text-brand-text-main'}`} />
+                      </button>
                       <button
                         type="button"
                         onClick={(e) => handleToggleWishlist(tour.id, e)}
@@ -743,14 +756,13 @@ export function ToursHomeView({
                       >
                         <Heart className={`w-3.5 h-3.5 ${wishlist.includes(tour.id) ? 'fill-rose-600 text-rose-600' : 'text-brand-text-main'}`} />
                       </button>
-                      <button
-                        type="button"
-                        onClick={(e) => handleShareTour(tour, e)}
-                        className="bg-white hover:bg-slate-50 text-brand-text-main hover:text-brand-primary w-11 h-11 rounded-full shadow-md transition-all hover:scale-110 flex items-center justify-center border border-slate-100 cursor-pointer"
-                        title={tt('customerHome.toursHomeView.shareTitle')}
-                      >
-                        <Share2 className="w-3.5 h-3.5" />
-                      </button>
+                      <ShareMenuButton
+                        tour={tour}
+                        slots={slots}
+                        onShowNotification={onShowNotification}
+                        stopPropagationOnOpen
+                        buttonClassName="bg-white hover:bg-slate-50 text-brand-text-main hover:text-brand-primary w-11 h-11 rounded-full shadow-md transition-all hover:scale-110 flex items-center justify-center border border-slate-100 cursor-pointer"
+                      />
                     </div>
                   </div>
                   {tour.isInternational && (

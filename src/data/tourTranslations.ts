@@ -9,8 +9,8 @@ export type TourTranslationEntry = {
 
 const NOTE_EN = '✔️ Important note: We\'re heading into nature — if it doesn\'t bother you to deal with rain, wind or mud, if you don\'t complain about everything, and you\'re a good-natured, fun-loving, genuine outdoors person who won\'t spoil the trip for others, come along! 🌞';
 const NOTE_RU = '✔️ Важно: мы отправляемся на природу — если вас не пугают дождь, ветер и грязь, вы не будете жаловаться на всё подряд и вы дружелюбный, весёлый, настоящий любитель активного отдыха, который не испортит поездку другим — присоединяйтесь! 🌞';
-const CONTACT_EN = '📲 For registration and more information: +994 50 111 22 33 (WhatsApp)';
-const CONTACT_RU = '📲 Для регистрации и дополнительной информации: +994 50 111 22 33 (WhatsApp)';
+const CONTACT_EN = '📲 For registration and more information: +994 70 671 78 04 (WhatsApp)';
+const CONTACT_RU = '📲 Для регистрации и дополнительной информации: +994 70 671 78 04 (WhatsApp)';
 
 export const tourTranslations: Record<string, TourTranslationEntry> = {
   'tour-mestdergah': {

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Tour } from '../../types';
-import { Heart, MapPin } from 'lucide-react';
+import { Heart, MapPin, Scale } from 'lucide-react';
 import { useLanguage } from '../../i18n/LanguageContext';
 import { getLocalizedTourName } from '../../i18n/tourLocalization';
 
@@ -9,9 +9,11 @@ interface WishlistViewProps {
   onBack: () => void;
   onSelectTour: (tour: Tour) => void;
   onToggleWishlist: (tourId: string, e?: React.MouseEvent) => void;
+  compareList: string[];
+  onToggleCompare: (tourId: string, e?: React.MouseEvent) => void;
 }
 
-export function WishlistView({ wishlistTours, onBack, onSelectTour, onToggleWishlist }: WishlistViewProps) {
+export function WishlistView({ wishlistTours, onBack, onSelectTour, onToggleWishlist, compareList, onToggleCompare }: WishlistViewProps) {
   const { t, language } = useLanguage();
   return (
     <div className="max-w-[1400px] mx-auto px-4 lg:px-8 py-8 space-y-6">
@@ -43,14 +45,24 @@ export function WishlistView({ wishlistTours, onBack, onSelectTour, onToggleWish
             >
               <div className="relative aspect-[4/3] overflow-hidden bg-slate-100">
                 <img src={tour.image || undefined} className="w-full h-full object-cover group-hover:scale-102 transition duration-500" alt={getLocalizedTourName(tour, language)} referrerPolicy="no-referrer" />
-                <button
-                  type="button"
-                  onClick={(e) => onToggleWishlist(tour.id, e)}
-                  className="absolute top-2 right-2 bg-white/90 hover:bg-white p-1.5 rounded-full shadow-md transition cursor-pointer"
-                  title={t('customerHome.wishlistView.removeTitle')}
-                >
-                  <Heart className="w-4 h-4 fill-rose-600 text-rose-600" />
-                </button>
+                <div className="absolute top-2 right-2 flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={(e) => onToggleCompare(tour.id, e)}
+                    className={`p-1.5 rounded-full shadow-md transition cursor-pointer border-2 ${compareList.includes(tour.id) ? 'bg-amber-50 border-amber-500 hover:bg-amber-100' : 'bg-white/90 hover:bg-white border-transparent'}`}
+                    title={compareList.includes(tour.id) ? t('customerHome.toursHomeView.compare.remove') : t('customerHome.toursHomeView.compare.add')}
+                  >
+                    <Scale className={`w-4 h-4 ${compareList.includes(tour.id) ? 'text-amber-600' : 'text-label-secondary'}`} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={(e) => onToggleWishlist(tour.id, e)}
+                    className="bg-white/90 hover:bg-white p-1.5 rounded-full shadow-md transition cursor-pointer"
+                    title={t('customerHome.wishlistView.removeTitle')}
+                  >
+                    <Heart className="w-4 h-4 fill-rose-600 text-rose-600" />
+                  </button>
+                </div>
               </div>
               <div className="p-4 space-y-2">
                 <h4 className="text-[16px] font-bold leading-[1.4] text-label-primary truncate">{getLocalizedTourName(tour, language)}</h4>

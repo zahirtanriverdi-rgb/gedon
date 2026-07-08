@@ -17,7 +17,6 @@ import {
   Heart,
   MessageCircle,
   Minus,
-  Share2,
   Star,
   Users,
   X
@@ -28,6 +27,7 @@ import { PackingListSection } from './PackingListSection';
 import { TourReviewsList } from './TourReviewsList';
 import { parseStoredGpxData, getRouteDurationHours } from '../../utils/gpxParser';
 import { TourRouteStatsCard } from '../tours/TourRouteStatsCard';
+import { ShareMenuButton } from '../tours/ShareMenuButton';
 
 type ConvertedPriceInfo = {
   azn: number;
@@ -51,9 +51,7 @@ interface TourDetailPageProps {
   onShowNotification?: (message: string, type?: 'success' | 'info' | 'error' | 'warning') => void;
   getConvertedPriceInfo: (price: number, currency?: 'AZN' | 'USD' | 'EUR') => ConvertedPriceInfo;
   getReviewsCount: (tourId: string) => number;
-  handleShareTour: (tour: Tour, e?: React.MouseEvent) => void;
   handleToggleWishlist: (tourId: string, e?: React.MouseEvent) => void;
-  setActiveView: (view: 'home' | 'faq' | 'organizer' | 'calculator' | 'wishlist') => void;
   setSelectedOrganizer: (organizer: User | null) => void;
   setSelectedTour: (tour: Tour | null) => void;
   setLightboxIndex: (updater: number | null | ((prev: number | null) => number | null)) => void;
@@ -81,9 +79,7 @@ export function TourDetailPage({
   onShowNotification,
   getConvertedPriceInfo,
   getReviewsCount,
-  handleShareTour,
   handleToggleWishlist,
-  setActiveView,
   setSelectedOrganizer,
   setSelectedTour,
   setLightboxIndex,
@@ -103,6 +99,13 @@ export function TourDetailPage({
   const [showDateDropdown, setShowDateDropdown] = useState<boolean>(false);
   const [showTourSlots, setShowTourSlots] = useState<boolean>(false);
   const isFeaturedThisMonth = React.useMemo(() => computeFeaturedTourIds(tours, slots).has(selectedTour.id), [tours, slots, selectedTour.id]);
+
+  // Tours created before the per-tour WhatsApp field existed (or where a vendor left it blank)
+  // fall back to the organizing vendor's own profile phone, never a hardcoded stranger's number.
+  const vendorFallbackPhone = React.useMemo(
+    () => users.find(u => u.id === selectedTour.vendorId)?.phone || '+994706717804',
+    [users, selectedTour.vendorId]
+  );
 
   // Opening a tour carries over whatever scroll position the home page list was at (e.g. the
   // user had scrolled down to see this card), so without this the detail page renders already
@@ -471,10 +474,8 @@ export function TourDetailPage({
         msgText += t('tourDetailPage.booking.waMessage.safetyLine');
       }
 
-      // Driver/Guide specific direct whatsapp number or fallback +994501112233
-      const targetWa = selectedTour.whatsapp_number
-        ? selectedTour.whatsapp_number.replace(/\s+/g, '')
-        : '+994501112233';
+      // Driver/Guide specific direct whatsapp number, or the organizing vendor's own profile phone
+      const targetWa = (selectedTour.whatsapp_number || vendorFallbackPhone).replace(/\s+/g, '');
 
       const waUrl = `https://wa.me/${targetWa}?text=${encodeURIComponent(msgText)}`;
 
@@ -502,7 +503,7 @@ export function TourDetailPage({
             {/* Header Section */}
             <div className="mb-8 space-y-4">
               <div className="flex space-x-2 text-xs text-label-tertiary font-medium">
-                <span><strong className="text-label-primary cursor-pointer pointer-events-auto hover:underline" onClick={(e) => { e.stopPropagation(); const org = users.find(u => u.id === selectedTour.vendorId); if (org) { setSelectedOrganizer(org); setActiveView('organizer'); setSelectedTour(null); } }}>{selectedTour.vendorName}</strong> {t('tourDetailPage.header.by')}</span>
+                <span><strong className="text-label-primary cursor-pointer pointer-events-auto hover:underline" onClick={(e) => { e.stopPropagation(); const org = users.find(u => u.id === selectedTour.vendorId); if (org) { setSelectedOrganizer(org); } }}>{selectedTour.vendorName}</strong> {t('tourDetailPage.header.by')}</span>
               </div>
               <h1 className="text-3xl sm:text-4xl font-extrabold text-label-primary tracking-tight leading-tight">
                 {getLocalizedTourName(selectedTour, language)}
@@ -534,9 +535,14 @@ export function TourDetailPage({
                     <Heart className={`w-4 h-4 ${wishlist.includes(selectedTour.id) ? 'fill-rose-600 text-rose-600' : ''}`} />
                     {wishlist.includes(selectedTour.id) ? t('tourDetailPage.header.inWishlist') : t('tourDetailPage.header.addToWishlist')}
                   </button>
-                  <button onClick={() => handleShareTour(selectedTour)} className="flex items-center gap-2 border border-slate-200 rounded-full px-4 py-2 hover:bg-slate-50 text-slate-700 font-extrabold text-sm transition cursor-pointer shadow-sm">
-                    <Share2 className="w-4 h-4" /> {t('tourDetailPage.header.share')}
-                  </button>
+                  <ShareMenuButton
+                    tour={selectedTour}
+                    slots={slots}
+                    onShowNotification={onShowNotification}
+                    showLabel
+                    iconClassName="w-4 h-4"
+                    buttonClassName="flex items-center gap-2 border border-slate-200 rounded-full px-4 py-2 hover:bg-slate-50 text-slate-700 font-extrabold text-sm transition cursor-pointer shadow-sm"
+                  />
                 </div>
               </div>
             </div>
@@ -1139,7 +1145,7 @@ export function TourDetailPage({
                           <span className="bg-emerald-600 text-white text-[8px] font-extrabold px-1.5 py-0.5 rounded tracking-wider">{t('tourDetailPage.waExplanation.activeLabel')}</span>
                         </div>
                         <p className="text-[11px] text-slate-600 leading-relaxed">
-                          {t('tourDetailPage.waExplanation.bodyPart1')} <strong>WhatsApp</strong> {t('tourDetailPage.waExplanation.bodyPart2', { number: selectedTour.whatsapp_number || '+994501112233' })}
+                          {t('tourDetailPage.waExplanation.bodyPart1')} <strong>WhatsApp</strong> {t('tourDetailPage.waExplanation.bodyPart2', { number: selectedTour.whatsapp_number || vendorFallbackPhone })}
                         </p>
                       </div>
 
@@ -1456,6 +1462,7 @@ export function TourDetailPage({
                     return (
                       <div className="border border-slate-200 rounded-2xl p-4 bg-white shadow-sm">
                         <TourRouteStatsCard
+                          tour={selectedTour}
                           parsed={parsedGpx}
                           durationLabel={durationLabel}
                           difficultyLabel={difficultyLabel}

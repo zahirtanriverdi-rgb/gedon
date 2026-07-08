@@ -4,6 +4,7 @@ export const app = {
     app: {
       nav: {
         wishlist: 'İstəklər',
+        compare: 'Müqayisə',
         guide: 'Bələdçi',
         guideTitle: 'Turdan əvvəl bilməli olduqlarınız',
         calculator: 'Qrup hesabla',
@@ -61,6 +62,7 @@ export const app = {
     app: {
       nav: {
         wishlist: 'Wishlist',
+        compare: 'Compare',
         guide: 'Guide',
         guideTitle: 'What to know before your tour',
         calculator: 'Group calculator',
@@ -118,6 +120,7 @@ export const app = {
     app: {
       nav: {
         wishlist: 'Избранное',
+        compare: 'Сравнить',
         guide: 'Гид',
         guideTitle: 'Что нужно знать перед туром',
         calculator: 'Групповой калькулятор',

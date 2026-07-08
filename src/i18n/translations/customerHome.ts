@@ -57,6 +57,10 @@ export const customerHome = {
           remove: 'İstəklərdən çıxar',
           add: 'İstəklərə əlavə et',
         },
+        compare: {
+          remove: 'Müqayisədən çıxar',
+          add: 'Müqayisəyə əlavə et',
+        },
         shareTitle: 'Dostlarınla Paylaş',
         difficulty: {
           easy: 'Asan',
@@ -121,6 +125,29 @@ export const customerHome = {
         backButton: 'Turlara qayıt',
         emptyState: 'Hələ heç bir tur istəklərinizə əlavə etməmisiniz.',
         removeTitle: 'İstəklərdən çıxar',
+      },
+      compareView: {
+        title: 'Turları Müqayisə Et',
+        backButton: 'Turlara qayıt',
+        emptyState: 'Hələ müqayisə üçün heç bir tur seçilməyib.',
+        needMore: 'Müqayisəni görmək üçün daha {{count}} tur seçin.',
+        removeTitle: 'Müqayisədən çıxar',
+        rows: {
+          price: 'Qiymət',
+          duration: 'Müddət',
+          difficulty: 'Çətinlik',
+          rating: 'Reytinq',
+          region: 'Region',
+          route: 'Məsafə / Hündürlük',
+          includes: 'Daxil olanlar',
+          languages: 'Dillər',
+          vendor: 'Operator',
+        },
+        swapModal: {
+          title: 'Artıq 3 tur seçilib',
+          subtitle: 'Yeni turu əlavə etmək üçün hansının yerinə qoyulacağını seç.',
+          cancel: 'Ləğv et',
+        },
       },
       imageLightbox: {
         galleryLabel: 'QALEREYA VİZUALİTOR ({{current}} / {{total}})',
@@ -249,6 +276,10 @@ export const customerHome = {
           remove: 'Remove from wishlist',
           add: 'Add to wishlist',
         },
+        compare: {
+          remove: 'Remove from compare',
+          add: 'Add to compare',
+        },
         shareTitle: 'Share with friends',
         difficulty: {
           easy: 'Easy',
@@ -313,6 +344,29 @@ export const customerHome = {
         backButton: 'Back to tours',
         emptyState: 'You haven\'t added any tours to your wishlist yet.',
         removeTitle: 'Remove from wishlist',
+      },
+      compareView: {
+        title: 'Compare Tours',
+        backButton: 'Back to tours',
+        emptyState: 'No tours selected for comparison yet.',
+        needMore: 'Select {{count}} more tour(s) to see the comparison.',
+        removeTitle: 'Remove from compare',
+        rows: {
+          price: 'Price',
+          duration: 'Duration',
+          difficulty: 'Difficulty',
+          rating: 'Rating',
+          region: 'Region',
+          route: 'Distance / Elevation',
+          includes: 'Includes',
+          languages: 'Languages',
+          vendor: 'Operator',
+        },
+        swapModal: {
+          title: 'You already have 3 tours selected',
+          subtitle: 'Pick which one to replace to add the new tour.',
+          cancel: 'Cancel',
+        },
       },
       imageLightbox: {
         galleryLabel: 'GALLERY VIEWER ({{current}} / {{total}})',
@@ -441,6 +495,10 @@ export const customerHome = {
           remove: 'Убрать из избранного',
           add: 'Добавить в избранное',
         },
+        compare: {
+          remove: 'Убрать из сравнения',
+          add: 'Добавить к сравнению',
+        },
         shareTitle: 'Поделиться с друзьями',
         difficulty: {
           easy: 'Лёгкий',
@@ -505,6 +563,29 @@ export const customerHome = {
         backButton: 'Вернуться к турам',
         emptyState: 'Вы ещё не добавили ни одного тура в избранное.',
         removeTitle: 'Убрать из избранного',
+      },
+      compareView: {
+        title: 'Сравнить туры',
+        backButton: 'Вернуться к турам',
+        emptyState: 'Вы ещё не выбрали ни одного тура для сравнения.',
+        needMore: 'Выберите ещё {{count}} тур(а), чтобы увидеть сравнение.',
+        removeTitle: 'Убрать из сравнения',
+        rows: {
+          price: 'Цена',
+          duration: 'Длительность',
+          difficulty: 'Сложность',
+          rating: 'Рейтинг',
+          region: 'Регион',
+          route: 'Расстояние / Высота',
+          includes: 'Включено',
+          languages: 'Языки',
+          vendor: 'Оператор',
+        },
+        swapModal: {
+          title: 'Уже выбрано 3 тура',
+          subtitle: 'Выберите, какой тур заменить, чтобы добавить новый.',
+          cancel: 'Отмена',
+        },
       },
       imageLightbox: {
         galleryLabel: 'ПРОСМОТР ГАЛЕРЕИ ({{current}} / {{total}})',
