@@ -161,21 +161,22 @@ export function ToursHomeView({
   }, [sortedAndFilteredTours, selectedCategory, hikingSubcategory]);
   return (
         // -mx-5 cancels the parent <main>'s fixed px-5 (20px) so this container can
-        // reapply the same 20px on mobile/tablet but widen to 96px at >=1440px,
-        // matching GetYourGuide's wide-screen side margins without touching the
-        // shared App.tsx <main> (which Vendor/Admin also render inside).
-        <div className="space-y-4 -mx-5 px-5 min-[1440px]:px-24">
+        // reapply the same 20px on mobile/tablet but widen to 72px at >=1440px,
+        // matching GetYourGuide's measured wide-screen side padding (div.container,
+        // 72px) without touching the shared App.tsx <main> (which Vendor/Admin
+        // also render inside).
+        <div className="space-y-4 -mx-5 px-5 min-[1440px]:px-[72px]">
 
           {/* Search & Filters (Clean Minimalism Style) */}
           {/* z-30 (not z-10): this wrapper's z-index caps the stacking context for the
               suggestions dropdown inside it, so it must outrank the tour cards' own
               z-10 share buttons below or the dropdown gets painted underneath them. */}
           <div className="flex flex-col items-center justify-center pt-[38px] pb-[88px] min-h-[294px] mb-3 relative z-30 w-full animate-fadeIn">
-            <h2 className="text-3xl md:text-4xl font-extrabold text-brand-text-main mb-6 tracking-tight text-center">{t('discoverTours')}</h2>
+            <h2 className="text-3xl md:text-4xl md:leading-[1.22] font-bold text-brand-text-main mb-6 tracking-tight text-center">{t('discoverTours')}</h2>
 
             {/* Main Pill Search Box */}
-            <div className="w-full max-w-3xl mx-auto mt-8 flex items-center justify-center relative">
-              <div ref={searchContainerRef} className="relative w-full bg-white shadow-md rounded-full p-1 border border-slate-200 flex items-center">
+            <div className="w-full max-w-[706px] mx-auto mt-8 flex items-center justify-center relative">
+              <div ref={searchContainerRef} className="relative w-full h-14 bg-white shadow-md rounded-full p-1 border border-slate-200 flex items-center">
                 <div className="pl-4 pr-2 flex items-center flex-1">
                    <Search className="text-brand-text-muted w-4 h-4 mr-3 flex-shrink-0" />
                    <input
@@ -190,7 +191,7 @@ export function ToursHomeView({
                          setIsSearchFocused(false);
                        }
                      }}
-                     className="w-full py-2.5 bg-transparent text-brand-text-main text-[13px] focus:outline-none font-medium placeholder-brand-text-muted"
+                     className="w-full py-2.5 bg-transparent text-brand-text-main text-base leading-[1.38] focus:outline-none font-normal placeholder-brand-text-muted"
                    />
                 </div>
                 <button
@@ -609,7 +610,14 @@ export function ToursHomeView({
 
       {/* Grid of Tours */}
       <div id="tours-list" className="space-y-16 mt-10">
-        
+
+      <div className="flex items-center justify-between mb-2 px-1">
+        <h3 className="text-sm font-extrabold text-brand-text-main tracking-tight flex items-center gap-1.5">
+          <Compass className="w-4 h-4 text-brand-primary" />
+          {tt('customerHome.toursHomeView.allToursSectionTitle')}
+        </h3>
+      </div>
+
       {selectedCategory === 'hiking' && (
         <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-3 mb-1 -mx-1 px-1">
           {HIKING_SUBCATEGORIES.map((sub) => {
@@ -804,7 +812,7 @@ export function ToursHomeView({
                       <span>{tt('customerHome.toursHomeView.activeDates', { count: tourSlots.length })}</span>
                     </div>
 
-                    <h3 className="font-bold text-brand-text-main text-sm leading-snug group-hover:text-brand-primary transition tracking-tight flex items-center gap-1">
+                    <h3 className="font-medium text-brand-text-main text-lg leading-[1.33] group-hover:text-brand-primary transition tracking-tight flex items-center gap-1">
                       {isSportActive && (
                         <span className="text-base shrink-0 select-none">
                           {tour.activityType === 'volleyball' ? '🏐' : tour.activityType === 'ski' ? '⛷️' : tour.activityType === 'rafting' ? '🚣‍♂️' : tour.activityType === 'running' ? '🏃‍♂️' : tour.activityType === 'bike' ? '🚴‍♂️' : '🏆'}
@@ -874,13 +882,13 @@ export function ToursHomeView({
                           <span className="line-through text-label-tertiary text-xs">
                             {getConvertedPriceInfo(tour.price ?? minPrice, tour.priceCurrency).both}
                           </span>
-                          <span className="text-2xl font-extrabold text-label-critical bg-surface-critical-weak px-1.5 rounded leading-tight">
+                          <span className="text-xl font-medium text-label-critical bg-surface-critical-weak px-1.5 rounded leading-[1.2]">
                             {getConvertedPriceInfo(tour.discountPrice, tour.priceCurrency).both}
                           </span>
                         </div>
                       ) : (
                         <div className="flex flex-col items-end">
-                          <strong className="text-brand-text-main text-2xl font-extrabold leading-tight">
+                          <strong className="text-brand-text-main text-xl font-medium leading-[1.2]">
                             {getConvertedPriceInfo(tour.price ?? minPrice, tour.priceCurrency).both}
                           </strong>
                           <span className="text-brand-text-muted text-[10px] font-medium">{tt('customerHome.toursHomeView.perPerson')}</span>

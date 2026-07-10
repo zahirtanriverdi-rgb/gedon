@@ -94,7 +94,7 @@ export const TourStatsRow: React.FC<TourStatsRowProps> = ({
             />
           ))}
           <span className="text-xs font-bold text-brand-text-main ml-1">{ratingValue}</span>
-          <span className="text-brand-text-muted text-[10px] font-medium">({t('customerHome.toursHomeView.reviewsCount', { count: reviewsCount })})</span>
+          <span className="text-brand-text-muted text-xs leading-[1.33] font-normal">({t('customerHome.toursHomeView.reviewsCount', { count: reviewsCount })})</span>
         </div>
       )}
       {isTopSeller && (

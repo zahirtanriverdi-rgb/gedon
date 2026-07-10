@@ -1863,27 +1863,4 @@ async function startServer() {
   });
 }
 
-// ===================== STATIC FILES & BASE URL (ƏN VACİB HİSSƏ) =====================
-const publicDir = path.join(process.cwd(), "public");
-
-// Bütün upload qovluqlarını static elan edirik
-app.use("/tour-images", express.static(path.join(publicDir, "tour-images")));
-app.use("/uploads", express.static(path.join(publicDir, "uploads")));
-app.use("/public", express.static(publicDir));
-
-// Base URL funksiyası (localhost və Render üçün avtomatik)
-const getBaseUrl = () => {
-  // Production mühitində əvvəlcə env dəyişənlərdən götür
-  if (process.env.NODE_ENV === "production") {
-    return process.env.VITE_API_BASE_URL || 
-           process.env.RENDER_EXTERNAL_URL || 
-           "https://gedekgorek.onrender.com";   // buranı öz linkinə dəyişdir
-  }
-  // Local development
-  return `http://localhost:${process.env.PORT || 3000}`;
-};
-
-console.log(`[Static] Public files served from: ${publicDir}`);
-console.log(`[Base URL] Using base URL: ${getBaseUrl()}`);
-
 startServer();

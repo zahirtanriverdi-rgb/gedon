@@ -14,6 +14,7 @@ export const customerHome = {
           newBadge: 'YENİ',
           hotBadge: 'HOT',
         },
+        allToursSectionTitle: 'Bütün Turlar',
         hikingSubcategories: {
           all: 'Hamısı',
           peak: 'Zirvə yürüşləri',
@@ -233,6 +234,7 @@ export const customerHome = {
           newBadge: 'NEW',
           hotBadge: 'HOT',
         },
+        allToursSectionTitle: 'All Tours',
         hikingSubcategories: {
           all: 'All',
           peak: 'Peak hikes',
@@ -452,6 +454,7 @@ export const customerHome = {
           newBadge: 'НОВОЕ',
           hotBadge: 'ХИТ',
         },
+        allToursSectionTitle: 'Все туры',
         hikingSubcategories: {
           all: 'Все',
           peak: 'Восхождения на вершины',

@@ -111,7 +111,7 @@ export default function CustomerPortal({
   // Translations
   const translations = {
     az: {
-      searchPlaceholder: "Tur adı, region və ya açar söz axtar...",
+      searchPlaceholder: "Məkanları və ya fəaliyyətləri kəşf et...",
       searchButton: "Axtar",
       discoverTours: "Xəyalınızdakı Turları Kəşf Edin",
       upcomingTours: "Yaxınlaşan Turlar",
@@ -127,7 +127,7 @@ export default function CustomerPortal({
       noToursDesc: "Zəhmət olmasa filtrləri dəyişdirin və ya fərqli açar sözlərlə yenidən cəhd edin."
     },
     en: {
-      searchPlaceholder: "Search tour name, region or keyword...",
+      searchPlaceholder: "Explore destinations and experiences...",
       searchButton: "Search",
       discoverTours: "Discover Your Dream Tours",
       upcomingTours: "Upcoming Tours",
@@ -143,7 +143,7 @@ export default function CustomerPortal({
       noToursDesc: "Please change your filters or try with different keywords."
     },
     ru: {
-      searchPlaceholder: "Поиск названия тура, региона или ключевого слова...",
+      searchPlaceholder: "Откройте для себя места и впечатления...",
       searchButton: "Поиск",
       discoverTours: "Откройте для себя туры вашей мечты",
       upcomingTours: "Ближайшие туры",
