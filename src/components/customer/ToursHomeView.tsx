@@ -14,7 +14,9 @@ import {
   Heart,
   Scale,
   Clock,
-  Star
+  Star,
+  SlidersHorizontal,
+  X
 } from 'lucide-react';
 import { SearchDropdown } from '../SearchDropdown';
 import { ReviewSubmissionPanel } from './ReviewSubmissionPanel';
@@ -162,6 +164,9 @@ export function ToursHomeView({
     if (selectedCategory !== 'hiking' || hikingSubcategory === 'all') return sortedAndFilteredTours;
     return sortedAndFilteredTours.filter((tour) => matchesHikingSubcategory(tour, hikingSubcategory));
   }, [sortedAndFilteredTours, selectedCategory, hikingSubcategory]);
+  // Drives the dot indicator on the filter icon button — true whenever any of the
+  // bottom-sheet's fields differ from their defaults.
+  const hasActiveFilters = selectedDifficulty !== 'all' || selectedRegion !== 'all' || !!calendarDateStart || maxPrice < maxPriceLimit || sortBy !== 'default';
   return (
         // -mx-5 cancels the parent <main>'s fixed px-5 so this container can
         // reapply proportional side padding across all breakpoints — scaling
@@ -171,15 +176,43 @@ export function ToursHomeView({
           {/* Search & Filters (Clean Minimalism Style) */}
           {/* z-30 (not z-10): this wrapper's z-index caps the stacking context for the
               suggestions dropdown inside it, so it must outrank the tour cards' own
-              z-10 share buttons below or the dropdown gets painted underneath them. */}
-          <div className="flex flex-col items-center justify-center pt-[38px] pb-[50px] min-h-[294px] mb-3 relative z-30 w-full animate-fadeIn">
-            <h2 className="text-3xl md:text-4xl md:leading-[1.22] font-bold text-brand-text-main mb-6 tracking-tight text-center">{t('discoverTours')}</h2>
+              z-10 share buttons below or the dropdown gets painted underneath them.
+              NOTE: no animate-fadeIn here — it directly wraps the sticky search bar, and
+              a transform-based fade animation on an ancestor silently breaks
+              position:sticky for descendants (this was why the search bar wasn't
+              sticking on mobile). */}
+          <div className="flex flex-col items-center justify-center pt-[20px] pb-[28px] sm:pt-[38px] sm:pb-[50px] min-h-[220px] sm:min-h-[294px] mb-3 relative z-30 w-full">
+            <h2 className="text-2xl sm:text-3xl md:text-4xl leading-tight md:leading-[1.22] font-extrabold text-brand-text-main mb-4 sm:mb-6 tracking-tight text-center">{t('discoverTours')}</h2>
 
-            {/* Main Pill Search Box */}
-            <div className="w-full max-w-[706px] mx-auto mt-8 flex items-center justify-center relative">
-              <div ref={searchContainerRef} className="relative w-full h-14 bg-white shadow-md rounded-full p-1 border border-slate-200 flex items-center">
-                <div className="pl-4 pr-2 flex items-center flex-1">
-                   <Search className="text-brand-text-muted w-4 h-4 mr-3 flex-shrink-0" />
+            {/* Main Pill Search Box — sticky on mobile only (pins at top-0, flush with the
+                viewport top, since the header itself isn't sticky there and scrolls away
+                with the logo). On desktop (sm+) this reverts to normal, non-sticky flow —
+                the header shows its own inline search bar instead, on the same line as the
+                logo and icons, so there's a single merged bar rather than two stacked rows.
+                -mx/px cancels the page container's side padding so the white backdrop spans
+                full width once it's pinned on mobile. */}
+            <div className="sticky top-0 sm:static z-30 w-full -mx-4 px-4 sm:mx-0 sm:px-0 md:mx-0 md:px-0 lg:mx-0 lg:px-0 xl:mx-0 xl:px-0 min-[1440px]:mx-0 min-[1440px]:px-0 bg-white/95 sm:bg-transparent backdrop-blur-sm sm:backdrop-blur-none">
+            <div className="w-full max-w-[706px] mx-auto mt-2 sm:mt-8 pb-3 sm:pb-4 flex items-center justify-center relative">
+              <div ref={searchContainerRef} className="relative w-full h-12 sm:h-14 bg-white shadow-sm sm:shadow-md rounded-full p-1 border border-slate-200 flex items-center">
+                <div className="pl-4 pr-2 flex items-center flex-1 min-w-0">
+                   <Search className="text-brand-text-muted w-5 h-5 sm:w-[22px] sm:h-[22px] mr-2 sm:mr-3 flex-shrink-0" />
+                   {/* Two inputs sharing the same state: only one is ever visible/focusable
+                       at a given breakpoint (display:none removes the other from layout and
+                       tab order), so this avoids a JS matchMedia check and any hydration mismatch. */}
+                   <input
+                     type="text"
+                     placeholder={t('searchPlaceholderShort')}
+                     value={currentSearchQuery}
+                     onChange={(e) => handleSearchChange(e.target.value)}
+                     onFocus={() => setIsSearchFocused(true)}
+                     onKeyDown={(e) => {
+                       if (e.key === 'Enter') {
+                         recordSearch(currentSearchQuery);
+                         setIsSearchFocused(false);
+                       }
+                     }}
+                     className="sm:hidden w-full min-w-0 py-2.5 bg-transparent text-brand-text-main text-sm leading-[1.38] focus:outline-none font-normal placeholder-brand-text-muted truncate"
+                   />
                    <input
                      type="text"
                      placeholder={t('searchPlaceholder')}
@@ -192,7 +225,7 @@ export function ToursHomeView({
                          setIsSearchFocused(false);
                        }
                      }}
-                     className="w-full py-2.5 bg-transparent text-brand-text-main text-base leading-[1.38] focus:outline-none font-normal placeholder-brand-text-muted"
+                     className="hidden sm:block w-full min-w-0 py-2.5 bg-transparent text-brand-text-main text-base leading-[1.38] focus:outline-none font-normal placeholder-brand-text-muted truncate"
                    />
                 </div>
                 <button
@@ -206,7 +239,7 @@ export function ToursHomeView({
                       window.scrollTo({top: y, behavior: 'smooth'});
                     }
                   }}
-                  className="bg-brand-primary hover:bg-brand-primary-hover text-white font-bold py-2.5 px-6 rounded-full transition-colors flex-shrink-0 text-xs shadow-md cursor-pointer"
+                  className="bg-brand-primary hover:bg-brand-primary-hover text-white font-bold py-2.5 px-4 sm:px-6 rounded-full transition-colors flex-shrink-0 text-xs shadow-md cursor-pointer"
                 >
                   {t('searchButton')}
                 </button>
@@ -226,88 +259,144 @@ export function ToursHomeView({
                   />
                 )}
               </div>
-            </div>
 
-            {/* Segmented Category Pill Selectors directly below */}
-            <div className="flex flex-wrap justify-center items-center gap-2 max-w-3xl mt-6 mb-4">
+              {/* Filter trigger — opens the advanced-filters bottom sheet. Replaces the
+                  old "Geniş Axtarış Filtrləri" text link so the hero stays compact. */}
               <button
-                onClick={() => setSelectedCategory('all')}
-                className={`px-4 py-2.5 rounded-full text-xs font-bold transition-all border ${
-                  selectedCategory === 'all' 
-                    ? 'bg-brand-primary text-white border-brand-primary shadow-sm' 
-                    : 'bg-white text-brand-text-main border-slate-200 hover:border-slate-300 hover:bg-slate-50'
-                }`}
+                type="button"
+                onClick={() => setIsFiltersExpanded(true)}
+                aria-label={tt('customerHome.toursHomeView.filters.showAdvanced')}
+                className="relative ml-2 sm:ml-3 shrink-0 w-12 h-12 sm:w-14 sm:h-14 bg-white shadow-sm sm:shadow-md rounded-full border border-slate-200 flex items-center justify-center text-brand-text-main hover:border-slate-300 hover:bg-slate-50 transition-colors cursor-pointer"
               >
-                🌍 {tt('customerHome.toursHomeView.categories.all')}
-              </button>
-              <button
-                onClick={() => setSelectedCategory('peak')}
-                className={`px-4 py-2.5 rounded-full text-xs font-bold transition-all border flex items-center gap-1.5 ${
-                  selectedCategory === 'peak' 
-                    ? 'bg-brand-primary text-white border-brand-primary shadow-sm' 
-                    : 'bg-white text-brand-text-main border-slate-200 hover:border-slate-300 hover:bg-slate-50'
-                }`}
-              >
-                🏔️ {tt('customerHome.toursHomeView.categories.peak')}
-              </button>
-              <button
-                onClick={() => setSelectedCategory('camp')}
-                className={`px-4 py-2.5 rounded-full text-xs font-bold transition-all border flex items-center gap-1.5 ${
-                  selectedCategory === 'camp' 
-                    ? 'bg-brand-primary text-white border-brand-primary shadow-sm' 
-                    : 'bg-white text-brand-text-main border-slate-200 hover:border-slate-300 hover:bg-slate-50'
-                }`}
-              >
-                ⛺ {tt('customerHome.toursHomeView.categories.camp')}
-              </button>
-              <button
-                onClick={() => setSelectedCategory('hiking')}
-                className={`px-4 py-2.5 rounded-full text-xs font-bold transition-all border flex items-center gap-1.5 ${
-                  selectedCategory === 'hiking' 
-                    ? 'bg-brand-primary text-white border-brand-primary shadow-sm' 
-                    : 'bg-white text-brand-text-main border-slate-200 hover:border-slate-300 hover:bg-slate-50'
-                }`}
-              >
-                🥾 {tt('customerHome.toursHomeView.categories.hiking')}
-              </button>
-              <button
-                onClick={() => setSelectedCategory('active')}
-                className={`px-4 py-2.5 rounded-full text-xs font-bold transition-all border relative flex items-center gap-1.5 ${
-                  selectedCategory === 'active' 
-                    ? 'bg-brand-primary text-white border-brand-primary shadow-sm' 
-                    : 'bg-white text-brand-text-main border-slate-200 hover:border-slate-300 hover:bg-slate-50'
-                }`}
-              >
-                🏃‍♂️ {tt('customerHome.toursHomeView.categories.active')}
-                <span className="absolute -top-2 -right-1 bg-white border border-border-primary text-label-secondary text-[9px] px-1.5 py-0.5 rounded-full font-black scale-90 shadow-sm">{tt('customerHome.toursHomeView.categories.newBadge')}</span>
-              </button>
-              <button
-                onClick={() => setSelectedCategory('international')}
-                className={`px-4 py-2.5 rounded-full text-xs font-bold transition-all border relative flex items-center gap-1.5 ${
-                  selectedCategory === 'international' 
-                    ? 'bg-brand-primary text-white border-brand-primary shadow-sm' 
-                    : 'bg-white text-brand-text-main border-slate-200 hover:border-slate-300 hover:bg-slate-50'
-                }`}
-              >
-                ✈️ {tt('customerHome.toursHomeView.categories.international')}
-                <span className="absolute -top-2 -right-1 bg-accent-orange-100 text-accent-orange-700 text-[9px] px-1.5 py-0.5 rounded-full font-black scale-90 shadow-sm">{tt('customerHome.toursHomeView.categories.hotBadge')}</span>
+                <SlidersHorizontal className="w-[18px] h-[18px] sm:w-5 sm:h-5" />
+                {hasActiveFilters && (
+                  <span className="absolute top-1 right-1 w-2 h-2 bg-brand-cta rounded-full ring-2 ring-white" />
+                )}
               </button>
             </div>
+            </div>
 
-            {/* Expandable Advanced Filters Toggle Button */}
-            <button
-              onClick={() => setIsFiltersExpanded(!isFiltersExpanded)}
-              className="mt-0 mb-1 text-[11px] font-bold text-brand-accent hover:text-accent-orange-600 flex items-center gap-1 transition-colors"
-            >
-              {isFiltersExpanded ? tt('customerHome.toursHomeView.filters.hide') : tt('customerHome.toursHomeView.filters.showAdvanced')}
-              <svg className={`w-3 h-3 transition-transform ${isFiltersExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
+            {/* Segmented Category Pill Selectors — single row, horizontally swipeable
+                (like GetYourGuide's chip row) instead of wrapping across lines. The
+                -mx-4 px-4 combo lets the row bleed to the viewport edge so the last
+                pill isn't clipped, while scrollbar is hidden via arbitrary variants
+                (no extra Tailwind plugin needed). */}
+            <div className="w-full max-w-3xl overflow-x-auto [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: 'none' }}>
+              <div className="flex items-center gap-2 mt-4 sm:mt-6 mb-3 sm:mb-4 px-4 -mx-4 sm:px-0 sm:mx-0 sm:justify-center snap-x snap-mandatory w-max sm:w-full mx-auto">
+                <button
+                  onClick={() => setSelectedCategory('all')}
+                  className={`shrink-0 snap-start px-3 py-2 sm:px-4 sm:py-2.5 rounded-full text-[11px] sm:text-xs font-bold transition-all border ${
+                    selectedCategory === 'all' 
+                      ? 'bg-emerald-50 text-brand-primary border-brand-primary' 
+                      : 'bg-white text-brand-text-main border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                  }`}
+                >
+                  🌍 {tt('customerHome.toursHomeView.categories.all')}
+                </button>
+                <button
+                  onClick={() => setSelectedCategory('peak')}
+                  className={`shrink-0 snap-start px-3 py-2 sm:px-4 sm:py-2.5 rounded-full text-[11px] sm:text-xs font-bold transition-all border flex items-center gap-1.5 ${
+                    selectedCategory === 'peak' 
+                      ? 'bg-emerald-50 text-brand-primary border-brand-primary' 
+                      : 'bg-white text-brand-text-main border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                  }`}
+                >
+                  🏔️ {tt('customerHome.toursHomeView.categories.peak')}
+                </button>
+                <button
+                  onClick={() => setSelectedCategory('camp')}
+                  className={`shrink-0 snap-start px-3 py-2 sm:px-4 sm:py-2.5 rounded-full text-[11px] sm:text-xs font-bold transition-all border flex items-center gap-1.5 ${
+                    selectedCategory === 'camp' 
+                      ? 'bg-emerald-50 text-brand-primary border-brand-primary' 
+                      : 'bg-white text-brand-text-main border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                  }`}
+                >
+                  ⛺ {tt('customerHome.toursHomeView.categories.camp')}
+                </button>
+                <button
+                  onClick={() => setSelectedCategory('hiking')}
+                  className={`shrink-0 snap-start px-3 py-2 sm:px-4 sm:py-2.5 rounded-full text-[11px] sm:text-xs font-bold transition-all border flex items-center gap-1.5 ${
+                    selectedCategory === 'hiking' 
+                      ? 'bg-emerald-50 text-brand-primary border-brand-primary' 
+                      : 'bg-white text-brand-text-main border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                  }`}
+                >
+                  🥾 {tt('customerHome.toursHomeView.categories.hiking')}
+                </button>
+                <button
+                  onClick={() => setSelectedCategory('active')}
+                  className={`shrink-0 snap-start px-3 py-2 sm:px-4 sm:py-2.5 rounded-full text-[11px] sm:text-xs font-bold transition-all border relative flex items-center gap-1.5 ${
+                    selectedCategory === 'active' 
+                      ? 'bg-emerald-50 text-brand-primary border-brand-primary' 
+                      : 'bg-white text-brand-text-main border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                  }`}
+                >
+                  🏃‍♂️ {tt('customerHome.toursHomeView.categories.active')}
+                  <span
+                    className="absolute top-0.5 right-0.5 w-2 h-2 bg-sky-500 rounded-full ring-2 ring-white"
+                    title={tt('customerHome.toursHomeView.categories.newBadge')}
+                  />
+                </button>
+                <button
+                  onClick={() => setSelectedCategory('international')}
+                  className={`shrink-0 snap-start px-3 py-2 sm:px-4 sm:py-2.5 rounded-full text-[11px] sm:text-xs font-bold transition-all border relative flex items-center gap-1.5 ${
+                    selectedCategory === 'international' 
+                      ? 'bg-emerald-50 text-brand-primary border-brand-primary' 
+                      : 'bg-white text-brand-text-main border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+                  }`}
+                >
+                  ✈️ {tt('customerHome.toursHomeView.categories.international')}
+                  <span
+                    className="absolute top-0.5 right-0.5 w-2 h-2 bg-rose-500 rounded-full ring-2 ring-white"
+                    title={tt('customerHome.toursHomeView.categories.hotBadge')}
+                  />
+                </button>
+              </div>
+            </div>
 
-            {/* Expandable Extra Filters */}
+            {/* Advanced filters now open as a bottom-sheet (triggered from the filter
+                icon docked on the search bar) instead of an inline "show filters"
+                text toggle + expanding grid — keeps the hero compact on mobile. */}
+
+            {/* Advanced Filters Bottom Sheet */}
             {isFiltersExpanded && (
-              <div className="w-full max-w-4xl bg-white p-10 rounded-2xl border border-slate-200 shadow-lg mt-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6 animate-fadeIn">
+              <div className="fixed inset-0 z-[200] flex items-end sm:items-center justify-center">
+                {/* Backdrop */}
+                <div
+                  className="absolute inset-0 bg-black/40 animate-fadeIn"
+                  onClick={() => setIsFiltersExpanded(false)}
+                />
+                {/* Sheet panel — full-width slab pinned to the bottom on mobile,
+                    centered rounded card from sm and up. Structured as a flex column
+                    with a sticky header and a sticky footer (Reset / Apply) so both
+                    stay reachable on mobile no matter how tall the scrollable body gets —
+                    previously the whole panel (header included) scrolled together, so on
+                    small screens the close button could scroll out of view with nothing
+                    left to confirm or dismiss the sheet. */}
+                <div className="relative w-full sm:max-w-2xl max-h-[85vh] bg-white rounded-t-3xl sm:rounded-2xl border border-slate-200 shadow-lg flex flex-col overflow-hidden animate-fadeIn">
+                  {/* Sticky header */}
+                  <div className="shrink-0 sticky top-0 z-10 bg-white px-6 sm:px-10 pt-4 sm:pt-8 pb-3 border-b border-slate-100">
+                    {/* Drag handle (mobile only, decorative) */}
+                    <div className="sm:hidden -mt-1 mb-2 flex justify-center">
+                      <div className="w-10 h-1 bg-slate-200 rounded-full" />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-extrabold text-brand-text-main">
+                        {tt('customerHome.toursHomeView.filters.showAdvanced')}
+                      </h3>
+                      <button
+                        type="button"
+                        onClick={() => setIsFiltersExpanded(false)}
+                        aria-label={tt('customerHome.toursHomeView.filters.hide')}
+                        className="w-8 h-8 flex items-center justify-center rounded-full text-brand-text-muted hover:bg-slate-100 hover:text-brand-text-main transition-colors cursor-pointer"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Scrollable body */}
+                  <div className="flex-1 overflow-y-auto px-6 sm:px-10 py-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
                 {/* Difficulty Filter */}
                 <div>
                   <label className="block text-[10px] font-bold text-brand-text-muted mb-1">{tt('customerHome.toursHomeView.filters.difficultyLabel')}</label>
@@ -361,9 +450,18 @@ export function ToursHomeView({
                     <Calendar className="w-3.5 h-3.5 flex-shrink-0 opacity-70" />
                   </button>
 
-                  {/* Absolute positioning for visual monthly calendar so it pops out of grid */}
+                  {/* Rendered as a fixed, centered modal instead of an absolutely-positioned
+                      dropdown — the old version was clipped by the filter sheet's own
+                      overflow-y-auto scroll container (a dropdown that overflows a
+                      scrollable ancestor gets cut off), which was the root cause of the
+                      calendar looking broken/cut-off on both desktop and mobile. */}
                   {showCalendarWidget && (
-                    <div ref={calendarContainerRef} className="absolute z-50 left-0 mt-1 top-full bg-white px-5 py-4 rounded-2xl border border-slate-200 shadow-xl w-72 animate-fade-in font-sans">
+                    <div className="fixed inset-0 z-[220] flex items-center justify-center p-4">
+                      <div
+                        className="absolute inset-0 bg-black/40 animate-fadeIn"
+                        onClick={() => setShowCalendarWidget(false)}
+                      />
+                      <div ref={calendarContainerRef} className="relative bg-white px-5 py-4 rounded-2xl border border-slate-200 shadow-xl w-72 max-w-[90vw] animate-fade-in font-sans">
                       <div className="flex items-center justify-between mb-4">
                         <button
                           type="button"
@@ -385,6 +483,14 @@ export function ToursHomeView({
                             className="p-1 px-2.5 bg-slate-100 hover:bg-slate-200 text-brand-text-main rounded-lg text-xs font-bold transition cursor-pointer"
                           >
                             &rarr;
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setShowCalendarWidget(false)}
+                            aria-label={tt('customerHome.toursHomeView.filters.hide')}
+                            className="p-1.5 bg-slate-100 hover:bg-slate-200 text-brand-text-main rounded-lg transition cursor-pointer"
+                          >
+                            <X className="w-3 h-3" />
                           </button>
                         </div>
                       </div>
@@ -467,6 +573,7 @@ export function ToursHomeView({
                           {tt('customerHome.toursHomeView.filters.calendar.reset')}
                         </button>
                       )}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -504,6 +611,35 @@ export function ToursHomeView({
                       onChange={(e) => setMaxPrice(Number(e.target.value))}
                       className="w-full accent-brand-cta cursor-pointer h-1 bg-slate-200 rounded-lg"
                     />
+                  </div>
+                </div>
+                  </div>
+
+                  {/* Sticky footer — always reachable on mobile: reset clears every
+                      advanced field back to its default, the primary button just closes
+                      the sheet (filtering already happens live as fields change). */}
+                  <div className="shrink-0 sticky bottom-0 bg-white border-t border-slate-100 px-6 sm:px-10 py-3 sm:py-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:pb-4 flex items-center justify-between gap-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedDifficulty('all');
+                        setSelectedRegion('all');
+                        setCalendarDateStart('');
+                        setCalendarDateEnd('');
+                        setSortBy('default');
+                        setMaxPrice(maxPriceLimit);
+                      }}
+                      className="px-4 py-2.5 rounded-xl text-xs font-bold text-brand-text-muted hover:bg-slate-100 hover:text-brand-text-main transition-colors cursor-pointer"
+                    >
+                      Sıfırla
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsFiltersExpanded(false)}
+                      className="flex-1 sm:flex-none sm:px-8 py-2.5 rounded-xl bg-brand-primary hover:bg-brand-primary-hover text-white text-xs font-bold transition-colors cursor-pointer shadow-sm"
+                    >
+                      Nəticələri göstər
+                    </button>
                   </div>
                 </div>
               </div>
@@ -566,10 +702,23 @@ export function ToursHomeView({
                             {getLocalizedTourName(tour, language)}
                           </h4>
                           
-                          <div className="text-[11px] font-semibold text-gray-500 line-clamp-1 mb-2">
+                          <div className="text-[11px] font-semibold text-gray-500 line-clamp-1 mb-1">
                             {tour.durationDays} gün • {tour.region} • {(tour.category === 'active' || tour.isActiveLife) ? 'Aktiv' : 'Lokal'}
                           </div>
-                          
+
+                          {(() => {
+                            const parts = slot.startDate ? slot.startDate.split('-') : [];
+                            if (parts.length < 3) return null;
+                            const [year, month, day] = parts;
+                            const monthLabel = monthNames?.[month] || month;
+                            return (
+                              <div className="flex items-center gap-1 text-[11px] font-bold text-brand-primary mb-2">
+                                <Calendar className="w-3 h-3 flex-shrink-0" />
+                                <span>{parseInt(day, 10)} {monthLabel} {year}</span>
+                              </div>
+                            );
+                          })()}
+
                           <div className="flex items-end justify-between mt-auto">
                             <div className="flex items-center gap-1">
                               <span className="text-[13px] font-bold text-[#1a2b49]">{getAverageRating(tour.id)}</span>

@@ -311,16 +311,22 @@ export default function App() {
     showNotification(t('app.notifications.ratesUpdated'), 'success');
   };
 
-  // Global search and scroll state for sticky header
+  // Global search query — shared with CustomerPortal/ToursHomeView so the search term
+  // persists across route changes and stays in sync between the home page's own search
+  // box and the inline copy that appears in the header on desktop once scrolled.
   const [globalSearchQuery, setGlobalSearchQuery] = useState('');
   const [isGlobalSearchFocused, setIsGlobalSearchFocused] = useState(false);
   const globalSearchRef = React.useRef<HTMLDivElement>(null);
   const [recentSearches, setRecentSearches] = useState<string[]>(() => getRecentSearches());
   const recordSearch = (term: string) => setRecentSearches(addRecentSearch(term));
+  // isScrolled: past the point where the home page's own search box has scrolled out of
+  // view — used only to reveal the inline search bar in the header on desktop (sm+); on
+  // mobile the header never shows it, since there the home page's own search bar handles
+  // sticking to the top itself.
   const [isScrolled, setIsScrolled] = useState(false);
-  // Tracks whether the page has scrolled at all (vs. isScrolled's 300px threshold for the
-  // sticky search bar) — drives the header's border/shadow so it stays flush with the page
-  // background at the very top and only separates once the user starts scrolling.
+  // Tracks whether the page has scrolled at all — drives the header's border/shadow so
+  // it stays flush with the page background at the very top and only separates once the
+  // user starts scrolling.
   const [isHeaderScrolled, setIsHeaderScrolled] = useState(false);
   const [displayCurrency, setDisplayCurrency] = useState<'AZN' | 'USD' | 'EUR'>('AZN');
   // Language selection lives in the global LanguageContext (src/i18n/LanguageContext.tsx) so
@@ -782,12 +788,16 @@ export default function App() {
   // language switcher shown on the vendor/admin login screens.
   const renderChrome = (content: React.ReactNode, showCustomerNav: boolean) => (
     <>
-      {/* Main Elegant Header — flush with the page background at scrollY 0, gains a
-          border/shadow only once the user scrolls (sticky/scrolled state) */}
-      <header className={`bg-white sticky top-0 z-40 min-h-[var(--header-height)] border-b transition-shadow duration-200 ${
+      {/* Main Elegant Header — sticky only from the sm breakpoint up: on desktop it (and
+          the logo) stays pinned at the top while scrolling, and once scrolled far enough
+          shows an inline search bar on the SAME line as the logo and the icons — logo,
+          search bar and icons all in one row, glued together at the top. On mobile the
+          header itself isn't sticky (it scrolls away with the logo); only the real search
+          bar living on the home page (ToursHomeView) sticks there instead. */}
+      <header className={`bg-white relative sm:sticky sm:top-0 z-40 min-h-[var(--header-height)] border-b transition-shadow duration-200 ${
         isHeaderScrolled ? 'border-border-primary shadow-sm' : 'border-transparent'
       }`}>
-        <div className="relative max-w-[var(--global-max-width)] mx-auto min-h-[var(--header-height)] px-8 py-2 md:py-0 flex flex-wrap md:flex-nowrap items-center justify-between gap-4">
+        <div className="relative max-w-[var(--global-max-width)] mx-auto min-h-[var(--header-height)] px-8 py-2 md:py-0 flex flex-wrap md:flex-nowrap items-center justify-center sm:justify-between gap-4">
 
           {/* Logo Brand */}
           <div className="flex items-center gap-2 cursor-pointer" onClick={() => {
@@ -801,12 +811,12 @@ export default function App() {
             </div>
           </div>
 
-          {/* Sticky Search Bar (Only visible when scrolled in Customer mode) — on mobile this
-              wraps onto its own full-width row within the header (via flex-wrap above) instead
-              of floating absolutely over the page, so it can no longer overlap page content
-              scrolling underneath it. Desktop keeps the original single-row inline layout. */}
+          {/* Inline Search Bar — desktop only, shown once scrolled past the home page's
+              own search box. Bound to the same globalSearchQuery state as that box, so
+              they always stay in sync — this is effectively that same search reflected
+              here once its own copy has scrolled out of view. */}
           {showCustomerNav && isScrolled && (
-            <div ref={globalSearchRef} className="flex order-3 w-full md:order-none md:w-auto md:flex-1 md:max-w-xl md:mx-8 animate-fadeIn">
+            <div ref={globalSearchRef} className="hidden sm:flex sm:flex-1 sm:max-w-xl sm:mx-8 relative animate-fadeIn">
               <div className="relative w-full bg-white shadow-sm rounded-full p-1.5 border border-slate-200 flex items-center">
                 <div className="pl-4 pr-2 flex items-center flex-1">
                    <input
@@ -854,8 +864,12 @@ export default function App() {
             </div>
           )}
 
-          {/* Right Section */}
-          <div className="flex items-center gap-1 sm:gap-2">
+          {/* Right Section — hidden on mobile when in customer mode: compare, wishlist,
+              guide, calculator, language and the burger dropdown are all already available
+              from CustomerPortal's own bottom mobile nav bar, so showing them here too just
+              duplicated the same icons in two places. Desktop has no bottom nav, so it keeps
+              them here as before. */}
+          <div className={`items-center gap-1 sm:gap-2 ${showCustomerNav ? 'hidden sm:flex' : 'flex'}`}>
             {showCustomerNav ? (
               <div className="flex items-center gap-1 sm:gap-2">
                 <button
@@ -1057,9 +1071,15 @@ export default function App() {
         </div>
       </header>
 
-      {/* Main Workspace Frame */}
+      {/* Main Workspace Frame — the customer home page (ToursHomeView) now sticks its
+          own real search bar to the top of the viewport as the user scrolls past it,
+          so there's no separate duplicate search bar living in the header anymore.
+          NOTE: no animate-fadeIn wrapper here anymore — a transform-based fade
+          animation on an ancestor silently breaks position:sticky for descendants
+          (a well-known CSS gotcha), which was why the search bar wasn't sticking
+          on mobile. */}
       <main className="max-w-[var(--global-max-width)] mx-auto px-5 py-8 flex-1 w-full space-y-6">
-        <div className="space-y-6 animate-fadeIn">
+        <div className="space-y-6">
           {content}
         </div>
       </main>
@@ -1250,6 +1270,7 @@ export default function App() {
                   onSearchChange={setGlobalSearchQuery}
                   displayCurrency={displayCurrency}
                   appLanguage={appLanguage}
+                  onDisplayCurrencyChange={setDisplayCurrency}
                   priceCalculatorConfig={platformConfig.priceCalculatorConfig}
                 />
               </Suspense>

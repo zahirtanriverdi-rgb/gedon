@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
+import { Compass, Heart, Scale, Menu, X, BookOpen, Calculator } from 'lucide-react';
 import { Tour, TourSlot, Booking, Review, User, PriceCalculatorConfig } from '../types';
 import FAQPage from './FAQPage';
 import { PriceCalculator } from './PriceCalculator';
@@ -21,10 +22,12 @@ import { getWishlist, toggleWishlist } from '../utils/wishlist';
 import { getCompareList, toggleCompareList, replaceInCompareList } from '../utils/compare';
 import { useLanguage } from '../i18n/LanguageContext';
 import { computeFeaturedTourIds } from '../utils/featuredTours';
+import { useEffect, useRef } from 'react';
 
 // Automatic rating boost applied to tours currently flagged as this month's bestseller
 // (computeFeaturedTourIds), on top of whichever base rating (vendor-set or review average) applies.
 const BESTSELLER_RATING_BOOST = 0.3;
+
 
 const MONTH_KEYS = [
   'january', 'february', 'march', 'april', 'may', 'june',
@@ -48,6 +51,7 @@ interface CustomerPortalProps {
   onSearchChange?: (query: string) => void;
   displayCurrency?: 'AZN' | 'USD' | 'EUR';
   appLanguage?: 'az' | 'en' | 'ru';
+  onDisplayCurrencyChange?: (currency: 'AZN' | 'USD' | 'EUR') => void;
   priceCalculatorConfig?: PriceCalculatorConfig;
 }
 
@@ -68,9 +72,10 @@ export default function CustomerPortal({
   onSearchChange,
   displayCurrency = 'AZN',
   appLanguage = 'az',
+  onDisplayCurrencyChange,
   priceCalculatorConfig
 }: CustomerPortalProps) {
-  const { t: tGlobal } = useLanguage();
+  const { t: tGlobal, language: currentLang, setLanguage } = useLanguage();
   // Helper for currency conversion based on central exchange rates
   const getConvertedPriceInfo = (price: number, currency?: 'AZN' | 'USD' | 'EUR') => {
     const usdRate = exchangeRates?.USD || 1.70;
@@ -124,7 +129,13 @@ export default function CustomerPortal({
       allLevels: "Bütün dərəcələr",
       everywhere: "Hər yer (Bütün)",
       noToursFound: "Axtarışa uyğun tur tapılmadı",
-      noToursDesc: "Zəhmət olmasa filtrləri dəyişdirin və ya fərqli açar sözlərlə yenidən cəhd edin."
+      noToursDesc: "Zəhmət olmasa filtrləri dəyişdirin və ya fərqli açar sözlərlə yenidən cəhd edin.",
+      navDiscover: "Kəşf et",
+      navWishlist: "İstəklər",
+      navCompare: "Müqayisə",
+      navMenu: "Menyu",
+      navGuide: "Bələdçi",
+      navCalculator: "Qrup hesabla"
     },
     en: {
       searchPlaceholder: "Explore destinations and experiences...",
@@ -140,7 +151,13 @@ export default function CustomerPortal({
       allLevels: "All levels",
       everywhere: "Everywhere",
       noToursFound: "No tours found",
-      noToursDesc: "Please change your filters or try with different keywords."
+      noToursDesc: "Please change your filters or try with different keywords.",
+      navDiscover: "Discover",
+      navWishlist: "Wishlist",
+      navCompare: "Compare",
+      navMenu: "Menu",
+      navGuide: "Guide",
+      navCalculator: "Group calculator"
     },
     ru: {
       searchPlaceholder: "Откройте для себя места и впечатления...",
@@ -156,7 +173,13 @@ export default function CustomerPortal({
       allLevels: "Все уровни",
       everywhere: "Везде",
       noToursFound: "Туры не найдены",
-      noToursDesc: "Пожалуйста, измените фильтры или попробуйте другие ключевые слова."
+      noToursDesc: "Пожалуйста, измените фильтры или попробуйте другие ключевые слова.",
+      navDiscover: "Обзор",
+      navWishlist: "Избранное",
+      navCompare: "Сравнить",
+      navMenu: "Меню",
+      navGuide: "Гид",
+      navCalculator: "Групповой калькулятор"
     }
   };
   const t = (key: keyof typeof translations.az) => translations[appLanguage]?.[key] || translations.az[key];
@@ -194,6 +217,20 @@ export default function CustomerPortal({
   const [localSearchQuery, setLocalSearchQuery] = useState('');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const searchContainerRef = React.useRef<HTMLDivElement>(null);
+
+  // Bottom mobile nav's burger dropdown (Bələdçi / Qrup hesabla) — mirrors the header's
+  // existing mobile "more" menu in App.tsx, scoped locally since this nav lives here.
+  const [mobileNavMenuOpen, setMobileNavMenuOpen] = useState(false);
+  const mobileNavMenuRef = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (mobileNavMenuRef.current && !mobileNavMenuRef.current.contains(event.target as Node)) {
+        setMobileNavMenuOpen(false);
+      }
+    };
+    if (mobileNavMenuOpen) document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [mobileNavMenuOpen]);
   
   // Real search history, persisted to localStorage (shared with the header's search bar)
   const [recentSearches, setRecentSearches] = useState<string[]>(() => getRecentSearches());
@@ -268,7 +305,10 @@ export default function CustomerPortal({
   const [calendarDateStart, setCalendarDateStart] = useState<string>('');
   const [calendarDateEnd, setCalendarDateEnd] = useState<string>('');
   const [showCalendarWidget, setShowCalendarWidget] = useState<boolean>(false);
-  const [currentMonthView, setCurrentMonthView] = useState<string>('2026-05');
+  const [currentMonthView, setCurrentMonthView] = useState<string>(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  });
 
   const calendarContainerRef = React.useRef<HTMLDivElement>(null);
 
@@ -640,7 +680,7 @@ export default function CustomerPortal({
   };
 
   return (
-    <>
+    <div className="pb-16 sm:pb-0">
       <Routes>
         <Route
           path="/"
@@ -846,6 +886,146 @@ export default function CustomerPortal({
           <ImageLightbox tour={quickBookTour} lightboxIndex={lightboxIndex} onSetLightboxIndex={setLightboxIndex} />
         </div>
       )}
-    </>
+
+   {/* Mobile Bottom Navigation Bar */}
+<nav className="sm:hidden fixed bottom-0 left-0 right-0 w-full z-[100] bg-white border-t border-slate-200 shadow-[0_-2px_8px_rgba(0,0,0,0.04)] pb-[env(safe-area-inset-bottom)] overflow-visible">        <div className="flex flex-row items-center justify-between w-full h-16 px-1">
+          
+          <button
+            type="button"
+            onClick={() => {
+              setMobileNavMenuOpen(false);
+              // Always a hard return to a clean homepage: if we're already on '/' a plain
+              // navigate('/') wouldn't re-trigger the route-change reset effect above (the
+              // pathname never actually changes), so search/filters/scroll would stay stuck
+              // as they were. A full reload guarantees the same "fresh home" result every
+              // time, whichever page the customer is currently on.
+              window.location.href = '/';
+            }}
+            className={`flex-1 flex flex-col items-center justify-center h-full gap-0.5 transition-colors ${
+              location.pathname === '/' ? 'text-brand-primary' : 'text-brand-text-muted'
+            }`}
+          >
+            <Compass className="w-5 h-5" strokeWidth={location.pathname === '/' ? 2.5 : 2} />
+            <span className="text-[10px] font-bold">{t('navDiscover')}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => { setMobileNavMenuOpen(false); navigate('/wishlist'); }}
+            className={`flex-1 relative flex flex-col items-center justify-center h-full gap-0.5 transition-colors ${
+              location.pathname === '/wishlist' ? 'text-brand-primary' : 'text-brand-text-muted'
+            }`}
+          >
+            <span className="relative flex justify-center">
+              <Heart className="w-5 h-5" strokeWidth={location.pathname === '/wishlist' ? 2.5 : 2} fill={location.pathname === '/wishlist' ? 'currentColor' : 'none'} />
+              {wishlist.length > 0 && (
+                <span className="absolute -top-1.5 -right-3 min-w-[15px] h-[15px] px-0.5 bg-rose-600 text-white text-[9px] font-bold rounded-full flex items-center justify-center">
+                  {wishlist.length}
+                </span>
+              )}
+            </span>
+            <span className="text-[10px] font-bold">{t('navWishlist')}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => { setMobileNavMenuOpen(false); navigate('/compare'); }}
+            className={`flex-1 relative flex flex-col items-center justify-center h-full gap-0.5 transition-colors ${
+              location.pathname === '/compare' ? 'text-brand-primary' : 'text-brand-text-muted'
+            }`}
+          >
+            <span className="relative flex justify-center">
+              <Scale className="w-5 h-5" strokeWidth={location.pathname === '/compare' ? 2.5 : 2} />
+              {compareList.length > 0 && (
+                <span className="absolute -top-1.5 -right-3 min-w-[15px] h-[15px] px-0.5 bg-brand-cta text-white text-[9px] font-bold rounded-full flex items-center justify-center">
+                  {compareList.length}
+                </span>
+              )}
+            </span>
+            <span className="text-[10px] font-bold">{t('navCompare')}</span>
+          </button>
+
+          <div className="flex-1 relative h-full flex" ref={mobileNavMenuRef}>
+            <button
+              type="button"
+              onClick={() => setMobileNavMenuOpen((v) => !v)}
+              className={`w-full h-full flex flex-col items-center justify-center gap-0.5 transition-colors ${
+                mobileNavMenuOpen || location.pathname === '/faq' || location.pathname === '/calculator'
+                  ? 'text-brand-primary'
+                  : 'text-brand-text-muted'
+              }`}
+            >
+              {mobileNavMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" strokeWidth={2} />}
+              <span className="text-[10px] font-bold">{t('navMenu')}</span>
+            </button>
+
+            {/* Menyunun kəsilməməsi üçün right-0 və z-[110] tənzimləndi */}
+            {mobileNavMenuOpen && (
+              <div className="absolute bottom-[calc(100%+12px)] right-0 w-48 bg-white rounded-2xl border border-slate-200 shadow-2xl overflow-hidden z-[110] animate-in fade-in slide-in-from-bottom-2 duration-200">
+                <button
+                  type="button"
+                  onClick={() => { setMobileNavMenuOpen(false); navigate('/faq'); }}
+                  className="w-full flex items-center gap-3 px-5 py-4 text-sm font-medium text-brand-text-main hover:bg-slate-50 transition-colors border-b border-slate-100"
+                >
+                  <BookOpen className="w-5 h-5 text-brand-text-muted" />
+                  {t('navGuide')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setMobileNavMenuOpen(false); navigate('/calculator'); }}
+                  className="w-full flex items-center gap-3 px-5 py-4 text-sm font-medium text-brand-text-main hover:bg-slate-50 transition-colors border-b border-slate-100"
+                >
+                  <Calculator className="w-5 h-5 text-brand-text-muted" />
+                  {t('navCalculator')}
+                </button>
+
+                {/* Dil + valyuta seçimi — header-dəki desktop menyusu ilə eyni 4 cüt seçim
+                    (AZ/AZN, RU/AZN, EN/USD, EN/EUR). Əvvəllər burada yalnız dil dəyişirdi,
+                    valyuta bu menyudan heç dəyişmirdi — desktopla uyğunlaşdırıldı. */}
+                <div className="px-5 pt-3 pb-1 text-[10px] uppercase tracking-wide font-bold text-slate-400">
+                  {appLanguage === 'ru' ? 'Язык / Валюта' : appLanguage === 'en' ? 'Language / Currency' : 'Dil / Valyuta'}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => { setLanguage('az'); onDisplayCurrencyChange?.('AZN'); setMobileNavMenuOpen(false); }}
+                  className={`w-full flex items-center gap-2 px-5 py-2.5 text-sm font-medium transition-colors ${
+                    currentLang === 'az' && displayCurrency === 'AZN' ? 'text-brand-primary bg-emerald-50' : 'text-brand-text-main hover:bg-slate-50'
+                  }`}
+                >
+                  🇦🇿 AZ (AZN)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setLanguage('ru'); onDisplayCurrencyChange?.('AZN'); setMobileNavMenuOpen(false); }}
+                  className={`w-full flex items-center gap-2 px-5 py-2.5 text-sm font-medium transition-colors ${
+                    currentLang === 'ru' && displayCurrency === 'AZN' ? 'text-brand-primary bg-emerald-50' : 'text-brand-text-main hover:bg-slate-50'
+                  }`}
+                >
+                  🇷🇺 RU (AZN)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setLanguage('en'); onDisplayCurrencyChange?.('USD'); setMobileNavMenuOpen(false); }}
+                  className={`w-full flex items-center gap-2 px-5 py-2.5 text-sm font-medium transition-colors ${
+                    currentLang === 'en' && displayCurrency === 'USD' ? 'text-brand-primary bg-emerald-50' : 'text-brand-text-main hover:bg-slate-50'
+                  }`}
+                >
+                  🇬🇧 EN (USD)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setLanguage('en'); onDisplayCurrencyChange?.('EUR'); setMobileNavMenuOpen(false); }}
+                  className={`w-full flex items-center gap-2 px-5 py-2.5 text-sm font-medium transition-colors ${
+                    currentLang === 'en' && displayCurrency === 'EUR' ? 'text-brand-primary bg-emerald-50' : 'text-brand-text-main hover:bg-slate-50'
+                  }`}
+                >
+                  🇪🇺 EN (EUR)
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </nav>
+    </div>
   );
 }
