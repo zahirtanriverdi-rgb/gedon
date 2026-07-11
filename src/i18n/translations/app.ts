@@ -12,7 +12,7 @@ export const app = {
         logout: 'Çıxış',
       },
       search: {
-        placeholder: 'Tur adı, region və ya açar söz axtar...',
+        placeholder: 'Məkanları və ya fəaliyyətləri kəşf et...',
         button: 'Axtar',
       },
       state: {
@@ -70,7 +70,7 @@ export const app = {
         logout: 'Log out',
       },
       search: {
-        placeholder: 'Search tour name, region or keyword...',
+        placeholder: 'Explore destinations and experiences...',
         button: 'Search',
       },
       state: {
@@ -128,7 +128,7 @@ export const app = {
         logout: 'Выйти',
       },
       search: {
-        placeholder: 'Поиск по названию тура, региону или ключевому слову...',
+        placeholder: 'Откройте для себя места и впечатления...',
         button: 'Поиск',
       },
       state: {

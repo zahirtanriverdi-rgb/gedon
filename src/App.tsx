@@ -27,7 +27,8 @@ import {
   Scale,
   Globe,
   Calculator,
-  BookOpen
+  BookOpen,
+  Menu
 } from 'lucide-react';
 
 // The API always responds with JSON, but if a request slips past Express (e.g. a 413
@@ -73,6 +74,11 @@ export default function App() {
 
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Controls the mobile-only "more" dropdown that groups guide/calculator/language
+  // behind a single burger icon, since mobile header space only fits compare + wishlist
+  // plus this one extra button.
+  const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
 
   const [loggedInVendor, setLoggedInVendor] = useState<User | null>(null);
   // JWT from /api/auth/operator/login — kept in memory only (not localStorage), matches
@@ -361,6 +367,19 @@ export default function App() {
     }
     document.addEventListener('mousedown', handleClickOutsideSearch);
     return () => document.removeEventListener('mousedown', handleClickOutsideSearch);
+  }, []);
+
+  // Closes the mobile "more" dropdown (guide/calculator/language) on outside click,
+  // same pattern as the search dropdown above.
+  const mobileMoreRef = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    function handleClickOutsideMobileMore(event: MouseEvent) {
+      if (mobileMoreRef.current && !mobileMoreRef.current.contains(event.target as Node)) {
+        setMobileMoreOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutsideMobileMore);
+    return () => document.removeEventListener('mousedown', handleClickOutsideMobileMore);
   }, []);
 
   React.useEffect(() => {
@@ -867,94 +886,163 @@ export default function App() {
                   </span>
                   <span className="hidden sm:block text-xs text-brand-text-main font-semibold">{t('app.nav.wishlist')}</span>
                 </button>
-                <button
-                  onClick={() => navigate('/faq')}
-                  className="relative w-11 sm:w-auto sm:min-w-0 sm:px-2 h-16 sm:h-14 flex flex-col items-center justify-center gap-0.5 hover:text-emerald-600 transition group cursor-pointer bg-transparent border-none p-0"
-                  title={t('app.nav.guideTitle')}
-                >
-                  <span className="w-11 h-8 sm:w-9 sm:h-7 flex items-center justify-center rounded-full transition-colors group-hover:bg-emerald-50">
-                    <BookOpen className="w-6 h-6 sm:w-5 sm:h-5 stroke-[2px] transition-all duration-150 group-hover:stroke-emerald-500 group-hover:scale-110" />
-                  </span>
-                  <span className="hidden sm:block text-xs text-brand-text-main font-semibold whitespace-nowrap">{t('app.nav.guide')}</span>
-                </button>
-                <button
-                  onClick={() => navigate('/calculator')}
-                  className="w-11 sm:w-auto sm:min-w-0 sm:px-2 h-16 sm:h-14 flex flex-col items-center justify-center gap-0.5 hover:text-emerald-600 transition group cursor-pointer bg-transparent border-none p-0"
-                >
-                  <span className="w-11 h-8 sm:w-9 sm:h-7 flex items-center justify-center rounded-full transition-colors group-hover:bg-emerald-50">
-                    <Calculator className="w-6 h-6 sm:w-5 sm:h-5 stroke-[2px] transition-all duration-150 group-hover:stroke-emerald-500 group-hover:scale-110" />
-                  </span>
-                  <span className="hidden sm:block text-xs text-brand-text-main font-semibold whitespace-nowrap">{t('app.nav.calculator')}</span>
-                </button>
-                <div className="relative">
+
+                {/* Guide/Calculator/Language stay inline on desktop; on mobile they move
+                    into the single burger dropdown below so the header only ever shows
+                    compare + wishlist + one more button. */}
+                <div className="hidden sm:flex sm:items-center sm:gap-2">
                   <button
-                    ref={langMenu.buttonRef}
-                    onClick={() => langMenu.setOpen((v) => !v)}
-                    className="w-11 sm:w-auto sm:min-w-0 sm:px-2 h-16 sm:h-14 flex flex-col items-center justify-center gap-0.5 hover:text-emerald-600 transition group cursor-pointer bg-transparent border-none p-0"
-                    title={t('app.nav.changeLangCurrency')}
+                    onClick={() => navigate('/faq')}
+                    className="relative w-11 sm:w-auto sm:min-w-0 sm:px-2 h-16 sm:h-14 flex flex-col items-center justify-center gap-0.5 hover:text-emerald-600 transition group cursor-pointer bg-transparent border-none p-0"
+                    title={t('app.nav.guideTitle')}
                   >
-                    <span className={`w-11 h-8 sm:w-9 sm:h-7 flex items-center justify-center rounded-full transition-colors group-hover:bg-emerald-50 ${langMenu.open ? 'bg-emerald-50 text-emerald-600' : 'text-brand-text-muted'}`}>
-                      <span className="relative inline-block w-6 h-6 sm:w-5 sm:h-5">
-                        <Globe
-                          className={`absolute inset-0 w-full h-full stroke-[2px] transition-all duration-300 ease-out group-hover:stroke-emerald-500 group-hover:scale-110 ${
-                            langMenu.open ? 'opacity-0 rotate-90 scale-50' : 'opacity-100 rotate-0 scale-100'
-                          }`}
-                        />
-                        <X
-                          className={`absolute inset-0 w-full h-full stroke-[2px] text-emerald-600 transition-all duration-300 ease-out ${
-                            langMenu.open ? 'opacity-100 rotate-0 scale-100' : 'opacity-0 -rotate-90 scale-50'
-                          }`}
-                        />
-                      </span>
+                    <span className="w-11 h-8 sm:w-9 sm:h-7 flex items-center justify-center rounded-full transition-colors group-hover:bg-emerald-50">
+                      <BookOpen className="w-6 h-6 sm:w-5 sm:h-5 stroke-[2px] transition-all duration-150 group-hover:stroke-emerald-500 group-hover:scale-110" />
                     </span>
-                    <span className="hidden sm:block text-xs text-brand-text-muted font-semibold">
-                      {appLanguage === 'az' && displayCurrency === 'AZN' ? 'AZ / AZN ₼' :
-                       appLanguage === 'ru' && displayCurrency === 'AZN' ? 'RU / AZN ₼' :
-                       appLanguage === 'en' && displayCurrency === 'USD' ? 'EN / USD $' :
-                       appLanguage === 'en' && displayCurrency === 'EUR' ? 'EN / EUR €' :
-                       `${appLanguage.toUpperCase()} / ${displayCurrency}`}
+                    <span className="hidden sm:block text-xs text-brand-text-main font-semibold whitespace-nowrap">{t('app.nav.guide')}</span>
+                  </button>
+                  <button
+                    onClick={() => navigate('/calculator')}
+                    className="w-11 sm:w-auto sm:min-w-0 sm:px-2 h-16 sm:h-14 flex flex-col items-center justify-center gap-0.5 hover:text-emerald-600 transition group cursor-pointer bg-transparent border-none p-0"
+                  >
+                    <span className="w-11 h-8 sm:w-9 sm:h-7 flex items-center justify-center rounded-full transition-colors group-hover:bg-emerald-50">
+                      <Calculator className="w-6 h-6 sm:w-5 sm:h-5 stroke-[2px] transition-all duration-150 group-hover:stroke-emerald-500 group-hover:scale-110" />
+                    </span>
+                    <span className="hidden sm:block text-xs text-brand-text-main font-semibold whitespace-nowrap">{t('app.nav.calculator')}</span>
+                  </button>
+                  <div className="relative">
+                    <button
+                      ref={langMenu.buttonRef}
+                      onClick={() => langMenu.setOpen((v) => !v)}
+                      className="w-11 sm:w-auto sm:min-w-0 sm:px-2 h-16 sm:h-14 flex flex-col items-center justify-center gap-0.5 hover:text-emerald-600 transition group cursor-pointer bg-transparent border-none p-0"
+                      title={t('app.nav.changeLangCurrency')}
+                    >
+                      <span className={`w-11 h-8 sm:w-9 sm:h-7 flex items-center justify-center rounded-full transition-colors group-hover:bg-emerald-50 ${langMenu.open ? 'bg-emerald-50 text-emerald-600' : 'text-brand-text-muted'}`}>
+                        <span className="relative inline-block w-6 h-6 sm:w-5 sm:h-5">
+                          <Globe
+                            className={`absolute inset-0 w-full h-full stroke-[2px] transition-all duration-300 ease-out group-hover:stroke-emerald-500 group-hover:scale-110 ${
+                              langMenu.open ? 'opacity-0 rotate-90 scale-50' : 'opacity-100 rotate-0 scale-100'
+                            }`}
+                          />
+                          <X
+                            className={`absolute inset-0 w-full h-full stroke-[2px] text-emerald-600 transition-all duration-300 ease-out ${
+                              langMenu.open ? 'opacity-100 rotate-0 scale-100' : 'opacity-0 -rotate-90 scale-50'
+                            }`}
+                          />
+                        </span>
+                      </span>
+                      <span className="hidden sm:block text-xs text-brand-text-muted font-semibold">
+                        {appLanguage === 'az' && displayCurrency === 'AZN' ? 'AZ / AZN ₼' :
+                         appLanguage === 'ru' && displayCurrency === 'AZN' ? 'RU / AZN ₼' :
+                         appLanguage === 'en' && displayCurrency === 'USD' ? 'EN / USD $' :
+                         appLanguage === 'en' && displayCurrency === 'EUR' ? 'EN / EUR €' :
+                         `${appLanguage.toUpperCase()} / ${displayCurrency}`}
+                      </span>
+                    </button>
+                    {langMenu.hasOpenedOnce && langMenu.coords && createPortal(
+                      <div
+                        ref={langMenu.panelRef}
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                          top: langMenu.coords.top,
+                          left: langMenu.coords.left,
+                          width: langMenu.coords.width,
+                          maxHeight: langMenu.panelVisible ? langMenu.expandedHeight : 0,
+                        }}
+                        className={`fixed z-50 bg-white border border-slate-200 shadow-xl rounded-2xl overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+                          langMenu.panelVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'
+                        }`}
+                      >
+                        <button
+                          className="w-full text-left px-4 py-3 text-[12px] font-semibold text-slate-700 hover:bg-slate-50 transition-colors border-b border-slate-100 flex items-center gap-2"
+                          onClick={() => { setAppLanguage('az'); setDisplayCurrency('AZN'); langMenu.setOpen(false); }}
+                        >
+                          🇦🇿 AZ (AZN)
+                        </button>
+                        <button
+                          className="w-full text-left px-4 py-3 text-[12px] font-semibold text-slate-700 hover:bg-slate-50 transition-colors border-b border-slate-100 flex items-center gap-2"
+                          onClick={() => { setAppLanguage('ru'); setDisplayCurrency('AZN'); langMenu.setOpen(false); }}
+                        >
+                          🇷🇺 RU (AZN)
+                        </button>
+                        <button
+                          className="w-full text-left px-4 py-3 text-[12px] font-semibold text-slate-700 hover:bg-slate-50 transition-colors border-b border-slate-100 flex items-center gap-2"
+                          onClick={() => { setAppLanguage('en'); setDisplayCurrency('USD'); langMenu.setOpen(false); }}
+                        >
+                          🇬🇧 EN (USD)
+                        </button>
+                        <button
+                          className="w-full text-left px-4 py-3 text-[12px] font-semibold text-slate-700 hover:bg-slate-50 transition-colors flex items-center gap-2"
+                          onClick={() => { setAppLanguage('en'); setDisplayCurrency('EUR'); langMenu.setOpen(false); }}
+                        >
+                          🇪🇺 EN (EUR)
+                        </button>
+                      </div>,
+                      document.body
+                    )}
+                  </div>
+                </div>
+
+                {/* Mobile-only burger: groups guide/calculator/language behind one icon */}
+                <div className="relative sm:hidden" ref={mobileMoreRef}>
+                  <button
+                    onClick={() => setMobileMoreOpen((v) => !v)}
+                    className="w-11 h-16 flex flex-col items-center justify-center gap-0.5 hover:text-emerald-600 transition group cursor-pointer bg-transparent border-none p-0"
+                  >
+                    <span className={`w-11 h-8 flex items-center justify-center rounded-full transition-colors group-hover:bg-emerald-50 ${mobileMoreOpen ? 'bg-emerald-50 text-emerald-600' : ''}`}>
+                      {mobileMoreOpen ? (
+                        <X className="w-6 h-6 stroke-[2px]" />
+                      ) : (
+                        <Menu className="w-6 h-6 stroke-[2px]" />
+                      )}
                     </span>
                   </button>
-                  {langMenu.hasOpenedOnce && langMenu.coords && createPortal(
+
+                  {mobileMoreOpen && (
                     <div
-                      ref={langMenu.panelRef}
                       onClick={(e) => e.stopPropagation()}
-                      style={{
-                        top: langMenu.coords.top,
-                        left: langMenu.coords.left,
-                        width: langMenu.coords.width,
-                        maxHeight: langMenu.panelVisible ? langMenu.expandedHeight : 0,
-                      }}
-                      className={`fixed z-50 bg-white border border-slate-200 shadow-xl rounded-2xl overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
-                        langMenu.panelVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'
-                      }`}
+                      className="absolute right-0 top-16 z-50 w-56 bg-white border border-slate-200 shadow-xl rounded-2xl overflow-hidden"
                     >
                       <button
-                        className="w-full text-left px-4 py-3 text-[12px] font-semibold text-slate-700 hover:bg-slate-50 transition-colors border-b border-slate-100 flex items-center gap-2"
-                        onClick={() => { setAppLanguage('az'); setDisplayCurrency('AZN'); langMenu.setOpen(false); }}
+                        className="w-full text-left px-4 py-3 text-[13px] font-semibold text-slate-700 hover:bg-slate-50 transition-colors border-b border-slate-100 flex items-center gap-2"
+                        onClick={() => { navigate('/faq'); setMobileMoreOpen(false); }}
+                      >
+                        <BookOpen className="w-4 h-4" /> {t('app.nav.guide')}
+                      </button>
+                      <button
+                        className="w-full text-left px-4 py-3 text-[13px] font-semibold text-slate-700 hover:bg-slate-50 transition-colors border-b border-slate-100 flex items-center gap-2"
+                        onClick={() => { navigate('/calculator'); setMobileMoreOpen(false); }}
+                      >
+                        <Calculator className="w-4 h-4" /> {t('app.nav.calculator')}
+                      </button>
+                      <div className="px-4 pt-2 pb-1 text-[10px] uppercase tracking-wide font-bold text-slate-400">
+                        {t('app.nav.changeLangCurrency')}
+                      </div>
+                      <button
+                        className="w-full text-left px-4 py-2.5 text-[13px] font-semibold text-slate-700 hover:bg-slate-50 transition-colors flex items-center gap-2"
+                        onClick={() => { setAppLanguage('az'); setDisplayCurrency('AZN'); setMobileMoreOpen(false); }}
                       >
                         🇦🇿 AZ (AZN)
                       </button>
                       <button
-                        className="w-full text-left px-4 py-3 text-[12px] font-semibold text-slate-700 hover:bg-slate-50 transition-colors border-b border-slate-100 flex items-center gap-2"
-                        onClick={() => { setAppLanguage('ru'); setDisplayCurrency('AZN'); langMenu.setOpen(false); }}
+                        className="w-full text-left px-4 py-2.5 text-[13px] font-semibold text-slate-700 hover:bg-slate-50 transition-colors flex items-center gap-2"
+                        onClick={() => { setAppLanguage('ru'); setDisplayCurrency('AZN'); setMobileMoreOpen(false); }}
                       >
                         🇷🇺 RU (AZN)
                       </button>
                       <button
-                        className="w-full text-left px-4 py-3 text-[12px] font-semibold text-slate-700 hover:bg-slate-50 transition-colors border-b border-slate-100 flex items-center gap-2"
-                        onClick={() => { setAppLanguage('en'); setDisplayCurrency('USD'); langMenu.setOpen(false); }}
+                        className="w-full text-left px-4 py-2.5 text-[13px] font-semibold text-slate-700 hover:bg-slate-50 transition-colors flex items-center gap-2"
+                        onClick={() => { setAppLanguage('en'); setDisplayCurrency('USD'); setMobileMoreOpen(false); }}
                       >
                         🇬🇧 EN (USD)
                       </button>
                       <button
-                        className="w-full text-left px-4 py-3 text-[12px] font-semibold text-slate-700 hover:bg-slate-50 transition-colors flex items-center gap-2"
-                        onClick={() => { setAppLanguage('en'); setDisplayCurrency('EUR'); langMenu.setOpen(false); }}
+                        className="w-full text-left px-4 py-2.5 text-[13px] font-semibold text-slate-700 hover:bg-slate-50 transition-colors flex items-center gap-2"
+                        onClick={() => { setAppLanguage('en'); setDisplayCurrency('EUR'); setMobileMoreOpen(false); }}
                       >
                         🇪🇺 EN (EUR)
                       </button>
-                    </div>,
-                    document.body
+                    </div>
                   )}
                 </div>
               </div>

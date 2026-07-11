@@ -12,7 +12,9 @@ import {
   ChevronRight,
   Plane,
   Heart,
-  Scale
+  Scale,
+  Clock,
+  Star
 } from 'lucide-react';
 import { SearchDropdown } from '../SearchDropdown';
 import { ReviewSubmissionPanel } from './ReviewSubmissionPanel';
@@ -22,6 +24,7 @@ import { getLocalizedTourName, getLocalizedTourDescription } from '../../i18n/to
 import { parseStoredGpxData, getRouteDurationHours } from '../../utils/gpxParser';
 import { TourStatsRow } from '../tours/TourStatsRow';
 import { ShareMenuButton } from '../tours/ShareMenuButton';
+import { RouteSparkline } from '../tours/RouteSparkline';
 import { matchesHikingSubcategory, HIKING_SUBCATEGORIES, HikingSubcategory } from '../../utils/hikingSubcategories';
 
 type ConvertedPriceInfo = {
@@ -160,18 +163,16 @@ export function ToursHomeView({
     return sortedAndFilteredTours.filter((tour) => matchesHikingSubcategory(tour, hikingSubcategory));
   }, [sortedAndFilteredTours, selectedCategory, hikingSubcategory]);
   return (
-        // -mx-5 cancels the parent <main>'s fixed px-5 (20px) so this container can
-        // reapply the same 20px on mobile/tablet but widen to 72px at >=1440px,
-        // matching GetYourGuide's measured wide-screen side padding (div.container,
-        // 72px) without touching the shared App.tsx <main> (which Vendor/Admin
-        // also render inside).
-        <div className="space-y-4 -mx-5 px-5 min-[1440px]:px-[72px]">
+        // -mx-5 cancels the parent <main>'s fixed px-5 so this container can
+        // reapply proportional side padding across all breakpoints — scaling
+        // smoothly from mobile to wide-screen.
+        <div className="space-y-4 -mx-5 px-4 sm:px-5 md:px-8 lg:px-12 xl:px-14 min-[1440px]:px-[72px]">
 
           {/* Search & Filters (Clean Minimalism Style) */}
           {/* z-30 (not z-10): this wrapper's z-index caps the stacking context for the
               suggestions dropdown inside it, so it must outrank the tour cards' own
               z-10 share buttons below or the dropdown gets painted underneath them. */}
-          <div className="flex flex-col items-center justify-center pt-[38px] pb-[88px] min-h-[294px] mb-3 relative z-30 w-full animate-fadeIn">
+          <div className="flex flex-col items-center justify-center pt-[38px] pb-[50px] min-h-[294px] mb-3 relative z-30 w-full animate-fadeIn">
             <h2 className="text-3xl md:text-4xl md:leading-[1.22] font-bold text-brand-text-main mb-6 tracking-tight text-center">{t('discoverTours')}</h2>
 
             {/* Main Pill Search Box */}
@@ -362,7 +363,7 @@ export function ToursHomeView({
 
                   {/* Absolute positioning for visual monthly calendar so it pops out of grid */}
                   {showCalendarWidget && (
-                    <div ref={calendarContainerRef} className="absolute z-50 left-0 mt-1 top-full bg-white px-5 py-4 rounded-xl border border-slate-200 shadow-xl w-72 animate-fade-in font-sans">
+                    <div ref={calendarContainerRef} className="absolute z-50 left-0 mt-1 top-full bg-white px-5 py-4 rounded-2xl border border-slate-200 shadow-xl w-72 animate-fade-in font-sans">
                       <div className="flex items-center justify-between mb-4">
                         <button
                           type="button"
@@ -511,10 +512,9 @@ export function ToursHomeView({
 
           {/* Horizontal Slider for Upcoming Tours (Minimal) */}
           {uniqueUpcomingTours.length > 0 && (
-              <div className="mb-3 mt-0 w-full max-w-[1200px] mx-auto animate-fadeIn relative">
+              <div className="mb-3 mt-0 w-full animate-fadeIn relative">
                 <div className="flex items-center justify-between mb-2 px-1">
-                  <h3 className="text-sm font-extrabold text-brand-text-main tracking-tight flex items-center gap-1.5">
-                    <Calendar className="w-4 h-4 text-brand-primary" />
+                  <h3 className="text-[24px] font-medium text-brand-text-main tracking-tight">
                     {t('upcomingTours')}
                   </h3>
                 </div>
@@ -527,7 +527,7 @@ export function ToursHomeView({
                         const slider = document.getElementById('upcoming-tours-slider');
                         if(slider) slider.scrollBy({ left: -300, behavior: 'smooth' });
                       }}
-                      className="absolute left-0 top-1/2 -translate-y-1/2 -ml-3 md:-ml-4 z-10 bg-brand-bg-page text-brand-accent p-2.5 rounded-full shadow-lg hover:bg-slate-50 transition-colors flex items-center justify-center border-2 border-slate-200"
+                      className="hidden md:flex absolute left-0 top-1/2 -translate-y-1/2 -ml-3 md:-ml-4 z-10 bg-brand-bg-page text-brand-accent p-2.5 rounded-full shadow-lg hover:bg-slate-50 transition-colors items-center justify-center border-2 border-slate-200"
                     >
                       <ChevronLeft className="w-5 h-5" />
                     </button>
@@ -541,50 +541,61 @@ export function ToursHomeView({
                       <div
                         key={tour.id}
                         onClick={() => onSelectTour(tour)}
-                        className="w-[85%] sm:w-[calc(50%-8px)] md:w-[calc(33.333%-12px)] h-[150px] flex-shrink-0 bg-white border border-slate-200 rounded-[20px] p-3 flex items-center gap-4 snap-start cursor-pointer hover:border-emerald-300 hover:shadow-xl transition-all duration-300 group shadow-sm hover:-translate-y-1"
+                        className="w-[85vw] sm:w-[403px] h-[150px] flex-shrink-0 bg-white border border-slate-200 rounded-[20px] p-2.5 flex items-stretch gap-3.5 snap-start cursor-pointer hover:border-emerald-300 hover:shadow-xl transition-all duration-300 group shadow-sm hover:-translate-y-1"
                       >
-                        <div className="w-[110px] h-[110px] rounded-xl overflow-hidden flex-shrink-0 relative shadow-sm border border-slate-100">
+                        {/* Image Container with overlapping heart */}
+                        <div className="w-[130px] h-[130px] rounded-[16px] flex-shrink-0 relative">
                           <img
                             src={tour.image || `https://images.unsplash.com/photo-1542224566-6e85f2e6772f?auto=format&fit=crop&q=80&w=200`}
-                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                            className="w-full h-full object-cover rounded-[16px] group-hover:scale-105 transition-transform duration-500"
                             alt=""
                           />
                           <button
                             type="button"
                             onClick={(e) => handleToggleWishlist(tour.id, e)}
-                            className="absolute top-1 right-1 bg-white/90 hover:bg-white p-1 rounded-full shadow-sm transition cursor-pointer"
+                            className="absolute top-2 right-2 w-[40px] h-[40px] bg-white rounded-full shadow-md border border-slate-50 flex items-center justify-center transition cursor-pointer z-10 hover:scale-110"
                             title={wishlist.includes(tour.id) ? tt('customerHome.toursHomeView.wishlist.remove') : tt('customerHome.toursHomeView.wishlist.add')}
                           >
-                            <Heart className={`w-2.5 h-2.5 ${wishlist.includes(tour.id) ? 'fill-rose-600 text-rose-600' : 'text-brand-text-main'}`} />
+                            <Heart className={`w-5 h-5 ${wishlist.includes(tour.id) ? 'fill-rose-600 text-rose-600' : 'text-[#1a2b49] stroke-[2.5]'}`} />
                           </button>
                         </div>
-                        <div className="flex flex-col flex-1 justify-center overflow-hidden h-full py-1">
-                          <h4 className="text-[14px] font-black text-brand-text-main truncate mb-1" title={getLocalizedTourName(tour, language)}>{getLocalizedTourName(tour, language)}</h4>
-                          <div className="text-[12px] font-bold text-brand-text-muted mb-2 flex items-center gap-1.5">
-                            <MapPin className="w-3.5 h-3.5 text-brand-primary shrink-0" />
-                            <span className="truncate">{tour.region}</span>
+                        
+                        {/* Text Container */}
+                        <div className="flex flex-col flex-1 py-0.5 overflow-hidden pr-1">
+                          <h4 className="text-[15px] font-extrabold text-[#1a2b49] line-clamp-2 leading-[1.2] mb-1" title={getLocalizedTourName(tour, language)}>
+                            {getLocalizedTourName(tour, language)}
+                          </h4>
+                          
+                          <div className="text-[11px] font-semibold text-gray-500 line-clamp-1 mb-2">
+                            {tour.durationDays} gün • {tour.region} • {(tour.category === 'active' || tour.isActiveLife) ? 'Aktiv' : 'Lokal'}
                           </div>
-                          <div className="flex items-center justify-between mt-auto">
-                            <span className="text-[11px] font-black text-brand-primary bg-white border border-emerald-100 px-2 py-1 rounded-md tracking-tight">
-                              {slot.startDate}
-                          </span>
-                          {tour.discountPrice && tour.discountPrice > 0 && tour.discountPrice < (tour.price ?? slot.price) ? (
-                            <span className="flex items-baseline gap-1">
-                              <span className="line-through text-label-tertiary text-[10px]">
-                                {getConvertedPriceInfo(tour.price ?? slot.price, tour.priceCurrency).both}
-                              </span>
-                              <span className="text-[13px] font-black text-label-critical bg-surface-critical-weak px-1 rounded tracking-tight">
-                                {getConvertedPriceInfo(tour.discountPrice, tour.priceCurrency).both}
-                              </span>
-                            </span>
-                          ) : (
-                            <span className="text-[13px] font-black text-brand-text-main tracking-tight">
-                              {getConvertedPriceInfo(slot.price, tour.priceCurrency).both}
-                            </span>
-                          )}
+                          
+                          <div className="flex items-end justify-between mt-auto">
+                            <div className="flex items-center gap-1">
+                              <span className="text-[13px] font-bold text-[#1a2b49]">{getAverageRating(tour.id)}</span>
+                              <Star className="w-3.5 h-3.5 fill-[#1a2b49] text-[#1a2b49]" />
+                              <span className="text-[11px] font-medium text-gray-500">({getReviewsCount(tour.id)})</span>
+                            </div>
+                            
+                            <div className="flex items-baseline gap-1.5">
+                              {tour.discountPrice && tour.discountPrice > 0 && tour.discountPrice < (tour.price ?? slot.price) ? (
+                                <>
+                                  <span className="text-gray-500 text-[11px] font-medium line-through">
+                                    {getConvertedPriceInfo(tour.price ?? slot.price, tour.priceCurrency).both}
+                                  </span>
+                                  <span className="text-[18px] font-extrabold text-[#dc3545] tracking-tight">
+                                    {getConvertedPriceInfo(tour.discountPrice, tour.priceCurrency).both}
+                                  </span>
+                                </>
+                              ) : (
+                                <span className="text-[18px] font-extrabold text-[#dc3545] tracking-tight">
+                                  {getConvertedPriceInfo(slot.price, tour.priceCurrency).both}
+                                </span>
+                              )}
+                            </div>
+                          </div>
                         </div>
                       </div>
-                    </div>
                   ))}
                 </div>
                   {uniqueUpcomingTours.length > 3 && (
@@ -594,7 +605,7 @@ export function ToursHomeView({
                         const slider = document.getElementById('upcoming-tours-slider');
                         if(slider) slider.scrollBy({ left: 300, behavior: 'smooth' });
                       }}
-                      className="absolute right-0 top-1/2 -translate-y-1/2 -mr-3 md:-mr-4 z-10 bg-brand-bg-page text-brand-accent p-2.5 rounded-full shadow-lg hover:bg-slate-50 transition-colors flex items-center justify-center border-2 border-slate-200"
+                      className="hidden md:flex absolute right-0 top-1/2 -translate-y-1/2 -mr-3 md:-mr-4 z-10 bg-brand-bg-page text-brand-accent p-2.5 rounded-full shadow-lg hover:bg-slate-50 transition-colors items-center justify-center border-2 border-slate-200"
                     >
                       <ChevronRight className="w-5 h-5" />
                     </button>
@@ -612,8 +623,7 @@ export function ToursHomeView({
       <div id="tours-list" className="space-y-16 mt-10">
 
       <div className="flex items-center justify-between mb-2 px-1">
-        <h3 className="text-sm font-extrabold text-brand-text-main tracking-tight flex items-center gap-1.5">
-          <Compass className="w-4 h-4 text-brand-primary" />
+        <h3 className="text-[24px] font-medium text-brand-text-main tracking-tight">
           {tt('customerHome.toursHomeView.allToursSectionTitle')}
         </h3>
       </div>
@@ -640,7 +650,7 @@ export function ToursHomeView({
         </div>
       )}
       {visibleTours.length === 0 ? (
-        <div className="text-center py-16 bg-white rounded-xl border border-slate-200 p-8 space-y-3 shadow-xs">
+        <div className="text-center py-16 bg-white rounded-2xl border border-slate-200 p-8 space-y-3 shadow-xs">
           <AlertCircle className="w-8 h-8 text-slate-300 mx-auto" />
           <h3 className="text-sm font-bold text-brand-text-main">{t('noToursFound')}</h3>
           <p className="text-xs text-brand-text-muted max-w-md mx-auto">
@@ -651,18 +661,34 @@ export function ToursHomeView({
 
         
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 xl:gap-6">
           {visibleTours.map((tour) => {
             const tourSlots = slots.filter(s => s.tourId === tour.id);
             const priceList = tourSlots.map(s => s.price);
             const minPrice = priceList.length > 0 ? Math.min(...priceList) : 25;
             const isSportActive = tour.category === 'active' || tour.isActiveLife;
             const diffColors: Record<TourDifficulty, { bg: string, text: string, label: string }> = {
-              easy: { bg: 'bg-emerald-50 text-emerald-850 border border-emerald-100', text: 'text-emerald-800', label: tt('customerHome.toursHomeView.difficulty.easy') },
-              medium: { bg: 'bg-brand-bg-light text-brand-text-main border border-slate-200', text: 'text-brand-text-main', label: tt('customerHome.toursHomeView.difficulty.medium') },
-              hard: { bg: 'bg-orange-50 text-orange-850 border border-orange-100', text: 'text-orange-800', label: tt('customerHome.toursHomeView.difficulty.hard') },
-              extreme: { bg: 'bg-red-50 text-red-850 border border-red-100', text: 'text-red-800', label: tt('customerHome.toursHomeView.difficulty.extreme') }
-            };
+  easy: { 
+    bg: 'bg-lime-600/10 text-lime-600 border border-lime-600/30', 
+    text: 'text-lime-600', 
+    label: tt('customerHome.toursHomeView.difficulty.easy') 
+  },
+  medium: { 
+    bg: 'bg-yellow-400/10 text-yellow-600 border border-yellow-400/40', 
+    text: 'text-yellow-600', 
+    label: tt('customerHome.toursHomeView.difficulty.medium') 
+  },
+  hard: { 
+    bg: 'bg-yellow-700/10 text-yellow-700 border border-yellow-700/30', 
+    text: 'text-yellow-700', 
+    label: tt('customerHome.toursHomeView.difficulty.hard') 
+  },
+  extreme: { 
+    bg: 'bg-rose-600/10 text-rose-600 border border-rose-600/30', 
+    text: 'text-rose-600', 
+    label: tt('customerHome.toursHomeView.difficulty.extreme') 
+  }
+};
 
             const badges: Record<TourCategory, { emoji: string, label: string }> = {
               peak: { emoji: '🏔️', label: tt('customerHome.toursHomeView.categories.peak') },
@@ -675,26 +701,26 @@ export function ToursHomeView({
             // Dynamic Active Lifestyle Difficulty override with color codes
             let difficultyBg = diffColors[tour.difficulty]?.bg || 'bg-slate-100 text-brand-text-main';
             let difficultyLabel = diffColors[tour.difficulty]?.label || tt('customerHome.toursHomeView.difficulty.medium');
-            let difficultyBarColorClass = 'bg-sky-500';
+            let difficultyBarColorClass = 'bg-[#ffc107]';
             let difficultyPercent = 60;
-            if (tour.difficulty === 'easy') { difficultyBarColorClass = 'bg-emerald-500'; difficultyPercent = 30; }
-            else if (tour.difficulty === 'hard') { difficultyBarColorClass = 'bg-rose-500'; difficultyPercent = 85; }
-            else if (tour.difficulty === 'extreme') { difficultyBarColorClass = 'bg-red-700'; difficultyPercent = 100; }
+            if (tour.difficulty === 'easy') { difficultyBarColorClass = 'bg-[#28a745]'; difficultyPercent = 30; }
+            else if (tour.difficulty === 'hard') { difficultyBarColorClass = 'bg-[#fd7e14]'; difficultyPercent = 85; }
+            else if (tour.difficulty === 'extreme') { difficultyBarColorClass = 'bg-[#dc3545]'; difficultyPercent = 100; }
 
             if (isSportActive) {
               const activeDiff = tour.activeDifficulty || (tour.difficulty === 'easy' ? 'beginner' : tour.difficulty === 'hard' || tour.difficulty === 'extreme' ? 'professional' : 'medium');
               if (activeDiff === 'beginner' || activeDiff === 'easy') {
-                difficultyBg = 'bg-emerald-100 text-brand-primary border border-emerald-300 font-bold';
+                difficultyBg = 'bg-[#28a745]/10 text-[#28a745] border border-[#28a745]/30 font-bold';
                 difficultyLabel = `🟢 ${tt('customerHome.toursHomeView.activeDifficulty.beginner')}`;
-                difficultyBarColorClass = 'bg-emerald-500'; difficultyPercent = 30;
+                difficultyBarColorClass = 'bg-[#28a745]'; difficultyPercent = 30;
               } else if (activeDiff === 'medium') {
-                difficultyBg = 'bg-yellow-100 text-amber-800 border border-yellow-300 font-bold';
+                difficultyBg = 'bg-[#ffc107]/10 text-[#d39e00] border border-[#ffc107]/40 font-bold';
                 difficultyLabel = `🟡 ${tt('customerHome.toursHomeView.activeDifficulty.medium')}`;
-                difficultyBarColorClass = 'bg-sky-500'; difficultyPercent = 60;
+                difficultyBarColorClass = 'bg-[#ffc107]'; difficultyPercent = 60;
               } else {
-                difficultyBg = 'bg-red-150 bg-red-100 text-red-700 border border-red-200 font-extrabold';
+                difficultyBg = 'bg-[#dc3545]/10 text-[#dc3545] border border-[#dc3545]/30 font-extrabold';
                 difficultyLabel = `🔴 ${tt('customerHome.toursHomeView.activeDifficulty.professional')}`;
-                difficultyBarColorClass = 'bg-rose-500'; difficultyPercent = 85;
+                difficultyBarColorClass = 'bg-[#dc3545]'; difficultyPercent = 85;
               }
 
               // Dynamic Sports badge
@@ -723,191 +749,181 @@ export function ToursHomeView({
             return (
               <div
                 key={tour.id}
-                className={`bg-white rounded-xl border overflow-hidden shadow-sm hover:shadow-md transition-all flex flex-col group cursor-pointer ${tour.isInternational ? 'border-amber-200 ring-1 ring-amber-100/50 bg-gradient-to-b from-amber-500/2 to-transparent' : 'border-slate-200'} ${isSportActive ? 'border-amber-300 bg-gradient-to-tr from-amber-50/10 to-transparent' : ''}`}
+                className={`bg-[#fcfdfc] rounded-[24px] overflow-hidden shadow-sm hover:shadow-md transition-all flex flex-col group cursor-pointer border ${tour.isInternational ? 'border-amber-200 ring-1 ring-amber-100/50' : 'border-slate-100'} ${isSportActive ? 'border-amber-300' : ''}`}
                 onClick={() => onSelectTour(tour)}
               >
-                {/* Tour Image */}
-                <div className="relative h-52 overflow-hidden bg-slate-100">
+                {/* Top Image Section */}
+                <div className="relative h-[200px] overflow-hidden bg-slate-100 shrink-0">
                   <img
                     src={tour.image || undefined}
                     alt={getLocalizedTourName(tour, language)}
-                    className="w-full h-full object-cover group-hover:scale-102 transition duration-500"
+                    className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
                     referrerPolicy="no-referrer"
                   />
-                  <div className="absolute top-3 left-3 right-3 flex items-start justify-between gap-2 z-10">
-                    <div className="flex gap-1.5 flex-wrap min-w-0 pr-1">
-                      {featuredTourIds.has(tour.id) && (
-                        <span className="text-[10px] font-extrabold tracking-tight px-2 py-0.5 rounded-md shadow-xs bg-brand-accent text-white">
-                          🔥 {tt('customerHome.toursHomeView.bestSellerOfMonth')}
-                        </span>
-                      )}
-                      <span className={`text-[10px] font-bold tracking-tight px-2 py-0.5 rounded-md shadow-xs ${tour.isInternational ? 'bg-brand-accent text-white' : 'bg-brand-text-main/90 text-white'}`}>
-                        {badges[tour.category]?.emoji || '✈️'} {badges[tour.category]?.label || tt('customerHome.toursHomeView.badges.international')}
-                      </span>
-                      {!parsedGpx && (
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md shadow-xs ${difficultyBg}`}>
-                          {difficultyLabel}
-                        </span>
-                      )}
-                    </div>
-                    {/* Compare + Wishlist + Share buttons — 44x44 touch target via padding, icon glyph stays small */}
-                    <div className="flex items-center gap-1 shrink-0">
-                      <button
-                        type="button"
-                        onClick={(e) => handleToggleCompare(tour.id, e)}
-                        className={`w-11 h-11 rounded-full shadow-md transition-all hover:scale-110 flex items-center justify-center border-2 cursor-pointer ${compareList.includes(tour.id) ? 'bg-amber-50 border-amber-500 hover:bg-amber-100' : 'bg-white hover:bg-slate-50 border-slate-100'}`}
-                        title={compareList.includes(tour.id) ? tt('customerHome.toursHomeView.compare.remove') : tt('customerHome.toursHomeView.compare.add')}
-                      >
-                        <Scale className={`w-3.5 h-3.5 ${compareList.includes(tour.id) ? 'text-amber-600' : 'text-brand-text-main'}`} />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(e) => handleToggleWishlist(tour.id, e)}
-                        className="bg-white hover:bg-slate-50 w-11 h-11 rounded-full shadow-md transition-all hover:scale-110 flex items-center justify-center border border-slate-100 cursor-pointer"
-                        title={wishlist.includes(tour.id) ? tt('customerHome.toursHomeView.wishlist.remove') : tt('customerHome.toursHomeView.wishlist.add')}
-                      >
-                        <Heart className={`w-3.5 h-3.5 ${wishlist.includes(tour.id) ? 'fill-rose-600 text-rose-600' : 'text-brand-text-main'}`} />
-                      </button>
-                      <ShareMenuButton
-                        tour={tour}
-                        slots={slots}
-                        onShowNotification={onShowNotification}
-                        stopPropagationOnOpen
-                        buttonClassName="bg-white hover:bg-slate-50 text-brand-text-main hover:text-brand-primary w-11 h-11 rounded-full shadow-md transition-all hover:scale-110 flex items-center justify-center border border-slate-100 cursor-pointer"
-                      />
-                    </div>
+                  {/* Category Badge - Top Left */}
+                  <div className="absolute top-4 left-4 bg-black/60 backdrop-blur-sm text-white px-2.5 py-1 rounded-full flex items-center gap-1.5 z-10 shadow-sm">
+                    <span className="text-[11px] font-medium tracking-wide">
+                      {badges[tour.category]?.emoji || '🏔️'} {badges[tour.category]?.label || tt('customerHome.toursHomeView.categories.peak')}
+                    </span>
                   </div>
-                  {tour.isInternational && (
-                    <div className="absolute bottom-10 right-3 bg-brand-accent text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow-sm">
-                      ✈️ {tt('customerHome.toursHomeView.flightTicket')} {tour.flightIncluded ? tt('customerHome.toursHomeView.included') : tt('customerHome.toursHomeView.notIncluded')}
-                    </div>
-                  )}
-                  <div className="absolute bottom-3 right-3 bg-white/90 backdrop-blur-xs text-brand-text-main pl-1.5 pr-2 py-0.5 rounded-full border border-slate-250 text-[10px] font-semibold flex items-center gap-1">
-                    <MapPin className="w-3 h-3 text-brand-primary shrink-0" />
-                    {tour.region.split(',')[0]}
+
+                  {/* Actions - Top Right */}
+                  <div className="absolute top-4 right-4 flex items-center gap-1.5 z-10">
+                    <button
+                      type="button"
+                      onClick={(e) => handleToggleCompare(tour.id, e)}
+                      className={`w-8 h-8 rounded-full flex items-center justify-center transition shadow-sm ${compareList.includes(tour.id) ? 'bg-amber-50 text-amber-600' : 'bg-white/90 hover:bg-white text-gray-700'}`}
+                      title={compareList.includes(tour.id) ? tt('customerHome.toursHomeView.compare.remove') : tt('customerHome.toursHomeView.compare.add')}
+                    >
+                      <Scale className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => handleToggleWishlist(tour.id, e)}
+                      className="w-8 h-8 bg-white/90 hover:bg-white rounded-full flex items-center justify-center transition shadow-sm"
+                      title={wishlist.includes(tour.id) ? tt('customerHome.toursHomeView.wishlist.remove') : tt('customerHome.toursHomeView.wishlist.add')}
+                    >
+                      <Heart className={`w-3.5 h-3.5 ${wishlist.includes(tour.id) ? 'fill-rose-600 text-rose-600' : 'text-gray-700'}`} />
+                    </button>
+                    <ShareMenuButton
+                      tour={tour}
+                      slots={slots}
+                      onShowNotification={onShowNotification}
+                      stopPropagationOnOpen
+                      buttonClassName="w-8 h-8 bg-white/90 hover:bg-white rounded-full flex items-center justify-center text-gray-700 transition shadow-sm"
+                    />
+                  </div>
+
+                  {/* Location Pill - Bottom Right */}
+                  <div className="absolute bottom-4 right-4 bg-white text-gray-800 text-[11px] font-semibold px-2.5 py-1 rounded-full flex items-center gap-1 z-10 shadow-sm border border-slate-100">
+                    <MapPin className="w-3 h-3 text-[#2E4F3E]" />
+                    <span className="truncate max-w-[120px]">{tour.region.split(',')[0]}</span>
                   </div>
                 </div>
 
-                {/* Tour Card Body */}
-                <div className="p-3.5 flex-1 flex flex-col justify-between">
-                  <div className="space-y-1.5">
-                    <div className="flex items-center gap-1.5 text-[10px] text-brand-text-muted font-bold tracking-wider">
-                      {isSportActive ? (
-                        <>
-                          <span className="text-amber-600 font-bold">🏅</span>
-                          <span>{tt('customerHome.toursHomeView.sportsBadges.activeSport')} • {tour.activityType === 'volleyball' ? tt('customerHome.toursHomeView.activityTypeLabels.volleyball') : tour.activityType === 'ski' ? tt('customerHome.toursHomeView.activityTypeLabels.ski') : tour.activityType === 'rafting' ? tt('customerHome.toursHomeView.activityTypeLabels.rafting') : tour.activityType === 'running' ? tt('customerHome.toursHomeView.activityTypeLabels.running') : tour.activityType === 'bike' ? tt('customerHome.toursHomeView.activityTypeLabels.bike') : tt('customerHome.toursHomeView.activityTypeLabels.other')}</span>
-                        </>
-                      ) : tour.isInternational ? (
-                        <>
-                          <Plane className="w-3 h-3 text-amber-500 animate-pulse" />
-                          <span>{tt('customerHome.toursHomeView.durationInternational', { nights: tour.durationNights || Number(tour.durationDays) - 1, days: tour.durationDays })}</span>
-                        </>
-                      ) : (
-                        <>
-                          <Compass className="w-3 h-3 text-brand-primary" />
-                          <span>{tt('customerHome.toursHomeView.durationDomestic', { days: tour.durationDays })}</span>
-                        </>
-                      )}
-                      <span className="text-slate-300">•</span>
-                      <span>{tt('customerHome.toursHomeView.activeDates', { count: tourSlots.length })}</span>
-                    </div>
+                {/* Card Body */}
+                <div className="px-5 pt-5 pb-4 flex-1 flex flex-col">
+                  {/* Duration & Dates */}
+                  <div className="flex items-center gap-1.5 text-[11px] text-gray-500 font-medium mb-2">
+                    <Clock className="w-3.5 h-3.5" />
+                    <span>
+                      {isSportActive 
+                        ? `${tt('customerHome.toursHomeView.sportsBadges.activeSport')}` 
+                        : tour.isInternational 
+                          ? tt('customerHome.toursHomeView.durationInternational', { nights: tour.durationNights || Number(tour.durationDays) - 1, days: tour.durationDays })
+                          : tt('customerHome.toursHomeView.durationDomestic', { days: tour.durationDays })} 
+                      <span className="mx-1.5">•</span> 
+                      {tt('customerHome.toursHomeView.activeDates', { count: tourSlots.length })}
+                    </span>
+                  </div>
 
-                    <h3 className="font-medium text-brand-text-main text-lg leading-[1.33] group-hover:text-brand-primary transition tracking-tight flex items-center gap-1">
-                      {isSportActive && (
-                        <span className="text-base shrink-0 select-none">
-                          {tour.activityType === 'volleyball' ? '🏐' : tour.activityType === 'ski' ? '⛷️' : tour.activityType === 'rafting' ? '🚣‍♂️' : tour.activityType === 'running' ? '🏃‍♂️' : tour.activityType === 'bike' ? '🚴‍♂️' : '🏆'}
+                  {/* Title */}
+                  <h3 className="font-bold text-gray-900 text-[15px] leading-snug mb-4 line-clamp-2">
+                    {getLocalizedTourName(tour, language)}
+                  </h3>
+
+                  {/* Align everything below description to the bottom */}
+                  <div className="mt-auto flex flex-col">
+                    {/* Stats Row */}
+                    {parsedGpx ? (
+                      <div className="flex items-center justify-between bg-[#fcfdfc] border border-slate-100 rounded-xl p-2.5 mb-4 shadow-sm h-[60px]">
+                        <div className="flex flex-col gap-0.5 justify-center">
+                          <span className="text-[8px] font-bold text-gray-400 uppercase tracking-wider">Məsafə</span>
+                          <span className="text-[12px] font-extrabold text-gray-800">{parsedGpx.stats.distanceKm} <span className="text-[9px] font-medium text-gray-500">km</span></span>
+                        </div>
+                        
+                        <div className="w-[1px] h-8 bg-slate-100 mx-2"></div>
+                        
+                        <div className="flex flex-col gap-0.5 items-center flex-1 justify-center overflow-hidden">
+                          <span className="text-[8px] font-bold text-gray-400 uppercase tracking-wider leading-none">Marşrut</span>
+                          <RouteSparkline points={parsedGpx.points} className="w-[28px] h-[28px] text-brand-primary" />
+                        </div>
+                        
+                        <div className="w-[1px] h-8 bg-slate-100 mx-2"></div>
+                        
+                        <div className="flex flex-col gap-0.5 text-right justify-center">
+                          <span className="text-[8px] font-bold text-gray-400 uppercase tracking-wider">Yüksəklik</span>
+                          <span className="text-[12px] font-extrabold text-gray-800">{parsedGpx.stats.elevationGainM} <span className="text-[9px] font-medium text-gray-500">m</span></span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between bg-[#fcfdfc] border border-slate-100 rounded-xl p-2.5 mb-4 shadow-sm h-[60px]">
+                        <div className="flex flex-col gap-0.5 justify-center w-[30%]">
+                          <span className="text-[8px] font-bold text-gray-400 uppercase tracking-wider">Bələdçi</span>
+                          <span className="text-[11px] font-extrabold text-gray-800 line-clamp-1 truncate">
+                            {tour.languages && tour.languages.length > 0 ? tour.languages.join(', ') : 'AZ, RU'}
+                          </span>
+                        </div>
+                        
+                        <div className="w-[1px] h-8 bg-slate-100 mx-1.5 shrink-0"></div>
+                        
+                        <div className="flex flex-col gap-0.5 items-center justify-center flex-1 overflow-hidden">
+                          <span className="text-[8px] font-bold text-gray-400 uppercase tracking-wider text-center">Təchizat</span>
+                          <span className="text-[11px] font-extrabold text-gray-800 line-clamp-1 text-center w-full truncate">
+                            {tour.importantInfo?.bring && tour.importantInfo.bring.length > 0 
+                              ? tour.importantInfo.bring[0] 
+                              : 'Sərbəst geyim'}
+                          </span>
+                        </div>
+                        
+                        <div className="w-[1px] h-8 bg-slate-100 mx-1.5 shrink-0"></div>
+                        
+                        <div className="flex flex-col gap-0.5 text-right justify-center w-[30%]">
+                          <span className="text-[8px] font-bold text-gray-400 uppercase tracking-wider">Format</span>
+                          <span className="text-[11px] font-extrabold text-gray-800 line-clamp-1 truncate">
+                             {isSportActive ? 'Aktiv tur' : tour.isInternational ? 'Xarici tur' : tour.category === 'camp' ? 'Düşərgə' : 'Təbiət turu'}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Difficulty and Rating */}
+                    <div className="mb-4">
+                      <div className="flex justify-between items-end mb-1.5">
+                        <span className={`text-[11px] font-bold ${diffColors[tour.difficulty]?.text || 'text-gray-600'}`}>
+                          {difficultyLabel}
                         </span>
-                      )}
-                      {getLocalizedTourName(tour, language)}
-                    </h3>
-
-                    {isSportActive && (
-                      <div className="bg-amber-50/60 border border-amber-100 p-2.5 rounded-xl text-[10px] text-brand-text-main flex flex-col gap-1 my-1">
-                        <div className="flex justify-between font-bold text-brand-text-main">
-                          <span>🔞 {tt('customerHome.toursHomeView.ageLabel')}: <span className="text-amber-800 font-black">{tour.ageLimit || tt('customerHome.toursHomeView.ageDefault')}</span></span>
-                          <span className="text-brand-primary font-extrabold">{tour.equipmentIncluded ? `🎒 ${tt('customerHome.toursHomeView.equipmentFree')}` : `🎒 ${tt('customerHome.toursHomeView.equipmentRental')}`}</span>
-                        </div>
-                        {tour.requiredEquipment && (
-                          <div className="text-[9px] text-brand-text-muted truncate">
-                            🎒 {tt('customerHome.toursHomeView.requiredLabel')}: <strong className="text-brand-text-main font-semibold">{tour.requiredEquipment}</strong>
-                          </div>
-                        )}
-                        {tour.meetingPoint && (
-                          <div className="text-[9px] text-brand-text-muted truncate">
-                            📍 {tt('customerHome.toursHomeView.meetingLabel')}: <strong className="text-brand-text-main font-semibold">{tour.meetingPoint}</strong>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {tour.isInternational && (
-                      <div className="bg-gradient-to-r from-amber-50/70 to-teal-50/50 border border-amber-200/50 p-2.5 rounded-xl text-[10px] text-brand-text-main flex flex-col gap-1 my-1 shadow-4xs">
-                        <div className="flex items-center gap-1 leading-none font-bold text-brand-text-main">
-                          🏨 <span className="text-emerald-900 font-black">{tour.hotelName}</span>
-                          <span className="text-brand-accent font-black text-[10px]">
-                            {Array(Number(tour.hotelStars || 5)).fill('★').join('')}
-                          </span>
-                        </div>
-                        <div className="flex justify-between text-[9px] text-brand-text-muted font-bold">
-                          <span>🍽️ {tt('customerHome.toursHomeView.mealLabel')}: {tour.mealType || tt('customerHome.toursHomeView.mealDefault')}</span>
-                          <span className="text-brand-primary">✈️ {tour.flightIncluded ? tt('customerHome.toursHomeView.flightIncluded') : tt('customerHome.toursHomeView.flightNotIncluded')}</span>
+                        <div className="flex items-center gap-1">
+                          <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                          <span className="text-[11px] font-bold text-gray-800">{getAverageRating(tour.id)} <span className="font-normal text-gray-500">({getReviewsCount(tour.id)} rəy)</span></span>
                         </div>
                       </div>
-                    )}
-
-                    <p className="text-xs text-brand-text-muted line-clamp-2 leading-relaxed">
-                      {getLocalizedTourDescription(tour, language)}
-                    </p>
-                  </div>
-
-                  {/* Rating & Price row — price is the primary signal; the GPX stats+mini-map (or, lacking GPX, camp/rating fallback) fills the space in front of it */}
-                  <div className="flex items-stretch justify-between gap-3 mt-3 pt-2.5 border-t border-slate-100">
-                    <TourStatsRow
-                      tour={tour}
-                      parsedGpx={parsedGpx}
-                      durationLabel={routeDurationLabel}
-                      difficultyLabel={difficultyLabel}
-                      difficultyBarColorClass={difficultyBarColorClass}
-                      difficultyPercent={difficultyPercent}
-                      ratingValue={Number(getAverageRating(tour.id))}
-                      reviewsCount={getReviewsCount(tour.id)}
-                      isTopSeller={Number(getAverageRating(tour.id)) >= 4.5 || getReviewsCount(tour.id) >= 1 || tour.name.toLowerCase().includes('kəpəz') || tour.name.toLowerCase().includes('kuzun')}
-                      topSellerMonth={getTourMonths(tour.id)[0] || tt('miscWidgets.tourWeatherForecast.months.may')}
-                    />
-
-                    <div className="text-right shrink-0 border-l border-slate-100 pl-4 flex flex-col justify-center">
-                      <span className="text-[9px] text-brand-text-muted block tracking-wider font-semibold">{tt('customerHome.toursHomeView.priceLabel')}</span>
-                      {tour.discountPrice && tour.discountPrice > 0 && tour.discountPrice < (tour.price ?? minPrice) ? (
-                        <div className="flex flex-col items-end">
-                          <span className="line-through text-label-tertiary text-xs">
-                            {getConvertedPriceInfo(tour.price ?? minPrice, tour.priceCurrency).both}
-                          </span>
-                          <span className="text-xl font-medium text-label-critical bg-surface-critical-weak px-1.5 rounded leading-[1.2]">
-                            {getConvertedPriceInfo(tour.discountPrice, tour.priceCurrency).both}
-                          </span>
-                        </div>
-                      ) : (
-                        <div className="flex flex-col items-end">
-                          <strong className="text-brand-text-main text-xl font-medium leading-[1.2]">
-                            {getConvertedPriceInfo(tour.price ?? minPrice, tour.priceCurrency).both}
-                          </strong>
-                          <span className="text-brand-text-muted text-[10px] font-medium">{tt('customerHome.toursHomeView.perPerson')}</span>
-                        </div>
-                      )}
+                      
+                      {/* Segmented Bar */}
+                      <div className="flex gap-1 h-1.5">
+                        {[20, 40, 60, 80, 100].map(threshold => {
+                           let segColor = 'bg-slate-200';
+                           if (difficultyPercent >= threshold) {
+                              if (difficultyPercent <= 30) segColor = 'bg-lime-600';
+                              else if (difficultyPercent <= 60) segColor = 'bg-yellow-400';
+                              else if (difficultyPercent <= 85) segColor = 'bg-yellow-700';
+                              else segColor = 'bg-rose-600';
+                           }
+                           return <div key={threshold} className={`flex-1 rounded-full ${segColor}`}></div>;
+                        })}
+                      </div>
                     </div>
-                  </div>
 
-                  {/* Elegant Hover Action Bar - Slides down nicely without breaking the initial card layout flow */}
-                  <div className="max-h-0 opacity-0 overflow-hidden group-hover:max-h-24 group-hover:opacity-100 transition-all duration-350 ease-in-out">
-                    <div className="mt-3.5 pt-3.5 border-t border-dashed border-slate-200/80 flex gap-2">
-                      <button
-                        type="button"
-                        onClick={(e) => handleQuickWhatsApp(tour, e)}
-                        className="flex-1 bg-whatsapp-500 hover:bg-whatsapp-600 text-white font-black text-[10px] py-2 px-2.5 rounded-lg transition-all hover:shadow-2xs tracking-wider flex items-center justify-center gap-1 cursor-pointer"
-                        title={tt('customerHome.toursHomeView.whatsappTitle')}
+                    {/* Bottom Row */}
+                    <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+                      <div className="flex flex-col">
+                        <span className="text-[8px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Qiymət</span>
+                        <div className="flex items-baseline gap-0.5">
+                          <span className="text-[18px] font-extrabold text-gray-900 leading-none">
+                            {tour.discountPrice && tour.discountPrice > 0 && tour.discountPrice < (tour.price ?? minPrice) 
+                              ? getConvertedPriceInfo(tour.discountPrice, tour.priceCurrency).both
+                              : getConvertedPriceInfo(tour.price ?? minPrice, tour.priceCurrency).both}
+                          </span>
+                          <span className="text-[9px] font-medium text-gray-500 whitespace-nowrap">/ nəfər</span>
+                        </div>
+                      </div>
+                      
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); onSelectTour(tour); }}
+                        className="bg-[#2E4F3E] hover:bg-[#233f30] text-white px-4 py-2 rounded-xl text-[11px] font-bold flex items-center gap-1.5 transition-colors shadow-sm"
                       >
-                        <MessageCircle className="w-3.5 h-3.5" />
-                        {tt('customerHome.toursHomeView.whatsappReserve')}
+                        Daha Ətraflı
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg>
                       </button>
                     </div>
                   </div>
