@@ -24,9 +24,13 @@ const FALLBACK_CONFIG: PriceCalculatorConfig = {
 export interface PriceCalculatorProps {
   onBack?: () => void;
   config?: PriceCalculatorConfig;
+  // All cfg rates are authored in AZN; these let the result cards follow the header's
+  // currency selection (EN visitors browse in USD/EUR) instead of always showing AZN.
+  displayCurrency?: 'AZN' | 'USD' | 'EUR';
+  exchangeRates?: { USD: number; EUR: number };
 }
 
-export const PriceCalculator: React.FC<PriceCalculatorProps> = ({ onBack, config }) => {
+export const PriceCalculator: React.FC<PriceCalculatorProps> = ({ onBack, config, displayCurrency = 'AZN', exchangeRates }) => {
   const { t } = useLanguage();
   const cfg = config || FALLBACK_CONFIG;
   const distances = cfg.destinations;
@@ -106,6 +110,8 @@ export const PriceCalculator: React.FC<PriceCalculatorProps> = ({ onBack, config
 
   const formatMoney = (val: number | undefined) => {
     if (val === undefined || isNaN(val)) return '—';
+    if (displayCurrency === 'USD' && exchangeRates?.USD) return (val / exchangeRates.USD).toFixed(2) + ' USD';
+    if (displayCurrency === 'EUR' && exchangeRates?.EUR) return (val / exchangeRates.EUR).toFixed(2) + ' EUR';
     return val.toFixed(2) + ' AZN';
   };
 

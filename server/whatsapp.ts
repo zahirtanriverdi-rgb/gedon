@@ -28,12 +28,33 @@ let currentQrDataUrl: string | null = null;
 let connectedNumber: string | null = null;
 let startingPromise: Promise<void> | null = null;
 
+// Reconnect pacing: an unlinked session times out its QR roughly once a minute and every
+// network blip also closes the socket, so an immediate unconditional restart turns the log
+// into a "Bağlantı kəsildi → yenidən qoşulma" firehose. Back off exponentially instead and
+// reset once a connection actually opens.
+const RECONNECT_BASE_DELAY_MS = 5_000;
+const RECONNECT_MAX_DELAY_MS = 5 * 60 * 1000;
+let reconnectAttempts = 0;
+let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+
 export function getWhatsAppStatus() {
   return { status, qr: currentQrDataUrl, number: connectedNumber };
 }
 
+// Unauthenticated variant for the public booking flow: only reveals whether number
+// verification is currently possible, never the QR code or the linked number.
+export function getPublicWhatsAppStatus() {
+  return { connected: status === "connected" };
+}
+
 export async function startWhatsApp(): Promise<void> {
   if (startingPromise) return startingPromise;
+
+  // A manual (admin-panel) start supersedes any scheduled retry.
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
 
   startingPromise = (async () => {
     status = "connecting";
@@ -62,22 +83,36 @@ export async function startWhatsApp(): Promise<void> {
         status = "connected";
         currentQrDataUrl = null;
         connectedNumber = sock?.user?.id?.split(":")[0] || null;
+        reconnectAttempts = 0;
         console.log("[WhatsApp] Bağlantı quruldu:", connectedNumber);
       }
 
       if (connection === "close") {
         const statusCode = (lastDisconnect?.error as Boom)?.output?.statusCode;
-        const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
-        console.warn("[WhatsApp] Bağlantı kəsildi. Yenidən qoşulma cəhdi ediləcək:", shouldReconnect);
+        const loggedOut = statusCode === DisconnectReason.loggedOut;
 
         status = "disconnected";
         connectedNumber = null;
         sock = null;
         startingPromise = null;
 
-        if (shouldReconnect) {
-          startWhatsApp().catch((e) => console.error("[WhatsApp] Yenidən qoşulma xətası:", e));
+        if (loggedOut) {
+          // The session was unlinked from the phone — reconnecting is pointless until the
+          // admin scans a fresh QR from the admin panel.
+          currentQrDataUrl = null;
+          console.warn("[WhatsApp] Sessiya telefondan silinib (logged out). Admin paneldən yenidən QR oxudulmalıdır.");
+          return;
         }
+
+        const delay = Math.min(RECONNECT_BASE_DELAY_MS * 2 ** reconnectAttempts, RECONNECT_MAX_DELAY_MS);
+        reconnectAttempts += 1;
+        console.warn(`[WhatsApp] Bağlantı kəsildi (kod: ${statusCode ?? "?"}). ${Math.round(delay / 1000)} saniyə sonra yenidən qoşulma cəhdi (#${reconnectAttempts}).`);
+
+        if (reconnectTimer) clearTimeout(reconnectTimer);
+        reconnectTimer = setTimeout(() => {
+          reconnectTimer = null;
+          startWhatsApp().catch((e) => console.error("[WhatsApp] Yenidən qoşulma xətası:", e));
+        }, delay);
       }
     });
   })();
@@ -86,6 +121,11 @@ export async function startWhatsApp(): Promise<void> {
 }
 
 export async function logoutWhatsApp(): Promise<void> {
+  if (reconnectTimer) {
+    clearTimeout(reconnectTimer);
+    reconnectTimer = null;
+  }
+  reconnectAttempts = 0;
   if (sock) {
     try {
       await sock.logout();
@@ -170,7 +210,10 @@ export function checkAndConsumeRateLimit(phone: string): RateLimitResult {
 // below, so a scripted loop can't cheaply hammer the connected number just by varying phone
 // numbers. No external account/keys needed, unlike reCAPTCHA/hCaptcha — enough friction for
 // this scale given the per-phone/global limits already in place.
-const CAPTCHA_TTL_MS = 3 * 60 * 1000;
+// 15 minutes: the challenge is displayed at the top of a booking form the customer still has
+// to fill in (name, phone, team members…), so a short TTL expires mid-typing and looks like
+// a "wrong answer" loop to an honest user. Rate limits below carry the anti-abuse weight.
+const CAPTCHA_TTL_MS = 15 * 60 * 1000;
 
 type CaptchaEntry = { answer: number; expiresAt: number };
 const captchaStore = new Map<string, CaptchaEntry>();
@@ -191,11 +234,15 @@ export function generateCaptchaChallenge(): { id: string; question: string } {
 }
 
 // One-time use: the entry is removed on the first submission attempt regardless of outcome,
-// so a wrong guess can't just be retried against the same challenge.
-export function verifyCaptchaChallenge(id: string, answer: number): boolean {
+// so a wrong guess can't just be retried against the same challenge. "expired" (also returned
+// for unknown/already-consumed ids) lets the API tell an honest-but-slow user apart from a
+// wrong answer instead of misleadingly claiming their correct answer was wrong.
+export type CaptchaVerifyResult = "ok" | "wrong" | "expired";
+
+export function verifyCaptchaChallenge(id: string, answer: number): CaptchaVerifyResult {
   const entry = captchaStore.get(id);
   captchaStore.delete(id);
-  if (!entry) return false;
-  if (Date.now() > entry.expiresAt) return false;
-  return entry.answer === answer;
+  if (!entry) return "expired";
+  if (Date.now() > entry.expiresAt) return "expired";
+  return entry.answer === answer ? "ok" : "wrong";
 }

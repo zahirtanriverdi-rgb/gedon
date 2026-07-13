@@ -1,13 +1,16 @@
 import React from 'react';
 import { Clock, MapPin } from 'lucide-react';
 import { Tour } from '../types';
+import { normalizeAzText } from '../utils/searchNormalize';
+import { getLocalizedTourName, getLocalizedTourDescription } from '../i18n/tourLocalization';
+import type { Language } from '../i18n/LanguageContext';
 
 interface SearchDropdownProps {
   query: string;
   tours: Tour[];
   recentSearches: string[];
   onSelect: (value: string) => void;
-  appLanguage?: 'az' | 'en' | 'ru';
+  appLanguage?: Language;
 }
 
 export const SearchDropdown: React.FC<SearchDropdownProps> = ({ 
@@ -17,7 +20,12 @@ export const SearchDropdown: React.FC<SearchDropdownProps> = ({
   onSelect,
   appLanguage = 'az' 
 }) => {
-  const lowerQuery = query.toLowerCase().trim();
+  // Without strictNullChecks, a destructuring default widens the param type to `string`, so
+  // pin it back to Language for the localization helpers below.
+  const lang: Language = (appLanguage || 'az') as Language;
+  // Diacritic-folded so "selale" typed on an EN/RU keyboard still matches "şəlalə" — the same
+  // normalization the main grid filter uses (utils/searchNormalize).
+  const lowerQuery = normalizeAzText(query.trim());
   
   // Determine if we should show recent searches
   const showRecent = !lowerQuery && recentSearches.length > 0;
@@ -32,7 +40,7 @@ export const SearchDropdown: React.FC<SearchDropdownProps> = ({
 
   if (lowerQuery) {
     // 1. Find matching regions
-    const matchedRegions: string[] = Array.from(new Set(approvedTours.filter(t => t.region.toLowerCase().includes(lowerQuery)).map(t => t.region)));
+    const matchedRegions: string[] = Array.from(new Set(approvedTours.filter(t => normalizeAzText(t.region).includes(lowerQuery)).map(t => t.region)));
 
     matchedRegions.slice(0, 3).forEach(region => {
        const count = approvedTours.filter(t => t.region === region).length;
@@ -43,12 +51,18 @@ export const SearchDropdown: React.FC<SearchDropdownProps> = ({
        });
     });
 
-    // 2. Find matching tours
-    const matchedTours = approvedTours.filter(t => t.name.toLowerCase().includes(lowerQuery) || t.description.toLowerCase().includes(lowerQuery));
-    
+    // 2. Find matching tours — match against both the AZ source text and the localized
+    // name/description, so e.g. an EN visitor typing the English tour name also gets hits.
+    const matchedTours = approvedTours.filter(t =>
+      normalizeAzText(t.name).includes(lowerQuery) ||
+      normalizeAzText(t.description).includes(lowerQuery) ||
+      normalizeAzText(getLocalizedTourName(t, lang)).includes(lowerQuery) ||
+      normalizeAzText(getLocalizedTourDescription(t, lang)).includes(lowerQuery)
+    );
+
     matchedTours.slice(0, 4).forEach(tour => {
        suggestions.push({
-         title: tour.name,
+         title: getLocalizedTourName(tour, lang),
          subtitle: tour.region,
          type: 'tour',
          image: tour.image,

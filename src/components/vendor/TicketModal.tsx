@@ -432,31 +432,31 @@ export function TicketModal({ booking, tours, onApproveBooking, onShowNotificati
                 onUpdateBooking(null);
               }
             }}
-            className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50"
+            className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-end sm:items-center justify-center sm:p-4 z-50"
           >
-            <div className="bg-white rounded-2xl border border-slate-200 w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl flex flex-col">
+            <div className="bg-white rounded-t-2xl sm:rounded-2xl border border-slate-200 w-full sm:max-w-2xl max-h-[94vh] sm:max-h-[90vh] overflow-y-auto shadow-2xl flex flex-col">
               
               {/* Header */}
-              <div className="p-4 border-b border-slate-150 flex items-center justify-between bg-slate-50">
-                <div className="flex items-center gap-2">
-                  <span className="p-1.5 bg-emerald-50 text-emerald-800 rounded-lg">
+              <div className="p-4 border-b border-slate-150 flex items-center justify-between bg-slate-50 sticky top-0 z-10 pt-[calc(1rem+env(safe-area-inset-top))] sm:pt-4">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="p-1.5 bg-emerald-50 text-emerald-800 rounded-lg flex-shrink-0">
                     <CheckCircle className="w-4 h-4 text-emerald-600" />
                   </span>
-                  <div>
-                    <h3 className="font-extrabold text-slate-900 text-xs tracking-wider">{t('vendorBookings.ticketModal.header.title')}</h3>
-                    <p className="text-[10px] text-slate-500 font-bold font-mono">{t('vendorBookings.ticketModal.header.refIdLabel')}: #{bookingRef}</p>
+                  <div className="min-w-0">
+                    <h3 className="font-extrabold text-slate-900 text-xs tracking-wider truncate">{t('vendorBookings.ticketModal.header.title')}</h3>
+                    <p className="text-[10px] text-slate-500 font-bold font-mono truncate">{t('vendorBookings.ticketModal.header.refIdLabel')}: #{bookingRef}</p>
                   </div>
                 </div>
                 <button 
                   onClick={() => onUpdateBooking(null)}
-                  className="p-1.5 hover:bg-slate-200 rounded-lg text-slate-400 hover:text-slate-700 transition cursor-pointer"
+                  className="p-2 -mr-1 hover:bg-slate-200 rounded-lg text-slate-400 hover:text-slate-700 transition cursor-pointer flex-shrink-0"
                 >
                   <X className="w-4 h-4" />
                 </button>
               </div>
 
               {/* Body */}
-              <div className="p-5 space-y-5 flex-1">
+              <div className="p-3 sm:p-5 space-y-5 flex-1">
                 
                 {/* Visual Status Indicator */}
                 <div className={`p-4 rounded-xl border flex items-center justify-between ${
@@ -625,7 +625,7 @@ export function TicketModal({ booking, tours, onApproveBooking, onShowNotificati
               </div>
 
               {/* Actions Footer */}
-              <div className="p-4 border-t border-slate-150 bg-slate-50 flex flex-col sm:flex-row gap-3 justify-between items-center">
+              <div className="p-4 border-t border-slate-150 bg-slate-50 flex flex-col sm:flex-row gap-3 justify-between items-center sticky bottom-0 pb-[calc(1rem+env(safe-area-inset-bottom))] sm:pb-4">
 
                 <button
                   type="button"
@@ -633,7 +633,7 @@ export function TicketModal({ booking, tours, onApproveBooking, onShowNotificati
                     navigator.clipboard.writeText(whatsappMsg);
                     if (onShowNotification) onShowNotification(t('vendorBookings.ticketModal.notifications.textCopied'), 'success');
                   }}
-                  className="w-full sm:w-auto px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 cursor-pointer"
+                  className="w-full sm:w-auto px-4 py-2.5 sm:py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 cursor-pointer"
                 >
                   <FileText className="w-3.5 h-3.5" />
                   {t('vendorBookings.ticketModal.buttons.copy')}
@@ -644,7 +644,7 @@ export function TicketModal({ booking, tours, onApproveBooking, onShowNotificati
                   <button
                     type="button"
                     onClick={handlePrintTicket}
-                    className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 cursor-pointer transition"
+                    className="w-full sm:w-auto px-4 py-2.5 sm:py-2 bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 cursor-pointer transition"
                   >
                     <Printer className="w-3.5 h-3.5 text-slate-300" />
                     <span>{t('vendorBookings.ticketModal.buttons.downloadOrPrintPdf')}</span>
@@ -676,7 +676,7 @@ export function TicketModal({ booking, tours, onApproveBooking, onShowNotificati
                       const waUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(whatsappMsg)}`;
                       window.open(waUrl, '_blank');
                     }}
-                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 cursor-pointer transition shadow-md shadow-emerald-100"
+                    className="w-full sm:w-auto px-4 py-2.5 sm:py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5 cursor-pointer transition shadow-md shadow-emerald-100"
                   >
                     <Send className="w-3.5 h-3.5 text-white" />
                     <span>{t('vendorBookings.ticketModal.buttons.sendWhatsapp')}</span>

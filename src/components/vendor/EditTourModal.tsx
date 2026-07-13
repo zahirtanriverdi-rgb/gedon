@@ -26,21 +26,21 @@ export function EditTourModal({ tour, slots, currentUser, onAddTour, onEditTour,
   const isIntl = tour.isInternational || tour.category === 'international';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[92vh]">
-        <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50 flex-shrink-0">
-          <div className="flex items-center gap-2">
-            <div className="p-2 bg-amber-100 text-amber-800 rounded-lg">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-slate-900/60 backdrop-blur-xs">
+      <div className="bg-white rounded-t-2xl sm:rounded-2xl shadow-xl w-full sm:max-w-3xl overflow-hidden flex flex-col max-h-[94vh] sm:max-h-[92vh]">
+        <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50 flex-shrink-0 pt-[calc(1rem+env(safe-area-inset-top))] sm:pt-5">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="p-2 bg-amber-100 text-amber-800 rounded-lg flex-shrink-0">
               <Edit className="w-5 h-5 text-amber-700" />
             </div>
-            <div>
-              <h3 className="font-extrabold text-slate-900 text-sm">{t('vendorMisc.editTourModal.title')}</h3>
-              <p className="text-[10px] text-slate-500 font-medium">{t('vendorMisc.editTourModal.subtitle')}</p>
+            <div className="min-w-0">
+              <h3 className="font-extrabold text-slate-900 text-sm truncate">{t('vendorMisc.editTourModal.title')}</h3>
+              <p className="text-[10px] text-slate-500 font-medium truncate">{t('vendorMisc.editTourModal.subtitle')}</p>
             </div>
           </div>
           <button
             type="button"
-            className="p-1.5 rounded-lg hover:bg-slate-200 text-slate-400 hover:text-slate-600 transition-all cursor-pointer"
+            className="p-2 -mr-1 rounded-lg hover:bg-slate-200 text-slate-400 hover:text-slate-600 transition-all cursor-pointer flex-shrink-0"
             onClick={onClose}
           >
             <X className="w-5 h-5" />

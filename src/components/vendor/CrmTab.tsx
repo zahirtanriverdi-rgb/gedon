@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Tour, TourSlot, Booking, User } from '../../types';
-import { QrScannerModal } from './QrScannerModal';
+import { QrScannerModal, playScanFeedback } from './QrScannerModal';
 import { Calendar, CheckCircle, Copy, Download, FileText, Plus, Printer, Send, Users, X } from 'lucide-react';
 import { useLanguage } from '../../i18n/LanguageContext';
 
@@ -63,6 +63,7 @@ export function CrmTab({ tours, slots, bookings, currentUser, operatorToken, onE
     setIsQrScannerOpen(false);
 
     if (!operatorToken) {
+      playScanFeedback('error');
       if (onShowNotification) onShowNotification(t('vendorBookings.crmTab.notifications.sessionExpired'), 'error');
       return;
     }
@@ -79,6 +80,7 @@ export function CrmTab({ tours, slots, bookings, currentUser, operatorToken, onE
       const data = await response.json();
 
       if (!response.ok) {
+        playScanFeedback('error');
         if (onShowNotification) {
           onShowNotification(data.error || t('vendorBookings.crmTab.notifications.ticketNotFound'), 'error');
         }
@@ -86,6 +88,7 @@ export function CrmTab({ tours, slots, bookings, currentUser, operatorToken, onE
       }
 
       if (data.alreadyCheckedIn) {
+        playScanFeedback('duplicate');
         if (onShowNotification) onShowNotification(t('vendorBookings.crmTab.notifications.alreadyCheckedIn'), 'warning');
         return;
       }
@@ -93,11 +96,13 @@ export function CrmTab({ tours, slots, bookings, currentUser, operatorToken, onE
       if (onEditBooking) {
         await onEditBooking(data.booking);
       }
+      playScanFeedback('success');
       if (onShowNotification) {
         onShowNotification(t('vendorBookings.crmTab.notifications.checkinSuccess', { name: data.booking.customerName, count: data.booking.participantsCount }), 'success');
       }
     } catch (err) {
       console.error('Check-in zamanı xəta baş verdi:', err);
+      playScanFeedback('error');
       if (onShowNotification) onShowNotification(t('vendorBookings.crmTab.notifications.checkinSystemError'), 'error');
     }
   };
@@ -245,7 +250,7 @@ export function CrmTab({ tours, slots, bookings, currentUser, operatorToken, onE
                     </span>
                   </div>
 
-                  <div className="flex items-center gap-2 justify-end self-end">
+                  <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto sm:justify-end sm:self-end">
                     <button
                       type="button"
                       onClick={() => {
@@ -285,7 +290,7 @@ export function CrmTab({ tours, slots, bookings, currentUser, operatorToken, onE
                           onShowNotification(t('vendorBookings.crmTab.notifications.csvExported'), 'success');
                         }
                       }}
-                      className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-800 font-extrabold text-[10px] rounded-lg transition border border-slate-250 cursor-pointer flex items-center gap-1.5 shadow-xs font-sans font-bold"
+                      className="flex-1 sm:flex-none px-3 py-2 sm:py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-800 font-extrabold text-[10px] rounded-lg transition border border-slate-250 cursor-pointer flex items-center justify-center gap-1.5 shadow-xs font-sans font-bold"
                     >
                       <Download className="w-3.5 h-3.5" />
                       <span>{t('vendorBookings.crmTab.buttons.exportCsv')}</span>
@@ -332,7 +337,7 @@ export function CrmTab({ tours, slots, bookings, currentUser, operatorToken, onE
                           }
                         });
                       }}
-                      className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 hover:text-emerald-950 border border-emerald-200 font-extrabold text-[10px] rounded-lg transition cursor-pointer flex items-center gap-1.5 shadow-xs font-sans font-bold"
+                      className="flex-1 sm:flex-none px-3 py-2 sm:py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 hover:text-emerald-950 border border-emerald-200 font-extrabold text-[10px] rounded-lg transition cursor-pointer flex items-center justify-center gap-1.5 shadow-xs font-sans font-bold"
                     >
                       <Copy className="w-3.5 h-3.5" />
                       <span>{t('vendorBookings.crmTab.buttons.copyForWhatsapp')}</span>
@@ -357,11 +362,11 @@ export function CrmTab({ tours, slots, bookings, currentUser, operatorToken, onE
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-col xs:flex-row sm:flex-row items-stretch sm:items-center gap-2">
                     <button
                       type="button"
                       onClick={() => setIsQrScannerOpen(true)}
-                      className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-md transition duration-150 cursor-pointer flex items-center gap-2 text-xs font-sans select-none"
+                      className="w-full sm:w-auto px-4 py-2.5 sm:py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl shadow-md transition duration-150 cursor-pointer flex items-center justify-center gap-2 text-xs font-sans select-none"
                     >
                       <span>📷 {t('vendorBookings.crmTab.buttons.checkWithQr')}</span>
                     </button>
@@ -383,7 +388,7 @@ export function CrmTab({ tours, slots, bookings, currentUser, operatorToken, onE
                         setManualOperatorNote('');
                         setIsAddParticipantOpen(true);
                       }}
-                      className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-md transition duration-150 cursor-pointer flex items-center gap-2 text-xs font-sans select-none"
+                      className="w-full sm:w-auto px-4 py-2.5 sm:py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-md transition duration-150 cursor-pointer flex items-center justify-center gap-2 text-xs font-sans select-none"
                     >
                       <Plus className="w-4 h-4" />
                       <span>{t('vendorBookings.crmTab.buttons.addParticipant')}</span>
@@ -391,8 +396,8 @@ export function CrmTab({ tours, slots, bookings, currentUser, operatorToken, onE
                   </div>
                 </div>
 
-                <div className="overflow-x-auto font-sans">
-                  <table className="w-full text-left border-collapse text-xs">
+                <div className="overflow-x-auto font-sans -webkit-overflow-scrolling-touch">
+                  <table className="w-full min-w-[720px] text-left border-collapse text-xs">
                     <thead className="bg-ink-50 border-b border-slate-200 text-slate-400 font-bold tracking-wider text-[10px]">
                       <tr>
                         <th className="p-3 text-center w-12">{t('vendorBookings.crmTab.table.headers.order')}</th>
@@ -554,16 +559,16 @@ export function CrmTab({ tours, slots, bookings, currentUser, operatorToken, onE
 
               {/* Manual Participant Insertion Modal Dialog (Requirement 3) */}
               {isAddParticipantOpen && (
-                <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4">
-                  <div className="bg-white rounded-2xl border border-slate-100 shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto overflow-hidden animate-scaleIn font-sans">
-                    <div className="p-4 bg-slate-900 text-white flex items-center justify-between">
+                <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-xs flex items-end sm:items-center justify-center sm:p-4">
+                  <div className="bg-white rounded-t-2xl sm:rounded-2xl border border-slate-100 shadow-2xl w-full sm:max-w-md max-h-[92vh] overflow-y-auto animate-scaleIn font-sans">
+                    <div className="p-4 bg-slate-900 text-white flex items-center justify-between sticky top-0 z-10 pt-[calc(1rem+env(safe-area-inset-top))] sm:pt-4">
                       <h4 className="text-xs font-extrabold tracking-widest flex items-center gap-2">
                         🎟️ {t('vendorBookings.crmTab.addModal.title')}
                       </h4>
                       <button
                         type="button"
                         onClick={() => setIsAddParticipantOpen(false)}
-                        className="p-1 text-slate-400 hover:text-white transition cursor-pointer mb-0"
+                        className="p-2 -mr-2 text-slate-400 hover:text-white transition cursor-pointer rounded-lg active:bg-white/10"
                       >
                         <X className="w-5 h-5" />
                       </button>
@@ -711,18 +716,18 @@ export function CrmTab({ tours, slots, bookings, currentUser, operatorToken, onE
                         </div>
                       )}
 
-                      <div className="flex gap-3 pt-2">
+                      <div className="flex gap-3 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
                         <button
                           type="button"
                           onClick={() => setIsAddParticipantOpen(false)}
-                          className="w-1/2 p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-705 text-slate-700 font-bold text-xs rounded-xl transition cursor-pointer"
+                          className="w-1/2 p-3 sm:p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-705 text-slate-700 font-bold text-xs rounded-xl transition cursor-pointer"
                         >
                           {t('vendorBookings.crmTab.addModal.cancelButton')}
                         </button>
                         <button
                           type="submit"
                           disabled={isSubmittingManualBooking}
-                          className="w-1/2 p-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition shadow-md cursor-pointer disabled:opacity-50"
+                          className="w-1/2 p-3 sm:p-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition shadow-md cursor-pointer disabled:opacity-50"
                         >
                           {isSubmittingManualBooking ? t('vendorBookings.crmTab.addModal.saving') : t('vendorBookings.crmTab.addModal.saveButton')}
                         </button>

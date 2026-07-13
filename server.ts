@@ -1,3 +1,5 @@
+// Load .env before anything else reads process.env (JWT_SECRET, DATABASE_URL, seed passwords…).
+import "dotenv/config";
 import express from "express";
 import path from "path";
 import fs from "fs";
@@ -14,6 +16,7 @@ import { generateUniqueSlug } from "./server/slugify.ts";
 import {
   startWhatsApp,
   getWhatsAppStatus,
+  getPublicWhatsAppStatus,
   logoutWhatsApp,
   isRegisteredOnWhatsApp,
   checkAndConsumeRateLimit,
@@ -576,6 +579,13 @@ app.post("/api/whatsapp/logout", authenticateUser, async (req: any, res) => {
   }
 });
 
+// GET /api/whatsapp/public-status — public, lets the booking form show whether number
+// verification is currently possible (badge + fallback link) without leaking the QR code
+// or the linked number (those stay behind the admin-only /api/whatsapp/status above).
+app.get("/api/whatsapp/public-status", (req, res) => {
+  return res.json(getPublicWhatsAppStatus());
+});
+
 // GET /api/whatsapp/captcha — public, issues a one-time math challenge that must accompany
 // the verify-number call below. Keeps a scripted loop from cheaply hammering the connected
 // number just by varying phone numbers (on top of the rate limits already in place).
@@ -595,7 +605,15 @@ app.post("/api/whatsapp/verify-number", async (req, res) => {
   if (!captchaId || captchaAnswer === undefined || captchaAnswer === null || captchaAnswer === "") {
     return res.status(400).json({ error: "Zəhmət olmasa təhlükəsizlik sualını cavablandırın." });
   }
-  if (!verifyCaptchaChallenge(String(captchaId), Number(captchaAnswer))) {
+  const captchaResult = verifyCaptchaChallenge(String(captchaId), Number(captchaAnswer));
+  if (captchaResult === "expired") {
+    return res.status(400).json({
+      error: "Təhlükəsizlik sualının vaxtı bitib. Yeni sual göndərildi — zəhmət olmasa onu cavablandırın.",
+      captchaFailed: true,
+      captchaExpired: true
+    });
+  }
+  if (captchaResult === "wrong") {
     return res.status(400).json({ error: "Təhlükəsizlik sualının cavabı yanlışdır. Zəhmət olmasa yenidən cəhd edin.", captchaFailed: true });
   }
 
@@ -1842,19 +1860,66 @@ async function startServer() {
     res.status(404).json({ error: "Belə bir API endpoint mövcud deyil." });
   });
 
+  // Classify page navigations BEFORE the SPA fallbacks below: unknown routes (mistyped URLs,
+  // deleted tour slugs) still render the SPA — whose router shows its NotFoundPage — but with
+  // a real 404 status instead of a soft-404 (200 + HTML), which search engines would index.
+  const STATIC_CLIENT_ROUTES = new Set(['/', '/faq', '/calculator', '/wishlist', '/compare', '/vendor/login', '/admin/login']);
+  app.use(async (req, res, next) => {
+    if (req.method !== 'GET') return next();
+    // Only page navigations — assets (js/css/img) don't send an HTML accept header.
+    if (!(req.headers.accept || '').includes('text/html')) return next();
+    const p = (req.path || '/').replace(/\/+$/, '') || '/';
+
+    let known = STATIC_CLIENT_ROUTES.has(p)
+      || p.startsWith('/vendor/dashboard')
+      || p.startsWith('/admin/dashboard');
+    try {
+      if (!known && p.startsWith('/tours/')) {
+        const slug = decodeURIComponent(p.slice('/tours/'.length));
+        const rows = await dbClient.query(`SELECT id FROM tours WHERE slug = ?`, [slug]);
+        known = rows.length > 0;
+      } else if (!known && p.startsWith('/organizer/')) {
+        const vendorId = decodeURIComponent(p.slice('/organizer/'.length));
+        const rows = await dbClient.query(`SELECT id FROM users WHERE id = ? AND role = 'vendor'`, [vendorId]);
+        known = rows.length > 0;
+      }
+    } catch {
+      known = true; // DB hiccup — never 404 a potentially valid page
+    }
+
+    if (!known) {
+      res.status(404);
+      (req as any).spaNotFound = true;
+    }
+    next();
+  });
+
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
     });
+    // Vite's own html middleware always responds 200, wiping the 404 the classifier above
+    // set — so unknown pages get their (transformed) index.html served here instead, with
+    // the real 404 status. The SPA router still renders its NotFoundPage.
+    app.use(async (req, res, next) => {
+      if (!(req as any).spaNotFound) return next();
+      try {
+        const template = fs.readFileSync(path.join(process.cwd(), "index.html"), "utf-8");
+        const html = await vite.transformIndexHtml(req.originalUrl, template);
+        res.status(404).set({ "Content-Type": "text/html" }).end(html);
+      } catch {
+        next();
+      }
+    });
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
-    // SPA fallback handling
+    // SPA fallback handling — .status() keeps whatever the classifier above decided.
     app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
+      res.status(res.statusCode || 200).sendFile(path.join(distPath, 'index.html'));
     });
   }
 

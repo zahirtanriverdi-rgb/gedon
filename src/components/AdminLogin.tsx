@@ -26,7 +26,9 @@ export default function AdminLogin({ onLogin }: AdminLoginProps) {
       });
       const data = await response.json();
       if (!response.ok) {
-        setError(data.error || t('miscWidgets.adminLogin.invalidCredentials'));
+        // 401 gets the localized message — the server's `error` string is Azerbaijani-only,
+        // which looked broken on the EN/RU login screens.
+        setError(response.status === 401 ? t('miscWidgets.adminLogin.invalidCredentials') : (data.error || t('miscWidgets.adminLogin.invalidCredentials')));
         return;
       }
       onLogin(data.user, data.token);

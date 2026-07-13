@@ -239,7 +239,7 @@ export function ProfileTab({ currentUser, operatorToken, onShowNotification, onC
           </div>
 
           <div className="pt-4 border-t border-slate-100">
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
               <div>
                 <h3 className="text-sm font-bold text-slate-800">{t('vendorMisc.profileTab.teamTitle')}</h3>
                 <p className="text-xs text-slate-500">{t('vendorMisc.profileTab.teamSubtitle')}</p>
@@ -247,7 +247,7 @@ export function ProfileTab({ currentUser, operatorToken, onShowNotification, onC
               <button
                 type="button"
                 onClick={() => setProfileGuides([...profileGuides, { id: 'guide-' + Math.random().toString(36).slice(2, 10), name: '', bio: '', specialty: '', avatar: '' }])}
-                className="px-3 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-bold text-[10px] tracking-wider rounded-lg flex items-center gap-1 transition"
+                className="px-3 py-2 sm:py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 font-bold text-[10px] tracking-wider rounded-lg flex items-center gap-1 transition"
               >
                 <Plus className="w-3 h-3" />
                 {t('vendorMisc.profileTab.addGuide')}
@@ -353,7 +353,7 @@ export function ProfileTab({ currentUser, operatorToken, onShowNotification, onC
             )}
           </div>
 
-          <div className="pt-4 flex justify-end gap-3">
+          <div className="pt-4 flex flex-col-reverse sm:flex-row justify-end gap-3">
             <button
               type="button"
               onClick={() => {
@@ -366,14 +366,14 @@ export function ProfileTab({ currentUser, operatorToken, onShowNotification, onC
                 setProfileGuides(currentUser.guides || []);
                 onCancel();
               }}
-              className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 px-6 rounded-xl transition"
+              className="w-full sm:w-auto bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2.5 sm:py-2 px-6 rounded-xl transition"
             >
               {t('vendorMisc.profileTab.cancel')}
             </button>
             <button
               type="submit"
               disabled={profileSubmitting}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 px-6 rounded-xl flex items-center gap-2 transition disabled:opacity-50"
+              className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 sm:py-2 px-6 rounded-xl flex items-center justify-center gap-2 transition disabled:opacity-50"
             >
               {profileSubmitting ? (
                 <>
@@ -483,7 +483,7 @@ export function ProfileTab({ currentUser, operatorToken, onShowNotification, onC
             <button
               type="submit"
               disabled={isChangingPassword}
-              className="bg-slate-900 hover:bg-slate-800 text-white font-bold py-2 px-6 rounded-xl flex items-center gap-2 transition disabled:opacity-50"
+              className="w-full sm:w-auto bg-slate-900 hover:bg-slate-800 text-white font-bold py-2.5 sm:py-2 px-6 rounded-xl flex items-center justify-center gap-2 transition disabled:opacity-50"
             >
               {isChangingPassword ? t('vendorMisc.profileTab.updating') : t('vendorMisc.profileTab.updatePassword')}
             </button>

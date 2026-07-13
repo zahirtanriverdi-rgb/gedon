@@ -136,12 +136,18 @@ export function TourDetailPage({
   }, [isBookingStep]);
 
   // Same DOM-timing reasoning as above: scroll to the tour-slots-calendar section only after
-  // showTourSlots flips to true and React has actually rendered it.
+  // showTourSlots flips to true and React has actually rendered it. Re-run once more after a
+  // beat — late-loading images above the section shift the layout mid-animation, which used
+  // to leave the viewport far from the calendar (the button just seemed to "do nothing").
   React.useEffect(() => {
-    if (showTourSlots) {
+    if (!showTourSlots) return;
+    const scrollToCalendar = () => {
       const el = document.getElementById('tour-slots-calendar');
       if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
+    };
+    scrollToCalendar();
+    const settleTimer = setTimeout(scrollToCalendar, 450);
+    return () => clearTimeout(settleTimer);
   }, [showTourSlots]);
   const [bookingSubmitError, setBookingSubmitError] = useState<string | null>(null);
   const [bookingSuccessData, setBookingSuccessData] = useState<any>(null);
@@ -156,25 +162,10 @@ export function TourDetailPage({
   const [isPhoneVerified, setIsPhoneVerified] = useState<boolean>(false);
   const [isCheckingNumber, setIsCheckingNumber] = useState<boolean>(false);
 
-  // Best-effort default dial code from the visitor's IP location — defaults to Azerbaijan
-  // (see DEFAULT_DIAL_CODE) if the lookup fails or is blocked, since most bookings are for
-  // Azerbaijan-based tours anyway. The customer can always override it via the selector.
-  React.useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch('https://ipapi.co/json/');
-        const data = await res.json();
-        const detected: string | undefined = data?.country_calling_code;
-        if (!cancelled && detected && DIAL_CODES.some(c => c.dialCode === detected)) {
-          setPhoneCountryDialCode(detected);
-        }
-      } catch {
-        // Keep the Azerbaijan default.
-      }
-    })();
-    return () => { cancelled = true; };
-  }, []);
+  // The dial code always starts at +994 (DEFAULT_DIAL_CODE): almost every customer is booking
+  // an Azerbaijan tour with an Azerbaijani number, and the previous IP-geolocation lookup
+  // (ipapi.co) silently preselected surprising codes for VPN/roaming visitors — a wrong code
+  // is far more costly here than one manual selection for the rare foreign customer.
 
   // Domestic numbers are usually typed with their trunk "0" prefix (e.g. 0501234567) even
   // after a country code has been selected — that 0 isn't part of the actual E.164 number,
@@ -186,8 +177,34 @@ export function TourDetailPage({
 
   // Small math captcha gating the real WhatsApp lookup (see /api/whatsapp/captcha) — one-time
   // use, so a fresh one is fetched after every attempt (success or failure).
+  // Human-readable, localized date for raw ISO slot dates ("2026-07-18" → "18 İyul 2026").
+  // Reuses the month names already translated for the weather widget.
+  const MONTH_TRANSLATION_KEYS = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+  const formatDisplayDate = (iso: string | undefined | null): string => {
+    if (!iso || !/^\d{4}-\d{2}-\d{2}/.test(iso)) return iso || '';
+    const [y, m, d] = iso.slice(0, 10).split('-');
+    const monthName = t(`miscWidgets.tourWeatherForecast.months.${MONTH_TRANSLATION_KEYS[Number(m) - 1]}`);
+    return `${Number(d)} ${monthName} ${y}`;
+  };
+
   const [captchaId, setCaptchaId] = useState<string | null>(null);
   const [captchaQuestion, setCaptchaQuestion] = useState<string | null>(null);
+  // Persistent inline verification error — a toast alone auto-dismisses, leaving the user
+  // staring at a silently refreshed captcha with no idea what went wrong.
+  const [verifyErrorMessage, setVerifyErrorMessage] = useState<string | null>(null);
+  // null = unknown (endpoint unreachable / not yet asked) — treated as "assume online" so the
+  // badge doesn't flash red for everyone on a transient fetch hiccup.
+  const [whatsappSystemOnline, setWhatsappSystemOnline] = useState<boolean | null>(null);
+
+  const refreshWhatsappSystemStatus = async () => {
+    try {
+      const res = await fetch('/api/whatsapp/public-status');
+      const data = await res.json();
+      setWhatsappSystemOnline(!!data.connected);
+    } catch {
+      setWhatsappSystemOnline(null);
+    }
+  };
   const [captchaAnswer, setCaptchaAnswer] = useState<string>('');
 
   const fetchCaptchaChallenge = async () => {
@@ -254,7 +271,9 @@ export function TourDetailPage({
     setBookingCustomerPhone('');
     setIsPhoneVerified(false);
     setIsCheckingNumber(false);
+    setVerifyErrorMessage(null);
     fetchCaptchaChallenge();
+    refreshWhatsappSystemStatus();
 
     // Active Lifestyle States Reset
     setUsingOwnEquipment(false);
@@ -309,6 +328,7 @@ export function TourDetailPage({
     }
 
     setIsCheckingNumber(true);
+    setVerifyErrorMessage(null);
     try {
       const res = await fetch('/api/whatsapp/verify-number', {
         method: 'POST',
@@ -319,6 +339,7 @@ export function TourDetailPage({
 
       if (res.ok && data.hasWhatsapp) {
         setIsPhoneVerified(true);
+        setVerifyErrorMessage(null);
         if (onShowNotification) onShowNotification(t('tourDetailPage.booking.validation.otpVerified'), 'success');
         return;
       }
@@ -326,20 +347,25 @@ export function TourDetailPage({
       let message = data.error || t('tourDetailPage.booking.validation.otpSendFailed');
       if (res.status === 422 && data.hasWhatsapp === false) {
         message = t('tourDetailPage.booking.validation.otpNoWhatsapp');
+      } else if (data.captchaExpired) {
+        message = t('tourDetailPage.booking.validation.captchaExpired');
       } else if (data.captchaFailed) {
         message = t('tourDetailPage.booking.validation.captchaWrong');
       } else if (res.status === 429) {
         message = t('tourDetailPage.booking.validation.otpRateLimited');
       } else if (res.status === 503) {
         message = t('tourDetailPage.booking.validation.otpServiceUnavailable');
+        setWhatsappSystemOnline(false);
       }
       setIsPhoneVerified(false);
+      setVerifyErrorMessage(message);
       if (onShowNotification) onShowNotification(message, 'error');
       // The captcha was consumed server-side by this attempt (whatever the outcome), so the
       // next retry needs a fresh one.
       fetchCaptchaChallenge();
     } catch {
       setIsPhoneVerified(false);
+      setVerifyErrorMessage(t('tourDetailPage.booking.validation.otpServiceUnavailable'));
       if (onShowNotification) onShowNotification(t('tourDetailPage.booking.validation.otpServiceUnavailable'), 'error');
       fetchCaptchaChallenge();
     } finally {
@@ -513,10 +539,10 @@ export function TourDetailPage({
                   {isFeaturedThisMonth && (
                     <div className="bg-amber-500 text-white border border-amber-600 text-xs font-extrabold px-2 py-1 rounded shadow-sm shrink-0">🔥 {t('tourDetailPage.header.bestSellerBadge')}</div>
                   )}
-                  {REVIEWS_ENABLED && (
+                  {REVIEWS_ENABLED && selectedTour.rating != null && (
                     <div className="flex items-center gap-1 font-bold text-label-primary text-sm shrink-0">
                       <Star className="w-4 h-4 fill-amber-500 text-amber-500" />
-                      4.9 <span className="text-label-tertiary font-normal underline decoration-slate-300">({t('tourDetailPage.header.reviewsCount', { count: getReviewsCount(selectedTour.id) })})</span>
+                      {selectedTour.rating.toFixed(1)} <span className="text-label-tertiary font-normal underline decoration-slate-300">({t('tourDetailPage.header.reviewsCount', { count: getReviewsCount(selectedTour.id) })})</span>
                     </div>
                   )}
                   <div className="flex items-center gap-1 font-bold text-label-primary text-sm shrink-0">
@@ -607,7 +633,9 @@ export function TourDetailPage({
                   </div>
                   <div className="flex flex-col gap-1.5">
                     <Clock className="w-6 h-6 text-slate-700 mb-1" />
-                    <span className="text-sm font-extrabold text-slate-900">{t('tourDetailPage.quickInfo.duration', { hours: selectedTour.durationHours ?? (selectedTour.durationDays * 8) })}</span>
+                    <span className="text-sm font-extrabold text-slate-900">{selectedTour.durationDays >= 2
+                      ? t('tourDetailPage.quickInfo.durationDays', { days: selectedTour.durationDays })
+                      : t('tourDetailPage.quickInfo.duration', { hours: selectedTour.durationHours ?? (selectedTour.durationDays * 8) })}</span>
                     <button
                       type="button"
                       onClick={() => {
@@ -657,9 +685,9 @@ export function TourDetailPage({
                             }`}
                           >
                             <div className="space-y-1">
-                              <span className="font-bold text-slate-700 block">📅 {t('tourDetailPage.slotsCalendar.date', { date: slot.startDate })}</span>
+                              <span className="font-bold text-slate-700 block">📅 {t('tourDetailPage.slotsCalendar.date', { date: formatDisplayDate(slot.startDate) })}</span>
                               <span className="text-slate-400 block text-[10px]">
-                                {slot.startDate !== slot.endDate && t('tourDetailPage.slotsCalendar.endDate', { date: slot.endDate })}
+                                {slot.startDate !== slot.endDate && t('tourDetailPage.slotsCalendar.endDate', { date: formatDisplayDate(slot.endDate) })}
                               </span>
                             </div>
 
@@ -830,7 +858,7 @@ export function TourDetailPage({
                       <div className="flex justify-between items-center bg-slate-50 p-3 rounded-lg">
                         <div className="text-xs">
                           <span className="text-slate-400 block">{t('tourDetailPage.checkout.selectedDate')}</span>
-                          <strong className="text-slate-700">{selectedSlot?.startDate}</strong>
+                          <strong className="text-slate-700">{formatDisplayDate(selectedSlot?.startDate)}</strong>
                         </div>
                         <div className="text-xs text-right">
                           <span className="text-slate-400 block">{t('tourDetailPage.checkout.tourPrice')}</span>
@@ -1115,6 +1143,27 @@ export function TourDetailPage({
                                 )}
                                 {isCheckingNumber ? t('tourDetailPage.otp.sendingButton') : t('tourDetailPage.otp.sendButton')}
                               </button>
+                              {verifyErrorMessage && (
+                                <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-[11px] font-bold text-red-600 leading-snug">
+                                  ⚠️ {verifyErrorMessage}
+                                </div>
+                              )}
+                              {whatsappSystemOnline === false && (
+                                <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 space-y-2">
+                                  <p className="text-[11px] text-amber-800 font-semibold leading-snug">
+                                    {t('tourDetailPage.otp.systemOfflineNotice')}
+                                  </p>
+                                  <a
+                                    href={`https://wa.me/${String(selectedTour.whatsapp_number || vendorFallbackPhone || '').replace(/\D/g, '')}?text=${encodeURIComponent(t('tourDetailPage.otp.directWhatsappPrefill', { tour: getLocalizedTourName(selectedTour, language), date: formatDisplayDate(selectedSlot?.startDate) }))}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-extrabold px-3 py-1.5 rounded-lg transition"
+                                  >
+                                    <MessageCircle className="w-3.5 h-3.5 fill-current" />
+                                    {t('tourDetailPage.otp.directWhatsappButton')}
+                                  </a>
+                                </div>
+                              )}
                             </div>
                           ) : (
                             <div className="bg-emerald-50 border border-emerald-150 rounded-lg p-3 flex items-center justify-between text-xs text-emerald-800">
@@ -1142,7 +1191,11 @@ export function TourDetailPage({
                         <div className="flex items-center gap-2 text-emerald-800 font-extrabold text-xs">
                           <MessageCircle className="w-4 h-4 text-emerald-600 fill-current animate-pulse" />
                           <span>{t('tourDetailPage.waExplanation.title')}</span>
-                          <span className="bg-emerald-600 text-white text-[8px] font-extrabold px-1.5 py-0.5 rounded tracking-wider">{t('tourDetailPage.waExplanation.activeLabel')}</span>
+                          {whatsappSystemOnline === false ? (
+                            <span className="bg-red-500 text-white text-[8px] font-extrabold px-1.5 py-0.5 rounded tracking-wider">{t('tourDetailPage.waExplanation.inactiveLabel')}</span>
+                          ) : (
+                            <span className="bg-emerald-600 text-white text-[8px] font-extrabold px-1.5 py-0.5 rounded tracking-wider">{t('tourDetailPage.waExplanation.activeLabel')}</span>
+                          )}
                         </div>
                         <p className="text-[11px] text-slate-600 leading-relaxed">
                           {t('tourDetailPage.waExplanation.bodyPart1')} <strong>WhatsApp</strong> {t('tourDetailPage.waExplanation.bodyPart2', { number: selectedTour.whatsapp_number || vendorFallbackPhone })}
@@ -1828,7 +1881,7 @@ export function TourDetailPage({
                         >
                           <div className="flex items-center gap-3">
                             <Calendar className="w-5 h-5 text-emerald-700" />
-                            <span className="text-sm font-extrabold text-slate-800">{selectedSlot ? t('tourDetailPage.dateDropdown.selectedDate', { date: selectedSlot.startDate }) : t('tourDetailPage.dateDropdown.selectDate')}</span>
+                            <span className="text-sm font-extrabold text-slate-800">{selectedSlot ? t('tourDetailPage.dateDropdown.selectedDate', { date: formatDisplayDate(selectedSlot.startDate) }) : t('tourDetailPage.dateDropdown.selectDate')}</span>
                           </div>
                           <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${showDateDropdown ? 'rotate-180' : ''}`} />
                         </button>
@@ -1869,7 +1922,7 @@ export function TourDetailPage({
                                             : 'hover:bg-slate-50 cursor-pointer'
                                       }`}
                                     >
-                                      <span className="text-xs font-bold text-slate-700">📅 {slot.startDate}</span>
+                                      <span className="text-xs font-bold text-slate-700">📅 {formatDisplayDate(slot.startDate)}</span>
                                       <span className={`text-[10px] font-bold ${isDisabled ? 'text-red-400' : 'text-slate-400'}`}>
                                         {isPast ? t('tourDetailPage.dateDropdown.ended') : remainingSpots <= 0 ? t('tourDetailPage.dateDropdown.full') : t('tourDetailPage.dateDropdown.spotsLeft', { count: remainingSpots })}
                                       </span>
@@ -1980,7 +2033,9 @@ export function TourDetailPage({
                           )}
 
                           <div className="mt-auto pt-4 border-t border-slate-100 flex items-end justify-between">
-                            <span className="text-xs text-label-tertiary font-medium">{t('tourDetailPage.relatedTours.hours', { hours: tour.durationHours ?? (tour.durationDays * 8) })}</span>
+                            <span className="text-xs text-label-tertiary font-medium">{tour.durationDays >= 2
+                              ? t('tourDetailPage.relatedTours.days', { days: tour.durationDays })
+                              : t('tourDetailPage.relatedTours.hours', { hours: tour.durationHours ?? (tour.durationDays * 8) })}</span>
                             {minPrice ? (
                               <div className="flex flex-col items-end">
                                 <span className="text-[10px] text-label-tertiary font-medium">{t('tourDetailPage.relatedTours.startingPrices')}</span>

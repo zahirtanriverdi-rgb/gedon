@@ -20,7 +20,9 @@ export const app = {
         retry: 'Yenidən cəhd et',
       },
       footer: {
-        tagline: 'Azərbaycan daxili turlar ekosistemi SaaS arxitektura sənədləşməsi və simulyator paneli.',
+        tagline: 'GedəkGörək — Azərbaycanda dağ yürüşləri, kamp və aktiv istirahət turları üçün onlayn marketplace.',
+        faqLink: 'Bələdçi & FAQ',
+        supportLink: 'Texniki dəstək (WhatsApp)',
       },
       notifications: {
         ratesUpdated: 'Valyuta məzənnələri uğurla yeniləndi! 💱✨',
@@ -78,7 +80,9 @@ export const app = {
         retry: 'Retry',
       },
       footer: {
-        tagline: 'A SaaS architecture documentation and simulator panel for a domestic Azerbaijan tour ecosystem.',
+        tagline: 'GedəkGörək — the online marketplace for hiking, camping and active-lifestyle tours in Azerbaijan.',
+        faqLink: 'Guide & FAQ',
+        supportLink: 'Technical support (WhatsApp)',
       },
       notifications: {
         ratesUpdated: 'Currency rates updated successfully! 💱✨',
@@ -136,7 +140,9 @@ export const app = {
         retry: 'Повторить попытку',
       },
       footer: {
-        tagline: 'Документация SaaS-архитектуры и панель симулятора для экосистемы внутренних туров Азербайджана.',
+        tagline: 'GedəkGörək — онлайн-маркетплейс горных походов, кемпинга и активного отдыха в Азербайджане.',
+        faqLink: 'Гид и FAQ',
+        supportLink: 'Техническая поддержка (WhatsApp)',
       },
       notifications: {
         ratesUpdated: 'Курсы валют успешно обновлены! 💱✨',

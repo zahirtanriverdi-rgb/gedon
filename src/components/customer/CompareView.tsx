@@ -21,7 +21,7 @@ interface CompareViewProps {
   onSelectTour: (tour: Tour) => void;
   onRemoveFromCompare: (tourId: string) => void;
   getConvertedPriceInfo: (price: number, currency?: 'AZN' | 'USD' | 'EUR') => ConvertedPriceInfo;
-  getAverageRating: (tourId: string) => string;
+  getAverageRating: (tourId: string) => string | null;
   getReviewsCount: (tourId: string) => number;
 }
 
@@ -89,11 +89,15 @@ export function CompareView({
       key: 'rating',
       label: t('customerHome.compareView.rows.rating'),
       render: (tour) => (
-        <span className="flex items-center gap-1">
-          <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-          <span className="font-bold">{getAverageRating(tour.id)}</span>
-          <span className="text-label-tertiary text-xs">({getReviewsCount(tour.id)})</span>
-        </span>
+        getAverageRating(tour.id) !== null ? (
+          <span className="flex items-center gap-1">
+            <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+            <span className="font-bold">{getAverageRating(tour.id)}</span>
+            <span className="text-label-tertiary text-xs">({getReviewsCount(tour.id)})</span>
+          </span>
+        ) : (
+          <span className="text-xs font-bold text-emerald-700">{t('customerHome.toursHomeView.cardMeta.newTag')}</span>
+        )
       ),
     },
     {

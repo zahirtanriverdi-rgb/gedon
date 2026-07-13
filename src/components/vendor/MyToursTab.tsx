@@ -110,11 +110,11 @@ export function MyToursTab({ tours, slots, myTours, myTourIds, tourSearchTerm, o
               myTours.map((tour) => {
                 const tourSlots = slots.filter(s => s.tourId === tour.id);
                 return (
-                  <div key={tour.id} className="bg-white border border-slate-200 rounded-lg p-4 flex gap-4 items-center justify-between shadow-xs">
+                  <div key={tour.id} className="bg-white border border-slate-200 rounded-lg p-4 flex flex-wrap sm:flex-nowrap gap-4 items-center justify-between shadow-xs">
                     <img 
                       src={tour.image || undefined} 
                       alt="" 
-                      className="w-14 h-14 rounded object-cover border border-slate-150 flex-shrink-0"
+                      className="w-12 h-12 sm:w-14 sm:h-14 rounded object-cover border border-slate-150 flex-shrink-0"
                       referrerPolicy="no-referrer"
                     />
                     <div className="flex-1 space-y-1 min-w-0">

@@ -17,11 +17,10 @@ export const customerHome = {
         allToursSectionTitle: 'Bütün Turlar',
         hikingSubcategories: {
           all: 'Hamısı',
-          peak: 'Zirvə yürüşləri',
           waterfall: 'Şəlalə marşrutları',
-          camp: 'Kemp turları',
-          extreme: 'Ekstremal / çoxgünlük',
+          forest: 'Meşə marşrutları',
           family: 'Ailə üçün asan yürüşlər',
+          hard: 'Çətin yürüşlər',
         },
         filters: {
           hide: 'Gizlət',
@@ -41,7 +40,14 @@ export const customerHome = {
             hasActiveTrips: 'Aktiv Səfərlər var 🌿',
             noTrips: 'Səfər yoxdur',
             reset: 'Sıfırla',
+            modeDates: 'Ayrı tarixlər',
+            modeRange: 'Tarix aralığı',
+            hintDates: 'İstədiyiniz qədər tarix seçin — təkrar klik seçimi ləğv edir',
+            hintRangeStart: 'Başlanğıc tarixi seçin',
+            hintRangeEnd: 'İndi son tarixi seçin',
+            selectedCount: '{{count}} tarix seçilib',
           },
+          resetAll: 'Filtrləri sıfırla',
           sortLabel: 'SIRALAMA',
           sortOptions: {
             default: 'Varsayılan Sıralama',
@@ -71,6 +77,13 @@ export const customerHome = {
         },
         badges: {
           international: 'Xarici',
+        },
+        cardMeta: {
+          day: 'gün',
+          activeTag: 'Aktiv',
+          localTag: 'Lokal',
+          newTag: 'Yeni',
+          reviews: '{{count}} rəy',
         },
         activeDifficulty: {
           beginner: 'Başlanğıc',
@@ -237,11 +250,10 @@ export const customerHome = {
         allToursSectionTitle: 'All Tours',
         hikingSubcategories: {
           all: 'All',
-          peak: 'Peak hikes',
           waterfall: 'Waterfall routes',
-          camp: 'Camping tours',
-          extreme: 'Extreme / multi-day',
+          forest: 'Forest routes',
           family: 'Easy family hikes',
+          hard: 'Challenging hikes',
         },
         filters: {
           hide: 'Hide',
@@ -261,7 +273,14 @@ export const customerHome = {
             hasActiveTrips: 'Active trips available 🌿',
             noTrips: 'No trips',
             reset: 'Reset',
+            modeDates: 'Single dates',
+            modeRange: 'Date range',
+            hintDates: 'Pick as many dates as you like — click again to deselect',
+            hintRangeStart: 'Pick a start date',
+            hintRangeEnd: 'Now pick an end date',
+            selectedCount: '{{count}} dates selected',
           },
+          resetAll: 'Reset filters',
           sortLabel: 'SORT BY',
           sortOptions: {
             default: 'Default order',
@@ -291,6 +310,13 @@ export const customerHome = {
         },
         badges: {
           international: 'International',
+        },
+        cardMeta: {
+          day: 'day(s)',
+          activeTag: 'Active',
+          localTag: 'Local',
+          newTag: 'New',
+          reviews: '{{count}} reviews',
         },
         activeDifficulty: {
           beginner: 'Beginner',
@@ -457,11 +483,10 @@ export const customerHome = {
         allToursSectionTitle: 'Все туры',
         hikingSubcategories: {
           all: 'Все',
-          peak: 'Восхождения на вершины',
           waterfall: 'Маршруты к водопадам',
-          camp: 'Кемпинг-туры',
-          extreme: 'Экстрим / многодневные',
+          forest: 'Лесные маршруты',
           family: 'Лёгкие семейные походы',
+          hard: 'Сложные походы',
         },
         filters: {
           hide: 'Скрыть',
@@ -481,7 +506,14 @@ export const customerHome = {
             hasActiveTrips: 'Есть активные поездки 🌿',
             noTrips: 'Поездок нет',
             reset: 'Сбросить',
+            modeDates: 'Отдельные даты',
+            modeRange: 'Диапазон дат',
+            hintDates: 'Выберите любое число дат — повторный клик снимает выбор',
+            hintRangeStart: 'Выберите дату начала',
+            hintRangeEnd: 'Теперь выберите дату окончания',
+            selectedCount: 'Выбрано дат: {{count}}',
           },
+          resetAll: 'Сбросить фильтры',
           sortLabel: 'СОРТИРОВКА',
           sortOptions: {
             default: 'Сортировка по умолчанию',
@@ -511,6 +543,13 @@ export const customerHome = {
         },
         badges: {
           international: 'Зарубежный',
+        },
+        cardMeta: {
+          day: 'дн.',
+          activeTag: 'Актив',
+          localTag: 'Локальный',
+          newTag: 'Новый',
+          reviews: '{{count}} отзывов',
         },
         activeDifficulty: {
           beginner: 'Начинающий',

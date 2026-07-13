@@ -4,6 +4,7 @@ import fs from 'fs';
 import { DatabaseSync } from 'node:sqlite';
 import bcrypt from 'bcryptjs';
 import { seedUsers, seedTours, seedTourSlots } from '../src/data/toursData';
+import { seedPasswords, SEED_FALLBACK_PASSWORD } from './seedCredentials';
 import type { Tour } from '../src/types';
 import { generateUniqueSlug } from './slugify';
 
@@ -247,6 +248,70 @@ export async function initializeDatabase() {
 
   await seedIfEmpty();
   await backfillMissingUsernames();
+  await fixAdminEmailTypo();
+  await backfillSeedContentFixes();
+}
+
+// Content fixes for databases seeded from older seed data (seedIfEmpty only runs once, so
+// corrections to src/data/toursData.ts never reach an existing DB by themselves). Every
+// UPDATE is guarded to only touch rows still carrying the old value, making this idempotent
+// and safe to run on every boot.
+async function backfillSeedContentFixes() {
+  // (a) Wrong or duplicated stock cover photos — tour-tufandag's old one was literally a car.
+  const imageFixes: Array<[string, string, string]> = [
+    ['tour-tufandag', 'photo-1544829099', 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&auto=format&fit=crop&q=80'],
+    ['tour-niyaldag', 'photo-1454496522488', 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=800&auto=format&fit=crop&q=80'],
+    ['tour-dilman', 'photo-1441974231531', 'https://images.unsplash.com/photo-1433086966358-54859d0ed716?w=800&auto=format&fit=crop&q=80'],
+    ['tour-yardimli', 'photo-1473448912268', 'https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=800&auto=format&fit=crop&q=80'],
+    ['tour-xalit-yasil-nerimankend', 'photo-1470071459604', 'https://images.unsplash.com/photo-1470770841072-f978cf4d019e?w=800&auto=format&fit=crop&q=80'],
+    ['tour-xanbulan', 'photo-1447752875215', 'https://images.unsplash.com/photo-1439066615861-d1af74d74000?w=800&auto=format&fit=crop&q=80'],
+    ['tour-gobelek-turu', 'photo-1447752875215', 'https://images.unsplash.com/photo-1418065460487-3e41a6c84dc5?w=800&auto=format&fit=crop&q=80'],
+  ];
+  for (const [tourId, oldMarker, newUrl] of imageFixes) {
+    await dbClient.execute(
+      `UPDATE tours SET image = ? WHERE id = ? AND image LIKE ?`,
+      [newUrl, tourId, `%${oldMarker}%`]
+    );
+  }
+
+  // (a2) The vendor's public avatar was a random Unsplash portrait of a stranger — clear it
+  // so the organizer page falls back to its brand-initial badge.
+  await dbClient.execute(
+    `UPDATE users SET avatar = '' WHERE id = 'user-vendor-1' AND avatar LIKE '%photo-1534528741775%'`
+  );
+
+  // (b) Tufandağ's route runs via Khinalig/Shahyaylag (Quba side) per its description — not
+  // the Gabala ski-resort approach the old region label implied.
+  await dbClient.execute(
+    `UPDATE tours SET region = ? WHERE id = 'tour-tufandag' AND region = 'Qəbələ (Tufandağ)'`,
+    ['Quba (Xınalıq)']
+  );
+
+  // (c) Hand-written EN/RU translations added to the seed after a row was already in the DB
+  // (e.g. the international/active-lifestyle tours) — copy them in wherever still missing.
+  for (const tour of seedTours) {
+    if (!tour.translations) continue;
+    const rows = await dbClient.query(`SELECT extra_data FROM tours WHERE id = ?`, [tour.id]);
+    if (!rows.length) continue;
+    let extra: Record<string, any> = {};
+    try {
+      extra = JSON.parse(rows[0].extra_data || '{}') || {};
+    } catch {
+      extra = {};
+    }
+    if (extra.translations) continue;
+    extra.translations = tour.translations;
+    await dbClient.execute(`UPDATE tours SET extra_data = ? WHERE id = ?`, [JSON.stringify(extra), tour.id]);
+  }
+}
+
+// Databases seeded from the original seed data have the admin's email with a typo'd domain
+// ("gedekgore.az", missing the "k"). The seed file now says admin@gedekgorek.az — align any
+// existing row so the documented login e-mail actually works.
+async function fixAdminEmailTypo() {
+  await dbClient.execute(
+    `UPDATE users SET email = 'admin@gedekgorek.az' WHERE email = 'admin@gedekgore.az' AND role = 'admin'`
+  );
 }
 
 // Databases seeded before the `username` column existed have it as NULL on every row
@@ -273,7 +338,7 @@ async function seedIfEmpty() {
   console.log('[DB] Tours table is empty — seeding demo users, tours & slots...');
 
   for (const user of seedUsers) {
-    const passwordHash = await bcrypt.hash(user.password || 'changeme123', 10);
+    const passwordHash = await bcrypt.hash(seedPasswords[user.email] || SEED_FALLBACK_PASSWORD, 10);
     const extra: Record<string, any> = {};
     if (user.guides && user.guides.length > 0) extra.guides = user.guides;
     if (user.aboutTranslations) extra.aboutTranslations = user.aboutTranslations;

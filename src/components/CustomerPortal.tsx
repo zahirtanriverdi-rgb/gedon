@@ -22,6 +22,7 @@ import { getWishlist, toggleWishlist } from '../utils/wishlist';
 import { getCompareList, toggleCompareList, replaceInCompareList } from '../utils/compare';
 import { useLanguage } from '../i18n/LanguageContext';
 import { computeFeaturedTourIds } from '../utils/featuredTours';
+import { normalizeAzText } from '../utils/searchNormalize';
 import { useEffect, useRef } from 'react';
 
 // Automatic rating boost applied to tours currently flagged as this month's bestseller
@@ -265,6 +266,7 @@ export default function CustomerPortal({
     setSortBy('default');
     setCalendarDateStart('');
     setCalendarDateEnd('');
+    setCalendarSelectedDates([]);
     setShowCalendarWidget(false);
     setIsFiltersExpanded(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -304,6 +306,11 @@ export default function CustomerPortal({
   const [sortBy, setSortBy] = useState<string>('default');
   const [calendarDateStart, setCalendarDateStart] = useState<string>('');
   const [calendarDateEnd, setCalendarDateEnd] = useState<string>('');
+  // 'dates' = istənilən sayda ayrı tarix (multi-select), 'range' = başlanğıc→son aralığı.
+  // Two explicit modes because a single click-handler that silently switched between
+  // "single date" and "range end" confused users about what their second tap did.
+  const [calendarMode, setCalendarMode] = useState<'dates' | 'range'>('dates');
+  const [calendarSelectedDates, setCalendarSelectedDates] = useState<string[]>([]);
   const [showCalendarWidget, setShowCalendarWidget] = useState<boolean>(false);
   const [currentMonthView, setCurrentMonthView] = useState<string>(() => {
     const now = new Date();
@@ -423,30 +430,24 @@ export default function CustomerPortal({
     return Array.from(new Set(months)).sort();
   }, [availableTourDates]);
 
-  // Filter logic
-  const normalizeAzText = (text: string) => {
-    return text.toLowerCase()
-      .replace(/ə/g, 'e')
-      .replace(/ö/g, 'o')
-      .replace(/ğ/g, 'g')
-      .replace(/ü/g, 'u')
-      .replace(/ş/g, 's')
-      .replace(/ç/g, 'c')
-      .replace(/ı/g, 'i')
-      .replace(/i̇/g, 'i');
-  };
-
+  // Filter logic — normalizeAzText lives in utils/searchNormalize so the suggestions dropdown
+  // folds diacritics exactly the same way as this main grid filter.
   const filteredTours = tours.filter((tour) => {
     // 0. Approval status — belt-and-suspenders alongside the server-side filter (GET /api/tours
     // only returns status = 'approved' to anonymous/customer requests). A pending or rejected
     // tour must never render on the customer marketplace, full stop.
     if (tour.status !== 'approved') return false;
 
-    // 1. Text Search
+    // 1. Text Search — also matches the localized EN/RU name/description, so a suggestion
+    // picked from the dropdown (which shows localized titles) round-trips into a hit here.
     const searchNormalized = normalizeAzText(currentSearchQuery);
-    const matchesSearch = normalizeAzText(tour.name).includes(searchNormalized) || 
+    const localizedName = tour.translations?.[currentLang]?.name || '';
+    const localizedDescription = tour.translations?.[currentLang]?.description || '';
+    const matchesSearch = normalizeAzText(tour.name).includes(searchNormalized) ||
                           normalizeAzText(tour.region).includes(searchNormalized) ||
-                          normalizeAzText(tour.description || '').includes(searchNormalized);
+                          normalizeAzText(tour.description || '').includes(searchNormalized) ||
+                          normalizeAzText(localizedName).includes(searchNormalized) ||
+                          normalizeAzText(localizedDescription).includes(searchNormalized);
     
     // 2. Category
     let matchesCategory = selectedCategory === 'all' || tour.category === selectedCategory;
@@ -479,9 +480,11 @@ export default function CustomerPortal({
     // 7. Month Filter (matches if any tour slot starts with selectedMonth)
     const matchesMonth = !selectedMonth || tourSlots.some(s => s.startDate.startsWith(selectedMonth));
 
-    // 8. Təqvim Date Filter (specific date or range)
+    // 8. Təqvim Date Filter (ayrı tarixlər və ya aralıq)
     let matchesCalendar = true;
-    if (calendarDateStart && calendarDateEnd) {
+    if (calendarMode === 'dates' && calendarSelectedDates.length > 0) {
+      matchesCalendar = tourSlots.some(s => calendarSelectedDates.includes(s.startDate));
+    } else if (calendarDateStart && calendarDateEnd) {
       matchesCalendar = tourSlots.some(s => s.startDate >= calendarDateStart && s.startDate <= calendarDateEnd);
     } else if (calendarDateStart) {
       matchesCalendar = tourSlots.some(s => s.startDate === calendarDateStart);
@@ -530,7 +533,14 @@ export default function CustomerPortal({
         const dateB = getMinDateStr(b.id, bSlots);
         return dateB.localeCompare(dateA);
       }
-      return 0; // default / unsorted
+      // default: nearest upcoming slot date first; tours with no upcoming slots sink to the end
+      const todayStr = new Date().toISOString().slice(0, 10);
+      const getMinUpcomingDateStr = (tourSlotsList: TourSlot[]) => {
+        const dates = tourSlotsList.map(s => s.startDate).filter(d => d && d >= todayStr);
+        if (dates.length === 0) return '9999-12-31';
+        return dates.sort()[0];
+      };
+      return getMinUpcomingDateStr(aSlots).localeCompare(getMinUpcomingDateStr(bSlots));
     });
   }, [filteredTours, sortBy, slots]);
 
@@ -594,8 +604,10 @@ export default function CustomerPortal({
 
   // Calculate Average rating - vendor-set tour.rating acts as the base while there are no real
   // reviews yet; once real reviews come in they take over. Bestseller-of-the-month tours get a
-  // small automatic boost on top of whichever base applies.
-  const getAverageRating = (tourId: string) => {
+  // small automatic boost on top of whichever base applies. Returns null when there's no data
+  // at all — a fabricated "4.5 (0 rəy)" reads as fake and erodes trust, so callers render a
+  // "Yeni" (new) badge instead.
+  const getAverageRating = (tourId: string): string | null => {
     const tour = tours.find(t => t.id === tourId);
     const tourReviews = reviews.filter(r => r.tourId === tourId);
 
@@ -605,7 +617,7 @@ export default function CustomerPortal({
     } else if (tour && tour.rating !== undefined && tour.rating !== null) {
       base = tour.rating;
     } else {
-      base = 4.5; // default fallback if neither a vendor rating nor reviews exist
+      return null;
     }
 
     if (featuredTourIds.has(tourId)) {
@@ -647,6 +659,13 @@ export default function CustomerPortal({
   };
 
   const handleCalendarDayClick = (dayStr: string) => {
+    if (calendarMode === 'dates') {
+      // Toggle: klik olunan tarix seçilibsə çıxarılır, seçilməyibsə əlavə olunur.
+      setCalendarSelectedDates(prev =>
+        prev.includes(dayStr) ? prev.filter(d => d !== dayStr) : [...prev, dayStr].sort()
+      );
+      return;
+    }
     if (!calendarDateStart || (calendarDateStart && calendarDateEnd)) {
       setCalendarDateStart(dayStr);
       setCalendarDateEnd('');
@@ -658,6 +677,21 @@ export default function CustomerPortal({
         setCalendarDateEnd('');
       }
     }
+  };
+
+  // Rejim dəyişəndə o biri rejimin seçimi təmizlənir — yoxsa görünməyən filter qalır.
+  const handleCalendarModeChange = (mode: 'dates' | 'range') => {
+    if (mode === calendarMode) return;
+    setCalendarMode(mode);
+    setCalendarDateStart('');
+    setCalendarDateEnd('');
+    setCalendarSelectedDates([]);
+  };
+
+  const handleCalendarReset = () => {
+    setCalendarDateStart('');
+    setCalendarDateEnd('');
+    setCalendarSelectedDates([]);
   };
 
   const getTourMonths = (tourId: string) => {
@@ -687,10 +721,18 @@ export default function CustomerPortal({
           element={
             <>
               <Helmet>
-                <title>GədəkGörək Marketplace | Azərbaycanda Turlar və Aktiv İstirahət</title>
+                <title>{
+                  appLanguage === 'en' ? 'GedəkGörək Marketplace | Tours and Active Recreation in Azerbaijan'
+                  : appLanguage === 'ru' ? 'GedəkGörək Marketplace | Туры и активный отдых в Азербайджане'
+                  : 'GedəkGörək Marketplace | Azərbaycanda Turlar və Aktiv İstirahət'
+                }</title>
                 <meta
                   name="description"
-                  content="Azərbaycanın ən yaxşı hiking, kamp, zirvə və xarici turlarını kəşf edin — GədəkGörək ilə asanlıqla rezerv edin."
+                  content={
+                    appLanguage === 'en' ? 'Discover the best hiking, camping, peak and international tours in Azerbaijan — book easily with GedəkGörək.'
+                    : appLanguage === 'ru' ? 'Откройте для себя лучшие походы, кемпинги, восхождения и зарубежные туры Азербайджана — бронируйте легко с GedəkGörək.'
+                    : 'Azərbaycanın ən yaxşı hiking, kamp, zirvə və xarici turlarını kəşf edin — GedəkGörək ilə asanlıqla rezerv edin.'
+                  }
                 />
               </Helmet>
               <ToursHomeView
@@ -728,8 +770,10 @@ export default function CustomerPortal({
                 setShowCalendarWidget={setShowCalendarWidget}
                 calendarDateStart={calendarDateStart}
                 calendarDateEnd={calendarDateEnd}
-                setCalendarDateStart={setCalendarDateStart}
-                setCalendarDateEnd={setCalendarDateEnd}
+                calendarMode={calendarMode}
+                handleCalendarModeChange={handleCalendarModeChange}
+                calendarSelectedDates={calendarSelectedDates}
+                handleCalendarReset={handleCalendarReset}
                 calendarContainerRef={calendarContainerRef}
                 currentMonthView={currentMonthView}
                 monthNames={monthNames}
@@ -789,7 +833,7 @@ export default function CustomerPortal({
           path="/calculator"
           element={
             <div className="bg-slate-50 min-h-screen">
-              <PriceCalculator onBack={() => navigate('/')} config={priceCalculatorConfig} />
+              <PriceCalculator onBack={() => navigate('/')} config={priceCalculatorConfig} displayCurrency={displayCurrency} exchangeRates={exchangeRates} />
             </div>
           }
         />

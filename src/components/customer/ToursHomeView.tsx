@@ -73,8 +73,10 @@ interface ToursHomeViewProps {
   setShowCalendarWidget: (val: boolean) => void;
   calendarDateStart: string;
   calendarDateEnd: string;
-  setCalendarDateStart: (val: string) => void;
-  setCalendarDateEnd: (val: string) => void;
+  calendarMode: 'dates' | 'range';
+  handleCalendarModeChange: (mode: 'dates' | 'range') => void;
+  calendarSelectedDates: string[];
+  handleCalendarReset: () => void;
   calendarContainerRef: React.RefObject<HTMLDivElement>;
   currentMonthView: string;
   monthNames: Record<string, string>;
@@ -90,7 +92,7 @@ interface ToursHomeViewProps {
   getConvertedPriceInfo: (price: number, currency?: 'AZN' | 'USD' | 'EUR') => ConvertedPriceInfo;
   sortedAndFilteredTours: Tour[];
   getTourMonths: (tourId: string) => string[];
-  getAverageRating: (tourId: string) => string;
+  getAverageRating: (tourId: string) => string | null;
   getReviewsCount: (tourId: string) => number;
   handleQuickWhatsApp: (tour: Tour, e: React.MouseEvent) => void;
   onSelectTour: (tour: Tour) => void;
@@ -133,8 +135,10 @@ export function ToursHomeView({
   setShowCalendarWidget,
   calendarDateStart,
   calendarDateEnd,
-  setCalendarDateStart,
-  setCalendarDateEnd,
+  calendarMode,
+  handleCalendarModeChange,
+  calendarSelectedDates,
+  handleCalendarReset,
   calendarContainerRef,
   currentMonthView,
   monthNames,
@@ -166,7 +170,8 @@ export function ToursHomeView({
   }, [sortedAndFilteredTours, selectedCategory, hikingSubcategory]);
   // Drives the dot indicator on the filter icon button — true whenever any of the
   // bottom-sheet's fields differ from their defaults.
-  const hasActiveFilters = selectedDifficulty !== 'all' || selectedRegion !== 'all' || !!calendarDateStart || maxPrice < maxPriceLimit || sortBy !== 'default';
+  const hasCalendarSelection = !!calendarDateStart || calendarSelectedDates.length > 0;
+  const hasActiveFilters = selectedDifficulty !== 'all' || selectedRegion !== 'all' || hasCalendarSelection || maxPrice < maxPriceLimit || sortBy !== 'default';
   return (
         // -mx-5 cancels the parent <main>'s fixed px-5 so this container can
         // reapply proportional side padding across all breakpoints — scaling
@@ -181,8 +186,14 @@ export function ToursHomeView({
               a transform-based fade animation on an ancestor silently breaks
               position:sticky for descendants (this was why the search bar wasn't
               sticking on mobile). */}
-          <div className="flex flex-col items-center justify-center pt-[20px] pb-[28px] sm:pt-[38px] sm:pb-[50px] min-h-[220px] sm:min-h-[294px] mb-3 relative z-30 w-full">
-            <h2 className="text-2xl sm:text-3xl md:text-4xl leading-tight md:leading-[1.22] font-extrabold text-brand-text-main mb-4 sm:mb-6 tracking-tight text-center">{t('discoverTours')}</h2>
+          {/* max-sm:contents — position:sticky only sticks within its PARENT's box, and
+              this hero wrapper is only ~220px tall, so on mobile the search bar used to
+              unstick as soon as the hero scrolled past. display:contents dissolves the
+              hero's box on mobile so the sticky bar's containing block becomes the
+              full-page container above, letting it stay pinned for the whole scroll.
+              The hero's own mobile spacing moves to its children (h2 pt, chips row mb). */}
+          <div className="max-sm:contents flex flex-col items-center justify-center pt-[20px] pb-[28px] sm:pt-[38px] sm:pb-[50px] min-h-[220px] sm:min-h-[294px] mb-3 relative z-30 w-full">
+            <h2 className="max-sm:pt-[20px] text-2xl sm:text-3xl md:text-4xl leading-tight md:leading-[1.22] font-extrabold text-brand-text-main mb-4 sm:mb-6 tracking-tight text-center">{t('discoverTours')}</h2>
 
             {/* Main Pill Search Box — sticky on mobile only (pins at top-0, flush with the
                 viewport top, since the header itself isn't sticky there and scrolls away
@@ -191,7 +202,12 @@ export function ToursHomeView({
                 logo and icons, so there's a single merged bar rather than two stacked rows.
                 -mx/px cancels the page container's side padding so the white backdrop spans
                 full width once it's pinned on mobile. */}
-            <div className="sticky top-0 sm:static z-30 w-full -mx-4 px-4 sm:mx-0 sm:px-0 md:mx-0 md:px-0 lg:mx-0 lg:px-0 xl:mx-0 xl:px-0 min-[1440px]:mx-0 min-[1440px]:px-0 bg-white/95 sm:bg-transparent backdrop-blur-sm sm:backdrop-blur-none">
+            {/* sm:w-full only — on mobile the width must stay auto: w-full (width:100%) combined
+                with -mx-4 over-constrains the box, shifting it left without widening it, so the
+                white backdrop stopped 32px short of the right viewport edge and the tour card
+                behind peeked through. Auto width lets the negative margins bleed it flush to
+                BOTH edges. */}
+            <div className="sticky top-0 sm:static z-30 sm:w-full -mx-4 px-4 sm:mx-0 sm:px-0 md:mx-0 md:px-0 lg:mx-0 lg:px-0 xl:mx-0 xl:px-0 min-[1440px]:mx-0 min-[1440px]:px-0 bg-white/95 sm:bg-transparent backdrop-blur-sm sm:backdrop-blur-none">
             <div className="w-full max-w-[706px] mx-auto mt-2 sm:mt-8 pb-3 sm:pb-4 flex items-center justify-center relative">
               <div ref={searchContainerRef} className="relative w-full h-12 sm:h-14 bg-white shadow-sm sm:shadow-md rounded-full p-1 border border-slate-200 flex items-center">
                 <div className="pl-4 pr-2 flex items-center flex-1 min-w-0">
@@ -261,18 +277,39 @@ export function ToursHomeView({
               </div>
 
               {/* Filter trigger — opens the advanced-filters bottom sheet. Replaces the
-                  old "Geniş Axtarış Filtrləri" text link so the hero stays compact. */}
-              <button
-                type="button"
-                onClick={() => setIsFiltersExpanded(true)}
-                aria-label={tt('customerHome.toursHomeView.filters.showAdvanced')}
-                className="relative ml-2 sm:ml-3 shrink-0 w-12 h-12 sm:w-14 sm:h-14 bg-white shadow-sm sm:shadow-md rounded-full border border-slate-200 flex items-center justify-center text-brand-text-main hover:border-slate-300 hover:bg-slate-50 transition-colors cursor-pointer"
-              >
-                <SlidersHorizontal className="w-[18px] h-[18px] sm:w-5 sm:h-5" />
+                  old "Geniş Axtarış Filtrləri" text link so the hero stays compact.
+                  Wrapped in a div because the reset (×) badge must be a sibling button —
+                  nesting a button inside a button is invalid HTML and breaks tapping. */}
+              <div className="relative ml-2 sm:ml-3 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setIsFiltersExpanded(true)}
+                  aria-label={tt('customerHome.toursHomeView.filters.showAdvanced')}
+                  className="w-12 h-12 sm:w-14 sm:h-14 bg-white shadow-sm sm:shadow-md rounded-full border border-slate-200 flex items-center justify-center text-brand-text-main hover:border-slate-300 hover:bg-slate-50 transition-colors cursor-pointer"
+                >
+                  <SlidersHorizontal className="w-[18px] h-[18px] sm:w-5 sm:h-5" />
+                </button>
+                {/* Reset-filters badge — replaces the old passive dot indicator. The
+                    visible circle stays small, but before:-inset-2 extends the tappable
+                    area to ~36px so it's comfortably pressable with a finger. */}
                 {hasActiveFilters && (
-                  <span className="absolute top-1 right-1 w-2 h-2 bg-brand-cta rounded-full ring-2 ring-white" />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedDifficulty('all');
+                      setSelectedRegion('all');
+                      handleCalendarReset();
+                      setSortBy('default');
+                      setMaxPrice(maxPriceLimit);
+                    }}
+                    aria-label={tt('customerHome.toursHomeView.filters.resetAll')}
+                    title={tt('customerHome.toursHomeView.filters.resetAll')}
+                    className="absolute -top-0.5 -right-0.5 z-10 w-5 h-5 bg-brand-primary hover:bg-brand-primary-hover text-white rounded-full ring-2 ring-white shadow-sm flex items-center justify-center transition-colors cursor-pointer before:absolute before:-inset-2 before:content-[''] before:rounded-full"
+                  >
+                    <X className="w-3 h-3" strokeWidth={3} />
+                  </button>
                 )}
-              </button>
+              </div>
             </div>
             </div>
 
@@ -281,7 +318,9 @@ export function ToursHomeView({
                 -mx-4 px-4 combo lets the row bleed to the viewport edge so the last
                 pill isn't clipped, while scrollbar is hidden via arbitrary variants
                 (no extra Tailwind plugin needed). */}
-            <div className="w-full max-w-3xl overflow-x-auto [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: 'none' }}>
+            {/* max-sm:mb-14 replaces the hero wrapper's dissolved mobile bottom spacing
+                (pb-[28px] + mb-3 + the outer space-y-4 gap ≈ 56px) — see max-sm:contents note above. */}
+            <div className="w-full max-w-3xl overflow-x-auto [&::-webkit-scrollbar]:hidden max-sm:mb-14" style={{ scrollbarWidth: 'none' }}>
               <div className="flex items-center gap-2 mt-4 sm:mt-6 mb-3 sm:mb-4 px-4 -mx-4 sm:px-0 sm:mx-0 sm:justify-center snap-x snap-mandatory w-max sm:w-full mx-auto">
                 <button
                   onClick={() => setSelectedCategory('all')}
@@ -395,8 +434,10 @@ export function ToursHomeView({
                     </div>
                   </div>
 
-                  {/* Scrollable body */}
-                  <div className="flex-1 overflow-y-auto px-6 sm:px-10 py-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
+                  {/* Scrollable body — capped at 3 columns: the sheet is max-w-2xl,
+                      so 5 columns left ~100px per control and truncated the Azerbaijani
+                      labels/selects ("Bütün dərəcələr", "Varsayılan Sıralama", …). */}
+                  <div className="flex-1 overflow-y-auto px-6 sm:px-10 py-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                 {/* Difficulty Filter */}
                 <div>
                   <label className="block text-[10px] font-bold text-brand-text-muted mb-1">{tt('customerHome.toursHomeView.filters.difficultyLabel')}</label>
@@ -436,15 +477,19 @@ export function ToursHomeView({
                     id="calendar-toggle-btn"
                     onClick={() => setShowCalendarWidget(!showCalendarWidget)}
                     className={`w-full px-3 py-2 border rounded-lg text-xs font-semibold text-left flex items-center justify-between transition-colors focus:outline-none focus:ring-1 focus:ring-brand-cta cursor-pointer ${
-                      showCalendarWidget || calendarDateStart
+                      showCalendarWidget || hasCalendarSelection
                         ? 'bg-emerald-50 text-brand-primary border-brand-primary ring-1 ring-brand-primary'
                         : 'bg-brand-bg-light text-brand-text-main border-slate-200 hover:bg-slate-100'
                     }`}
                   >
                     <span className="truncate">
-                      {calendarDateStart
-                        ? `${calendarDateStart}${calendarDateEnd ? ` ➡️ ${calendarDateEnd}` : ''}`
-                        : tt('customerHome.toursHomeView.filters.specificDate')
+                      {calendarSelectedDates.length === 1
+                        ? calendarSelectedDates[0]
+                        : calendarSelectedDates.length > 1
+                          ? tt('customerHome.toursHomeView.filters.calendar.selectedCount', { count: calendarSelectedDates.length })
+                          : calendarDateStart
+                            ? `${calendarDateStart}${calendarDateEnd ? ` ➡️ ${calendarDateEnd}` : ''}`
+                            : tt('customerHome.toursHomeView.filters.specificDate')
                       }
                     </span>
                     <Calendar className="w-3.5 h-3.5 flex-shrink-0 opacity-70" />
@@ -495,6 +540,45 @@ export function ToursHomeView({
                         </div>
                       </div>
 
+                      {/* Seçim rejimi — iki aydın rejim: "Ayrı tarixlər" (istənilən sayda
+                          tək-tək tarix) və "Aralıq" (başlanğıc→son). Əvvəl ikisi eyni
+                          klik axınında qarışırdı: ikinci klik gizlicə aralığın sonuna
+                          çevrilirdi və çoxlu ayrı tarix seçmək mümkün deyildi. */}
+                      <div className="flex bg-slate-100 rounded-lg p-0.5 mb-3">
+                        <button
+                          type="button"
+                          onClick={() => handleCalendarModeChange('dates')}
+                          className={`flex-1 py-1.5 rounded-md text-[10px] font-bold transition cursor-pointer ${
+                            calendarMode === 'dates'
+                              ? 'bg-white text-brand-primary shadow-sm'
+                              : 'text-brand-text-muted hover:text-brand-text-main'
+                          }`}
+                        >
+                          {tt('customerHome.toursHomeView.filters.calendar.modeDates')}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleCalendarModeChange('range')}
+                          className={`flex-1 py-1.5 rounded-md text-[10px] font-bold transition cursor-pointer ${
+                            calendarMode === 'range'
+                              ? 'bg-white text-brand-primary shadow-sm'
+                              : 'text-brand-text-muted hover:text-brand-text-main'
+                          }`}
+                        >
+                          {tt('customerHome.toursHomeView.filters.calendar.modeRange')}
+                        </button>
+                      </div>
+
+                      {/* Rejimə uyğun qısa izah — istifadəçi növbəti kliklə nə baş
+                          verəcəyini əvvəlcədən bilsin. */}
+                      <p className="text-[10px] text-brand-text-muted text-center mb-2 leading-snug">
+                        {calendarMode === 'dates'
+                          ? tt('customerHome.toursHomeView.filters.calendar.hintDates')
+                          : calendarDateStart && !calendarDateEnd
+                            ? tt('customerHome.toursHomeView.filters.calendar.hintRangeEnd')
+                            : tt('customerHome.toursHomeView.filters.calendar.hintRangeStart')}
+                      </p>
+
                       <div className="grid grid-cols-7 gap-1 mb-2 text-center text-[10px] font-bold text-brand-text-muted">
                         {tt('customerHome.toursHomeView.filters.calendar.weekDays').split(',').map((day, idx) => (
                           <div key={`${day}-${idx}`}>{day}</div>
@@ -522,12 +606,13 @@ export function ToursHomeView({
                             const dayStr = String(d).padStart(2, '0');
                             const fullDayStr = `${currentMonthView}-${dayStr}`;
                             const hasActiveSlots = slots.some(s => s.tourId && s.startDate === fullDayStr && tours.some(t => t.id === s.tourId && t.isActive !== false));
-                            const isStart = calendarDateStart === fullDayStr;
-                            const isEnd = calendarDateEnd === fullDayStr;
-                            const isWithinRange = calendarDateStart && calendarDateEnd && fullDayStr > calendarDateStart && fullDayStr < calendarDateEnd;
+                            const isPicked = calendarMode === 'dates' && calendarSelectedDates.includes(fullDayStr);
+                            const isStart = calendarMode === 'range' && calendarDateStart === fullDayStr;
+                            const isEnd = calendarMode === 'range' && calendarDateEnd === fullDayStr;
+                            const isWithinRange = calendarMode === 'range' && calendarDateStart && calendarDateEnd && fullDayStr > calendarDateStart && fullDayStr < calendarDateEnd;
 
                             let cellClass = "py-1.5 rounded-lg cursor-pointer transition select-none ";
-                            if (isStart || isEnd) {
+                            if (isPicked || isStart || isEnd) {
                               cellClass += "bg-brand-primary text-white font-bold scale-102 shadow-xs";
                             } else if (isWithinRange) {
                               cellClass += "bg-emerald-100 text-brand-primary font-bold";
@@ -549,7 +634,7 @@ export function ToursHomeView({
                               >
                                 <div className="relative flex flex-col items-center">
                                   <span>{d}</span>
-                                  {hasActiveSlots && !isStart && !isEnd && !isWithinRange && (
+                                  {hasActiveSlots && !isPicked && !isStart && !isEnd && !isWithinRange && (
                                     <span className="w-1 h-1 bg-brand-primary rounded-full mt-0.5 animate-pulse"></span>
                                   )}
                                 </div>
@@ -560,13 +645,12 @@ export function ToursHomeView({
                         })()}
                       </div>
 
-                      {calendarDateStart && (
+                      {hasCalendarSelection && (
                         <button
                            type="button"
                            onClick={(e) => {
                              e.stopPropagation();
-                             setCalendarDateStart('');
-                             setCalendarDateEnd('');
+                             handleCalendarReset();
                            }}
                            className="w-full mt-3 py-1.5 bg-rose-50 text-rose-700 hover:bg-rose-100 font-bold text-[10px] rounded-lg transition"
                         >
@@ -600,7 +684,7 @@ export function ToursHomeView({
                 <div className="flex flex-col justify-end">
                   <div className="flex justify-between text-[10px] font-bold text-brand-text-muted mb-1.5">
                     <span>{tt('customerHome.toursHomeView.filters.maxPrice')}</span>
-                    <span className="text-brand-cta font-extrabold">{maxPrice} ₼</span>
+                    <span className="text-brand-cta font-extrabold whitespace-nowrap">{maxPrice} ₼</span>
                   </div>
                   <div className="py-1">
                     <input
@@ -624,8 +708,7 @@ export function ToursHomeView({
                       onClick={() => {
                         setSelectedDifficulty('all');
                         setSelectedRegion('all');
-                        setCalendarDateStart('');
-                        setCalendarDateEnd('');
+                        handleCalendarReset();
                         setSortBy('default');
                         setMaxPrice(maxPriceLimit);
                       }}
@@ -703,7 +786,7 @@ export function ToursHomeView({
                           </h4>
                           
                           <div className="text-[11px] font-semibold text-gray-500 line-clamp-1 mb-1">
-                            {tour.durationDays} gün • {tour.region} • {(tour.category === 'active' || tour.isActiveLife) ? 'Aktiv' : 'Lokal'}
+                            {tour.durationDays} {tt('customerHome.toursHomeView.cardMeta.day')} • {tour.region} • {(tour.category === 'active' || tour.isActiveLife) ? tt('customerHome.toursHomeView.cardMeta.activeTag') : tt('customerHome.toursHomeView.cardMeta.localTag')}
                           </div>
 
                           {(() => {
@@ -721,9 +804,15 @@ export function ToursHomeView({
 
                           <div className="flex items-end justify-between mt-auto">
                             <div className="flex items-center gap-1">
-                              <span className="text-[13px] font-bold text-[#1a2b49]">{getAverageRating(tour.id)}</span>
-                              <Star className="w-3.5 h-3.5 fill-[#1a2b49] text-[#1a2b49]" />
-                              <span className="text-[11px] font-medium text-gray-500">({getReviewsCount(tour.id)})</span>
+                              {getAverageRating(tour.id) !== null ? (
+                                <>
+                                  <span className="text-[13px] font-bold text-[#1a2b49]">{getAverageRating(tour.id)}</span>
+                                  <Star className="w-3.5 h-3.5 fill-[#1a2b49] text-[#1a2b49]" />
+                                  <span className="text-[11px] font-medium text-gray-500">({getReviewsCount(tour.id)})</span>
+                                </>
+                              ) : (
+                                <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 rounded px-1.5 py-0.5">{tt('customerHome.toursHomeView.cardMeta.newTag')}</span>
+                              )}
                             </div>
                             
                             <div className="flex items-baseline gap-1.5">
@@ -921,25 +1010,26 @@ export function ToursHomeView({
                     <button
                       type="button"
                       onClick={(e) => handleToggleCompare(tour.id, e)}
-                      className={`w-8 h-8 rounded-full flex items-center justify-center transition shadow-sm ${compareList.includes(tour.id) ? 'bg-amber-50 text-amber-600' : 'bg-white/90 hover:bg-white text-gray-700'}`}
+                      className={`w-[40px] h-[40px] rounded-full flex items-center justify-center transition shadow-sm ${compareList.includes(tour.id) ? 'bg-amber-50 text-amber-600' : 'bg-white/90 hover:bg-white text-gray-700'}`}
                       title={compareList.includes(tour.id) ? tt('customerHome.toursHomeView.compare.remove') : tt('customerHome.toursHomeView.compare.add')}
                     >
-                      <Scale className="w-3.5 h-3.5" />
+                      <Scale className="w-5 h-5" />
                     </button>
                     <button
                       type="button"
                       onClick={(e) => handleToggleWishlist(tour.id, e)}
-                      className="w-8 h-8 bg-white/90 hover:bg-white rounded-full flex items-center justify-center transition shadow-sm"
+                      className="w-[40px] h-[40px] bg-white/90 hover:bg-white rounded-full flex items-center justify-center transition shadow-sm"
                       title={wishlist.includes(tour.id) ? tt('customerHome.toursHomeView.wishlist.remove') : tt('customerHome.toursHomeView.wishlist.add')}
                     >
-                      <Heart className={`w-3.5 h-3.5 ${wishlist.includes(tour.id) ? 'fill-rose-600 text-rose-600' : 'text-gray-700'}`} />
+                      <Heart className={`w-5 h-5 ${wishlist.includes(tour.id) ? 'fill-rose-600 text-rose-600' : 'text-gray-700'}`} />
                     </button>
                     <ShareMenuButton
                       tour={tour}
                       slots={slots}
                       onShowNotification={onShowNotification}
                       stopPropagationOnOpen
-                      buttonClassName="w-8 h-8 bg-white/90 hover:bg-white rounded-full flex items-center justify-center text-gray-700 transition shadow-sm"
+                      buttonClassName="w-[40px] h-[40px] bg-white/90 hover:bg-white rounded-full flex items-center justify-center text-gray-700 transition shadow-sm"
+                      iconClassName="w-5 h-5"
                     />
                   </div>
 
@@ -1033,8 +1123,14 @@ export function ToursHomeView({
                           {difficultyLabel}
                         </span>
                         <div className="flex items-center gap-1">
-                          <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                          <span className="text-[11px] font-bold text-gray-800">{getAverageRating(tour.id)} <span className="font-normal text-gray-500">({getReviewsCount(tour.id)} rəy)</span></span>
+                          {getAverageRating(tour.id) !== null ? (
+                            <>
+                              <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                              <span className="text-[11px] font-bold text-gray-800">{getAverageRating(tour.id)} <span className="font-normal text-gray-500">({tt('customerHome.toursHomeView.cardMeta.reviews', { count: getReviewsCount(tour.id) })})</span></span>
+                            </>
+                          ) : (
+                            <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 rounded px-1.5 py-0.5">{tt('customerHome.toursHomeView.cardMeta.newTag')}</span>
+                          )}
                         </div>
                       </div>
                       

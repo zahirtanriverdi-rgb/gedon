@@ -26,7 +26,9 @@ export default function OperatorLogin({ onLogin }: OperatorLoginProps) {
       });
       const data = await response.json();
       if (!response.ok) {
-        setError(data.error || t('miscWidgets.operatorLogin.invalidCredentials'));
+        // 401 gets the localized message — the server's `error` string is Azerbaijani-only,
+        // which looked broken on the EN/RU login screens.
+        setError(response.status === 401 ? t('miscWidgets.operatorLogin.invalidCredentials') : (data.error || t('miscWidgets.operatorLogin.invalidCredentials')));
         return;
       }
       onLogin(data.user, data.token);
@@ -93,11 +95,6 @@ export default function OperatorLogin({ onLogin }: OperatorLoginProps) {
           <div className="mt-6 border-t border-slate-100 pt-5">
              <div className="text-[10px] text-slate-400 text-center flex flex-col gap-1">
                <span>{t('miscWidgets.operatorLogin.contactAdminNote')}</span>
-               {(window.location.search.includes('admin')) && (
-                 <strong className="text-emerald-600 mt-2 block border p-1 rounded bg-emerald-50">
-                    {t('miscWidgets.operatorLogin.testCredentials')}
-                 </strong>
-               )}
              </div>
           </div>
         </div>

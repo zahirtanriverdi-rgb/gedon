@@ -341,7 +341,7 @@ export function InternationalTourForm({ currentUser, tour, slots, onAddTour, onE
 
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-      <div className="bg-gradient-to-r from-emerald-800 to-teal-800 p-6 text-white">
+      <div className="bg-gradient-to-r from-emerald-800 to-teal-800 p-4 sm:p-6 text-white">
         <h2 className="text-sm font-bold flex items-center gap-2 tracking-wider">
           ✈️ {isEditMode ? t('vendorTourForms.internationalTourForm.header.titleEdit') : t('vendorTourForms.internationalTourForm.header.titleNew')}
         </h2>
@@ -350,7 +350,7 @@ export function InternationalTourForm({ currentUser, tour, slots, onAddTour, onE
         </p>
       </div>
 
-      <form onSubmit={handleInternationalTourSubmit} className="p-6 space-y-6">
+      <form onSubmit={handleInternationalTourSubmit} className="p-4 sm:p-6 space-y-6">
         {/* Step indicator */}
         <div className="flex items-center justify-center gap-1.5 sm:gap-3 py-1">
           {FORM_STEPS.map((step, idx) => (
@@ -727,20 +727,20 @@ export function InternationalTourForm({ currentUser, tour, slots, onAddTour, onE
           <div className="bg-red-50 border border-red-200 text-red-700 text-xs font-semibold rounded-lg px-3 py-2">⚠️ {formSubmitError}</div>
         )}
 
-        <div className="flex items-center gap-3 justify-end pt-4 border-t border-slate-200">
+        <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3 sm:justify-end pt-4 border-t border-slate-200">
           {currentStep === 1 && (
-            <button type="button" onClick={() => onNavigateBack()} className="px-4 py-2 border border-slate-250 text-slate-600 text-xs font-bold rounded-lg hover:bg-slate-50">{t('vendorTourForms.internationalTourForm.buttons.cancel')}</button>
+            <button type="button" onClick={() => onNavigateBack()} className="w-full sm:w-auto px-4 py-3 sm:py-2 border border-slate-250 text-slate-600 text-xs font-bold rounded-lg hover:bg-slate-50">{t('vendorTourForms.internationalTourForm.buttons.cancel')}</button>
           )}
           {currentStep > 1 && (
             <button
               type="button"
               onClick={goToPrevStep}
-              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-lg transition-all cursor-pointer"
+              className="w-full sm:w-auto px-4 py-3 sm:py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-lg transition-all cursor-pointer"
             >
               {t('vendorTourForms.internationalTourForm.buttons.back')}
             </button>
           )}
-          <button type="submit" disabled={isSavingForm} className="px-6 py-2.5 bg-emerald-800 hover:bg-emerald-850 text-white font-black text-xs rounded-lg shadow-sm transition-all disabled:opacity-50 flex items-center gap-1.5">
+          <button type="submit" disabled={isSavingForm} className="w-full sm:w-auto px-6 py-3 sm:py-2.5 bg-emerald-800 hover:bg-emerald-850 text-white font-black text-xs rounded-lg shadow-sm transition-all disabled:opacity-50 flex items-center justify-center gap-1.5">
             {currentStep < 3 ? (
               <>{t('vendorTourForms.internationalTourForm.buttons.next')}</>
             ) : (

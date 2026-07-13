@@ -7,7 +7,7 @@ export default function NotFoundPage() {
   return (
     <>
       <Helmet>
-        <title>{`${t('notFoundPage.title')} | GədəkGörək`}</title>
+        <title>{`${t('notFoundPage.title')} | GedəkGörək`}</title>
         <meta name="robots" content="noindex" />
       </Helmet>
       <div className="min-h-[60vh] flex flex-col items-center justify-center gap-4 text-center px-4 py-24">

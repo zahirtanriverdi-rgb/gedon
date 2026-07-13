@@ -20,8 +20,9 @@ export default defineConfig(() => {
       hmr: process.env.DISABLE_HMR !== 'true',
       // Disable file watching when DISABLE_HMR is true to save CPU during agent edits.
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
-      // Ngrok və tunelləmə üçün bütün hostlara icazə veririk
-      allowedHosts: true,
+      // Ngrok və tunelləmə üçün bütün hostlara icazə veririk.
+      // `as const` — vite's type is `true | string[]`, a plain boolean doesn't narrow to it.
+      allowedHosts: true as const,
     },
   };
 });

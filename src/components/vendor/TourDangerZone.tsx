@@ -50,7 +50,7 @@ export function TourDangerZone({ isActive, onToggleActive, onDelete }: TourDange
           </div>
           <div>
             {showDeleteConfirm ? (
-              <div className="flex items-center gap-2 bg-rose-50 border border-rose-200/60 p-2 rounded-xl animate-fadeIn">
+              <div className="flex flex-wrap items-center gap-2 bg-rose-50 border border-rose-200/60 p-2 rounded-xl animate-fadeIn w-full sm:w-auto">
                 <span className="text-[9px] font-black text-rose-800 tracking-wide">{t('vendorMisc.tourDangerZone.confirmQuestion')}</span>
                 <button
                   type="button"

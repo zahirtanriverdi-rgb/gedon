@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useMemo, type ReactNode } from 'react';
+import { createContext, useContext, useState, useMemo, useEffect, type ReactNode } from 'react';
 import { translations } from './translations';
 
 export type Language = 'az' | 'en' | 'ru';
@@ -31,6 +31,12 @@ function readStoredLanguage(): Language {
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
   const [language, setLanguageState] = useState<Language>(readStoredLanguage);
+
+  // Keep <html lang> in sync with the active UI language — index.html ships lang="az", which
+  // is wrong for EN/RU sessions (screen readers and search engines both read this attribute).
+  useEffect(() => {
+    document.documentElement.lang = language;
+  }, [language]);
 
   const setLanguage = (lang: Language) => {
     setLanguageState(lang);

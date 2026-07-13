@@ -188,13 +188,20 @@ export default function App() {
       if (saved) {
          const parsed: User[] = JSON.parse(saved);
          return parsed.map(user => {
+            // Older builds shipped seed passwords inside this localStorage blob; strip them on
+            // load so they disappear from existing visitors' browsers on the next save (real
+            // auth is server-side, nothing client-side reads this field).
+            delete (user as any).password;
+            // Older builds also shipped a random Unsplash portrait as the vendor's public
+            // avatar — drop it so the organizer page falls back to the brand-initial badge.
+            if (user.avatar && user.avatar.includes('photo-1534528741775')) user.avatar = '';
             const seed = seedUsers.find(su => su.id === user.id);
             if (seed) {
-               return { 
-                 ...seed, 
-                 ...user, 
-                 guides: user.guides && user.guides.length > 0 ? user.guides : seed.guides, 
-                 about: user.about || seed.about || '' 
+               return {
+                 ...seed,
+                 ...user,
+                 guides: user.guides && user.guides.length > 0 ? user.guides : seed.guides,
+                 about: user.about || seed.about || ''
                };
             }
             return user;
@@ -413,7 +420,10 @@ export default function App() {
   // for those anymore. Users/platformConfig stay on localStorage — out of scope for this pass.
   React.useEffect(() => {
     try {
-      localStorage.setItem('turlar_users', JSON.stringify(users));
+      // Belt-and-braces: never let a password field (e.g. one injected by other client code)
+      // reach localStorage, where any visitor can read it.
+      const sanitized = users.map(({ password: _password, ...rest }: any) => rest);
+      localStorage.setItem('turlar_users', JSON.stringify(sanitized));
     } catch (e) {
       console.error('Failed to save users', e);
     }
@@ -1091,9 +1101,9 @@ export default function App() {
             <p className="text-slate-500 mt-1">{t('app.footer.tagline')}</p>
           </div>
           <div className="flex gap-4">
-            <span className="hover:text-white transition">Privacy Policy</span>
+            <a href="/faq" className="hover:text-white transition">{t('app.footer.faqLink')}</a>
             <span className="text-slate-750">|</span>
-            <span className="hover:text-white transition">Technical Support</span>
+            <a href="https://wa.me/994706717804" target="_blank" rel="noopener noreferrer" className="hover:text-white transition">{t('app.footer.supportLink')}</a>
           </div>
         </div>
       </footer>

@@ -382,5 +382,45 @@ export const tourTranslations: Record<string, TourTranslationEntry> = {
       name: 'Хызы, гора Бейбеим и разноцветные горы',
       description: `Едем увидеть гору Бейбеим и разноцветные горы Хызы 🏔 Гора Бейбеим — высшая точка хребта Варафта (935 м). С вершины открывается панорама на гору Бешбармаг, Каспийское море и центр Хызынского района.\n\n⏳ Длительность: 6 часов | 📊 Сложность: средне-лёгкая | 🚶 Маршрут: 10 км (туда-обратно)\n\n🗓 Программа:\n06:40 – Сбор (метро Генджлик, выезд у Бадамлы)\n07:00–09:30 – Баку → село Зарат\n10:00–14:00 – Восхождение на гору Бейбеим\n16:00–18:00 – Спуск с вершины\n18:00–20:00 – Село Зарат → Баку\n\n💰 Цена: 45 AZN\n\n${NOTE_RU}\n\n${CONTACT_RU}`
     }
+  },
+  'tour-kapadokya-sehr': {
+    en: {
+      name: '🎈 Cappadocia Magical Autumn Tour',
+      description: 'Discover the one-of-a-kind valleys of Cappadocia, watch colorful hot-air balloons decorate the sky at sunrise, and spend unforgettable nights in a cave hotel! 🌅✨'
+    },
+    ru: {
+      name: '🎈 Волшебный осенний тур в Каппадокию',
+      description: 'Откройте для себя неповторимые долины Каппадокии, встречайте рассвет под разноцветными воздушными шарами и проведите незабываемые ночи в пещерном отеле! 🌅✨'
+    }
+  },
+  'tour-roma-toskana': {
+    en: {
+      name: '🇮🇹 Rome and Tuscany Dreams',
+      description: 'An unforgettable 5-day autumn journey to Rome, Florence and the unique valleys of Tuscany — the cradle of Italian culture. Rich with the ancient Colosseum, the Trevi Fountain and a stroll through Tuscany\'s famous vineyards. Direct Baku–Rome round-trip flights and a 4-star boutique hotel are included in the price!'
+    },
+    ru: {
+      name: '🇮🇹 Мечты о Риме и Тоскане',
+      description: 'Незабываемое 5-дневное осеннее путешествие в Рим, Флоренцию и уникальные долины Тосканы — колыбель итальянской культуры. Вас ждут древний Колизей, фонтан Треви и прогулка по знаменитым виноградникам Тосканы. Прямые авиабилеты Баку–Рим туда-обратно и 4-звёздочный бутик-отель включены в стоимость!'
+    }
+  },
+  'tour-active-volleyball': {
+    en: {
+      name: 'Premium Volleyball Tournament at Heydar Aliyev Pro Arena 🏐',
+      description: 'An amateur volleyball tournament held in a professional indoor arena. Register individually or with your own ready-made team and compete for the win. Referees, sports kits, and a cup with prizes for the winners are included.'
+    },
+    ru: {
+      name: 'Премиум волейбольный турнир в Pro Arena имени Гейдара Алиева 🏐',
+      description: 'Любительский волейбольный турнир на профессиональной крытой арене. Регистрируйтесь индивидуально или со своей готовой командой и боритесь за победу. Судьи, спортивная форма, а также кубок и призы для победителей включены.'
+    }
+  },
+  'tour-active-rafting': {
+    en: {
+      name: 'Wild Rafting and Camping Adventure on the Kura River 🌊🚣‍♀️',
+      description: 'An adrenaline-packed rafting experience on the wild waters of the Kura, with river crossings at Gabala and Shamkir. First-timers get a detailed briefing, and a professional instructor is assigned to every boat.'
+    },
+    ru: {
+      name: 'Бурный рафтинг и кемпинг-приключение на реке Кура 🌊🚣‍♀️',
+      description: 'Рафтинг, полный адреналина, по бурным водам Куры с речными переходами в Габале и Шамкире. Для новичков проводится подробный инструктаж, а к каждой лодке прикрепляется профессиональный инструктор.'
+    }
   }
 };

@@ -78,7 +78,7 @@ export function TourDetailRoute({ tours, lightboxIndex, setLightboxIndex, ...res
   return (
     <>
       <Helmet>
-        <title>{`${tour.name} | GədəkGörək`}</title>
+        <title>{`${tour.name} | GedəkGörək`}</title>
         <meta name="description" content={description} />
         <meta property="og:title" content={tour.name} />
         <meta property="og:description" content={description} />

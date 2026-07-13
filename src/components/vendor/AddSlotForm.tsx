@@ -64,7 +64,7 @@ export function AddSlotForm({ myTours, onAddSlot, onShowNotification, onSuccess 
   };
 
   return (
-    <form onSubmit={handleSlotSubmit} className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-5">
+    <form onSubmit={handleSlotSubmit} className="bg-white p-4 sm:p-6 rounded-xl border border-slate-200 shadow-sm space-y-5">
       <div>
         <span className="text-[10px] tracking-widest text-slate-400 font-bold block mb-1">{t('vendorMisc.addSlotForm.activeSalesLabel')}</span>
         <h3 className="font-bold text-slate-900 text-sm">{t('vendorMisc.addSlotForm.formTitle')}</h3>
@@ -147,7 +147,7 @@ export function AddSlotForm({ myTours, onAddSlot, onShowNotification, onSuccess 
       <button
         type="submit"
         disabled={isSavingForm}
-        className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-lg transition-all disabled:opacity-50"
+        className="w-full sm:w-auto px-5 py-3 sm:py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-lg transition-all disabled:opacity-50"
       >
         {isSavingForm ? t('vendorMisc.addSlotForm.saving') : t('vendorMisc.addSlotForm.activateButton')}
       </button>

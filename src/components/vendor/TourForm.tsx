@@ -400,7 +400,7 @@ const handleMediaFilesChange = async (e: React.ChangeEvent<HTMLInputElement>) =>
   if (!files || files.length === 0) return;
 
   const formData = new FormData();
-  Array.from(files).forEach(file => formData.append('files', file));
+  Array.from<File>(files).forEach(file => formData.append('files', file));
 
   try {
     const res = await fetch(`${getBaseUrl()}/api/upload`, {
@@ -432,7 +432,7 @@ const handleMediaFilesChange = async (e: React.ChangeEvent<HTMLInputElement>) =>
 
   return (
     <div className="space-y-5">
-      <form onSubmit={handleTourSubmit} className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-5">
+      <form onSubmit={handleTourSubmit} className="bg-white p-4 sm:p-6 rounded-xl border border-slate-200 shadow-sm space-y-5">
         <div>
           <span className="text-[10px] tracking-widest text-slate-400 font-bold block mb-1">
             {isEditMode ? t('vendorTourForms.tourForm.header.eyebrowEdit') : (tourCategory === 'active' ? t('vendorTourForms.tourForm.header.eyebrowNewActive') : t('vendorTourForms.tourForm.header.eyebrowNewStandard'))}
@@ -931,12 +931,12 @@ const handleMediaFilesChange = async (e: React.ChangeEvent<HTMLInputElement>) =>
           <div className="bg-red-50 border border-red-200 text-red-700 text-xs font-semibold rounded-lg px-3 py-2">⚠️ {formSubmitError}</div>
         )}
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3">
           {currentStep > 1 && (
             <button
               type="button"
               onClick={goToPrevStep}
-              className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-lg transition-all cursor-pointer"
+              className="w-full sm:w-auto px-5 py-3 sm:py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-lg transition-all cursor-pointer"
             >
               {t('vendorTourForms.tourForm.buttons.back')}
             </button>
@@ -945,7 +945,7 @@ const handleMediaFilesChange = async (e: React.ChangeEvent<HTMLInputElement>) =>
           <button
             type="submit"
             disabled={isSavingForm}
-            className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-lg transition-all cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+            className="w-full sm:w-auto px-5 py-3 sm:py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-lg transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
           >
             {currentStep < 3 ? (
               <>{t('vendorTourForms.tourForm.buttons.next')}</>
@@ -958,7 +958,7 @@ const handleMediaFilesChange = async (e: React.ChangeEvent<HTMLInputElement>) =>
           </button>
 
           {currentStep === 1 && (
-            <button type="button" onClick={onNavigateBack} className="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-lg transition-all cursor-pointer">
+            <button type="button" onClick={onNavigateBack} className="w-full sm:w-auto px-5 py-3 sm:py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-lg transition-all cursor-pointer">
               {t('vendorTourForms.tourForm.buttons.cancel')}
             </button>
           )}

@@ -1,20 +1,24 @@
 import { Tour, TourSlot, User } from '../types';
 import { tourTranslations } from './tourTranslations';
 
-// Mock/Seed users in our database representing Vendor (Tour Operators), Admin, and Customers
+// Mock/Seed users in our database representing Vendor (Tour Operators), Admin, and Customers.
+// SECURITY: no passwords here — this file is bundled into the client (and mirrored into
+// localStorage), so anything in it is visible to every visitor. Initial seed passwords live
+// server-side only, in server/seedCredentials.ts.
 export const seedUsers: User[] = [
   {
     id: 'user-vendor-1',
     name: 'GedəkGörək',
     email: 'info@gedekgorek.az',
     username: 'gedekgorek',
-    password: 'password123',
     role: 'vendor',
     phone: '+994 70 671 78 04',
     companyName: 'GedəkGörək LLC',
     balance: 450.0,
     whatsapp_number: '+994 70 671 78 04',
-    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+    // No avatar on purpose: the public organizer page falls back to a brand-initial badge.
+    // The old value was a random Unsplash portrait of a stranger presented as the company.
+    avatar: '',
     about: 'GedəkGörək Azərbaycanda peşəkar dağçılıq, yürüş və düşərgə turları üzrə ixtisaslaşmış komandadır. Təbiətlə həmahəng, təhlükəsiz və yaddaqalan ekoturlar təşkil edirik.',
     aboutTranslations: {
       en: 'GedəkGörək is a team specialized in professional mountaineering, hiking and camping tours in Azerbaijan. We organize safe, memorable eco-tours in harmony with nature.',
@@ -45,8 +49,7 @@ export const seedUsers: User[] = [
   {
     id: 'user-admin',
     name: 'Elnur Cəfərov',
-    email: 'admin@gedekgore.az',
-    password: 'admin123',
+    email: 'admin@gedekgorek.az',
     role: 'admin',
     phone: '+994 55 555 55 55',
     balance: 1450.0,
@@ -159,12 +162,14 @@ export const seedTours: Tour[] = [
     category: 'peak',
     difficulty: 'extreme',
     description: `Azərbaycanın ən möhtəşəm və ciddi dağ macəralarından birinə dəvət edirik! Tufandağ — ölkənin 4-cü ən yüksək zirvəsi. Buradan Bazardüzü, Şahdağ, Zəfər, Bazaryurd zirvələrini eyni anda izləmək mümkündür.\n\nXınalıq kəndindən 4x4 ilə Şahyaylağa qədər çıxırıq, oradan 6.4 km yürüşlə düşərgəyə (Tufan gölü yaxınlığı). Gecələmə çadırda, səhər zirvə hücumu (3.4 km).\n\n🔥 Çətinlik: Çətin (4.5–5/5)\n💰 Qiymət: 270 AZN\n⚠️ Maksimum 14 nəfər, sənədlər əvvəlcədən tələb olunur\n\n${NOTE}\n\n${CONTACT}`,
-    region: 'Qəbələ (Tufandağ)',
+    // Route runs via Khinalig/Shahyaylag (Quba side) per the description — not the Gabala
+    // ski-resort approach, so the region label must say Quba.
+    region: 'Quba (Xınalıq)',
     durationDays: 3,
     includes: ['Nəqliyyat (Bakı–Xınalıq–Bakı)', '4x4 transfer', 'Bütün icazələr (DSX, FHN, Milli Park)', 'Çadır (2–4 nəfərlik)', 'Qaz ocağı', 'İlk yardım', 'Peşəkar bələdçi', 'Zirvə sertifikatı'],
     vendorId: 'user-vendor-1',
     vendorName: 'GedəkGörək',
-    image: 'https://images.unsplash.com/photo-1544829099-b9a0c07fad1a?w=800&auto=format&fit=crop&q=80',
+    image: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&auto=format&fit=crop&q=80',
     isApproved: true, status: 'approved'
   },
   {
@@ -178,7 +183,7 @@ export const seedTours: Tour[] = [
     includes: ['Nəqliyyat (Bakı – Lahıc – Bakı)', 'Tibbi səyahət sığortası', 'Çay süfrəsi', 'Dağ bələdçisi'],
     vendorId: 'user-vendor-1',
     vendorName: 'GedəkGörək',
-    image: 'https://images.unsplash.com/photo-1454496522488-7a8e488e8606?w=800&auto=format&fit=crop&q=80',
+    image: 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=800&auto=format&fit=crop&q=80',
     isApproved: true, status: 'approved'
   },
   {
@@ -396,7 +401,7 @@ export const seedTours: Tour[] = [
     includes: ['Transport', 'Bələdçi', 'Çay süfrəsi'],
     vendorId: 'user-vendor-1',
     vendorName: 'GedəkGörək',
-    image: 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=800&auto=format&fit=crop&q=80',
+    image: 'https://images.unsplash.com/photo-1433086966358-54859d0ed716?w=800&auto=format&fit=crop&q=80',
     isApproved: true, status: 'approved'
   },
   {
@@ -410,7 +415,7 @@ export const seedTours: Tour[] = [
     includes: ['Bakı-Yardımlı (Nisəqala kəndi)-Bakı nəqliyyat', 'Dağ maşını', 'Dağ bələdçiləri', 'Cənub milli mətbəxi (Aş, toyuq ləvəngi, kompot, təndir çörəyi)', 'Çay süfrəsi'],
     vendorId: 'user-vendor-1',
     vendorName: 'GedəkGörək',
-    image: 'https://images.unsplash.com/photo-1473448912268-2022ce9509d8?w=800&auto=format&fit=crop&q=80',
+    image: 'https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=800&auto=format&fit=crop&q=80',
     isApproved: true, status: 'approved'
   },
   {
@@ -456,7 +461,7 @@ export const seedTours: Tour[] = [
     includes: ['Nəqliyyat (Bakı–Şamaxı–Bakı)', 'Dağ bələdçiləri', 'Milli parka giriş', 'Sendviçlər 🥪', 'Samovar çayı + şirniyyat 🍪'],
     vendorId: 'user-vendor-1',
     vendorName: 'GedəkGörək',
-    image: 'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=800&auto=format&fit=crop&q=80',
+    image: 'https://images.unsplash.com/photo-1470770841072-f978cf4d019e?w=800&auto=format&fit=crop&q=80',
     isApproved: true, status: 'approved'
   },
   {
@@ -524,7 +529,7 @@ export const seedTours: Tour[] = [
     includes: ['Komfortlu avtobus (Bakı – Hirkan MP – Bakı)', 'Milli park girişi', 'Çay süfrəsi', 'Dağ bələdçisi'],
     vendorId: 'user-vendor-1',
     vendorName: 'GedəkGörək',
-    image: 'https://images.unsplash.com/photo-1447752875215-b2761acb3c5d?w=800&auto=format&fit=crop&q=80',
+    image: 'https://images.unsplash.com/photo-1439066615861-d1af74d74000?w=800&auto=format&fit=crop&q=80',
     isApproved: true, status: 'approved'
   },
   {
@@ -628,7 +633,7 @@ export const seedTours: Tour[] = [
     includes: ['Nəqliyyat (Sprinter)', 'Sığorta', 'Milli park bileti', 'Hiking və göbələk təlimçisi', 'Bələdçi', 'Göl kənarında çay'],
     vendorId: 'user-vendor-1',
     vendorName: 'GedəkGörək',
-    image: 'https://images.unsplash.com/photo-1447752875215-b2761acb3c5d?w=800&auto=format&fit=crop&q=80',
+    image: 'https://images.unsplash.com/photo-1418065460487-3e41a6c84dc5?w=800&auto=format&fit=crop&q=80',
     isApproved: true, status: 'approved'
   },
   {
