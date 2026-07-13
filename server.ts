@@ -23,6 +23,21 @@ import {
   generateCaptchaChallenge,
   verifyCaptchaChallenge
 } from "./server/whatsapp.ts";
+import {
+  validateCampSiteSubmission,
+  findNearbyDuplicate,
+  insertCampSite,
+  rowToPublicCampSite,
+  rowToAdminCampSite,
+  normalizeAzPhone,
+  checkAndConsumeLookupRateLimit,
+  getContributorStats,
+  getCampPointsConfig,
+  isCampSitesEnabled,
+  listContributors,
+  setSetting,
+} from "./server/campSites.ts";
+import { parseBboxParam, getPoisForBbox } from "./server/overpass.ts";
 
 const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
@@ -642,6 +657,298 @@ app.post("/api/whatsapp/verify-number", async (req, res) => {
 });
 
 // ============================================================================
+// Camp Sites — community-submitted camp spots (public page + admin moderation)
+// and the contributor points/reward system keyed by normalized phone number.
+// ============================================================================
+
+// GET /api/camp-sites — public list of approved camp sites. Submitter is credited by first
+// name + surname initial only; the phone number never leaves the server on this endpoint.
+app.get("/api/camp-sites", async (req, res) => {
+  try {
+    // Feature switched off by admin → the public API acts as if no camp sites exist, which
+    // also blanks the camp layer on tour maps without any client-side changes.
+    if (!(await isCampSitesEnabled())) {
+      return res.json({ campSites: [] });
+    }
+    const rows = await dbClient.query(
+      `SELECT * FROM camp_sites WHERE status = 'approved' ORDER BY created_at DESC`
+    );
+    res.json({ campSites: rows.map(rowToPublicCampSite) });
+  } catch (error: any) {
+    console.error("[GET /api/camp-sites] error:", error);
+    res.status(500).json({ error: "Kamp yerlərini gətirmək mümkün olmadı." });
+  }
+});
+
+// GET /api/camp-sites/config — public points configuration (shown on the camp sites page:
+// "hər təsdiqlənən yer X xal, Y xala pulsuz tur").
+app.get("/api/camp-sites/config", async (req, res) => {
+  try {
+    const config = await getCampPointsConfig();
+    res.json({ ...config, enabled: await isCampSitesEnabled() });
+  } catch (error: any) {
+    console.error("[GET /api/camp-sites/config] error:", error);
+    res.status(500).json({ error: "Konfiqurasiya yüklənə bilmədi." });
+  }
+});
+
+// GET /api/camp-sites/points?phone=... — public contributor points lookup. Uses its own
+// (cheap, DB-only) rate limiter, not the WhatsApp one. Unknown phones get zeros rather than
+// 404 so the endpoint can't be used to enumerate which numbers have submitted sites.
+app.get("/api/camp-sites/points", async (req, res) => {
+  const normalized = normalizeAzPhone(String(req.query.phone || ""));
+  if (!normalized) {
+    return res.status(400).json({ error: "Zəhmət olmasa düzgün əlaqə nömrəsi daxil edin." });
+  }
+  const rate = checkAndConsumeLookupRateLimit(normalized);
+  if (!rate.allowed) {
+    return res.status(429).json({
+      error: "Çox sayda cəhd edildi. Zəhmət olmasa bir az sonra yenidən cəhd edin.",
+      retryAfterSec: rate.retryAfterSec,
+    });
+  }
+  try {
+    res.json(await getContributorStats(normalized));
+  } catch (error: any) {
+    console.error("[GET /api/camp-sites/points] error:", error);
+    res.status(500).json({ error: "Xallar yoxlanıla bilmədi." });
+  }
+});
+
+// POST /api/camp-sites — public submission (any visitor may propose a camp site). Same
+// abuse-protection flow as /api/whatsapp/verify-number: captcha (issued by GET
+// /api/whatsapp/captcha) + per-phone rate limiting, then validation and a nearby-duplicate
+// check before the row lands in the admin review queue as 'pending_approval'.
+app.post("/api/camp-sites", async (req, res) => {
+  if (!(await isCampSitesEnabled())) {
+    return res.status(403).json({ error: "Kamp yerləri bölməsi hazırda aktiv deyil." });
+  }
+  const body = req.body || {};
+  if (!body.captchaId || body.captchaAnswer === undefined || body.captchaAnswer === null || body.captchaAnswer === "") {
+    return res.status(400).json({ error: "Zəhmət olmasa təhlükəsizlik sualını cavablandırın." });
+  }
+  const captchaResult = verifyCaptchaChallenge(String(body.captchaId), Number(body.captchaAnswer));
+  if (captchaResult === "expired") {
+    return res.status(400).json({
+      error: "Təhlükəsizlik sualının vaxtı bitib. Yeni sual göndərildi — zəhmət olmasa onu cavablandırın.",
+      captchaFailed: true,
+      captchaExpired: true,
+    });
+  }
+  if (captchaResult === "wrong") {
+    return res.status(400).json({ error: "Təhlükəsizlik sualının cavabı yanlışdır. Zəhmət olmasa yenidən cəhd edin.", captchaFailed: true });
+  }
+
+  const submission = validateCampSiteSubmission(body);
+  if ("error" in submission) {
+    return res.status(400).json({ error: submission.error });
+  }
+
+  const rate = checkAndConsumeRateLimit(submission.submitterPhoneNormalized);
+  if (!rate.allowed) {
+    return res.status(429).json({
+      error: "Çox sayda cəhd edildi. Zəhmət olmasa bir az sonra yenidən cəhd edin.",
+      reason: rate.reason,
+      retryAfterSec: rate.retryAfterSec,
+    });
+  }
+
+  try {
+    if (await findNearbyDuplicate(submission)) {
+      return res.status(409).json({ error: "Bu nömrə ilə yaxınlıqda artıq bir kamp yeri təqdim edilib." });
+    }
+    const id = await insertCampSite(submission);
+    res.status(201).json({ success: true, id });
+  } catch (error: any) {
+    console.error("[POST /api/camp-sites] error:", error);
+    res.status(500).json({ error: "Kamp yeri göndərilə bilmədi." });
+  }
+});
+
+// GET /api/admin/camp-sites?status=... — full rows (incl. submitter phone) for moderation.
+app.get("/api/admin/camp-sites", authenticateUser, async (req: any, res) => {
+  if (req.operator.role !== 'admin') {
+    return res.status(403).json({ error: "Bu əməliyyat yalnız adminlər üçündür." });
+  }
+  try {
+    const status = typeof req.query.status === "string" ? req.query.status : null;
+    const rows = status
+      ? await dbClient.query(`SELECT * FROM camp_sites WHERE status = ? ORDER BY created_at DESC`, [status])
+      : await dbClient.query(`SELECT * FROM camp_sites ORDER BY created_at DESC`);
+    res.json({ campSites: rows.map(rowToAdminCampSite) });
+  } catch (error: any) {
+    console.error("[GET /api/admin/camp-sites] error:", error);
+    res.status(500).json({ error: "Kamp yerlərini gətirmək mümkün olmadı." });
+  }
+});
+
+// PUT /api/admin/camp-sites/:id — approve/reject, mirroring the tour moderation flow.
+// Approval stamps points_awarded with the CURRENT camp_points_per_site setting (a snapshot:
+// later setting changes never rewrite already-earned points) — but only when transitioning
+// from a non-approved status, so re-sending 'approved' can't double-award.
+app.put("/api/admin/camp-sites/:id", authenticateUser, async (req: any, res) => {
+  if (req.operator.role !== 'admin') {
+    return res.status(403).json({ error: "Bu əməliyyat yalnız adminlər üçündür." });
+  }
+  try {
+    const rows = await dbClient.query(`SELECT * FROM camp_sites WHERE id = ?`, [req.params.id]);
+    if (!rows.length) return res.status(404).json({ error: "Kamp yeri tapılmadı." });
+    const existing = rows[0];
+
+    const status = (req.body || {}).status;
+    if (status === 'approved') {
+      if (existing.status !== 'approved') {
+        const { pointsPerSite } = await getCampPointsConfig();
+        await dbClient.execute(
+          `UPDATE camp_sites SET status = 'approved', points_awarded = ?, approved_at = CURRENT_TIMESTAMP, rejection_reason = NULL WHERE id = ?`,
+          [pointsPerSite, req.params.id]
+        );
+      }
+    } else if (status === 'rejected') {
+      const reason = typeof (req.body || {}).rejectionReason === 'string' ? req.body.rejectionReason.trim() : '';
+      if (!reason) {
+        return res.status(400).json({ error: "Rədd etmək üçün səbəb qeyd edilməlidir." });
+      }
+      await dbClient.execute(
+        `UPDATE camp_sites SET status = 'rejected', points_awarded = 0, approved_at = NULL, rejection_reason = ? WHERE id = ?`,
+        [reason, req.params.id]
+      );
+    } else {
+      return res.status(400).json({ error: "Status 'approved' və ya 'rejected' olmalıdır." });
+    }
+
+    const updated = await dbClient.query(`SELECT * FROM camp_sites WHERE id = ?`, [req.params.id]);
+    res.json({ campSite: rowToAdminCampSite(updated[0]) });
+  } catch (error: any) {
+    console.error("[PUT /api/admin/camp-sites/:id] error:", error);
+    res.status(500).json({ error: "Kamp yeri yenilənə bilmədi." });
+  }
+});
+
+// DELETE /api/admin/camp-sites/:id — spam cleanup. Note: deleting an APPROVED site also
+// removes its points from the submitter (points are computed from approved rows).
+app.delete("/api/admin/camp-sites/:id", authenticateUser, async (req: any, res) => {
+  if (req.operator.role !== 'admin') {
+    return res.status(403).json({ error: "Bu əməliyyat yalnız adminlər üçündür." });
+  }
+  try {
+    const rows = await dbClient.query(`SELECT id FROM camp_sites WHERE id = ?`, [req.params.id]);
+    if (!rows.length) return res.status(404).json({ error: "Kamp yeri tapılmadı." });
+    await dbClient.execute(`DELETE FROM camp_sites WHERE id = ?`, [req.params.id]);
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error("[DELETE /api/admin/camp-sites/:id] error:", error);
+    res.status(500).json({ error: "Kamp yeri silinə bilmədi." });
+  }
+});
+
+// GET /api/admin/camp-contributors — points leaderboard with reward earned/redeemed counts.
+app.get("/api/admin/camp-contributors", authenticateUser, async (req: any, res) => {
+  if (req.operator.role !== 'admin') {
+    return res.status(403).json({ error: "Bu əməliyyat yalnız adminlər üçündür." });
+  }
+  try {
+    res.json({ contributors: await listContributors() });
+  } catch (error: any) {
+    console.error("[GET /api/admin/camp-contributors] error:", error);
+    res.status(500).json({ error: "İştirakçı siyahısı gətirilə bilmədi." });
+  }
+});
+
+// POST /api/admin/camp-rewards/redeem — records that an admin handed out one earned free-tour
+// reward (the tour itself is arranged offline by contacting the contributor).
+app.post("/api/admin/camp-rewards/redeem", authenticateUser, async (req: any, res) => {
+  if (req.operator.role !== 'admin') {
+    return res.status(403).json({ error: "Bu əməliyyat yalnız adminlər üçündür." });
+  }
+  const phoneNormalized = normalizeAzPhone(String((req.body || {}).phoneNormalized || ""));
+  if (!phoneNormalized) {
+    return res.status(400).json({ error: "Düzgün telefon nömrəsi tələb olunur." });
+  }
+  try {
+    const stats = await getContributorStats(phoneNormalized);
+    if (stats.rewardsAvailable <= 0) {
+      return res.status(400).json({ error: "Bu iştirakçının istifadə olunmamış mükafatı yoxdur." });
+    }
+    const note = typeof (req.body || {}).note === 'string' ? req.body.note.trim() : null;
+    await dbClient.execute(
+      `INSERT INTO camp_reward_redemptions (id, phone_normalized, note, admin_id) VALUES (?, ?, ?, ?)`,
+      [`redeem-${randomUUID()}`, phoneNormalized, note, req.operator.id]
+    );
+    res.json({ success: true, stats: await getContributorStats(phoneNormalized) });
+  } catch (error: any) {
+    console.error("[POST /api/admin/camp-rewards/redeem] error:", error);
+    res.status(500).json({ error: "Mükafat qeydə alına bilmədi." });
+  }
+});
+
+// GET/PUT /api/admin/settings — the server-persisted camp points configuration (unlike the
+// client-side localStorage platformConfig, these values are read by the server at approval).
+app.get("/api/admin/settings", authenticateUser, async (req: any, res) => {
+  if (req.operator.role !== 'admin') {
+    return res.status(403).json({ error: "Bu əməliyyat yalnız adminlər üçündür." });
+  }
+  try {
+    const { pointsPerSite, threshold } = await getCampPointsConfig();
+    res.json({
+      campPointsPerSite: pointsPerSite,
+      campRewardThreshold: threshold,
+      campSitesEnabled: await isCampSitesEnabled(),
+    });
+  } catch (error: any) {
+    console.error("[GET /api/admin/settings] error:", error);
+    res.status(500).json({ error: "Parametrlər yüklənə bilmədi." });
+  }
+});
+
+app.put("/api/admin/settings", authenticateUser, async (req: any, res) => {
+  if (req.operator.role !== 'admin') {
+    return res.status(403).json({ error: "Bu əməliyyat yalnız adminlər üçündür." });
+  }
+  const body = req.body || {};
+  const pointsPerSite = Number(body.campPointsPerSite);
+  const threshold = Number(body.campRewardThreshold);
+  if (!Number.isInteger(pointsPerSite) || pointsPerSite <= 0 || !Number.isInteger(threshold) || threshold <= 0) {
+    return res.status(400).json({ error: "Hər iki qiymət müsbət tam ədəd olmalıdır." });
+  }
+  if (body.campSitesEnabled !== undefined && typeof body.campSitesEnabled !== 'boolean') {
+    return res.status(400).json({ error: "campSitesEnabled true/false olmalıdır." });
+  }
+  try {
+    await setSetting('camp_points_per_site', String(pointsPerSite));
+    await setSetting('camp_reward_threshold', String(threshold));
+    if (body.campSitesEnabled !== undefined) {
+      await setSetting('camp_sites_enabled', body.campSitesEnabled ? 'true' : 'false');
+    }
+    res.json({
+      campPointsPerSite: pointsPerSite,
+      campRewardThreshold: threshold,
+      campSitesEnabled: await isCampSitesEnabled(),
+    });
+  } catch (error: any) {
+    console.error("[PUT /api/admin/settings] error:", error);
+    res.status(500).json({ error: "Parametrlər saxlanıla bilmədi." });
+  }
+});
+
+// GET /api/osm/pois?bbox=minLat,minLon,maxLat,maxLon — cached Overpass (OpenStreetMap) proxy
+// feeding the GPX map's POI layer (peaks, springs, waterfalls, shelters, camp sites…).
+// Proxied server-side so the browser never talks to community Overpass mirrors directly and
+// repeated views of the same route hit our 24h cache instead of Overpass.
+app.get("/api/osm/pois", async (req, res) => {
+  const bbox = parseBboxParam(req.query.bbox);
+  if (!bbox) {
+    return res.status(400).json({ error: "bbox parametri 'minLat,minLon,maxLat,maxLon' formatında və maksimum 1°×1° olmalıdır." });
+  }
+  try {
+    res.json({ pois: await getPoisForBbox(bbox) });
+  } catch (error: any) {
+    console.error("[GET /api/osm/pois] error:", error?.message || error);
+    res.status(502).json({ error: "OpenStreetMap məlumatları hazırda əlçatan deyil." });
+  }
+});
+
+// ============================================================================
 // Marketplace Core Data API — Tours / Slots / Bookings / Reviews
 // Backed by dbClient (server/db.ts), which talks to PostgreSQL when
 // DATABASE_URL is configured and falls back to local SQLite otherwise.
@@ -768,7 +1075,7 @@ app.get("/sitemap.xml", async (req, res) => {
     const rows = await dbClient.query(
       `SELECT slug FROM tours WHERE status = 'approved' AND slug IS NOT NULL AND slug != '' AND (is_active IS NULL OR is_active != false)`
     );
-    const staticPaths = ["", "/faq", "/calculator"];
+    const staticPaths = ["", "/faq", "/calculator", "/camp-sites"];
     const urls = [
       ...staticPaths.map((p) => `<url><loc>${SITE_URL}${p}</loc></url>`),
       ...rows.map((r: any) => `<url><loc>${SITE_URL}/tours/${r.slug}</loc></url>`),
@@ -1863,7 +2170,7 @@ async function startServer() {
   // Classify page navigations BEFORE the SPA fallbacks below: unknown routes (mistyped URLs,
   // deleted tour slugs) still render the SPA — whose router shows its NotFoundPage — but with
   // a real 404 status instead of a soft-404 (200 + HTML), which search engines would index.
-  const STATIC_CLIENT_ROUTES = new Set(['/', '/faq', '/calculator', '/wishlist', '/compare', '/vendor/login', '/admin/login']);
+  const STATIC_CLIENT_ROUTES = new Set(['/', '/faq', '/calculator', '/wishlist', '/compare', '/camp-sites', '/vendor/login', '/admin/login']);
   app.use(async (req, res, next) => {
     if (req.method !== 'GET') return next();
     // Only page navigations — assets (js/css/img) don't send an HTML accept header.

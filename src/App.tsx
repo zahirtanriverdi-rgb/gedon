@@ -27,6 +27,7 @@ import {
   Scale,
   Globe,
   Calculator,
+  Tent,
   BookOpen,
   Menu
 } from 'lucide-react';
@@ -79,6 +80,17 @@ export default function App() {
   // behind a single burger icon, since mobile header space only fits compare + wishlist
   // plus this one extra button.
   const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
+
+  // Admin-controlled feature flag (settings table, camp_sites_enabled): when off, the camp
+  // sites nav buttons disappear entirely. Defaults to false until the config loads so the
+  // button never flashes visible on installs where the admin has switched it off.
+  const [campSitesEnabled, setCampSitesEnabled] = useState<boolean>(false);
+  React.useEffect(() => {
+    fetch('/api/camp-sites/config')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => setCampSitesEnabled(!!data && data.enabled !== false))
+      .catch(() => setCampSitesEnabled(true)); // config endpoint down — don't hide the feature
+  }, []);
 
   const [loggedInVendor, setLoggedInVendor] = useState<User | null>(null);
   // JWT from /api/auth/operator/login — kept in memory only (not localStorage), matches
@@ -934,6 +946,17 @@ export default function App() {
                     </span>
                     <span className="hidden sm:block text-xs text-brand-text-main font-semibold whitespace-nowrap">{t('app.nav.calculator')}</span>
                   </button>
+                  {campSitesEnabled && (
+                    <button
+                      onClick={() => navigate('/camp-sites')}
+                      className="w-11 sm:w-auto sm:min-w-0 sm:px-2 h-16 sm:h-14 flex flex-col items-center justify-center gap-0.5 hover:text-emerald-600 transition group cursor-pointer bg-transparent border-none p-0"
+                    >
+                      <span className="w-11 h-8 sm:w-9 sm:h-7 flex items-center justify-center rounded-full transition-colors group-hover:bg-emerald-50">
+                        <Tent className="w-6 h-6 sm:w-5 sm:h-5 stroke-[2px] transition-all duration-150 group-hover:stroke-emerald-500 group-hover:scale-110" />
+                      </span>
+                      <span className="hidden sm:block text-xs text-brand-text-main font-semibold whitespace-nowrap">{t('app.nav.campSites')}</span>
+                    </button>
+                  )}
                   <div className="relative">
                     <button
                       ref={langMenu.buttonRef}
@@ -1039,6 +1062,14 @@ export default function App() {
                       >
                         <Calculator className="w-4 h-4" /> {t('app.nav.calculator')}
                       </button>
+                      {campSitesEnabled && (
+                        <button
+                          className="w-full text-left px-4 py-3 text-[13px] font-semibold text-slate-700 hover:bg-slate-50 transition-colors border-b border-slate-100 flex items-center gap-2"
+                          onClick={() => { navigate('/camp-sites'); setMobileMoreOpen(false); }}
+                        >
+                          <Tent className="w-4 h-4" /> {t('app.nav.campSites')}
+                        </button>
+                      )}
                       <div className="px-4 pt-2 pb-1 text-[10px] uppercase tracking-wide font-bold text-slate-400">
                         {t('app.nav.changeLangCurrency')}
                       </div>

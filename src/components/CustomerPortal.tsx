@@ -8,6 +8,7 @@ import { PriceCalculator } from './PriceCalculator';
 import { ImageLightbox } from './customer/ImageLightbox';
 import { WishlistView } from './customer/WishlistView';
 import { CompareView } from './customer/CompareView';
+import { CampSitesPage } from './customer/CampSitesPage';
 import { CompareSwapModal } from './tours/CompareSwapModal';
 import { ReviewSubmissionPanel } from './customer/ReviewSubmissionPanel';
 import { ToursHomeView } from './customer/ToursHomeView';
@@ -828,6 +829,11 @@ export default function CustomerPortal({
         />
 
         <Route path="/faq" element={<FAQPage onBack={() => navigate('/')} />} />
+
+        <Route
+          path="/camp-sites"
+          element={<CampSitesPage onBack={() => navigate('/')} onShowNotification={onShowNotification} />}
+        />
 
         <Route
           path="/calculator"

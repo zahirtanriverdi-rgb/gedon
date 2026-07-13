@@ -244,6 +244,87 @@ export async function initializeDatabase() {
     );
   `);
 
+  // Community-submitted camp sites (public submissions, admin-moderated like tours).
+  // `points_awarded` is a snapshot of the camp_points_per_site setting at approval time, so
+  // later changes to the setting never retroactively rewrite a contributor's earned points.
+  await dbClient.execute(`
+    CREATE TABLE IF NOT EXISTS camp_sites (
+      id VARCHAR(255) PRIMARY KEY,
+      name VARCHAR(255) NOT NULL,
+      description TEXT,
+      lat DECIMAL NOT NULL,
+      lon DECIMAL NOT NULL,
+      photos TEXT,
+      submitter_name VARCHAR(255) NOT NULL,
+      submitter_surname VARCHAR(255) NOT NULL,
+      submitter_phone VARCHAR(50) NOT NULL,
+      submitter_phone_normalized VARCHAR(20) NOT NULL,
+      status VARCHAR(20) DEFAULT 'pending_approval',
+      rejection_reason TEXT,
+      points_awarded INTEGER DEFAULT 0,
+      approved_at TIMESTAMP,
+      is_verified BOOLEAN DEFAULT false,
+      is_paid BOOLEAN DEFAULT false,
+      added_by_admin BOOLEAN DEFAULT false,
+      extra_data TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+  await dbClient.execute(
+    `CREATE INDEX IF NOT EXISTS idx_camp_sites_phone ON camp_sites(submitter_phone_normalized)`
+  );
+
+  // Migrations for camp_sites tables created before these columns existed:
+  // is_verified — "we camped here and checked it ourselves" badge, admin-set only;
+  // is_paid — paid vs free camp spot; added_by_admin — rows created straight from the admin
+  // panel (auto-approved, excluded from the contributor points system).
+  for (const alter of [
+    `ALTER TABLE camp_sites ADD COLUMN is_verified BOOLEAN DEFAULT false`,
+    `ALTER TABLE camp_sites ADD COLUMN is_paid BOOLEAN DEFAULT false`,
+    `ALTER TABLE camp_sites ADD COLUMN added_by_admin BOOLEAN DEFAULT false`,
+  ]) {
+    try {
+      await dbClient.execute(alter);
+    } catch {
+      // column already exists — safe to ignore
+    }
+  }
+
+  // A row per free-tour reward handed out by an admin; rewardsEarned is always computed live
+  // from points, so redemptions only ever add rows here (no counters to keep in sync).
+  await dbClient.execute(`
+    CREATE TABLE IF NOT EXISTS camp_reward_redemptions (
+      id VARCHAR(255) PRIMARY KEY,
+      phone_normalized VARCHAR(20) NOT NULL,
+      note TEXT,
+      admin_id VARCHAR(255),
+      redeemed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  // Server-side key-value settings. Unlike the client's localStorage platformConfig, these
+  // must live in the DB because the server itself reads them (e.g. stamping points_awarded
+  // on camp-site approval).
+  await dbClient.execute(`
+    CREATE TABLE IF NOT EXISTS settings (
+      key VARCHAR(100) PRIMARY KEY,
+      value TEXT NOT NULL
+    );
+  `);
+  const defaultSettings: Array<[string, string]> = [
+    ['camp_points_per_site', '10'],
+    ['camp_reward_threshold', '100'],
+    // Admin-toggleable feature flag: when 'false', the camp sites feature disappears from the
+    // customer side entirely (header nav, /camp-sites page, public API) — admin keeps access.
+    ['camp_sites_enabled', 'true'],
+  ];
+  for (const [key, value] of defaultSettings) {
+    const existing = await dbClient.query(`SELECT key FROM settings WHERE key = ?`, [key]);
+    if (existing.length === 0) {
+      await dbClient.execute(`INSERT INTO settings (key, value) VALUES (?, ?)`, [key, value]);
+    }
+  }
+
   console.log('[DB] Schema ready. Indexes created successfully.');
 
   await seedIfEmpty();

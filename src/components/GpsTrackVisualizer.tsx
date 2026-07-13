@@ -12,6 +12,7 @@ import {
   Move
 } from 'lucide-react';
 import maplibregl from 'maplibre-gl';
+import { createSatelliteStyle } from '../utils/mapStyles';
 import { useLanguage } from '../i18n/LanguageContext';
 
 /**
@@ -80,6 +81,63 @@ function computeBearingDeg(lat1: number, lon1: number, lat2: number, lon2: numbe
 function lerpBearing(current: number, target: number, t: number): number {
   const diff = ((target - current + 540) % 360) - 180;
   return (current + diff * t + 360) % 360;
+}
+
+// --- OSM POI / camp-site map layers ---------------------------------------------------------
+// Icon + label config per normalized POI `kind` returned by /api/osm/pois. Icons are tiny
+// inline SVGs turned into data URIs so no sprite sheet / external asset is needed. Labels
+// intentionally live in popups, not text layers — the shared satellite style has no `glyphs`
+// URL, so MapLibre text rendering isn't available on it.
+const POI_GLYPHS: Record<string, { color: string; glyph: string; labelKey: string }> = {
+  peak: { color: '#6D28D9', glyph: 'M6 18 L12 7 L18 18 Z', labelKey: 'campSites.map.kindPeak' },
+  spring: { color: '#0284C7', glyph: 'M12 5 C12 5 7 11 7 14.5 A5 5 0 0 0 17 14.5 C17 11 12 5 12 5 Z', labelKey: 'campSites.map.kindSpring' },
+  waterfall: { color: '#06B6D4', glyph: 'M12 5 C12 5 7 11 7 14.5 A5 5 0 0 0 17 14.5 C17 11 12 5 12 5 Z', labelKey: 'campSites.map.kindWaterfall' },
+  shelter: { color: '#A16207', glyph: 'M5 12 L12 6 L19 12 V18 H5 Z', labelKey: 'campSites.map.kindShelter' },
+  drinking_water: { color: '#2563EB', glyph: 'M12 5 C12 5 7 11 7 14.5 A5 5 0 0 0 17 14.5 C17 11 12 5 12 5 Z', labelKey: 'campSites.map.kindDrinkingWater' },
+  camp_site: { color: '#0D9488', glyph: 'M12 6 L19 18 H14.5 L12 13.5 L9.5 18 H5 Z', labelKey: 'campSites.map.kindCampSite' },
+  alpine_hut: { color: '#B45309', glyph: 'M5 12 L12 6 L19 12 V18 H5 Z', labelKey: 'campSites.map.kindAlpineHut' },
+  cave: { color: '#475569', glyph: 'M6 18 V13 A6 6 0 0 1 18 13 V18 H14 V14 A2 2 0 0 0 10 14 V18 Z', labelKey: 'campSites.map.kindCave' },
+  viewpoint: { color: '#059669', glyph: 'M12 5 L13.8 10.2 L19.3 10.3 L14.9 13.6 L16.5 18.8 L12 15.6 L7.5 18.8 L9.1 13.6 L4.7 10.3 L10.2 10.2 Z', labelKey: 'campSites.map.kindViewpoint' },
+};
+
+// Community camp sites from our own DB get a distinct Muted Gold tent icon.
+const DB_CAMP_ICON = { color: '#C28E46', glyph: 'M12 6 L19 18 H14.5 L12 13.5 L9.5 18 H5 Z' };
+
+function buildPoiIconSvg(color: string, glyph: string): string {
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="30" height="30" viewBox="0 0 30 30">
+    <circle cx="15" cy="15" r="13.5" fill="${color}" stroke="white" stroke-width="2.5"/>
+    <path d="${glyph}" transform="translate(3 3)" fill="white"/>
+  </svg>`;
+}
+
+/** Loads an inline SVG as a MapLibre style image (no-op if already registered). */
+function addSvgImageToMap(map: maplibregl.Map, id: string, svg: string): Promise<void> {
+  return new Promise((resolve) => {
+    if (map.hasImage(id)) return resolve();
+    const img = new Image(30, 30);
+    img.onload = () => {
+      try {
+        if (!map.hasImage(id)) map.addImage(id, img, { pixelRatio: 1 });
+      } catch {
+        // Map was torn down mid-load — nothing to register the image on.
+      }
+      resolve();
+    };
+    img.onerror = () => resolve();
+    img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+  });
+}
+
+/** Padded "minLat,minLon,maxLat,maxLon" bbox string for /api/osm/pois. */
+function bboxFromBounds(bounds: maplibregl.LngLatBounds, padDeg = 0.03): string {
+  const sw = bounds.getSouthWest();
+  const ne = bounds.getNorthEast();
+  const f = (n: number) => n.toFixed(5);
+  return `${f(sw.lat - padDeg)},${f(sw.lng - padDeg)},${f(ne.lat + padDeg)},${f(ne.lng + padDeg)}`;
+}
+
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 interface GpsTrackVisualizerProps {
@@ -158,6 +216,17 @@ interface GpsMapOverlayProps {
 const GpsMapOverlay: React.FC<GpsMapOverlayProps> = ({ parsed, onClose }) => {
   const { t } = useLanguage();
   const [mapMode, setMapMode] = useState<'3d' | '2d'>('3d');
+  // OSM data layers: route-surroundings POIs + our community camp sites are on by default;
+  // the waymarkedtrails hiking overlay is opt-in (it visually competes with the GPX line).
+  const [layerToggles, setLayerToggles] = useState<{ pois: boolean; camps: boolean; trails: boolean }>({
+    pois: true,
+    camps: true,
+    trails: false,
+  });
+  const layerTogglesRef = useRef(layerToggles);
+  useEffect(() => {
+    layerTogglesRef.current = layerToggles;
+  }, [layerToggles]);
   const [isPlaying, setIsPlaying] = useState<boolean>(true);
   const [playbackSpeed, setPlaybackSpeed] = useState<number>(2.0);
   const [isFollowing, setIsFollowing] = useState<boolean>(true);
@@ -308,32 +377,8 @@ const GpsMapOverlay: React.FC<GpsMapOverlayProps> = ({ parsed, onClose }) => {
     const coordinates = pathPoints.map(pt => [pt[1], pt[0]] as [number, number]);
     const startCoord = coordinates[0];
 
-    // High quality Satellite imagery tile layer config - Using high availability Google tiles to bypass sandbox CORS/referer blocks
-    const customSatelliteStyle: maplibregl.StyleSpecification = {
-      version: 8,
-      sources: {
-        'satellite-tiles': {
-          type: 'raster',
-          tiles: [
-            'https://mt0.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
-            'https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
-            'https://mt2.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
-            'https://mt3.google.com/vt/lyrs=s&x={x}&y={y}&z={z}'
-          ],
-          tileSize: 256,
-          attribution: 'Map data © Google Imagery'
-        }
-      },
-      layers: [
-        {
-          id: 'satellite',
-          type: 'raster',
-          source: 'satellite-tiles',
-          minzoom: 0,
-          maxzoom: 22
-        }
-      ]
-    };
+    // High quality Satellite imagery tile layer config (shared with the camp sites page)
+    const customSatelliteStyle = createSatelliteStyle();
 
     // Calculate bounding box to fit the route nicely
     const bounds = coordinates.reduce((acc, coord) => {
@@ -479,6 +524,153 @@ const GpsMapOverlay: React.FC<GpsMapOverlayProps> = ({ parsed, onClose }) => {
         }
       });
 
+      // OSM hiking-trails raster overlay (waymarkedtrails.org), inserted UNDER the GPX line
+      // so the orange route always stays on top. Hidden until toggled on.
+      map.addSource('waymarkedtrails', {
+        type: 'raster',
+        tiles: ['https://tile.waymarkedtrails.org/hiking/{z}/{x}/{y}.png'],
+        tileSize: 256,
+        attribution: '© Waymarked Trails, © OpenStreetMap contributors'
+      });
+      map.addLayer({
+        id: 'trails-layer',
+        type: 'raster',
+        source: 'waymarkedtrails',
+        layout: { visibility: layerTogglesRef.current.trails ? 'visible' : 'none' },
+        paint: { 'raster-opacity': 0.85 }
+      }, 'route-line');
+
+      // Route-surroundings POIs (peaks, springs, waterfalls, shelters…) via our cached
+      // Overpass proxy, and approved community camp sites from our own DB. Both are fetched
+      // only when the overlay is open, and any failure is silent — the map must keep working.
+      const addPoiLayers = async () => {
+        const bbox = bboxFromBounds(bounds);
+
+        try {
+          const res = await fetch(`/api/osm/pois?bbox=${bbox}`);
+          if (res.ok && mapRef.current) {
+            const data = await res.json();
+            const pois: Array<{ id: number; kind: string; name: string; lat: number; lon: number; ele?: number }> =
+              Array.isArray(data.pois) ? data.pois : [];
+            const known = pois.filter((p) => POI_GLYPHS[p.kind]);
+            if (known.length > 0) {
+              await Promise.all(
+                Array.from(new Set(known.map((p) => p.kind))).map((kind) =>
+                  addSvgImageToMap(map, `poi-${kind}`, buildPoiIconSvg(POI_GLYPHS[kind].color, POI_GLYPHS[kind].glyph))
+                )
+              );
+              if (!mapRef.current) return;
+              map.addSource('osm-pois', {
+                type: 'geojson',
+                data: {
+                  type: 'FeatureCollection',
+                  features: known.map((p) => ({
+                    type: 'Feature' as const,
+                    properties: { kind: p.kind, name: p.name, ele: p.ele ?? null },
+                    geometry: { type: 'Point' as const, coordinates: [p.lon, p.lat] },
+                  })),
+                },
+              });
+              map.addLayer({
+                id: 'osm-pois-layer',
+                type: 'symbol',
+                source: 'osm-pois',
+                layout: {
+                  'icon-image': ['concat', 'poi-', ['get', 'kind']],
+                  'icon-size': 0.85,
+                  'icon-allow-overlap': false,
+                  visibility: layerTogglesRef.current.pois ? 'visible' : 'none',
+                },
+              });
+              map.on('click', 'osm-pois-layer', (e) => {
+                const feature = e.features && e.features[0];
+                if (!feature) return;
+                const props: any = feature.properties || {};
+                const kindLabel = POI_GLYPHS[props.kind] ? t(POI_GLYPHS[props.kind].labelKey) : props.kind;
+                const eleLine = props.ele ? `<div style="font-size:11px;color:#64748b;">${escapeHtml(t('campSites.map.elevation', { ele: Math.round(Number(props.ele)) }))}</div>` : '';
+                new maplibregl.Popup({ closeButton: true, offset: 14 })
+                  .setLngLat((feature.geometry as any).coordinates)
+                  .setHTML(
+                    `<div style="font-family:inherit;color:#0f172a;min-width:120px;">
+                      <div style="font-weight:800;font-size:13px;">${escapeHtml(props.name || kindLabel)}</div>
+                      <div style="font-size:11px;color:#0369a1;font-weight:700;">${escapeHtml(kindLabel)}</div>
+                      ${eleLine}
+                    </div>`
+                  )
+                  .addTo(map);
+              });
+              map.on('mouseenter', 'osm-pois-layer', () => { map.getCanvas().style.cursor = 'pointer'; });
+              map.on('mouseleave', 'osm-pois-layer', () => { map.getCanvas().style.cursor = ''; });
+            }
+          }
+        } catch {
+          // Overpass proxy unavailable — POI layer is simply absent.
+        }
+
+        try {
+          const res = await fetch('/api/camp-sites');
+          if (res.ok && mapRef.current) {
+            const data = await res.json();
+            const sites: Array<{ id: string; name: string; description: string; lat: number; lon: number }> =
+              Array.isArray(data.campSites) ? data.campSites : [];
+            // Keep only camps near this route's bbox (padded a bit wider than the POI one).
+            const sw = bounds.getSouthWest();
+            const ne = bounds.getNorthEast();
+            const pad = 0.1;
+            const nearby = sites.filter(
+              (s) => s.lat >= sw.lat - pad && s.lat <= ne.lat + pad && s.lon >= sw.lng - pad && s.lon <= ne.lng + pad
+            );
+            if (nearby.length > 0) {
+              await addSvgImageToMap(map, 'db-camp-icon', buildPoiIconSvg(DB_CAMP_ICON.color, DB_CAMP_ICON.glyph));
+              if (!mapRef.current) return;
+              map.addSource('db-camp-sites', {
+                type: 'geojson',
+                data: {
+                  type: 'FeatureCollection',
+                  features: nearby.map((s) => ({
+                    type: 'Feature' as const,
+                    properties: { name: s.name, description: s.description || '' },
+                    geometry: { type: 'Point' as const, coordinates: [s.lon, s.lat] },
+                  })),
+                },
+              });
+              map.addLayer({
+                id: 'db-camps-layer',
+                type: 'symbol',
+                source: 'db-camp-sites',
+                layout: {
+                  'icon-image': 'db-camp-icon',
+                  'icon-size': 1,
+                  'icon-allow-overlap': true,
+                  visibility: layerTogglesRef.current.camps ? 'visible' : 'none',
+                },
+              });
+              map.on('click', 'db-camps-layer', (e) => {
+                const feature = e.features && e.features[0];
+                if (!feature) return;
+                const props: any = feature.properties || {};
+                const desc = String(props.description || '').slice(0, 160);
+                new maplibregl.Popup({ closeButton: true, offset: 14 })
+                  .setLngLat((feature.geometry as any).coordinates)
+                  .setHTML(
+                    `<div style="font-family:inherit;color:#0f172a;min-width:130px;max-width:220px;">
+                      <div style="font-weight:800;font-size:13px;">${escapeHtml(props.name || '')}</div>
+                      <div style="font-size:11px;color:#C28E46;font-weight:700;">${escapeHtml(t('campSites.map.communityCamp'))}</div>
+                      ${desc ? `<div style="font-size:11px;color:#64748b;margin-top:2px;">${escapeHtml(desc)}</div>` : ''}
+                    </div>`
+                  )
+                  .addTo(map);
+              });
+              map.on('mouseenter', 'db-camps-layer', () => { map.getCanvas().style.cursor = 'pointer'; });
+              map.on('mouseleave', 'db-camps-layer', () => { map.getCanvas().style.cursor = ''; });
+            }
+          }
+        } catch {
+          // Camp sites API unavailable — layer is simply absent.
+        }
+      };
+      addPoiLayers();
+
       // Create custom elegant active hiker pin elements (Walking hiker silhouette look)
       const el = document.createElement('div');
       el.className = 'relative flex flex-col items-center justify-center';
@@ -611,6 +803,29 @@ const GpsMapOverlay: React.FC<GpsMapOverlayProps> = ({ parsed, onClose }) => {
     };
   }, [mapMode]);
 
+  // Flip OSM layer visibility when the user toggles the pills. Layers are created
+  // asynchronously inside the load handler, so each id is guarded — a toggle before the
+  // fetch resolves is still honored because the layer is created with layerTogglesRef's
+  // current value as its initial visibility.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const mapping: Array<[string, boolean]> = [
+      ['osm-pois-layer', layerToggles.pois],
+      ['db-camps-layer', layerToggles.camps],
+      ['trails-layer', layerToggles.trails],
+    ];
+    for (const [layerId, visible] of mapping) {
+      try {
+        if (map.getLayer(layerId)) {
+          map.setLayoutProperty(layerId, 'visibility', visible ? 'visible' : 'none');
+        }
+      } catch {
+        // Style not ready yet — the layer picks up the ref value when it's created.
+      }
+    }
+  }, [layerToggles]);
+
   // Real-time animation playback loop (Single-source dependency ticks, uninterrupted)
   useEffect(() => {
     if (!isPlaying) return;
@@ -732,6 +947,32 @@ const GpsMapOverlay: React.FC<GpsMapOverlayProps> = ({ parsed, onClose }) => {
 
         {/* Map Canvas */}
         <div ref={mapContainerRef} className="w-full h-full text-slate-900" style={{ outline: 'none' }} />
+
+        {/* TOP-LEFT: OSM layer toggle pills (POIs / community camps / hiking trails) */}
+        <div className="absolute top-4 left-4 z-[30] flex flex-col gap-1.5">
+          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-950/70 border border-white/15 rounded-full backdrop-blur-md text-[10px] font-black uppercase tracking-wider text-slate-300">
+            <Layers className="w-3.5 h-3.5 text-sky-400" />
+            {t('campSites.map.layers')}
+          </div>
+          {([
+            ['pois', t('campSites.map.layerPois')],
+            ['camps', t('campSites.map.layerCamps')],
+            ['trails', t('campSites.map.layerTrails')],
+          ] as Array<['pois' | 'camps' | 'trails', string]>).map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setLayerToggles((prev) => ({ ...prev, [key]: !prev[key] }))}
+              className={`px-3 py-1.5 rounded-full text-[10px] font-bold border backdrop-blur-md transition cursor-pointer text-left ${
+                layerToggles[key]
+                  ? 'bg-sky-600/90 border-sky-400/50 text-white'
+                  : 'bg-slate-950/60 border-white/15 text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
 
         {/* ORBIT JOYSTICK: drag the knob to rotate/tilt the camera around the hiker marker */}
         <div

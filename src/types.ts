@@ -194,3 +194,53 @@ export interface PriceCalculatorConfig {
 export interface PlatformConfig {
   priceCalculatorConfig: PriceCalculatorConfig;
 }
+
+export type CampSiteStatus = 'pending_approval' | 'approved' | 'rejected';
+
+// Public shape returned by GET /api/camp-sites — submitter is credited as "Name S."
+// and the contact phone never reaches the client.
+export interface CampSite {
+  id: string;
+  name: string;
+  description: string;
+  lat: number;
+  lon: number;
+  photos: string[]; // base64 data URLs
+  submitterName: string;
+  createdAt: string;
+}
+
+// Admin shape (GET /api/admin/camp-sites) — full submitter details for moderation.
+export interface AdminCampSite extends CampSite {
+  submitterSurname: string;
+  submitterPhone: string;
+  submitterPhoneNormalized: string;
+  status: CampSiteStatus;
+  rejectionReason?: string;
+  pointsAwarded: number;
+  approvedAt?: string;
+}
+
+// GET /api/camp-sites/points response — a contributor's points standing.
+export interface CampContributorStats {
+  points: number;
+  approvedCount: number;
+  pointsPerSite: number;
+  threshold: number;
+  rewardsEarned: number;
+  rewardsRedeemed: number;
+  rewardsAvailable: number;
+  pointsToNextReward: number;
+}
+
+// One row of GET /api/admin/camp-contributors.
+export interface CampContributor {
+  phoneNormalized: string;
+  submitterName: string;
+  submitterSurname: string;
+  approvedCount: number;
+  points: number;
+  rewardsEarned: number;
+  rewardsRedeemed: number;
+  rewardsAvailable: number;
+}

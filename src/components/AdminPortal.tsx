@@ -4,6 +4,7 @@ import { TourForm } from './vendor/TourForm';
 import { InternationalTourForm } from './vendor/InternationalTourForm';
 import { useLanguage } from '../i18n/LanguageContext';
 import DashboardSidebarLayout, { DashboardNavItem } from './layout/DashboardSidebarLayout';
+import AdminCampSites from './admin/AdminCampSites';
 import StatCard from './layout/StatCard';
 import LanguageSwitcher from './LanguageSwitcher';
 import {
@@ -27,7 +28,8 @@ import {
   LayoutDashboard,
   Compass,
   Building2,
-  Settings
+  Settings,
+  Tent
 } from 'lucide-react';
 
 function isTourInternational(t: Tour): boolean {
@@ -138,7 +140,7 @@ export default function AdminPortal({
   onLogout
 }: AdminPortalProps) {
   const { t } = useLanguage();
-  const [activeSection, setActiveSection] = useState<'dashboard' | 'tours' | 'vendors' | 'settings'>('dashboard');
+  const [activeSection, setActiveSection] = useState<'dashboard' | 'tours' | 'vendors' | 'campSites' | 'settings'>('dashboard');
 
   // Price calculator cost elements (destinations + rates) — editable draft, synced from
   // platformConfig whenever it changes elsewhere, saved explicitly via the button below.
@@ -416,6 +418,7 @@ export default function AdminPortal({
     { id: 'dashboard', label: t('adminPortal.sidebar.dashboard'), icon: LayoutDashboard },
     { id: 'tours', label: t('adminPortal.sidebar.tours'), icon: Compass },
     { id: 'vendors', label: t('adminPortal.sidebar.vendors'), icon: Building2 },
+    { id: 'campSites', label: t('adminPortal.sidebar.campSites'), icon: Tent },
     { id: 'settings', label: t('adminPortal.sidebar.settings'), icon: Settings },
   ];
   const activeNavItem = navItems.find((item) => item.id === activeSection);
@@ -498,6 +501,10 @@ export default function AdminPortal({
         </div>
       </div>
       </>
+      )}
+
+      {activeSection === 'campSites' && (
+        <AdminCampSites authToken={authToken} onShowNotification={onShowNotification} />
       )}
 
       {activeSection === 'settings' && (

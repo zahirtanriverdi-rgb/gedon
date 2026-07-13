@@ -2,6 +2,7 @@ import { common } from './common';
 import { app } from './app';
 import { customerHome } from './customerHome';
 import { customerMisc } from './customerMisc';
+import { campSites } from './campSites';
 import { tourDetailPage } from './tourDetailPage';
 import { adminPortal } from './adminPortal';
 import { vendorTourForms } from './vendorTourForms';
@@ -16,6 +17,7 @@ const namespaces = [
   app,
   customerHome,
   customerMisc,
+  campSites,
   tourDetailPage,
   adminPortal,
   vendorTourForms,
