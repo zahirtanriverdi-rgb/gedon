@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { BASE_URL } from './testUtils';
+import { BASE_URL, adminLogin } from './testUtils';
 
 describe('GET /api/bookings', () => {
   // Bookings carry customer names and phone numbers, so this must not be public.
@@ -9,12 +9,7 @@ describe('GET /api/bookings', () => {
   });
 
   it('returns 200 with a bookings array for an authenticated admin', async () => {
-    const loginRes = await fetch(`${BASE_URL}/api/auth/admin/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'admin@gedekgore.az', password: 'changeme123' }),
-    });
-    const { token } = await loginRes.json();
+    const { token } = await adminLogin();
     const res = await fetch(`${BASE_URL}/api/bookings`, { headers: { Authorization: `Bearer ${token}` } });
     expect(res.status).toBe(200);
     const data = await res.json();

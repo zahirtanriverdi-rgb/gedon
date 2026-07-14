@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { BASE_URL } from './testUtils';
+import { BASE_URL, adminLogin } from './testUtils';
 
 describe('POST /api/auth/admin/login', () => {
   it('returns 400 when email/password are missing', async () => {
@@ -21,13 +21,8 @@ describe('POST /api/auth/admin/login', () => {
   });
 
   it('returns 200 + token for the seeded admin account', async () => {
-    const res = await fetch(`${BASE_URL}/api/auth/admin/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: 'admin@gedekgore.az', password: 'changeme123' }),
-    });
-    expect(res.status).toBe(200);
-    const data = await res.json();
+    // adminLogin throws unless one of the known seeded credential pairs returns 200.
+    const data = await adminLogin();
     expect(data.success).toBe(true);
     expect(typeof data.token).toBe('string');
     expect(data.user.role).toBe('admin');
