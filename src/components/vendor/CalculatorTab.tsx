@@ -26,7 +26,9 @@ const OFFROAD_TYPES: OffroadVehicleType[] = ['niva', 'uaz', 'gaz66'];
 
 export function CalculatorTab({ tours, slots, currentUser, operatorToken, onUserUpdated, onShowNotification }: CalculatorTabProps) {
   const { t } = useLanguage();
-  const config = currentUser.calculatorConfig || DEFAULT_GUIDE_CALCULATOR_CONFIG;
+  // Merge (not replace) over the defaults — a config saved before a new rate field existed
+  // would otherwise leave that field `undefined` and turn every total into NaN.
+  const config = { ...DEFAULT_GUIDE_CALCULATOR_CONFIG, ...(currentUser.calculatorConfig || {}) };
 
   const [tourId, setTourId] = useState('');
   const [slotId, setSlotId] = useState('');
