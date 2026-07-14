@@ -34,30 +34,56 @@ export interface User {
   calculatorConfig?: GuideCalculatorConfig; // Admin-tuned per vendor; falls back to DEFAULT_GUIDE_CALCULATOR_CONFIG when unset
 }
 
+// Guide day-rates are tiered by the tour's own `category` (always set, unlike the old
+// altitude-based approach which needed a manual field vendors often left empty). Tours with
+// category 'active' or 'international' fall back to the hiking tier.
+export type OffroadVehicleType = 'niva' | 'uaz' | 'gaz66';
+
 export interface GuideCalculatorConfig {
-  baseGuideDailyRate: number; // AZN/day paid to the main guide on tours up to altitudeThreshold
-  assistantGuideDailyRate: number; // AZN/day paid to the assistant guide on tours up to altitudeThreshold
-  highAltitudeBaseGuideDailyRate: number; // AZN/day paid to the main guide on tours above altitudeThreshold
-  highAltitudeAssistantGuideDailyRate: number; // AZN/day paid to the assistant guide on tours above altitudeThreshold
-  altitudeThreshold: number; // Meters — tours with maxAltitude above this use the high-altitude rates
-  secondBonusMultiplier: number; // Second bonus = participant count x this multiplier
+  hikingBaseGuideDailyRate: number; // AZN/day, main guide, hiking-tier tours
+  hikingAssistantGuideDailyRate: number; // AZN/day, assistant guide, hiking-tier tours
+  campBaseGuideDailyRate: number; // AZN/day, main guide, camp-tier tours
+  campAssistantGuideDailyRate: number; // AZN/day, assistant guide, camp-tier tours
+  peakBaseGuideDailyRate: number; // AZN/day, main guide, peak/zirvə-tier tours
+  peakAssistantGuideDailyRate: number; // AZN/day, assistant guide, peak/zirvə-tier tours
+  mainGuideSecondBonusMultiplier: number; // Main guide's second bonus = participant count x this multiplier
+  assistantGuideSecondBonusMultiplier: number; // Assistant guide's second bonus = participant count x this multiplier
+  nivaPrice: number; // AZN per Niva used
+  uazPrice: number; // AZN per UAZ used
+  gaz66Price: number; // AZN per Gaz-66 used
+  sandwichLunchPrice: number; // AZN/person — sandwich lunch
+  villageHouseLunchPrice: number; // AZN/person — village house ("kənd evi") lunch
+  villageHouseTeaPrice: number; // AZN/person — village house tea table ("çay süfrəsi")
 }
 
 export const DEFAULT_GUIDE_CALCULATOR_CONFIG: GuideCalculatorConfig = {
-  baseGuideDailyRate: 40,
-  assistantGuideDailyRate: 30,
-  highAltitudeBaseGuideDailyRate: 60,
-  highAltitudeAssistantGuideDailyRate: 50,
-  altitudeThreshold: 2500,
-  secondBonusMultiplier: 1.5,
+  hikingBaseGuideDailyRate: 40,
+  hikingAssistantGuideDailyRate: 30,
+  campBaseGuideDailyRate: 40,
+  campAssistantGuideDailyRate: 30,
+  peakBaseGuideDailyRate: 60,
+  peakAssistantGuideDailyRate: 50,
+  mainGuideSecondBonusMultiplier: 1.5,
+  assistantGuideSecondBonusMultiplier: 1.5,
+  nivaPrice: 80,
+  uazPrice: 100,
+  gaz66Price: 150,
+  sandwichLunchPrice: 4,
+  villageHouseLunchPrice: 15,
+  villageHouseTeaPrice: 5,
 };
 
+// A transport record (bus, offroad vehicle, or any other vehicle) sent to a tour. Visible to
+// every vendor on the platform (shared list), but only the vendor who created a record may
+// edit or delete it — enforced server-side, not just hidden in the UI.
 export interface VendorBus {
   id: string;
   vendorId: string;
+  vendorName?: string; // Snapshot of the adding vendor's name/company, shown since the list is shared
   tourId?: string;
   tourName: string; // Snapshot of the tour name at the time the record was made
-  busName: string; // Bus identifier/description (plate, company, etc.)
+  plateNumber: string; // Mandatory vehicle registration/plate number
+  vehicleDescription?: string; // Optional extra detail (company, vehicle type, etc.)
   price: number; // In AZN
   travelDate: string; // ISO date string
   createdAt?: string;
@@ -90,7 +116,6 @@ export interface Tour {
   region: string;
   durationDays: number;
   durationHours?: number;
-  maxAltitude?: number; // Highest point of the route, in meters — drives the high-altitude guide rate tier in the vendor calculator (see GuideCalculatorConfig.altitudeThreshold)
   departureDateTime?: string; // ISO datetime string — trip's departure date & time
   returnDateTime?: string; // ISO datetime string — trip's return-to-Baku date & time; durationHours is derived from (returnDateTime - departureDateTime) when both are set
   includes: string[];

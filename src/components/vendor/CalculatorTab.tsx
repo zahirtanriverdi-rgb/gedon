@@ -1,17 +1,30 @@
 import React, { useEffect, useState } from 'react';
-import { Tour, TourSlot, User, DEFAULT_GUIDE_CALCULATOR_CONFIG } from '../../types';
+import { Tour, TourCategory, TourSlot, User, GuideCalculatorConfig, OffroadVehicleType, DEFAULT_GUIDE_CALCULATOR_CONFIG } from '../../types';
 import { useLanguage } from '../../i18n/LanguageContext';
-import { Calculator, Mountain, Save } from 'lucide-react';
+import { Calculator, Tags, Settings, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface CalculatorTabProps {
   tours: Tour[];
   slots: TourSlot[];
   currentUser: User;
-  onEditTour?: (updatedTour: Tour) => Promise<void>;
+  operatorToken?: string | null;
+  onUserUpdated?: (updatedUser: User) => void;
   onShowNotification?: (message: string, type?: 'success' | 'info' | 'error' | 'warning') => void;
 }
 
-export function CalculatorTab({ tours, slots, currentUser, onEditTour, onShowNotification }: CalculatorTabProps) {
+// Guide rate tier is derived from the tour's own category — always set, unlike the old
+// altitude-based approach which needed a manual field vendors often left empty. 'active' and
+// 'international' tours fall back to the hiking tier.
+type GuideTier = 'hiking' | 'camp' | 'peak';
+function tierForCategory(category: TourCategory): GuideTier {
+  if (category === 'peak') return 'peak';
+  if (category === 'camp') return 'camp';
+  return 'hiking';
+}
+
+const OFFROAD_TYPES: OffroadVehicleType[] = ['niva', 'uaz', 'gaz66'];
+
+export function CalculatorTab({ tours, slots, currentUser, operatorToken, onUserUpdated, onShowNotification }: CalculatorTabProps) {
   const { t } = useLanguage();
   const config = currentUser.calculatorConfig || DEFAULT_GUIDE_CALCULATOR_CONFIG;
 
@@ -20,11 +33,18 @@ export function CalculatorTab({ tours, slots, currentUser, onEditTour, onShowNot
   const [participants, setParticipants] = useState<number | ''>('');
   const [pricePerPerson, setPricePerPerson] = useState<number | ''>('');
   const [busPrice, setBusPrice] = useState<number | ''>('');
+  const [offroadType, setOffroadType] = useState<OffroadVehicleType | ''>('');
+  const [offroadQty, setOffroadQty] = useState<number | ''>('');
+  const [offroadUnitPrice, setOffroadUnitPrice] = useState<number | ''>('');
+  const [sandwichPrice, setSandwichPrice] = useState<number | ''>('');
+  const [villageLunchPrice, setVillageLunchPrice] = useState<number | ''>('');
+  const [villageTeaPrice, setVillageTeaPrice] = useState<number | ''>('');
   const [additionalBonus, setAdditionalBonus] = useState<number | ''>('');
-  const [altitudeInput, setAltitudeInput] = useState<number | ''>('');
-  const [saveAltitude, setSaveAltitude] = useState(false);
   const [netGuideTotalOverride, setNetGuideTotalOverride] = useState<number | null>(null);
-  const [savingAltitude, setSavingAltitude] = useState(false);
+
+  const [ratesOpen, setRatesOpen] = useState(false);
+  const [rateDraft, setRateDraft] = useState<GuideCalculatorConfig>(config);
+  const [savingRates, setSavingRates] = useState(false);
 
   const myTours = tours.filter(tr => tr.vendorId === currentUser.id);
   const selectedTour = myTours.find(tr => tr.id === tourId);
@@ -34,16 +54,8 @@ export function CalculatorTab({ tours, slots, currentUser, onEditTour, onShowNot
   useEffect(() => {
     setSlotId('');
     setNetGuideTotalOverride(null);
-    setSaveAltitude(false);
-    if (selectedTour) {
-      setParticipants('');
-      setPricePerPerson(selectedTour.price !== undefined ? selectedTour.price : '');
-      setAltitudeInput(selectedTour.maxAltitude !== undefined ? selectedTour.maxAltitude : '');
-    } else {
-      setParticipants('');
-      setPricePerPerson('');
-      setAltitudeInput('');
-    }
+    setParticipants('');
+    setPricePerPerson(selectedTour?.price !== undefined ? selectedTour.price : '');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tourId]);
 
@@ -56,6 +68,13 @@ export function CalculatorTab({ tours, slots, currentUser, onEditTour, onShowNot
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slotId]);
 
+  useEffect(() => {
+    if (!offroadType) { setOffroadUnitPrice(''); return; }
+    const priceKey = offroadType === 'niva' ? 'nivaPrice' : offroadType === 'uaz' ? 'uazPrice' : 'gaz66Price';
+    setOffroadUnitPrice(config[priceKey]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [offroadType]);
+
   if (!currentUser.calculatorEnabled) {
     return (
       <div className="bg-white p-8 rounded-xl border border-slate-200 text-center space-y-2">
@@ -66,36 +85,35 @@ export function CalculatorTab({ tours, slots, currentUser, onEditTour, onShowNot
   }
 
   const durationDays = selectedTour?.durationDays || 1;
-  const altitudeKnown = selectedTour?.maxAltitude !== undefined;
-  const effectiveAltitude = altitudeKnown ? selectedTour!.maxAltitude! : (altitudeInput === '' ? undefined : Number(altitudeInput));
-  const isHighAltitude = effectiveAltitude !== undefined && effectiveAltitude > config.altitudeThreshold;
-
-  const mainGuideRate = isHighAltitude ? config.highAltitudeBaseGuideDailyRate : config.baseGuideDailyRate;
-  const assistantGuideRate = isHighAltitude ? config.highAltitudeAssistantGuideDailyRate : config.assistantGuideDailyRate;
+  const tier: GuideTier = selectedTour ? tierForCategory(selectedTour.category) : 'hiking';
+  const mainGuideRate = tier === 'peak' ? config.peakBaseGuideDailyRate : tier === 'camp' ? config.campBaseGuideDailyRate : config.hikingBaseGuideDailyRate;
+  const assistantGuideRate = tier === 'peak' ? config.peakAssistantGuideDailyRate : tier === 'camp' ? config.campAssistantGuideDailyRate : config.hikingAssistantGuideDailyRate;
   const mainGuidePayment = mainGuideRate * durationDays;
   const assistantGuidePayment = assistantGuideRate * durationDays;
   const participantsNum = participants === '' ? 0 : Number(participants);
-  const secondBonus = participantsNum * config.secondBonusMultiplier;
+  // Main and assistant guide are different people — each gets their own second bonus, computed
+  // from their own multiplier, not a shared pool.
+  const mainGuideSecondBonus = participantsNum * config.mainGuideSecondBonusMultiplier;
+  const assistantGuideSecondBonus = participantsNum * config.assistantGuideSecondBonusMultiplier;
   const additionalBonusNum = additionalBonus === '' ? 0 : Number(additionalBonus);
-  const computedGuideTotal = mainGuidePayment + assistantGuidePayment + secondBonus + additionalBonusNum;
+  const mainGuideTotal = mainGuidePayment + mainGuideSecondBonus;
+  const assistantGuideTotal = assistantGuidePayment + assistantGuideSecondBonus;
+  const computedGuideTotal = mainGuideTotal + assistantGuideTotal + additionalBonusNum;
   const netGuideTotal = netGuideTotalOverride !== null ? netGuideTotalOverride : computedGuideTotal;
+
   const pricePerPersonNum = pricePerPerson === '' ? 0 : Number(pricePerPerson);
   const busPriceNum = busPrice === '' ? 0 : Number(busPrice);
-  const collected = participantsNum * pricePerPersonNum;
-  const netIncome = collected - busPriceNum - netGuideTotal;
+  const offroadQtyNum = offroadQty === '' ? 0 : Number(offroadQty);
+  const offroadUnitPriceNum = offroadUnitPrice === '' ? 0 : Number(offroadUnitPrice);
+  const offroadTotal = offroadType ? offroadQtyNum * offroadUnitPriceNum : 0;
+  const sandwichTotal = (sandwichPrice === '' ? 0 : Number(sandwichPrice)) * participantsNum;
+  const villageLunchTotal = (villageLunchPrice === '' ? 0 : Number(villageLunchPrice)) * participantsNum;
+  const villageTeaTotal = (villageTeaPrice === '' ? 0 : Number(villageTeaPrice)) * participantsNum;
+  const foodTotal = sandwichTotal + villageLunchTotal + villageTeaTotal;
+  const otherCostsTotal = busPriceNum + offroadTotal + foodTotal;
 
-  const handleSaveAltitude = async () => {
-    if (!selectedTour || !onEditTour || altitudeInput === '') return;
-    setSavingAltitude(true);
-    try {
-      await onEditTour({ ...selectedTour, maxAltitude: Number(altitudeInput) });
-      if (onShowNotification) onShowNotification(t('vendorCalculator.altitude.saveSuccess'), 'success');
-    } catch {
-      if (onShowNotification) onShowNotification(t('vendorCalculator.altitude.saveError'), 'error');
-    } finally {
-      setSavingAltitude(false);
-    }
-  };
+  const collected = participantsNum * pricePerPersonNum;
+  const netIncome = collected - otherCostsTotal - netGuideTotal;
 
   const numberInput = (value: number | '', onChange: (v: number | '') => void, extraProps: React.InputHTMLAttributes<HTMLInputElement> = {}) => (
     <input
@@ -107,14 +125,121 @@ export function CalculatorTab({ tours, slots, currentUser, onEditTour, onShowNot
     />
   );
 
+  const tierBadgeClass = tier === 'peak' ? 'bg-red-100 text-red-800' : tier === 'camp' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800';
+  const tierLabel = tier === 'peak' ? t('vendorCalculator.tier.peak') : tier === 'camp' ? t('vendorCalculator.tier.camp') : t('vendorCalculator.tier.hiking');
+
+  const openRates = () => {
+    if (ratesOpen) { setRatesOpen(false); return; }
+    setRateDraft(config);
+    setRatesOpen(true);
+  };
+
+  const rateNumberField = (label: string, key: keyof GuideCalculatorConfig) => (
+    <div>
+      <label className="block text-[10px] font-bold text-slate-400 mb-1">{label}</label>
+      <input
+        type="number"
+        step="0.1"
+        value={rateDraft[key]}
+        onChange={(e) => setRateDraft(prev => ({ ...prev, [key]: Number(e.target.value) }))}
+        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+      />
+    </div>
+  );
+
+  const handleSaveRates = async () => {
+    setSavingRates(true);
+    try {
+      const response = await fetch(`/api/users/${currentUser.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(operatorToken ? { Authorization: `Bearer ${operatorToken}` } : {}),
+        },
+        body: JSON.stringify({ calculatorConfig: rateDraft }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error);
+      if (onUserUpdated && data.user) onUserUpdated(data.user);
+      if (onShowNotification) onShowNotification(t('vendorCalculator.rates.saveSuccess'), 'success');
+      setRatesOpen(false);
+    } catch {
+      if (onShowNotification) onShowNotification(t('vendorCalculator.rates.saveError'), 'error');
+    } finally {
+      setSavingRates(false);
+    }
+  };
+
+  const resultRow = (label: string, value: number, bold = false) => (
+    <div className="flex justify-between border-b border-slate-700 pb-1.5">
+      <span className="text-slate-400">{label}</span>
+      <span className={bold ? 'font-black' : 'font-bold'}>{value.toFixed(2)} AZN</span>
+    </div>
+  );
+
   return (
     <div className="space-y-6">
       <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
-        <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-          <Calculator className="w-4 h-4 text-emerald-700" />
-          {t('vendorCalculator.header.title')}
-        </h3>
-        <p className="text-xs text-slate-500 mt-1">{t('vendorCalculator.header.subtitle')}</p>
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div>
+            <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+              <Calculator className="w-4 h-4 text-emerald-700" />
+              {t('vendorCalculator.header.title')}
+            </h3>
+            <p className="text-xs text-slate-500 mt-1">{t('vendorCalculator.header.subtitle')}</p>
+          </div>
+          <button
+            type="button"
+            onClick={openRates}
+            className="font-bold min-h-[36px] px-3 flex items-center gap-1.5 justify-center rounded-lg text-xs transition border bg-white hover:bg-slate-100 text-slate-700 border-slate-200"
+          >
+            <Settings className="w-3.5 h-3.5" />
+            {t('vendorCalculator.rates.editButton')}
+            {ratesOpen ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+          </button>
+        </div>
+
+        {ratesOpen && (
+          <div className="mt-4 pt-4 border-t border-slate-200 space-y-4">
+            <div>
+              <h4 className="text-[10px] font-bold text-slate-500 mb-2 uppercase tracking-wide">{t('vendorCalculator.rates.guideRatesTitle')}</h4>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                {rateNumberField(t('vendorCalculator.rates.hikingBase'), 'hikingBaseGuideDailyRate')}
+                {rateNumberField(t('vendorCalculator.rates.hikingAssistant'), 'hikingAssistantGuideDailyRate')}
+                {rateNumberField(t('vendorCalculator.rates.campBase'), 'campBaseGuideDailyRate')}
+                {rateNumberField(t('vendorCalculator.rates.campAssistant'), 'campAssistantGuideDailyRate')}
+                {rateNumberField(t('vendorCalculator.rates.peakBase'), 'peakBaseGuideDailyRate')}
+                {rateNumberField(t('vendorCalculator.rates.peakAssistant'), 'peakAssistantGuideDailyRate')}
+                {rateNumberField(t('vendorCalculator.rates.mainGuideBonusMultiplier'), 'mainGuideSecondBonusMultiplier')}
+                {rateNumberField(t('vendorCalculator.rates.assistantGuideBonusMultiplier'), 'assistantGuideSecondBonusMultiplier')}
+              </div>
+            </div>
+            <div>
+              <h4 className="text-[10px] font-bold text-slate-500 mb-2 uppercase tracking-wide">{t('vendorCalculator.rates.offroadRatesTitle')}</h4>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                {rateNumberField(t('vendorCalculator.rates.nivaPrice'), 'nivaPrice')}
+                {rateNumberField(t('vendorCalculator.rates.uazPrice'), 'uazPrice')}
+                {rateNumberField(t('vendorCalculator.rates.gaz66Price'), 'gaz66Price')}
+              </div>
+            </div>
+            <div>
+              <h4 className="text-[10px] font-bold text-slate-500 mb-2 uppercase tracking-wide">{t('vendorCalculator.rates.foodRatesTitle')}</h4>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                {rateNumberField(t('vendorCalculator.rates.sandwichPrice'), 'sandwichLunchPrice')}
+                {rateNumberField(t('vendorCalculator.rates.villageLunchPrice'), 'villageHouseLunchPrice')}
+                {rateNumberField(t('vendorCalculator.rates.villageTeaPrice'), 'villageHouseTeaPrice')}
+              </div>
+            </div>
+            <button
+              type="button"
+              disabled={savingRates}
+              onClick={handleSaveRates}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold min-h-[36px] px-4 flex items-center justify-center rounded-lg text-xs transition disabled:opacity-50"
+            >
+              {t('vendorCalculator.rates.saveButton')}
+            </button>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-5">
           <div className="space-y-1.5">
@@ -153,47 +278,16 @@ export function CalculatorTab({ tours, slots, currentUser, onEditTour, onShowNot
 
       {tourId && (
         <>
-          {/* Altitude */}
+          {/* Category-derived guide rate tier */}
           <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
             <h4 className="text-xs font-bold text-slate-700 flex items-center gap-2 mb-3">
-              <Mountain className="w-4 h-4 text-emerald-700" />
-              {t('vendorCalculator.altitude.label')}
+              <Tags className="w-4 h-4 text-emerald-700" />
+              {t('vendorCalculator.tier.label')}
             </h4>
-            {altitudeKnown ? (
-              <div className="flex items-center gap-3">
-                <span className="text-lg font-bold text-slate-800">{selectedTour!.maxAltitude} {t('vendorCalculator.altitude.unit')}</span>
-                <span className={`text-[10px] font-bold px-2 py-1 rounded ${isHighAltitude ? 'bg-red-100 text-red-800' : 'bg-emerald-100 text-emerald-800'}`}>
-                  {isHighAltitude ? t('vendorCalculator.altitude.peakTier', { threshold: config.altitudeThreshold }) : t('vendorCalculator.altitude.hikingTier', { threshold: config.altitudeThreshold })}
-                </span>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-2">{t('vendorCalculator.altitude.missingNotice')}</p>
-                <div className="flex flex-wrap items-center gap-2">
-                  <div className="w-32">{numberInput(altitudeInput, setAltitudeInput, { min: 0 })}</div>
-                  <span className="text-xs text-slate-500">{t('vendorCalculator.altitude.unit')}</span>
-                  {altitudeInput !== '' && (
-                    isHighAltitude
-                      ? <span className="text-[10px] font-bold px-2 py-1 rounded bg-red-100 text-red-800">{t('vendorCalculator.altitude.peakTier', { threshold: config.altitudeThreshold })}</span>
-                      : <span className="text-[10px] font-bold px-2 py-1 rounded bg-emerald-100 text-emerald-800">{t('vendorCalculator.altitude.hikingTier', { threshold: config.altitudeThreshold })}</span>
-                  )}
-                  {onEditTour && (
-                    <button
-                      type="button"
-                      disabled={altitudeInput === '' || savingAltitude}
-                      onClick={handleSaveAltitude}
-                      className="text-[10px] font-bold flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 disabled:opacity-50"
-                    >
-                      <Save className="w-3 h-3" />
-                      {t('vendorCalculator.altitude.saveToTour')}
-                    </button>
-                  )}
-                </div>
-              </div>
-            )}
+            <span className={`text-xs font-bold px-3 py-1.5 rounded-lg ${tierBadgeClass}`}>{tierLabel}</span>
           </div>
 
-          {/* Inputs */}
+          {/* Core inputs */}
           <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1.5">
@@ -213,7 +307,10 @@ export function CalculatorTab({ tours, slots, currentUser, onEditTour, onShowNot
                 {numberInput(busPrice, setBusPrice, { min: 0 })}
               </div>
               <div className="space-y-1.5">
-                <label className="block text-xs font-semibold text-slate-700">{t('vendorCalculator.inputs.additionalBonusLabel')}</label>
+                <label className="block text-xs font-semibold text-slate-700">
+                  {t('vendorCalculator.inputs.additionalBonusLabel')}
+                  <span className="block text-[10px] font-normal text-slate-400">{t('vendorCalculator.inputs.additionalBonusHint')}</span>
+                </label>
                 {numberInput(additionalBonus, setAdditionalBonus, { min: 0 })}
               </div>
               <div className="space-y-1.5">
@@ -226,34 +323,127 @@ export function CalculatorTab({ tours, slots, currentUser, onEditTour, onShowNot
             </div>
           </div>
 
-          {/* Results */}
-          <div className="bg-slate-900 text-white p-5 rounded-xl shadow-xs space-y-3">
-            <h4 className="text-xs font-bold tracking-widest text-slate-300">{t('vendorCalculator.results.title')}</h4>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
-              <div className="flex justify-between border-b border-slate-700 pb-1.5">
+          {/* Offroad */}
+          <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
+            <h4 className="text-xs font-bold text-slate-700 mb-3">{t('vendorCalculator.offroad.title')}</h4>
+            <div className="flex flex-wrap gap-2 mb-3">
+              {OFFROAD_TYPES.map(vt => (
+                <button
+                  key={vt}
+                  type="button"
+                  onClick={() => setOffroadType(offroadType === vt ? '' : vt)}
+                  className={`text-xs font-bold px-3 py-2 rounded-lg border transition ${
+                    offroadType === vt
+                      ? 'bg-emerald-600 text-white border-emerald-600'
+                      : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  {t(`vendorCalculator.offroad.${vt}`)}
+                </button>
+              ))}
+            </div>
+            {offroadType && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-semibold text-slate-700">{t('vendorCalculator.offroad.quantityLabel')}</label>
+                  {numberInput(offroadQty, setOffroadQty, { min: 0 })}
+                </div>
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-semibold text-slate-700">{t('vendorCalculator.offroad.unitPriceLabel')}</label>
+                  {numberInput(offroadUnitPrice, setOffroadUnitPrice, { min: 0 })}
+                </div>
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-semibold text-slate-700">{t('vendorCalculator.offroad.totalLabel')}</label>
+                  <div className="w-full bg-slate-100 text-slate-700 p-2.5 text-xs rounded-xl font-bold">{offroadTotal.toFixed(2)} AZN</div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Food */}
+          <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
+            <h4 className="text-xs font-bold text-slate-700 mb-3">{t('vendorCalculator.food.title')}</h4>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-1.5">
+                <label className="block text-xs font-semibold text-slate-700">{t('vendorCalculator.food.sandwichLabel')}</label>
+                {numberInput(sandwichPrice, setSandwichPrice, { min: 0 })}
+              </div>
+              <div className="space-y-1.5">
+                <label className="block text-xs font-semibold text-slate-700">{t('vendorCalculator.food.villageLunchLabel')}</label>
+                {numberInput(villageLunchPrice, setVillageLunchPrice, { min: 0 })}
+              </div>
+              <div className="space-y-1.5">
+                <label className="block text-xs font-semibold text-slate-700">{t('vendorCalculator.food.villageTeaLabel')}</label>
+                {numberInput(villageTeaPrice, setVillageTeaPrice, { min: 0 })}
+              </div>
+            </div>
+          </div>
+
+          {/* Results — clear "who gets how much" breakdown */}
+          <div className="bg-slate-900 text-white p-5 rounded-xl shadow-xs space-y-5">
+            <div>
+              <h4 className="text-xs font-bold tracking-widest text-slate-300 mb-2">{t('vendorCalculator.results.guidesTitle')}</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                <div className="bg-slate-800 rounded-lg p-3 space-y-1.5">
+                  <div className="flex justify-between text-slate-400">
+                    <span>{t('vendorCalculator.results.mainGuideBaseLabel')}</span>
+                    <span>{mainGuidePayment.toFixed(2)} AZN</span>
+                  </div>
+                  <div className="flex justify-between text-slate-400">
+                    <span>{t('vendorCalculator.results.mainGuideBonusLabel')}</span>
+                    <span>{mainGuideSecondBonus.toFixed(2)} AZN</span>
+                  </div>
+                  <div className="flex justify-between items-center pt-1.5 border-t border-slate-700">
+                    <span className="font-bold">{t('vendorCalculator.results.mainGuidePaymentLabel')}</span>
+                    <span className="font-black">{mainGuideTotal.toFixed(2)} AZN</span>
+                  </div>
+                </div>
+                <div className="bg-slate-800 rounded-lg p-3 space-y-1.5">
+                  <div className="flex justify-between text-slate-400">
+                    <span>{t('vendorCalculator.results.assistantGuideBaseLabel')}</span>
+                    <span>{assistantGuidePayment.toFixed(2)} AZN</span>
+                  </div>
+                  <div className="flex justify-between text-slate-400">
+                    <span>{t('vendorCalculator.results.assistantGuideBonusLabel')}</span>
+                    <span>{assistantGuideSecondBonus.toFixed(2)} AZN</span>
+                  </div>
+                  <div className="flex justify-between items-center pt-1.5 border-t border-slate-700">
+                    <span className="font-bold">{t('vendorCalculator.results.assistantGuidePaymentLabel')}</span>
+                    <span className="font-black">{assistantGuideTotal.toFixed(2)} AZN</span>
+                  </div>
+                </div>
+              </div>
+              {additionalBonusNum > 0 && resultRow(t('vendorCalculator.inputs.additionalBonusLabel'), additionalBonusNum)}
+              <div className="flex justify-between items-center pt-2">
+                <span className="text-xs font-bold text-slate-300">{t('vendorCalculator.results.guideTotalLabel')}</span>
+                <span className="text-sm font-black">{netGuideTotal.toFixed(2)} AZN</span>
+              </div>
+            </div>
+
+            <div className="pt-3 border-t border-slate-700">
+              <h4 className="text-xs font-bold tracking-widest text-slate-300 mb-2">{t('vendorCalculator.results.otherCostsTitle')}</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                {resultRow(t('vendorCalculator.results.busCostLabel'), busPriceNum)}
+                {offroadType && resultRow(t('vendorCalculator.results.offroadCostLabel'), offroadTotal)}
+                {sandwichTotal > 0 && resultRow(t('vendorCalculator.food.sandwichLabel'), sandwichTotal)}
+                {villageLunchTotal > 0 && resultRow(t('vendorCalculator.food.villageLunchLabel'), villageLunchTotal)}
+                {villageTeaTotal > 0 && resultRow(t('vendorCalculator.food.villageTeaLabel'), villageTeaTotal)}
+              </div>
+              <div className="flex justify-between items-center pt-2">
+                <span className="text-xs font-bold text-slate-300">{t('vendorCalculator.results.otherCostsTotalLabel')}</span>
+                <span className="text-sm font-black">{otherCostsTotal.toFixed(2)} AZN</span>
+              </div>
+            </div>
+
+            <div className="pt-3 border-t border-slate-700 space-y-2">
+              <div className="flex justify-between text-xs">
                 <span className="text-slate-400">{t('vendorCalculator.results.collectedLabel')}</span>
                 <span className="font-bold">{collected.toFixed(2)} AZN</span>
               </div>
-              <div className="flex justify-between border-b border-slate-700 pb-1.5">
-                <span className="text-slate-400">{t('vendorCalculator.results.mainGuidePaymentLabel')}</span>
-                <span className="font-bold">{mainGuidePayment.toFixed(2)} AZN</span>
+              <div className="flex justify-between items-center pt-2">
+                <span className="text-sm font-bold text-emerald-300">{t('vendorCalculator.results.netIncomeLabel')}</span>
+                <span className="text-xl font-black text-emerald-300">{netIncome.toFixed(2)} AZN</span>
               </div>
-              <div className="flex justify-between border-b border-slate-700 pb-1.5">
-                <span className="text-slate-400">{t('vendorCalculator.results.assistantGuidePaymentLabel')}</span>
-                <span className="font-bold">{assistantGuidePayment.toFixed(2)} AZN</span>
-              </div>
-              <div className="flex justify-between border-b border-slate-700 pb-1.5">
-                <span className="text-slate-400">{t('vendorCalculator.results.secondBonusLabel', { multiplier: config.secondBonusMultiplier })}</span>
-                <span className="font-bold">{secondBonus.toFixed(2)} AZN</span>
-              </div>
-              <div className="flex justify-between border-b border-slate-700 pb-1.5">
-                <span className="text-slate-400">{t('vendorCalculator.results.guideTotalLabel')}</span>
-                <span className="font-bold">{netGuideTotal.toFixed(2)} AZN</span>
-              </div>
-            </div>
-            <div className="flex justify-between items-center pt-2">
-              <span className="text-sm font-bold text-emerald-300">{t('vendorCalculator.results.netIncomeLabel')}</span>
-              <span className="text-xl font-black text-emerald-300">{netIncome.toFixed(2)} AZN</span>
             </div>
           </div>
         </>

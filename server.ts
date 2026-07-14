@@ -384,6 +384,10 @@ app.put("/api/users/:id", authenticateUser, async (req: any, res) => {
     let extra: Record<string, any> = {};
     try { extra = existingRow.extra_data ? JSON.parse(existingRow.extra_data) : {}; } catch { extra = {}; }
     if (body.guides !== undefined) extra.guides = body.guides;
+    // Rate values (day rates, offroad/food unit prices) are self-service: a vendor tunes their
+    // own numbers same as admin can. Whether the calculator/bus-tracking tab exists at all stays
+    // an admin-only call below — a vendor can't turn the feature on for themselves.
+    if ((isAdmin || isSelf) && body.calculatorConfig !== undefined) extra.calculatorConfig = body.calculatorConfig;
 
     let username = existingRow.username;
     let passwordHash = existingRow.password_hash;
@@ -396,7 +400,6 @@ app.put("/api/users/:id", authenticateUser, async (req: any, res) => {
       if (body.isManuallyDeactivated !== undefined) isManuallyDeactivated = !!body.isManuallyDeactivated;
       if (body.calculatorEnabled !== undefined) extra.calculatorEnabled = !!body.calculatorEnabled;
       if (body.busTrackingEnabled !== undefined) extra.busTrackingEnabled = !!body.busTrackingEnabled;
-      if (body.calculatorConfig !== undefined) extra.calculatorConfig = body.calculatorConfig;
     }
 
     // Changing the email — whether the owner edits their own profile or an admin edits it for
@@ -1976,16 +1979,20 @@ app.delete("/api/bookings/:id", authenticateUser, async (req: any, res) => {
   }
 });
 
-// Vendor bus tracking — CRUD for "which bus we sent to which tour departure, and at what cost".
-// Admin-gated per vendor via users.extra_data.busTrackingEnabled (see PUT /api/users/:id);
-// only the owning vendor may write, admin may read across all vendors.
+// Vendor transport tracking — CRUD for "which vehicle we sent to which tour departure, and at
+// what cost". Admin-gated per vendor via users.extra_data.busTrackingEnabled (see
+// PUT /api/users/:id). The list is shared: every vendor can read every record (so operators can
+// see what's already booked platform-wide), but only the owning vendor may write/edit/delete
+// their own rows — enforced below, not just hidden client-side.
 function rowToVendorBus(row: any) {
   return {
     id: row.id,
     vendorId: row.vendor_id,
+    vendorName: row.vendor_name || undefined,
     tourId: row.tour_id || undefined,
     tourName: row.tour_name,
-    busName: row.bus_name,
+    plateNumber: row.plate_number || '',
+    vehicleDescription: row.bus_name || undefined,
     price: Number(row.price) || 0,
     travelDate: row.travel_date,
     createdAt: row.created_at,
@@ -2010,8 +2017,8 @@ app.get("/api/vendor-buses", authenticateUser, async (req: any, res) => {
     const params: any[] = [];
 
     if (user.role === 'vendor') {
-      conditions.push('vendor_id = ?');
-      params.push(user.id);
+      // Shared list — every vendor sees every vendor's transport records (so operators can see
+      // what's already booked platform-wide). Writes stay owner-scoped in POST/PUT/DELETE below.
     } else if (user.role === 'admin') {
       if (req.query.vendorId) { conditions.push('vendor_id = ?'); params.push(String(req.query.vendorId)); }
     } else {
@@ -2037,16 +2044,19 @@ app.post("/api/vendor-buses", authenticateUser, async (req: any, res) => {
     }
 
     const body = req.body || {};
-    const { tourName, busName, price, travelDate } = body;
-    if (!tourName || !busName || price === undefined || !travelDate) {
-      return res.status(400).json({ error: "Zəhmət olmasa bütün məcburi sahələri doldurun (tourName, busName, price, travelDate)." });
+    const { tourName, plateNumber, price, travelDate } = body;
+    if (!tourName || !plateNumber || price === undefined || !travelDate) {
+      return res.status(400).json({ error: "Zəhmət olmasa bütün məcburi sahələri doldurun (tourName, plateNumber, price, travelDate)." });
     }
+
+    const vendorRows = await dbClient.query('SELECT name, company_name FROM users WHERE id = ?', [req.operator.id]);
+    const vendorName = vendorRows.length ? (vendorRows[0].company_name || vendorRows[0].name) : undefined;
 
     const id = `bus-${randomUUID()}`;
     await dbClient.execute(
-      `INSERT INTO vendor_buses (id, vendor_id, tour_id, tour_name, bus_name, price, travel_date)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [id, req.operator.id, body.tourId || null, tourName, busName, Number(price), travelDate]
+      `INSERT INTO vendor_buses (id, vendor_id, vendor_name, tour_id, tour_name, plate_number, bus_name, price, travel_date)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, req.operator.id, vendorName || null, body.tourId || null, tourName, plateNumber, body.vehicleDescription || null, Number(price), travelDate]
     );
 
     const rows = await dbClient.query('SELECT * FROM vendor_buses WHERE id = ?', [id]);
@@ -2069,13 +2079,18 @@ app.put("/api/vendor-buses/:id", authenticateUser, async (req: any, res) => {
     const body = req.body || {};
     const tourId = body.tourId !== undefined ? body.tourId : existing.tour_id;
     const tourName = body.tourName !== undefined ? body.tourName : existing.tour_name;
-    const busName = body.busName !== undefined ? body.busName : existing.bus_name;
+    const plateNumber = body.plateNumber !== undefined ? body.plateNumber : existing.plate_number;
+    const vehicleDescription = body.vehicleDescription !== undefined ? body.vehicleDescription : existing.bus_name;
     const price = body.price !== undefined ? Number(body.price) : Number(existing.price);
     const travelDate = body.travelDate !== undefined ? body.travelDate : existing.travel_date;
 
+    if (!plateNumber) {
+      return res.status(400).json({ error: "Nömrə mütləq daxil edilməlidir." });
+    }
+
     await dbClient.execute(
-      `UPDATE vendor_buses SET tour_id = ?, tour_name = ?, bus_name = ?, price = ?, travel_date = ? WHERE id = ?`,
-      [tourId || null, tourName, busName, price, travelDate, req.params.id]
+      `UPDATE vendor_buses SET tour_id = ?, tour_name = ?, plate_number = ?, bus_name = ?, price = ?, travel_date = ? WHERE id = ?`,
+      [tourId || null, tourName, plateNumber, vehicleDescription || null, price, travelDate, req.params.id]
     );
 
     const rows = await dbClient.query('SELECT * FROM vendor_buses WHERE id = ?', [req.params.id]);

@@ -1,11 +1,12 @@
-// Admin "Vendors" section — per-vendor calculator/bus-tracking toggles, rate config editor,
-// and the read-only cross-vendor bus records view (AdminVendorCalculator.tsx).
+// Admin "Vendors" section — per-vendor calculator/bus-tracking on/off toggles, and the
+// read-only cross-vendor bus records view (AdminVendorCalculator.tsx). Rate numbers themselves
+// are self-service on the vendor side (see vendorCalculator.ts "rates" — CalculatorTab.tsx).
 export const adminVendorTools = {
   az: {
     adminVendorTools: {
       section: {
         title: 'Bələdçi Kalkulyatoru və Avtobus İzləmə',
-        description: 'Vendorlar üçün kalkulyator və avtobus izləmə funksiyalarını aktiv/deaktiv edin, qiymət parametrlərini tənzimləyin.',
+        description: 'Vendorlar üçün kalkulyator və avtobus izləmə funksiyalarını aktiv/deaktiv edin. Qiymətləri hər vendor öz panelindən özü tənzimləyir.',
       },
       vendorRow: {
         calculatorLabel: 'Kalkulyator',
@@ -14,20 +15,6 @@ export const adminVendorTools = {
         disable: 'Deaktiv et',
         enabledBadge: 'Aktiv',
         disabledBadge: 'Deaktiv',
-        editRates: 'Qiymətləri tənzimlə',
-        hideRates: 'Bağla',
-      },
-      rateConfig: {
-        title: 'Bələdçi Qiymət Parametrləri — {{name}}',
-        baseGuideDailyRateLabel: 'Əsas bələdçi (AZN/gün)',
-        assistantGuideDailyRateLabel: 'Köməkçi bələdçi (AZN/gün)',
-        highAltitudeBaseGuideDailyRateLabel: 'Əsas bələdçi — zirvə (AZN/gün)',
-        highAltitudeAssistantGuideDailyRateLabel: 'Köməkçi bələdçi — zirvə (AZN/gün)',
-        altitudeThresholdLabel: 'Zirvə həddi (metr)',
-        secondBonusMultiplierLabel: 'İkinci bonus əmsalı',
-        saveButton: 'Yadda saxla',
-        saveSuccess: 'Qiymət parametrləri yadda saxlanıldı.',
-        saveError: 'Qiymət parametrləri yadda saxlanıla bilmədi.',
       },
       busRecords: {
         title: 'Avtobus Qeydləri',
@@ -53,7 +40,7 @@ export const adminVendorTools = {
     adminVendorTools: {
       section: {
         title: 'Guide Calculator & Bus Tracking',
-        description: 'Enable/disable the calculator and bus-tracking features per vendor, and tune rate settings.',
+        description: 'Enable/disable the calculator and bus-tracking features per vendor. Vendors tune their own rates from their own panel.',
       },
       vendorRow: {
         calculatorLabel: 'Calculator',
@@ -62,20 +49,6 @@ export const adminVendorTools = {
         disable: 'Disable',
         enabledBadge: 'Enabled',
         disabledBadge: 'Disabled',
-        editRates: 'Edit rates',
-        hideRates: 'Close',
-      },
-      rateConfig: {
-        title: 'Guide Rate Settings — {{name}}',
-        baseGuideDailyRateLabel: 'Main guide (AZN/day)',
-        assistantGuideDailyRateLabel: 'Assistant guide (AZN/day)',
-        highAltitudeBaseGuideDailyRateLabel: 'Main guide — peak (AZN/day)',
-        highAltitudeAssistantGuideDailyRateLabel: 'Assistant guide — peak (AZN/day)',
-        altitudeThresholdLabel: 'Peak threshold (meters)',
-        secondBonusMultiplierLabel: 'Second bonus multiplier',
-        saveButton: 'Save',
-        saveSuccess: 'Rate settings saved.',
-        saveError: 'Could not save rate settings.',
       },
       busRecords: {
         title: 'Bus Records',
@@ -101,7 +74,7 @@ export const adminVendorTools = {
     adminVendorTools: {
       section: {
         title: 'Калькулятор гида и учёт автобусов',
-        description: 'Включайте/выключайте калькулятор и учёт автобусов для каждого вендора, настраивайте тарифы.',
+        description: 'Включайте/выключайте калькулятор и учёт автобусов для каждого вендора. Тарифы вендоры настраивают сами в своей панели.',
       },
       vendorRow: {
         calculatorLabel: 'Калькулятор',
@@ -110,20 +83,6 @@ export const adminVendorTools = {
         disable: 'Выключить',
         enabledBadge: 'Включено',
         disabledBadge: 'Выключено',
-        editRates: 'Настроить тарифы',
-        hideRates: 'Закрыть',
-      },
-      rateConfig: {
-        title: 'Настройки тарифов гида — {{name}}',
-        baseGuideDailyRateLabel: 'Основной гид (AZN/день)',
-        assistantGuideDailyRateLabel: 'Помощник гида (AZN/день)',
-        highAltitudeBaseGuideDailyRateLabel: 'Основной гид — вершина (AZN/день)',
-        highAltitudeAssistantGuideDailyRateLabel: 'Помощник гида — вершина (AZN/день)',
-        altitudeThresholdLabel: 'Порог высоты вершины (метры)',
-        secondBonusMultiplierLabel: 'Коэффициент второго бонуса',
-        saveButton: 'Сохранить',
-        saveSuccess: 'Настройки тарифов сохранены.',
-        saveError: 'Не удалось сохранить настройки тарифов.',
       },
       busRecords: {
         title: 'Записи об автобусах',

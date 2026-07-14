@@ -619,6 +619,10 @@ export default function App() {
   // `currentUser` object in place and every other view keeps showing the old value.
   const handleVendorProfileUpdated = (updatedUser: User) => {
     setUsers(prev => prev.map(u => u.id === updatedUser.id ? { ...u, ...updatedUser } : u));
+    // `currentUser` inside VendorPortal comes from `loggedInVendor`, a separate piece of state
+    // set once at login — without this, a vendor's own profile/rate edits save correctly to the
+    // server but never show up in their own session until they log out and back in.
+    setLoggedInVendor(prev => (prev && prev.id === updatedUser.id ? { ...prev, ...updatedUser } : prev));
   };
 
   const handleAddSlot = async (newSlot: TourSlot) => {

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { User, VendorBus, GuideCalculatorConfig, DEFAULT_GUIDE_CALCULATOR_CONFIG } from '../../types';
+import { User, VendorBus } from '../../types';
 import { useLanguage } from '../../i18n/LanguageContext';
-import { Calculator, Bus, Settings, ChevronDown, ChevronUp } from 'lucide-react';
+import { Calculator, Truck } from 'lucide-react';
 
 interface AdminVendorCalculatorProps {
   vendors: User[];
@@ -11,11 +11,11 @@ interface AdminVendorCalculatorProps {
 }
 
 // Admin "Vendors" section widget: per-vendor toggles for the calculator/bus-tracking features,
-// an editable per-vendor rate config, and a read-only view of vendor-entered bus records.
+// and a read-only view of vendor-entered bus records. The rate numbers themselves (day rates,
+// offroad/food unit prices) are self-service — vendors tune and save their own from the
+// Kalkulyator tab (see CalculatorTab.tsx) — admin only controls whether the tab exists at all.
 export default function AdminVendorCalculator({ vendors, authToken, onUpdateUser, onShowNotification }: AdminVendorCalculatorProps) {
   const { t } = useLanguage();
-  const [editingRatesFor, setEditingRatesFor] = useState<string | null>(null);
-  const [rateDraft, setRateDraft] = useState<GuideCalculatorConfig>(DEFAULT_GUIDE_CALCULATOR_CONFIG);
   const [selectedBusVendorId, setSelectedBusVendorId] = useState<string>('');
   const [busRecords, setBusRecords] = useState<VendorBus[]>([]);
   const [busLoading, setBusLoading] = useState(false);
@@ -48,35 +48,6 @@ export default function AdminVendorCalculator({ vendors, authToken, onUpdateUser
     }
   };
 
-  const openRateEditor = (vendor: User) => {
-    if (editingRatesFor === vendor.id) {
-      setEditingRatesFor(null);
-      return;
-    }
-    setRateDraft({ ...DEFAULT_GUIDE_CALCULATOR_CONFIG, ...(vendor.calculatorConfig || {}) });
-    setEditingRatesFor(vendor.id);
-  };
-
-  const saveRates = (vendor: User) => {
-    if (!onUpdateUser) return;
-    onUpdateUser(vendor.id, { calculatorConfig: rateDraft });
-    if (onShowNotification) onShowNotification(t('adminVendorTools.rateConfig.saveSuccess'), 'success');
-    setEditingRatesFor(null);
-  };
-
-  const numberField = (label: string, key: keyof GuideCalculatorConfig) => (
-    <div>
-      <label className="block text-[10px] font-bold text-slate-400 mb-1">{label}</label>
-      <input
-        type="number"
-        step="0.1"
-        value={rateDraft[key]}
-        onChange={(e) => setRateDraft(prev => ({ ...prev, [key]: Number(e.target.value) }))}
-        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
-      />
-    </div>
-  );
-
   const activeVendors = vendors.filter(v => v.role === 'vendor' && !v.isArchived);
 
   return (
@@ -108,17 +79,6 @@ export default function AdminVendorCalculator({ vendors, authToken, onUpdateUser
                 >
                   {vendor.calculatorEnabled ? t('adminVendorTools.vendorRow.enabledBadge') : t('adminVendorTools.vendorRow.disabledBadge')}
                 </button>
-                {vendor.calculatorEnabled && (
-                  <button
-                    type="button"
-                    onClick={() => openRateEditor(vendor)}
-                    className="font-bold min-h-[36px] px-3 flex items-center gap-1 justify-center rounded text-xs transition border bg-white hover:bg-slate-100 text-slate-700 border-slate-200"
-                  >
-                    <Settings className="w-3.5 h-3.5" />
-                    {t('adminVendorTools.vendorRow.editRates')}
-                    {editingRatesFor === vendor.id ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                  </button>
-                )}
 
                 <span className="text-[10px] font-bold text-slate-400 ml-2">{t('adminVendorTools.vendorRow.busTrackingLabel')}</span>
                 <button
@@ -134,34 +94,13 @@ export default function AdminVendorCalculator({ vendors, authToken, onUpdateUser
                 </button>
               </div>
             </div>
-
-            {editingRatesFor === vendor.id && (
-              <div className="mt-3 pt-3 border-t border-slate-200">
-                <h4 className="text-[10px] font-bold text-slate-500 mb-2">{t('adminVendorTools.rateConfig.title', { name: vendor.name })}</h4>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                  {numberField(t('adminVendorTools.rateConfig.baseGuideDailyRateLabel'), 'baseGuideDailyRate')}
-                  {numberField(t('adminVendorTools.rateConfig.assistantGuideDailyRateLabel'), 'assistantGuideDailyRate')}
-                  {numberField(t('adminVendorTools.rateConfig.highAltitudeBaseGuideDailyRateLabel'), 'highAltitudeBaseGuideDailyRate')}
-                  {numberField(t('adminVendorTools.rateConfig.highAltitudeAssistantGuideDailyRateLabel'), 'highAltitudeAssistantGuideDailyRate')}
-                  {numberField(t('adminVendorTools.rateConfig.altitudeThresholdLabel'), 'altitudeThreshold')}
-                  {numberField(t('adminVendorTools.rateConfig.secondBonusMultiplierLabel'), 'secondBonusMultiplier')}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => saveRates(vendor)}
-                  className="mt-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold min-h-[36px] px-4 flex items-center justify-center rounded text-xs transition"
-                >
-                  {t('adminVendorTools.rateConfig.saveButton')}
-                </button>
-              </div>
-            )}
           </div>
         ))}
       </div>
 
       <div className="pt-4 border-t border-slate-200">
         <h4 className="text-xs font-bold text-slate-400 tracking-widest flex items-center gap-1.5 mb-2">
-          <Bus className="w-4 h-4 text-emerald-700" />
+          <Truck className="w-4 h-4 text-emerald-700" />
           {t('adminVendorTools.busRecords.title')}
         </h4>
         <label className="block text-[10px] font-bold text-slate-400 mb-1">{t('adminVendorTools.busRecords.selectVendorLabel')}</label>
@@ -187,7 +126,8 @@ export default function AdminVendorCalculator({ vendors, authToken, onUpdateUser
                 <thead>
                   <tr className="text-left text-[10px] font-bold text-slate-400 border-b border-slate-200">
                     <th className="py-1.5 pr-2">{t('adminVendorTools.busRecords.headers.tour')}</th>
-                    <th className="py-1.5 pr-2">{t('adminVendorTools.busRecords.headers.bus')}</th>
+                    <th className="py-1.5 pr-2">{t('adminVendorTools.busRecords.headers.plateNumber')}</th>
+                    <th className="py-1.5 pr-2">{t('adminVendorTools.busRecords.headers.description')}</th>
                     <th className="py-1.5 pr-2">{t('adminVendorTools.busRecords.headers.price')}</th>
                     <th className="py-1.5 pr-2">{t('adminVendorTools.busRecords.headers.date')}</th>
                   </tr>
@@ -196,7 +136,8 @@ export default function AdminVendorCalculator({ vendors, authToken, onUpdateUser
                   {busRecords.map(bus => (
                     <tr key={bus.id} className="border-b border-slate-100">
                       <td className="py-1.5 pr-2">{bus.tourName}</td>
-                      <td className="py-1.5 pr-2">{bus.busName}</td>
+                      <td className="py-1.5 pr-2 font-bold">{bus.plateNumber}</td>
+                      <td className="py-1.5 pr-2">{bus.vehicleDescription || '—'}</td>
                       <td className="py-1.5 pr-2">{bus.price} AZN</td>
                       <td className="py-1.5 pr-2">{bus.travelDate}</td>
                     </tr>

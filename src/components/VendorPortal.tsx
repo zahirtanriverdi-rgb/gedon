@@ -26,7 +26,7 @@ import {
   CalendarPlus,
   User as UserIcon,
   Calculator,
-  Bus
+  Truck
 } from 'lucide-react';
 
 // Shown in place of a tour create/edit form once the vendor's subscription has expired
@@ -195,7 +195,7 @@ export default function VendorPortal({
     { id: 'add-intl-tour', label: t('vendorMisc.vendorPortal.tabAddIntlTour'), icon: Plane },
     { id: 'add-slot', label: t('vendorMisc.vendorPortal.tabAddSlot'), icon: CalendarPlus },
     ...(currentUser.calculatorEnabled ? [{ id: 'calculator', label: t('vendorCalculator.tabLabel'), icon: Calculator }] : []),
-    ...(currentUser.busTrackingEnabled ? [{ id: 'buses', label: t('vendorBusTracking.tabLabel'), icon: Bus }] : []),
+    ...(currentUser.busTrackingEnabled ? [{ id: 'buses', label: t('vendorBusTracking.tabLabel'), icon: Truck }] : []),
     { id: 'profile', label: t('vendorMisc.vendorPortal.tabProfile'), icon: UserIcon },
   ];
   const activeNavId = activeSubTab === 'add-tour'
@@ -370,7 +370,8 @@ export default function VendorPortal({
           tours={tours}
           slots={slots}
           currentUser={currentUser}
-          onEditTour={onEditTour}
+          operatorToken={operatorToken}
+          onUserUpdated={onUserUpdated}
           onShowNotification={onShowNotification}
         />
       )}

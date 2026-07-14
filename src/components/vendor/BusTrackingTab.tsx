@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Tour, User, VendorBus } from '../../types';
 import { useLanguage } from '../../i18n/LanguageContext';
-import { Bus, Plus, Pencil, Trash2, X, Check } from 'lucide-react';
+import { Truck, Plus, Pencil, Trash2, X, Check, Info } from 'lucide-react';
 
 interface BusTrackingTabProps {
   tours: Tour[];
@@ -12,12 +12,13 @@ interface BusTrackingTabProps {
 
 interface BusFormState {
   tourId: string;
-  busName: string;
+  plateNumber: string;
+  vehicleDescription: string;
   price: number | '';
   travelDate: string;
 }
 
-const emptyForm: BusFormState = { tourId: '', busName: '', price: '', travelDate: '' };
+const emptyForm: BusFormState = { tourId: '', plateNumber: '', vehicleDescription: '', price: '', travelDate: '' };
 
 export function BusTrackingTab({ tours, currentUser, operatorToken, onShowNotification }: BusTrackingTabProps) {
   const { t } = useLanguage();
@@ -65,7 +66,7 @@ export function BusTrackingTab({ tours, currentUser, operatorToken, onShowNotifi
   };
 
   const startEdit = (bus: VendorBus) => {
-    setForm({ tourId: bus.tourId || '', busName: bus.busName, price: bus.price, travelDate: bus.travelDate });
+    setForm({ tourId: bus.tourId || '', plateNumber: bus.plateNumber, vehicleDescription: bus.vehicleDescription || '', price: bus.price, travelDate: bus.travelDate });
     setEditingId(bus.id);
     setIsAdding(true);
   };
@@ -78,13 +79,20 @@ export function BusTrackingTab({ tours, currentUser, operatorToken, onShowNotifi
 
   const handleSave = async () => {
     const tourName = myTours.find(tr => tr.id === form.tourId)?.name || '';
-    if (!tourName || !form.busName || form.price === '' || !form.travelDate) {
+    if (!tourName || !form.plateNumber.trim() || form.price === '' || !form.travelDate) {
       if (onShowNotification) onShowNotification(t('vendorBusTracking.notifications.missingFields'), 'warning');
       return;
     }
     setSaving(true);
     try {
-      const payload = { tourId: form.tourId || undefined, tourName, busName: form.busName, price: Number(form.price), travelDate: form.travelDate };
+      const payload = {
+        tourId: form.tourId || undefined,
+        tourName,
+        plateNumber: form.plateNumber.trim(),
+        vehicleDescription: form.vehicleDescription.trim() || undefined,
+        price: Number(form.price),
+        travelDate: form.travelDate,
+      };
       const url = editingId ? `/api/vendor-buses/${editingId}` : '/api/vendor-buses';
       const method = editingId ? 'PUT' : 'POST';
       const response = await fetch(url, { method, headers: authHeaders, body: JSON.stringify(payload) });
@@ -125,7 +133,7 @@ export function BusTrackingTab({ tours, currentUser, operatorToken, onShowNotifi
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
             <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-              <Bus className="w-4 h-4 text-emerald-700" />
+              <Truck className="w-4 h-4 text-emerald-700" />
               {t('vendorBusTracking.header.title')}
             </h3>
             <p className="text-xs text-slate-500 mt-1">{t('vendorBusTracking.header.subtitle')}</p>
@@ -140,6 +148,11 @@ export function BusTrackingTab({ tours, currentUser, operatorToken, onShowNotifi
               {t('vendorBusTracking.addButton')}
             </button>
           )}
+        </div>
+
+        <div className="mt-4 flex items-start gap-2 text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-3">
+          <Info className="w-4 h-4 shrink-0 mt-0.5" />
+          <span>{t('vendorBusTracking.sharedNotice')}</span>
         </div>
 
         {isAdding && (
@@ -158,12 +171,23 @@ export function BusTrackingTab({ tours, currentUser, operatorToken, onShowNotifi
               </select>
             </div>
             <div className="space-y-1.5">
-              <label className="block text-[10px] font-bold text-slate-400">{t('vendorBusTracking.form.busNameLabel')}</label>
+              <label className="block text-[10px] font-bold text-slate-400">{t('vendorBusTracking.form.plateNumberLabel')} *</label>
               <input
                 type="text"
-                value={form.busName}
-                onChange={(e) => setForm(f => ({ ...f, busName: e.target.value }))}
-                placeholder={t('vendorBusTracking.form.busNamePlaceholder')}
+                required
+                value={form.plateNumber}
+                onChange={(e) => setForm(f => ({ ...f, plateNumber: e.target.value }))}
+                placeholder={t('vendorBusTracking.form.plateNumberPlaceholder')}
+                className="w-full bg-white border border-slate-200 text-slate-700 p-2.5 text-xs rounded-xl"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="block text-[10px] font-bold text-slate-400">{t('vendorBusTracking.form.vehicleDescriptionLabel')}</label>
+              <input
+                type="text"
+                value={form.vehicleDescription}
+                onChange={(e) => setForm(f => ({ ...f, vehicleDescription: e.target.value }))}
+                placeholder={t('vendorBusTracking.form.vehicleDescriptionPlaceholder')}
                 className="w-full bg-white border border-slate-200 text-slate-700 p-2.5 text-xs rounded-xl"
               />
             </div>
@@ -219,32 +243,41 @@ export function BusTrackingTab({ tours, currentUser, operatorToken, onShowNotifi
             <table className="w-full text-xs">
               <thead>
                 <tr className="text-left text-[10px] font-bold text-slate-400 border-b border-slate-200">
+                  <th className="py-2 pr-3">{t('vendorBusTracking.table.headers.vendor')}</th>
                   <th className="py-2 pr-3">{t('vendorBusTracking.table.headers.tour')}</th>
-                  <th className="py-2 pr-3">{t('vendorBusTracking.table.headers.bus')}</th>
+                  <th className="py-2 pr-3">{t('vendorBusTracking.table.headers.plateNumber')}</th>
+                  <th className="py-2 pr-3">{t('vendorBusTracking.table.headers.description')}</th>
                   <th className="py-2 pr-3">{t('vendorBusTracking.table.headers.price')}</th>
                   <th className="py-2 pr-3">{t('vendorBusTracking.table.headers.date')}</th>
                   <th className="py-2 pr-3"></th>
                 </tr>
               </thead>
               <tbody>
-                {buses.map(bus => (
-                  <tr key={bus.id} className="border-b border-slate-100">
-                    <td className="py-2 pr-3 font-semibold text-slate-700">{bus.tourName}</td>
-                    <td className="py-2 pr-3">{bus.busName}</td>
-                    <td className="py-2 pr-3">{bus.price} AZN</td>
-                    <td className="py-2 pr-3">{bus.travelDate}</td>
-                    <td className="py-2 pr-3">
-                      <div className="flex gap-2 justify-end">
-                        <button type="button" onClick={() => startEdit(bus)} className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600" title={t('vendorBusTracking.table.editButton')}>
-                          <Pencil className="w-3.5 h-3.5" />
-                        </button>
-                        <button type="button" onClick={() => handleDelete(bus)} className="p-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-600" title={t('vendorBusTracking.table.deleteButton')}>
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                {buses.map(bus => {
+                  const isOwn = bus.vendorId === currentUser.id;
+                  return (
+                    <tr key={bus.id} className="border-b border-slate-100">
+                      <td className="py-2 pr-3 text-slate-500">{bus.vendorName || '—'}</td>
+                      <td className="py-2 pr-3 font-semibold text-slate-700">{bus.tourName}</td>
+                      <td className="py-2 pr-3 font-bold">{bus.plateNumber}</td>
+                      <td className="py-2 pr-3">{bus.vehicleDescription || '—'}</td>
+                      <td className="py-2 pr-3">{bus.price} AZN</td>
+                      <td className="py-2 pr-3">{bus.travelDate}</td>
+                      <td className="py-2 pr-3">
+                        {isOwn && (
+                          <div className="flex gap-2 justify-end">
+                            <button type="button" onClick={() => startEdit(bus)} className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600" title={t('vendorBusTracking.table.editButton')}>
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
+                            <button type="button" onClick={() => handleDelete(bus)} className="p-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-600" title={t('vendorBusTracking.table.deleteButton')}>
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
