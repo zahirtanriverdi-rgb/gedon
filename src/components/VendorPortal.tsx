@@ -9,6 +9,8 @@ import { EditTourModal } from './vendor/EditTourModal';
 import { TicketModal } from './vendor/TicketModal';
 import { CrmTab } from './vendor/CrmTab';
 import { MyToursTab } from './vendor/MyToursTab';
+import { CalculatorTab } from './vendor/CalculatorTab';
+import { BusTrackingTab } from './vendor/BusTrackingTab';
 import DashboardSidebarLayout, { DashboardNavItem } from './layout/DashboardSidebarLayout';
 import StatCard from './layout/StatCard';
 import LanguageSwitcher from './LanguageSwitcher';
@@ -22,7 +24,9 @@ import {
   Activity,
   Plane,
   CalendarPlus,
-  User as UserIcon
+  User as UserIcon,
+  Calculator,
+  Bus
 } from 'lucide-react';
 
 // Shown in place of a tour create/edit form once the vendor's subscription has expired
@@ -51,6 +55,7 @@ interface VendorPortalProps {
   onShowNotification?: (message: string, type?: 'success' | 'info' | 'error' | 'warning') => void;
   onApproveBooking?: (bookingId: string) => Promise<void>;
   onEditBooking?: (updatedBooking: Booking) => Promise<void>;
+  onDeleteBooking?: (bookingId: string) => Promise<void>;
   onAddBooking?: (newBooking: Booking) => Promise<void>;
   onUpdateSlotBookedCount?: (slotId: string, qty: number) => void;
   exchangeRates: { USD: number; EUR: number };
@@ -74,6 +79,7 @@ export default function VendorPortal({
   onShowNotification,
   onApproveBooking,
   onEditBooking,
+  onDeleteBooking,
   onAddBooking,
   onUpdateSlotBookedCount,
   exchangeRates,
@@ -83,7 +89,7 @@ export default function VendorPortal({
   onLogout
 }: VendorPortalProps) {
   const { t } = useLanguage();
-  const [activeSubTab, setActiveSubTab] = useState<'my-tours' | 'add-tour' | 'add-intl-tour' | 'add-slot' | 'profile' | 'crm'>('my-tours');
+  const [activeSubTab, setActiveSubTab] = useState<'my-tours' | 'add-tour' | 'add-intl-tour' | 'add-slot' | 'profile' | 'crm' | 'calculator' | 'buses'>('my-tours');
   const [tourSearchTerm, setTourSearchTerm] = useState('');
   const [selectedTicketBooking, setSelectedTicketBooking] = useState<Booking | null>(null);
 
@@ -188,6 +194,8 @@ export default function VendorPortal({
     { id: 'add-active-tour', label: t('vendorMisc.vendorPortal.tabAddActiveTour'), icon: Activity },
     { id: 'add-intl-tour', label: t('vendorMisc.vendorPortal.tabAddIntlTour'), icon: Plane },
     { id: 'add-slot', label: t('vendorMisc.vendorPortal.tabAddSlot'), icon: CalendarPlus },
+    ...(currentUser.calculatorEnabled ? [{ id: 'calculator', label: t('vendorCalculator.tabLabel'), icon: Calculator }] : []),
+    ...(currentUser.busTrackingEnabled ? [{ id: 'buses', label: t('vendorBusTracking.tabLabel'), icon: Bus }] : []),
     { id: 'profile', label: t('vendorMisc.vendorPortal.tabProfile'), icon: UserIcon },
   ];
   const activeNavId = activeSubTab === 'add-tour'
@@ -303,6 +311,7 @@ export default function VendorPortal({
           currentUser={currentUser}
           operatorToken={operatorToken}
           onEditBooking={onEditBooking}
+          onDeleteBooking={onDeleteBooking}
           onAddBooking={onAddBooking}
           onShowNotification={onShowNotification}
           triggerTicketGeneration={triggerTicketGeneration}
@@ -352,6 +361,27 @@ export default function VendorPortal({
           onAddSlot={onAddSlot}
           onShowNotification={onShowNotification}
           onSuccess={() => setActiveSubTab('my-tours')}
+        />
+      )}
+
+      {/* Subtab Content: Guide Payment / Net Income Calculator — admin-gated per vendor */}
+      {activeSubTab === 'calculator' && currentUser.calculatorEnabled && (
+        <CalculatorTab
+          tours={tours}
+          slots={slots}
+          currentUser={currentUser}
+          onEditTour={onEditTour}
+          onShowNotification={onShowNotification}
+        />
+      )}
+
+      {/* Subtab Content: Buses sent to tours — admin-gated per vendor */}
+      {activeSubTab === 'buses' && currentUser.busTrackingEnabled && (
+        <BusTrackingTab
+          tours={tours}
+          currentUser={currentUser}
+          operatorToken={operatorToken}
+          onShowNotification={onShowNotification}
         />
       )}
 

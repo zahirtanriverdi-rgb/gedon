@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Tour, TourSlot, Booking, User } from '../../types';
 import { QrScannerModal, playScanFeedback } from './QrScannerModal';
-import { Calendar, CheckCircle, Copy, Download, FileText, Plus, Printer, Send, Users, X } from 'lucide-react';
+import { Calendar, CheckCircle, Copy, Download, FileText, Plus, Printer, Send, Trash2, Users, X } from 'lucide-react';
 import { useLanguage } from '../../i18n/LanguageContext';
 
 interface CrmTabProps {
@@ -11,13 +11,30 @@ interface CrmTabProps {
   currentUser: User;
   operatorToken: string | null;
   onEditBooking?: (updatedBooking: Booking) => Promise<void>;
+  onDeleteBooking?: (bookingId: string) => Promise<void>;
   onAddBooking?: (newBooking: Booking) => Promise<void>;
   onShowNotification?: (message: string, type?: 'success' | 'info' | 'error' | 'warning') => void;
   triggerTicketGeneration: (booking: Booking, tourName?: string, region?: string, date?: string) => Promise<string | undefined>;
 }
 
-export function CrmTab({ tours, slots, bookings, currentUser, operatorToken, onEditBooking, onAddBooking, onShowNotification, triggerTicketGeneration }: CrmTabProps) {
+export function CrmTab({ tours, slots, bookings, currentUser, operatorToken, onEditBooking, onDeleteBooking, onAddBooking, onShowNotification, triggerTicketGeneration }: CrmTabProps) {
   const { t } = useLanguage();
+  const [deletingBookingId, setDeletingBookingId] = useState<string | null>(null);
+
+  const handleDeleteBooking = async (booking: Booking) => {
+    if (!onDeleteBooking) return;
+    const confirmed = window.confirm(t('vendorBookings.crmTab.table.deleteConfirm', { name: booking.customerName }));
+    if (!confirmed) return;
+
+    setDeletingBookingId(booking.id);
+    try {
+      await onDeleteBooking(booking.id);
+    } catch {
+      // onDeleteBooking (App.tsx) already showed an error toast
+    } finally {
+      setDeletingBookingId(null);
+    }
+  };
 
   // CRM & Tour Manifest States
   const [crmTourId, setCrmTourId] = useState<string>('');
@@ -397,7 +414,7 @@ export function CrmTab({ tours, slots, bookings, currentUser, operatorToken, onE
                 </div>
 
                 <div className="overflow-x-auto font-sans -webkit-overflow-scrolling-touch">
-                  <table className="w-full min-w-[720px] text-left border-collapse text-xs">
+                  <table className="w-full min-w-[820px] text-left border-collapse text-xs">
                     <thead className="bg-ink-50 border-b border-slate-200 text-slate-400 font-bold tracking-wider text-[10px]">
                       <tr>
                         <th className="p-3 text-center w-12">{t('vendorBookings.crmTab.table.headers.order')}</th>
@@ -407,12 +424,13 @@ export function CrmTab({ tours, slots, bookings, currentUser, operatorToken, onE
                         <th className="p-3">{t('vendorBookings.crmTab.table.headers.ticketAndDate')}</th>
                         <th className="p-3 w-64">{t('vendorBookings.crmTab.table.headers.operatorNote')}</th>
                         <th className="p-3 text-center">{t('vendorBookings.crmTab.table.headers.pdfTicket')}</th>
+                        <th className="p-3 text-center">{t('vendorBookings.crmTab.table.headers.actions')}</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 text-slate-750 text-slate-700">
                       {filteredCrmBookingsForSlot.length === 0 ? (
                         <tr>
-                          <td colSpan={7} className="p-10 text-center italic text-slate-400 border-b-0 bg-slate-50/50">
+                          <td colSpan={8} className="p-10 text-center italic text-slate-400 border-b-0 bg-slate-50/50">
                             {t('vendorBookings.crmTab.table.emptyState')}
                           </td>
                         </tr>
@@ -547,6 +565,18 @@ export function CrmTab({ tours, slots, bookings, currentUser, operatorToken, onE
                                 ) : (
                                   <span className="text-[10px] text-slate-400 italic">{t('vendorBookings.crmTab.table.pendingEllipsis')}</span>
                                 )}
+                              </td>
+                              <td className="p-1.5 py-3 text-center">
+                                <button
+                                  type="button"
+                                  disabled={deletingBookingId === b.id}
+                                  onClick={() => handleDeleteBooking(b)}
+                                  title={t('vendorBookings.crmTab.buttons.delete')}
+                                  className="inline-flex items-center gap-1 px-2 py-1 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 hover:border-red-300 rounded font-bold text-[10px] transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                  <span>{deletingBookingId === b.id ? t('vendorBookings.crmTab.buttons.deleting') : t('vendorBookings.crmTab.buttons.delete')}</span>
+                                </button>
                               </td>
                             </tr>
                           );

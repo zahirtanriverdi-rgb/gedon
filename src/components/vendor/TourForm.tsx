@@ -51,6 +51,7 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
   const [tourDifficulty, setTourDifficulty] = useState<'easy' | 'medium' | 'hard' | 'extreme'>('medium');
   const [tourRegion, setTourRegion] = useState<string>('');
   const [tourDays, setTourDays] = useState<number | ''>(1);
+  const [tourMaxAltitude, setTourMaxAltitude] = useState<number | ''>('');
   const [tourDescription, setTourDescription] = useState<string>('');
   const [tourIncludes, setTourIncludes] = useState<string[]>(['Professional Bələdçi', 'Komfort Transit', 'Səhər yeməyi', 'Yol Sığortası']);
   const [tourNotIncluded, setTourNotIncluded] = useState<string[]>([]);
@@ -178,6 +179,7 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
     setTourDifficulty(tour.difficulty as any);
     setTourRegion(tour.region);
     setTourDays(tour.durationDays);
+    setTourMaxAltitude(tour.maxAltitude !== undefined ? tour.maxAltitude : '');
     setTourDescription(tour.description || '');
     setTourIncludes(Array.isArray(tour.includes) ? tour.includes : []);
     setTourNotIncluded(Array.isArray(tour.notIncluded) ? tour.notIncluded : []);
@@ -266,6 +268,7 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
       description: tourDescription,
       region: tourRegion,
       durationDays: Number(tourDays),
+      maxAltitude: tourMaxAltitude !== '' ? Number(tourMaxAltitude) : undefined,
       durationHours: tourDurationHours ? Number(tourDurationHours) : undefined,
       departureDateTime: tourDepartureDateTime || undefined,
       returnDateTime: tourReturnDateTime || undefined,
@@ -534,6 +537,18 @@ const handleMediaFilesChange = async (e: React.ChangeEvent<HTMLInputElement>) =>
               required
               value={tourDays}
               onChange={handleNumberInput(setTourDays)}
+              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800"
+            />
+          </div>
+
+          <div>
+            <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">{t('vendorTourForms.tourForm.fields.maxAltitude.label')}</label>
+            <input
+              type="number"
+              min="0"
+              value={tourMaxAltitude}
+              onChange={handleNumberInput(setTourMaxAltitude)}
+              placeholder={t('vendorTourForms.tourForm.fields.maxAltitude.placeholder')}
               className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800"
             />
           </div>

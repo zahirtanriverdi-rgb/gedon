@@ -29,6 +29,38 @@ export interface User {
   isArchived?: boolean; // Soft-deleted by an admin — account can no longer log in, but its tours/slots/bookings are preserved for records
   isManuallyDeactivated?: boolean; // Admin can flip this on/off any time, independent of subscriptionValidUntil — hides the vendor's tours immediately without touching their subscription date
   emailVerified?: boolean; // Owner has confirmed control of `email` via a mailed code — required before it can be used for password-reset. Resets to false whenever email changes.
+  calculatorEnabled?: boolean; // Admin-set per vendor — shows/hides the guide-payment/net-income calculator tab in the vendor panel
+  busTrackingEnabled?: boolean; // Admin-set per vendor — shows/hides the "buses sent to tours" tab in the vendor panel
+  calculatorConfig?: GuideCalculatorConfig; // Admin-tuned per vendor; falls back to DEFAULT_GUIDE_CALCULATOR_CONFIG when unset
+}
+
+export interface GuideCalculatorConfig {
+  baseGuideDailyRate: number; // AZN/day paid to the main guide on tours up to altitudeThreshold
+  assistantGuideDailyRate: number; // AZN/day paid to the assistant guide on tours up to altitudeThreshold
+  highAltitudeBaseGuideDailyRate: number; // AZN/day paid to the main guide on tours above altitudeThreshold
+  highAltitudeAssistantGuideDailyRate: number; // AZN/day paid to the assistant guide on tours above altitudeThreshold
+  altitudeThreshold: number; // Meters — tours with maxAltitude above this use the high-altitude rates
+  secondBonusMultiplier: number; // Second bonus = participant count x this multiplier
+}
+
+export const DEFAULT_GUIDE_CALCULATOR_CONFIG: GuideCalculatorConfig = {
+  baseGuideDailyRate: 40,
+  assistantGuideDailyRate: 30,
+  highAltitudeBaseGuideDailyRate: 60,
+  highAltitudeAssistantGuideDailyRate: 50,
+  altitudeThreshold: 2500,
+  secondBonusMultiplier: 1.5,
+};
+
+export interface VendorBus {
+  id: string;
+  vendorId: string;
+  tourId?: string;
+  tourName: string; // Snapshot of the tour name at the time the record was made
+  busName: string; // Bus identifier/description (plate, company, etc.)
+  price: number; // In AZN
+  travelDate: string; // ISO date string
+  createdAt?: string;
 }
 
 export type TourCategory = 'peak' | 'camp' | 'hiking' | 'international' | 'active';
@@ -58,6 +90,7 @@ export interface Tour {
   region: string;
   durationDays: number;
   durationHours?: number;
+  maxAltitude?: number; // Highest point of the route, in meters — drives the high-altitude guide rate tier in the vendor calculator (see GuideCalculatorConfig.altitudeThreshold)
   departureDateTime?: string; // ISO datetime string — trip's departure date & time
   returnDateTime?: string; // ISO datetime string — trip's return-to-Baku date & time; durationHours is derived from (returnDateTime - departureDateTime) when both are set
   includes: string[];

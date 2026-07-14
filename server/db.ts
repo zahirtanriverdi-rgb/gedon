@@ -265,6 +265,27 @@ export async function initializeDatabase() {
     );
   `);
 
+  // Vendor bus tracking — which bus a vendor sent to which tour departure, and at what cost.
+  // Admin-gated per vendor (users.extra_data.busTrackingEnabled); only the owning vendor writes
+  // rows, admin only reads across vendors. tour_name is a snapshot so a record still reads fine
+  // if the tour is later renamed or deleted.
+  await dbClient.execute(`
+    CREATE TABLE IF NOT EXISTS vendor_buses (
+      id VARCHAR(255) PRIMARY KEY,
+      vendor_id VARCHAR(255) NOT NULL,
+      tour_id VARCHAR(255),
+      tour_name VARCHAR(255) NOT NULL,
+      bus_name VARCHAR(255) NOT NULL,
+      price DECIMAL NOT NULL,
+      travel_date VARCHAR(255) NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (vendor_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+  `);
+  await dbClient.execute(
+    `CREATE INDEX IF NOT EXISTS idx_vendor_buses_vendor ON vendor_buses(vendor_id)`
+  );
+
   // Reviews (anti-fake rating system: tied to a verified booking)
   await dbClient.execute(`
     CREATE TABLE IF NOT EXISTS reviews (

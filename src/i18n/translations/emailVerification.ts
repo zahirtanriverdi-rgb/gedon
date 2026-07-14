@@ -1,0 +1,51 @@
+// EmailVerificationCard — shared by AdminPortal's own-account settings and VendorPortal's ProfileTab.
+export const emailVerification = {
+  az: {
+    emailVerification: {
+      title: 'E-poçt Təsdiqləmə',
+      subtitle: 'Şifrəni bərpa etmək və hesab təhlükəsizliyini artırmaq üçün e-poçt ünvanınızı təsdiqləyin.',
+      verifiedBadge: 'Təsdiqlənib',
+      unverifiedBadge: 'Təsdiqlənməyib',
+      codeLabel: 'Təsdiq Kodu',
+      verifying: 'Yoxlanılır...',
+      verifyButton: 'Təsdiqlə',
+      resendCode: 'Kodu yenidən göndər',
+      sending: 'Göndərilir...',
+      sendCodeButton: 'Təsdiq Kodu Göndər',
+      codeSent: 'Təsdiq kodu e-poçtunuza göndərildi.',
+      verifySuccess: 'E-poçt ünvanınız uğurla təsdiqləndi!',
+    },
+  },
+  en: {
+    emailVerification: {
+      title: 'Email Verification',
+      subtitle: 'Verify your email address to enable password recovery and improve account security.',
+      verifiedBadge: 'Verified',
+      unverifiedBadge: 'Not Verified',
+      codeLabel: 'Verification Code',
+      verifying: 'Verifying...',
+      verifyButton: 'Verify',
+      resendCode: 'Resend code',
+      sending: 'Sending...',
+      sendCodeButton: 'Send Verification Code',
+      codeSent: 'Verification code sent to your email.',
+      verifySuccess: 'Your email has been verified successfully!',
+    },
+  },
+  ru: {
+    emailVerification: {
+      title: 'Подтверждение E-mail',
+      subtitle: 'Подтвердите свой адрес электронной почты для восстановления пароля и повышения безопасности аккаунта.',
+      verifiedBadge: 'Подтверждён',
+      unverifiedBadge: 'Не подтверждён',
+      codeLabel: 'Код подтверждения',
+      verifying: 'Проверка...',
+      verifyButton: 'Подтвердить',
+      resendCode: 'Отправить код повторно',
+      sending: 'Отправка...',
+      sendCodeButton: 'Отправить код подтверждения',
+      codeSent: 'Код подтверждения отправлен на вашу почту.',
+      verifySuccess: 'Ваш email успешно подтверждён!',
+    },
+  },
+};
