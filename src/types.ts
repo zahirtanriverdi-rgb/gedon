@@ -82,10 +82,22 @@ export interface VendorBus {
   vendorName?: string; // Snapshot of the adding vendor's name/company, shown since the list is shared
   tourId?: string;
   tourName: string; // Snapshot of the tour name at the time the record was made
-  plateNumber: string; // Mandatory vehicle registration/plate number
-  vehicleDescription?: string; // Optional extra detail (company, vehicle type, etc.)
+  contactPhone: string; // Mandatory driver/contact phone number
+  vehicleDescription?: string; // Optional extra detail (plate number, company, vehicle type, etc.)
   price: number; // In AZN
   travelDate: string; // ISO date string
+  createdAt?: string;
+}
+
+// A driver a vendor is warning other vendors about. Shared list (same visibility model as
+// VendorBus): every vendor reads every entry, but only the reporting vendor may edit/delete it.
+export interface DriverBlacklistEntry {
+  id: string;
+  vendorId: string;
+  vendorName?: string; // Snapshot of the reporting vendor's name/company
+  driverName: string;
+  phoneNumber: string;
+  reason: string;
   createdAt?: string;
 }
 

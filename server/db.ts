@@ -278,7 +278,7 @@ export async function initializeDatabase() {
       vendor_name VARCHAR(255),
       tour_id VARCHAR(255),
       tour_name VARCHAR(255) NOT NULL,
-      plate_number VARCHAR(255) NOT NULL DEFAULT '',
+      contact_phone VARCHAR(255) NOT NULL DEFAULT '',
       bus_name VARCHAR(255),
       price DECIMAL NOT NULL,
       travel_date VARCHAR(255) NOT NULL,
@@ -289,9 +289,12 @@ export async function initializeDatabase() {
   await dbClient.execute(
     `CREATE INDEX IF NOT EXISTS idx_vendor_buses_vendor ON vendor_buses(vendor_id)`
   );
-  // Migration for the table as it existed before plate_number/vendor_name existed.
+  // Migration for the table as it existed before contact_phone/vendor_name existed. Note
+  // plate_number was this column's very first name (renamed same day the field's real meaning
+  // — a driver contact phone, not a vehicle plate — was clarified); a fresh install never sees
+  // that column at all, so no migration reads from it.
   for (const alter of [
-    `ALTER TABLE vendor_buses ADD COLUMN plate_number VARCHAR(255) NOT NULL DEFAULT ''`,
+    `ALTER TABLE vendor_buses ADD COLUMN contact_phone VARCHAR(255) NOT NULL DEFAULT ''`,
     `ALTER TABLE vendor_buses ADD COLUMN vendor_name VARCHAR(255)`,
   ]) {
     try {
@@ -300,6 +303,25 @@ export async function initializeDatabase() {
       // column already exists — safe to ignore
     }
   }
+
+  // Driver blacklist — a vendor flags a bad driver (name/phone/reason) so other vendors avoid
+  // them. Same shared-read/owner-write model as vendor_buses, gated by the same
+  // busTrackingEnabled flag since it's part of the same "transport" workflow.
+  await dbClient.execute(`
+    CREATE TABLE IF NOT EXISTS driver_blacklist (
+      id VARCHAR(255) PRIMARY KEY,
+      vendor_id VARCHAR(255) NOT NULL,
+      vendor_name VARCHAR(255),
+      driver_name VARCHAR(255) NOT NULL,
+      phone_number VARCHAR(255) NOT NULL,
+      reason TEXT NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (vendor_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+  `);
+  await dbClient.execute(
+    `CREATE INDEX IF NOT EXISTS idx_driver_blacklist_vendor ON driver_blacklist(vendor_id)`
+  );
 
   // Reviews (anti-fake rating system: tied to a verified booking)
   await dbClient.execute(`

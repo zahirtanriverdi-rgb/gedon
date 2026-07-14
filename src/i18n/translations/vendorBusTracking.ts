@@ -1,7 +1,7 @@
 // Vendor "Nəqliyyat" tab (BusTrackingTab.tsx) — record of which vehicle (bus, offroad, etc.)
-// was sent to which tour. Admin-gated per vendor via User.busTrackingEnabled. The list is
-// shared across all vendors (everyone reads everyone's records); only the adding vendor may
-// edit/delete their own rows.
+// was sent to which tour, plus a shared driver blacklist. Admin-gated per vendor via
+// User.busTrackingEnabled. Both lists are shared across all vendors (everyone reads everyone's
+// records); only the adding vendor may edit/delete their own rows.
 export const vendorBusTracking = {
   az: {
     vendorBusTracking: {
@@ -15,10 +15,10 @@ export const vendorBusTracking = {
       form: {
         tourLabel: 'Tur',
         tourPlaceholder: '-- Tur seçin --',
-        plateNumberLabel: 'Nömrə',
-        plateNumberPlaceholder: 'Məs: 10-AA-123',
+        contactPhoneLabel: 'Əlaqə nömrəsi',
+        contactPhonePlaceholder: 'Məs: +994 55 555 55 55',
         vehicleDescriptionLabel: 'Təsvir (istəyə bağlı)',
-        vehicleDescriptionPlaceholder: 'Məs: Xəzər Turizm / Avtobus / Niva',
+        vehicleDescriptionPlaceholder: 'Məs: Xəzər Turizm / Avtobus / Niva / 10-AA-123',
         priceLabel: 'Qiymət (AZN)',
         dateLabel: 'Tarix',
         saveButton: 'Yadda saxla',
@@ -28,7 +28,7 @@ export const vendorBusTracking = {
         headers: {
           vendor: 'Vendor',
           tour: 'Tur',
-          plateNumber: 'Nömrə',
+          contactPhone: 'Əlaqə nömrəsi',
           description: 'Təsvir',
           price: 'Qiymət',
           date: 'Tarix',
@@ -44,7 +44,31 @@ export const vendorBusTracking = {
         updateSuccess: 'Qeyd yeniləndi.',
         deleteSuccess: 'Qeyd silindi.',
         error: 'Əməliyyat uğursuz oldu.',
-        missingFields: 'Zəhmət olmasa bütün məcburi sahələri doldurun (tur, nömrə, qiymət, tarix).',
+        missingFields: 'Zəhmət olmasa bütün məcburi sahələri doldurun (tur, əlaqə nömrəsi, qiymət, tarix).',
+      },
+      blacklist: {
+        title: 'Qara Siyahı',
+        subtitle: 'Digər vendorları xəbərdar etmək üçün etibarsız sürücüləri buraya əlavə edin. Siyahı bütün vendorlar tərəfindən görünür.',
+        addButton: 'Sürücü əlavə et',
+        driverNameLabel: 'Sürücünün adı',
+        driverNamePlaceholder: 'Məs: Elşən Məmmədov',
+        phoneNumberLabel: 'Telefon nömrəsi',
+        phoneNumberPlaceholder: 'Məs: +994 55 555 55 55',
+        reasonLabel: 'Səbəb',
+        reasonPlaceholder: 'Məs: Turu vaxtında gətirmədi, kobud davranış',
+        headers: {
+          vendor: 'Vendor',
+          driverName: 'Sürücü',
+          phoneNumber: 'Telefon',
+          reason: 'Səbəb',
+        },
+        empty: 'Qara siyahıda hələ heç bir sürücü yoxdur.',
+        deleteConfirm: 'Bu sürücünü qara siyahıdan silmək istədiyinizə əminsiniz?',
+        addSuccess: 'Sürücü qara siyahıya əlavə olundu.',
+        updateSuccess: 'Qeyd yeniləndi.',
+        deleteSuccess: 'Sürücü qara siyahıdan silindi.',
+        error: 'Əməliyyat uğursuz oldu.',
+        missingFields: 'Zəhmət olmasa bütün məcburi sahələri doldurun (ad, telefon, səbəb).',
       },
       disabled: {
         title: 'Nəqliyyat izləmə aktiv deyil',
@@ -64,10 +88,10 @@ export const vendorBusTracking = {
       form: {
         tourLabel: 'Tour',
         tourPlaceholder: '-- Select a tour --',
-        plateNumberLabel: 'Plate number',
-        plateNumberPlaceholder: 'e.g. 10-AA-123',
+        contactPhoneLabel: 'Contact phone',
+        contactPhonePlaceholder: 'e.g. +994 55 555 55 55',
         vehicleDescriptionLabel: 'Description (optional)',
-        vehicleDescriptionPlaceholder: 'e.g. Khazar Tourism / Bus / Niva',
+        vehicleDescriptionPlaceholder: 'e.g. Khazar Tourism / Bus / Niva / 10-AA-123',
         priceLabel: 'Price (AZN)',
         dateLabel: 'Date',
         saveButton: 'Save',
@@ -77,7 +101,7 @@ export const vendorBusTracking = {
         headers: {
           vendor: 'Vendor',
           tour: 'Tour',
-          plateNumber: 'Plate number',
+          contactPhone: 'Contact phone',
           description: 'Description',
           price: 'Price',
           date: 'Date',
@@ -93,7 +117,31 @@ export const vendorBusTracking = {
         updateSuccess: 'Record updated.',
         deleteSuccess: 'Record deleted.',
         error: 'Operation failed.',
-        missingFields: 'Please fill in all required fields (tour, plate number, price, date).',
+        missingFields: 'Please fill in all required fields (tour, contact phone, price, date).',
+      },
+      blacklist: {
+        title: 'Blacklist',
+        subtitle: 'Add unreliable drivers here to warn other vendors. Visible to every vendor.',
+        addButton: 'Add driver',
+        driverNameLabel: 'Driver name',
+        driverNamePlaceholder: 'e.g. Elshan Mammadov',
+        phoneNumberLabel: 'Phone number',
+        phoneNumberPlaceholder: 'e.g. +994 55 555 55 55',
+        reasonLabel: 'Reason',
+        reasonPlaceholder: 'e.g. Showed up late, rude behavior',
+        headers: {
+          vendor: 'Vendor',
+          driverName: 'Driver',
+          phoneNumber: 'Phone',
+          reason: 'Reason',
+        },
+        empty: 'No drivers on the blacklist yet.',
+        deleteConfirm: 'Are you sure you want to remove this driver from the blacklist?',
+        addSuccess: 'Driver added to the blacklist.',
+        updateSuccess: 'Record updated.',
+        deleteSuccess: 'Driver removed from the blacklist.',
+        error: 'Operation failed.',
+        missingFields: 'Please fill in all required fields (name, phone, reason).',
       },
       disabled: {
         title: 'Transport tracking is not enabled',
@@ -113,10 +161,10 @@ export const vendorBusTracking = {
       form: {
         tourLabel: 'Тур',
         tourPlaceholder: '-- Выберите тур --',
-        plateNumberLabel: 'Гос. номер',
-        plateNumberPlaceholder: 'Напр.: 10-AA-123',
+        contactPhoneLabel: 'Контактный телефон',
+        contactPhonePlaceholder: 'Напр.: +994 55 555 55 55',
         vehicleDescriptionLabel: 'Описание (необязательно)',
-        vehicleDescriptionPlaceholder: 'Напр.: Хазар Туризм / Автобус / Нива',
+        vehicleDescriptionPlaceholder: 'Напр.: Хазар Туризм / Автобус / Нива / 10-AA-123',
         priceLabel: 'Цена (AZN)',
         dateLabel: 'Дата',
         saveButton: 'Сохранить',
@@ -126,7 +174,7 @@ export const vendorBusTracking = {
         headers: {
           vendor: 'Вендор',
           tour: 'Тур',
-          plateNumber: 'Гос. номер',
+          contactPhone: 'Контактный телефон',
           description: 'Описание',
           price: 'Цена',
           date: 'Дата',
@@ -142,7 +190,31 @@ export const vendorBusTracking = {
         updateSuccess: 'Запись обновлена.',
         deleteSuccess: 'Запись удалена.',
         error: 'Операция не удалась.',
-        missingFields: 'Пожалуйста, заполните все обязательные поля (тур, номер, цена, дата).',
+        missingFields: 'Пожалуйста, заполните все обязательные поля (тур, контактный телефон, цена, дата).',
+      },
+      blacklist: {
+        title: 'Чёрный список',
+        subtitle: 'Добавляйте сюда ненадёжных водителей, чтобы предупредить других вендоров. Виден всем вендорам.',
+        addButton: 'Добавить водителя',
+        driverNameLabel: 'Имя водителя',
+        driverNamePlaceholder: 'Напр.: Эльшан Мамедов',
+        phoneNumberLabel: 'Номер телефона',
+        phoneNumberPlaceholder: 'Напр.: +994 55 555 55 55',
+        reasonLabel: 'Причина',
+        reasonPlaceholder: 'Напр.: Опоздал, грубое поведение',
+        headers: {
+          vendor: 'Вендор',
+          driverName: 'Водитель',
+          phoneNumber: 'Телефон',
+          reason: 'Причина',
+        },
+        empty: 'В чёрном списке пока нет водителей.',
+        deleteConfirm: 'Вы уверены, что хотите удалить этого водителя из чёрного списка?',
+        addSuccess: 'Водитель добавлен в чёрный список.',
+        updateSuccess: 'Запись обновлена.',
+        deleteSuccess: 'Водитель удалён из чёрного списка.',
+        error: 'Операция не удалась.',
+        missingFields: 'Пожалуйста, заполните все обязательные поля (имя, телефон, причина).',
       },
       disabled: {
         title: 'Отслеживание транспорта не включено',

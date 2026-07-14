@@ -126,7 +126,7 @@ export default function AdminVendorCalculator({ vendors, authToken, onUpdateUser
                 <thead>
                   <tr className="text-left text-[10px] font-bold text-slate-400 border-b border-slate-200">
                     <th className="py-1.5 pr-2">{t('adminVendorTools.busRecords.headers.tour')}</th>
-                    <th className="py-1.5 pr-2">{t('adminVendorTools.busRecords.headers.plateNumber')}</th>
+                    <th className="py-1.5 pr-2">{t('adminVendorTools.busRecords.headers.contactPhone')}</th>
                     <th className="py-1.5 pr-2">{t('adminVendorTools.busRecords.headers.description')}</th>
                     <th className="py-1.5 pr-2">{t('adminVendorTools.busRecords.headers.price')}</th>
                     <th className="py-1.5 pr-2">{t('adminVendorTools.busRecords.headers.date')}</th>
@@ -136,7 +136,7 @@ export default function AdminVendorCalculator({ vendors, authToken, onUpdateUser
                   {busRecords.map(bus => (
                     <tr key={bus.id} className="border-b border-slate-100">
                       <td className="py-1.5 pr-2">{bus.tourName}</td>
-                      <td className="py-1.5 pr-2 font-bold">{bus.plateNumber}</td>
+                      <td className="py-1.5 pr-2 font-bold">{bus.contactPhone}</td>
                       <td className="py-1.5 pr-2">{bus.vehicleDescription || '—'}</td>
                       <td className="py-1.5 pr-2">{bus.price} AZN</td>
                       <td className="py-1.5 pr-2">{bus.travelDate}</td>

@@ -23,7 +23,7 @@ export const adminVendorTools = {
         empty: 'Bu vendor üçün nəqliyyat qeydi yoxdur.',
         headers: {
           tour: 'Tur',
-          plateNumber: 'Nömrə',
+          contactPhone: 'Əlaqə nömrəsi',
           description: 'Təsvir',
           price: 'Qiymət',
           date: 'Tarix',
@@ -58,7 +58,7 @@ export const adminVendorTools = {
         empty: 'No transport records for this vendor.',
         headers: {
           tour: 'Tour',
-          plateNumber: 'Plate number',
+          contactPhone: 'Contact phone',
           description: 'Description',
           price: 'Price',
           date: 'Date',
@@ -93,7 +93,7 @@ export const adminVendorTools = {
         empty: 'Для этого вендора нет записей о транспорте.',
         headers: {
           tour: 'Тур',
-          plateNumber: 'Гос. номер',
+          contactPhone: 'Контактный телефон',
           description: 'Описание',
           price: 'Цена',
           date: 'Дата',

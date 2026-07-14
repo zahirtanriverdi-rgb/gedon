@@ -1991,7 +1991,7 @@ function rowToVendorBus(row: any) {
     vendorName: row.vendor_name || undefined,
     tourId: row.tour_id || undefined,
     tourName: row.tour_name,
-    plateNumber: row.plate_number || '',
+    contactPhone: row.contact_phone || '',
     vehicleDescription: row.bus_name || undefined,
     price: Number(row.price) || 0,
     travelDate: row.travel_date,
@@ -2044,9 +2044,9 @@ app.post("/api/vendor-buses", authenticateUser, async (req: any, res) => {
     }
 
     const body = req.body || {};
-    const { tourName, plateNumber, price, travelDate } = body;
-    if (!tourName || !plateNumber || price === undefined || !travelDate) {
-      return res.status(400).json({ error: "Zəhmət olmasa bütün məcburi sahələri doldurun (tourName, plateNumber, price, travelDate)." });
+    const { tourName, contactPhone, price, travelDate } = body;
+    if (!tourName || !contactPhone || price === undefined || !travelDate) {
+      return res.status(400).json({ error: "Zəhmət olmasa bütün məcburi sahələri doldurun (tourName, contactPhone, price, travelDate)." });
     }
 
     const vendorRows = await dbClient.query('SELECT name, company_name FROM users WHERE id = ?', [req.operator.id]);
@@ -2054,9 +2054,9 @@ app.post("/api/vendor-buses", authenticateUser, async (req: any, res) => {
 
     const id = `bus-${randomUUID()}`;
     await dbClient.execute(
-      `INSERT INTO vendor_buses (id, vendor_id, vendor_name, tour_id, tour_name, plate_number, bus_name, price, travel_date)
+      `INSERT INTO vendor_buses (id, vendor_id, vendor_name, tour_id, tour_name, contact_phone, bus_name, price, travel_date)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [id, req.operator.id, vendorName || null, body.tourId || null, tourName, plateNumber, body.vehicleDescription || null, Number(price), travelDate]
+      [id, req.operator.id, vendorName || null, body.tourId || null, tourName, contactPhone, body.vehicleDescription || null, Number(price), travelDate]
     );
 
     const rows = await dbClient.query('SELECT * FROM vendor_buses WHERE id = ?', [id]);
@@ -2079,18 +2079,18 @@ app.put("/api/vendor-buses/:id", authenticateUser, async (req: any, res) => {
     const body = req.body || {};
     const tourId = body.tourId !== undefined ? body.tourId : existing.tour_id;
     const tourName = body.tourName !== undefined ? body.tourName : existing.tour_name;
-    const plateNumber = body.plateNumber !== undefined ? body.plateNumber : existing.plate_number;
+    const contactPhone = body.contactPhone !== undefined ? body.contactPhone : existing.contact_phone;
     const vehicleDescription = body.vehicleDescription !== undefined ? body.vehicleDescription : existing.bus_name;
     const price = body.price !== undefined ? Number(body.price) : Number(existing.price);
     const travelDate = body.travelDate !== undefined ? body.travelDate : existing.travel_date;
 
-    if (!plateNumber) {
-      return res.status(400).json({ error: "Nömrə mütləq daxil edilməlidir." });
+    if (!contactPhone) {
+      return res.status(400).json({ error: "Əlaqə nömrəsi mütləq daxil edilməlidir." });
     }
 
     await dbClient.execute(
-      `UPDATE vendor_buses SET tour_id = ?, tour_name = ?, plate_number = ?, bus_name = ?, price = ?, travel_date = ? WHERE id = ?`,
-      [tourId || null, tourName, plateNumber, vehicleDescription || null, price, travelDate, req.params.id]
+      `UPDATE vendor_buses SET tour_id = ?, tour_name = ?, contact_phone = ?, bus_name = ?, price = ?, travel_date = ? WHERE id = ?`,
+      [tourId || null, tourName, contactPhone, vehicleDescription || null, price, travelDate, req.params.id]
     );
 
     const rows = await dbClient.query('SELECT * FROM vendor_buses WHERE id = ?', [req.params.id]);
@@ -2115,6 +2115,124 @@ app.delete("/api/vendor-buses/:id", authenticateUser, async (req: any, res) => {
   } catch (error: any) {
     console.error("[DELETE /api/vendor-buses/:id] error:", error);
     res.status(500).json({ error: "Avtobus qeydi silinə bilmədi: " + error.message });
+  }
+});
+
+// Driver blacklist — CRUD for "which drivers other vendors should avoid". Same shared-read /
+// owner-write model as vendor_buses, gated by the same busTrackingEnabled flag.
+function rowToDriverBlacklistEntry(row: any) {
+  return {
+    id: row.id,
+    vendorId: row.vendor_id,
+    vendorName: row.vendor_name || undefined,
+    driverName: row.driver_name,
+    phoneNumber: row.phone_number,
+    reason: row.reason,
+    createdAt: row.created_at,
+  };
+}
+
+app.get("/api/driver-blacklist", authenticateUser, async (req: any, res) => {
+  try {
+    const user = req.operator;
+    const conditions: string[] = [];
+    const params: any[] = [];
+
+    if (user.role === 'vendor') {
+      // Shared list — every vendor sees every reported driver.
+    } else if (user.role === 'admin') {
+      if (req.query.vendorId) { conditions.push('vendor_id = ?'); params.push(String(req.query.vendorId)); }
+    } else {
+      return res.status(403).json({ error: "Bu bölməyə icazəniz yoxdur." });
+    }
+
+    const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+    const rows = await dbClient.query(`SELECT * FROM driver_blacklist ${whereClause} ORDER BY created_at DESC`, params);
+    res.json({ entries: rows.map(rowToDriverBlacklistEntry) });
+  } catch (error: any) {
+    console.error("[GET /api/driver-blacklist] error:", error);
+    res.status(500).json({ error: "Qara siyahı gətirilə bilmədi: " + error.message });
+  }
+});
+
+app.post("/api/driver-blacklist", authenticateUser, async (req: any, res) => {
+  try {
+    if (req.operator.role !== 'vendor') {
+      return res.status(403).json({ error: "Yalnız operatorlar qara siyahıya əlavə edə bilər." });
+    }
+    if (!(await isBusTrackingEnabledForVendor(req.operator.id))) {
+      return res.status(403).json({ error: "Nəqliyyat izləmə bu hesab üçün aktiv deyil." });
+    }
+
+    const body = req.body || {};
+    const { driverName, phoneNumber, reason } = body;
+    if (!driverName || !phoneNumber || !reason) {
+      return res.status(400).json({ error: "Zəhmət olmasa bütün məcburi sahələri doldurun (driverName, phoneNumber, reason)." });
+    }
+
+    const vendorRows = await dbClient.query('SELECT name, company_name FROM users WHERE id = ?', [req.operator.id]);
+    const vendorName = vendorRows.length ? (vendorRows[0].company_name || vendorRows[0].name) : undefined;
+
+    const id = `blacklist-${randomUUID()}`;
+    await dbClient.execute(
+      `INSERT INTO driver_blacklist (id, vendor_id, vendor_name, driver_name, phone_number, reason)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [id, req.operator.id, vendorName || null, driverName, phoneNumber, reason]
+    );
+
+    const rows = await dbClient.query('SELECT * FROM driver_blacklist WHERE id = ?', [id]);
+    res.status(201).json({ entry: rowToDriverBlacklistEntry(rows[0]) });
+  } catch (error: any) {
+    console.error("[POST /api/driver-blacklist] error:", error);
+    res.status(500).json({ error: "Qara siyahıya əlavə edilə bilmədi: " + error.message });
+  }
+});
+
+app.put("/api/driver-blacklist/:id", authenticateUser, async (req: any, res) => {
+  try {
+    const existingRows = await dbClient.query('SELECT * FROM driver_blacklist WHERE id = ?', [req.params.id]);
+    if (!existingRows.length) return res.status(404).json({ error: "Qeyd tapılmadı." });
+    const existing = existingRows[0];
+    if (req.operator.role !== 'vendor' || existing.vendor_id !== req.operator.id) {
+      return res.status(403).json({ error: "Bu qeyd sizin hesabınıza aid deyil." });
+    }
+
+    const body = req.body || {};
+    const driverName = body.driverName !== undefined ? body.driverName : existing.driver_name;
+    const phoneNumber = body.phoneNumber !== undefined ? body.phoneNumber : existing.phone_number;
+    const reason = body.reason !== undefined ? body.reason : existing.reason;
+
+    if (!driverName || !phoneNumber || !reason) {
+      return res.status(400).json({ error: "Zəhmət olmasa bütün məcburi sahələri doldurun (driverName, phoneNumber, reason)." });
+    }
+
+    await dbClient.execute(
+      `UPDATE driver_blacklist SET driver_name = ?, phone_number = ?, reason = ? WHERE id = ?`,
+      [driverName, phoneNumber, reason, req.params.id]
+    );
+
+    const rows = await dbClient.query('SELECT * FROM driver_blacklist WHERE id = ?', [req.params.id]);
+    res.json({ entry: rowToDriverBlacklistEntry(rows[0]) });
+  } catch (error: any) {
+    console.error("[PUT /api/driver-blacklist/:id] error:", error);
+    res.status(500).json({ error: "Qeyd yenilənə bilmədi: " + error.message });
+  }
+});
+
+app.delete("/api/driver-blacklist/:id", authenticateUser, async (req: any, res) => {
+  try {
+    const existingRows = await dbClient.query('SELECT * FROM driver_blacklist WHERE id = ?', [req.params.id]);
+    if (!existingRows.length) return res.status(404).json({ error: "Qeyd tapılmadı." });
+    const existing = existingRows[0];
+    if (req.operator.role !== 'vendor' || existing.vendor_id !== req.operator.id) {
+      return res.status(403).json({ error: "Bu qeyd sizin hesabınıza aid deyil." });
+    }
+
+    await dbClient.execute('DELETE FROM driver_blacklist WHERE id = ?', [req.params.id]);
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error("[DELETE /api/driver-blacklist/:id] error:", error);
+    res.status(500).json({ error: "Qeyd silinə bilmədi: " + error.message });
   }
 });
 
