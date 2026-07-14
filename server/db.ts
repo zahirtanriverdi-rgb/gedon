@@ -265,6 +265,42 @@ export async function initializeDatabase() {
     );
   `);
 
+  // Vendor transport tracking — which vehicle (bus, offroad, etc.) a vendor sent to which tour
+  // departure, and at what cost. Admin-gated per vendor (users.extra_data.busTrackingEnabled).
+  // The list itself is shared/visible across all vendors (so operators can see what transport
+  // is already booked platform-wide); only the owning vendor may edit or delete their own rows.
+  // tour_name/vendor_name are snapshots so a record still reads fine if the tour is renamed or
+  // the vendor's display name changes later.
+  await dbClient.execute(`
+    CREATE TABLE IF NOT EXISTS vendor_buses (
+      id VARCHAR(255) PRIMARY KEY,
+      vendor_id VARCHAR(255) NOT NULL,
+      vendor_name VARCHAR(255),
+      tour_id VARCHAR(255),
+      tour_name VARCHAR(255) NOT NULL,
+      plate_number VARCHAR(255) NOT NULL DEFAULT '',
+      bus_name VARCHAR(255),
+      price DECIMAL NOT NULL,
+      travel_date VARCHAR(255) NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (vendor_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+  `);
+  await dbClient.execute(
+    `CREATE INDEX IF NOT EXISTS idx_vendor_buses_vendor ON vendor_buses(vendor_id)`
+  );
+  // Migration for the table as it existed before plate_number/vendor_name existed.
+  for (const alter of [
+    `ALTER TABLE vendor_buses ADD COLUMN plate_number VARCHAR(255) NOT NULL DEFAULT ''`,
+    `ALTER TABLE vendor_buses ADD COLUMN vendor_name VARCHAR(255)`,
+  ]) {
+    try {
+      await dbClient.execute(alter);
+    } catch {
+      // column already exists — safe to ignore
+    }
+  }
+
   // Reviews (anti-fake rating system: tied to a verified booking)
   await dbClient.execute(`
     CREATE TABLE IF NOT EXISTS reviews (

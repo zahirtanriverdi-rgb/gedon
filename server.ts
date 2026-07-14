@@ -171,6 +171,9 @@ function rowToUser(row: any) {
     isArchived: !!row.deleted_at,
     isManuallyDeactivated: !!row.is_manually_deactivated,
     emailVerified: !!row.email_verified_at,
+    calculatorEnabled: !!extra.calculatorEnabled,
+    busTrackingEnabled: !!extra.busTrackingEnabled,
+    calculatorConfig: extra.calculatorConfig || undefined,
   };
 }
 
@@ -381,6 +384,10 @@ app.put("/api/users/:id", authenticateUser, async (req: any, res) => {
     let extra: Record<string, any> = {};
     try { extra = existingRow.extra_data ? JSON.parse(existingRow.extra_data) : {}; } catch { extra = {}; }
     if (body.guides !== undefined) extra.guides = body.guides;
+    // Rate values (day rates, offroad/food unit prices) are self-service: a vendor tunes their
+    // own numbers same as admin can. Whether the calculator/bus-tracking tab exists at all stays
+    // an admin-only call below — a vendor can't turn the feature on for themselves.
+    if ((isAdmin || isSelf) && body.calculatorConfig !== undefined) extra.calculatorConfig = body.calculatorConfig;
 
     let username = existingRow.username;
     let passwordHash = existingRow.password_hash;
@@ -391,6 +398,8 @@ app.put("/api/users/:id", authenticateUser, async (req: any, res) => {
       if (body.password) passwordHash = await bcrypt.hash(body.password, 10);
       if (body.subscriptionValidUntil !== undefined) subscriptionValidUntil = body.subscriptionValidUntil;
       if (body.isManuallyDeactivated !== undefined) isManuallyDeactivated = !!body.isManuallyDeactivated;
+      if (body.calculatorEnabled !== undefined) extra.calculatorEnabled = !!body.calculatorEnabled;
+      if (body.busTrackingEnabled !== undefined) extra.busTrackingEnabled = !!body.busTrackingEnabled;
     }
 
     // Changing the email — whether the owner edits their own profile or an admin edits it for
@@ -1942,6 +1951,170 @@ app.put("/api/bookings/:id", authenticateUser, async (req: any, res) => {
   } catch (error: any) {
     console.error("[PUT /api/bookings/:id] error:", error);
     res.status(500).json({ error: "Rezervasiya yenilənə bilmədi: " + error.message });
+  }
+});
+
+// DELETE /api/bookings/:id — vendors may only delete their own bookings; admins may delete any.
+app.delete("/api/bookings/:id", authenticateUser, async (req: any, res) => {
+  try {
+    const existingRows = await dbClient.query('SELECT * FROM bookings WHERE id = ?', [req.params.id]);
+    if (!existingRows.length) return res.status(404).json({ error: "Rezervasiya tapılmadı." });
+
+    const existing = rowToBooking(existingRows[0]);
+    if (req.operator.role !== 'admin' && existing.vendorId !== req.operator.id) {
+      return res.status(403).json({ error: "Bu rezervasiya sizin hesabınıza aid deyil." });
+    }
+
+    // Cancelled bookings already freed their seats via PUT; only give seats back here
+    // if the booking being deleted was still occupying capacity.
+    if (existing.status !== 'cancelled') {
+      await dbClient.execute('UPDATE tour_slots SET booked_count = booked_count - ? WHERE id = ?', [Number(existing.participantsCount), existing.slotId]);
+    }
+
+    await dbClient.execute('DELETE FROM bookings WHERE id = ?', [req.params.id]);
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error("[DELETE /api/bookings/:id] error:", error);
+    res.status(500).json({ error: "Rezervasiya silinə bilmədi: " + error.message });
+  }
+});
+
+// Vendor transport tracking — CRUD for "which vehicle we sent to which tour departure, and at
+// what cost". Admin-gated per vendor via users.extra_data.busTrackingEnabled (see
+// PUT /api/users/:id). The list is shared: every vendor can read every record (so operators can
+// see what's already booked platform-wide), but only the owning vendor may write/edit/delete
+// their own rows — enforced below, not just hidden client-side.
+function rowToVendorBus(row: any) {
+  return {
+    id: row.id,
+    vendorId: row.vendor_id,
+    vendorName: row.vendor_name || undefined,
+    tourId: row.tour_id || undefined,
+    tourName: row.tour_name,
+    plateNumber: row.plate_number || '',
+    vehicleDescription: row.bus_name || undefined,
+    price: Number(row.price) || 0,
+    travelDate: row.travel_date,
+    createdAt: row.created_at,
+  };
+}
+
+async function isBusTrackingEnabledForVendor(vendorId: string): Promise<boolean> {
+  const rows = await dbClient.query('SELECT extra_data FROM users WHERE id = ?', [vendorId]);
+  if (!rows.length) return false;
+  try {
+    const extra = rows[0].extra_data ? JSON.parse(rows[0].extra_data) : {};
+    return !!extra.busTrackingEnabled;
+  } catch {
+    return false;
+  }
+}
+
+app.get("/api/vendor-buses", authenticateUser, async (req: any, res) => {
+  try {
+    const user = req.operator;
+    const conditions: string[] = [];
+    const params: any[] = [];
+
+    if (user.role === 'vendor') {
+      // Shared list — every vendor sees every vendor's transport records (so operators can see
+      // what's already booked platform-wide). Writes stay owner-scoped in POST/PUT/DELETE below.
+    } else if (user.role === 'admin') {
+      if (req.query.vendorId) { conditions.push('vendor_id = ?'); params.push(String(req.query.vendorId)); }
+    } else {
+      return res.status(403).json({ error: "Bu bölməyə icazəniz yoxdur." });
+    }
+
+    const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+    const rows = await dbClient.query(`SELECT * FROM vendor_buses ${whereClause} ORDER BY travel_date DESC, created_at DESC`, params);
+    res.json({ buses: rows.map(rowToVendorBus) });
+  } catch (error: any) {
+    console.error("[GET /api/vendor-buses] error:", error);
+    res.status(500).json({ error: "Avtobus qeydləri gətirilə bilmədi: " + error.message });
+  }
+});
+
+app.post("/api/vendor-buses", authenticateUser, async (req: any, res) => {
+  try {
+    if (req.operator.role !== 'vendor') {
+      return res.status(403).json({ error: "Yalnız operatorlar avtobus qeydi əlavə edə bilər." });
+    }
+    if (!(await isBusTrackingEnabledForVendor(req.operator.id))) {
+      return res.status(403).json({ error: "Avtobus izləmə bu hesab üçün aktiv deyil." });
+    }
+
+    const body = req.body || {};
+    const { tourName, plateNumber, price, travelDate } = body;
+    if (!tourName || !plateNumber || price === undefined || !travelDate) {
+      return res.status(400).json({ error: "Zəhmət olmasa bütün məcburi sahələri doldurun (tourName, plateNumber, price, travelDate)." });
+    }
+
+    const vendorRows = await dbClient.query('SELECT name, company_name FROM users WHERE id = ?', [req.operator.id]);
+    const vendorName = vendorRows.length ? (vendorRows[0].company_name || vendorRows[0].name) : undefined;
+
+    const id = `bus-${randomUUID()}`;
+    await dbClient.execute(
+      `INSERT INTO vendor_buses (id, vendor_id, vendor_name, tour_id, tour_name, plate_number, bus_name, price, travel_date)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [id, req.operator.id, vendorName || null, body.tourId || null, tourName, plateNumber, body.vehicleDescription || null, Number(price), travelDate]
+    );
+
+    const rows = await dbClient.query('SELECT * FROM vendor_buses WHERE id = ?', [id]);
+    res.status(201).json({ bus: rowToVendorBus(rows[0]) });
+  } catch (error: any) {
+    console.error("[POST /api/vendor-buses] error:", error);
+    res.status(500).json({ error: "Avtobus qeydi yaradıla bilmədi: " + error.message });
+  }
+});
+
+app.put("/api/vendor-buses/:id", authenticateUser, async (req: any, res) => {
+  try {
+    const existingRows = await dbClient.query('SELECT * FROM vendor_buses WHERE id = ?', [req.params.id]);
+    if (!existingRows.length) return res.status(404).json({ error: "Avtobus qeydi tapılmadı." });
+    const existing = existingRows[0];
+    if (req.operator.role !== 'vendor' || existing.vendor_id !== req.operator.id) {
+      return res.status(403).json({ error: "Bu qeyd sizin hesabınıza aid deyil." });
+    }
+
+    const body = req.body || {};
+    const tourId = body.tourId !== undefined ? body.tourId : existing.tour_id;
+    const tourName = body.tourName !== undefined ? body.tourName : existing.tour_name;
+    const plateNumber = body.plateNumber !== undefined ? body.plateNumber : existing.plate_number;
+    const vehicleDescription = body.vehicleDescription !== undefined ? body.vehicleDescription : existing.bus_name;
+    const price = body.price !== undefined ? Number(body.price) : Number(existing.price);
+    const travelDate = body.travelDate !== undefined ? body.travelDate : existing.travel_date;
+
+    if (!plateNumber) {
+      return res.status(400).json({ error: "Nömrə mütləq daxil edilməlidir." });
+    }
+
+    await dbClient.execute(
+      `UPDATE vendor_buses SET tour_id = ?, tour_name = ?, plate_number = ?, bus_name = ?, price = ?, travel_date = ? WHERE id = ?`,
+      [tourId || null, tourName, plateNumber, vehicleDescription || null, price, travelDate, req.params.id]
+    );
+
+    const rows = await dbClient.query('SELECT * FROM vendor_buses WHERE id = ?', [req.params.id]);
+    res.json({ bus: rowToVendorBus(rows[0]) });
+  } catch (error: any) {
+    console.error("[PUT /api/vendor-buses/:id] error:", error);
+    res.status(500).json({ error: "Avtobus qeydi yenilənə bilmədi: " + error.message });
+  }
+});
+
+app.delete("/api/vendor-buses/:id", authenticateUser, async (req: any, res) => {
+  try {
+    const existingRows = await dbClient.query('SELECT * FROM vendor_buses WHERE id = ?', [req.params.id]);
+    if (!existingRows.length) return res.status(404).json({ error: "Avtobus qeydi tapılmadı." });
+    const existing = existingRows[0];
+    if (req.operator.role !== 'vendor' || existing.vendor_id !== req.operator.id) {
+      return res.status(403).json({ error: "Bu qeyd sizin hesabınıza aid deyil." });
+    }
+
+    await dbClient.execute('DELETE FROM vendor_buses WHERE id = ?', [req.params.id]);
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error("[DELETE /api/vendor-buses/:id] error:", error);
+    res.status(500).json({ error: "Avtobus qeydi silinə bilmədi: " + error.message });
   }
 });
 

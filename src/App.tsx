@@ -619,6 +619,10 @@ export default function App() {
   // `currentUser` object in place and every other view keeps showing the old value.
   const handleVendorProfileUpdated = (updatedUser: User) => {
     setUsers(prev => prev.map(u => u.id === updatedUser.id ? { ...u, ...updatedUser } : u));
+    // `currentUser` inside VendorPortal comes from `loggedInVendor`, a separate piece of state
+    // set once at login — without this, a vendor's own profile/rate edits save correctly to the
+    // server but never show up in their own session until they log out and back in.
+    setLoggedInVendor(prev => (prev && prev.id === updatedUser.id ? { ...prev, ...updatedUser } : prev));
   };
 
   const handleAddSlot = async (newSlot: TourSlot) => {
@@ -791,6 +795,33 @@ export default function App() {
     } catch (e: any) {
       showNotification(e.message || t('app.notifications.bookingUpdateError'), 'error');
       throw e; // let the caller (e.g. VendorPortal's CRM table) know the update failed too
+    }
+  };
+
+  const handleDeleteBooking = async (bookingId: string) => {
+    try {
+      const response = await fetch(`/api/bookings/${bookingId}`, { method: 'DELETE', headers: authHeaders() });
+      if (!response.ok) {
+        const data = await parseApiResponse(response);
+        throw new Error(data.error || 'Rezervasiya silinə bilmədi.');
+      }
+
+      const deleted = bookings.find(b => b.id === bookingId);
+      setBookings(prev => prev.filter(b => b.id !== bookingId));
+      if (deleted) {
+        const slotsResponse = await fetch(`/api/slots?tourId=${deleted.tourId}`);
+        if (slotsResponse.ok) {
+          const slotsData = await slotsResponse.json();
+          setSlots(prev => prev.map(s => {
+            const refreshed = slotsData.slots.find((rs: TourSlot) => rs.id === s.id);
+            return refreshed || s;
+          }));
+        }
+      }
+      showNotification(t('app.notifications.bookingDeleted'), 'success');
+    } catch (e: any) {
+      showNotification(e.message || t('app.notifications.bookingDeleteError'), 'error');
+      throw e;
     }
   };
 
@@ -1231,6 +1262,7 @@ export default function App() {
                     onShowNotification={showNotification}
                     onApproveBooking={handleApproveBooking}
                     onEditBooking={handleEditBooking}
+                    onDeleteBooking={handleDeleteBooking}
                     onAddBooking={handleAddBooking}
                     onUpdateSlotBookedCount={handleUpdateSlotBookedCount}
                     exchangeRates={exchangeRates}

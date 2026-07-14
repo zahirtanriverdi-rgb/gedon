@@ -5,6 +5,7 @@ import { InternationalTourForm } from './vendor/InternationalTourForm';
 import { useLanguage } from '../i18n/LanguageContext';
 import DashboardSidebarLayout, { DashboardNavItem } from './layout/DashboardSidebarLayout';
 import AdminCampSites from './admin/AdminCampSites';
+import AdminVendorCalculator from './admin/AdminVendorCalculator';
 import StatCard from './layout/StatCard';
 import LanguageSwitcher from './LanguageSwitcher';
 import EmailVerificationCard from './EmailVerificationCard';
@@ -1242,6 +1243,14 @@ export default function AdminPortal({
               })}
             </div>
           </div>
+
+          {/* Section: Guide Calculator & Bus Tracking — per-vendor toggles + rate config */}
+          <AdminVendorCalculator
+            vendors={users}
+            authToken={authToken}
+            onUpdateUser={onUpdateUser}
+            onShowNotification={onShowNotification}
+          />
 
           {/* Section: Create New Vendor/Operator Account */}
           <div className="bg-white p-5 rounded-xl border border-slate-200 space-y-4 shadow-xs">
