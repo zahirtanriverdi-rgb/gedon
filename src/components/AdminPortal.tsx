@@ -7,6 +7,7 @@ import DashboardSidebarLayout, { DashboardNavItem } from './layout/DashboardSide
 import AdminCampSites from './admin/AdminCampSites';
 import StatCard from './layout/StatCard';
 import LanguageSwitcher from './LanguageSwitcher';
+import EmailVerificationCard from './EmailVerificationCard';
 import {
   Building,
   Calculator,
@@ -29,7 +30,9 @@ import {
   Compass,
   Building2,
   Settings,
-  Tent
+  Tent,
+  Power,
+  Mail
 } from 'lucide-react';
 
 function isTourInternational(t: Tour): boolean {
@@ -179,6 +182,67 @@ export default function AdminPortal({
     if (onUpdatePriceCalculatorConfig) onUpdatePriceCalculatorConfig(pcConfig);
   };
 
+  // Admin-controlled feature flag (settings table, group_calculator_enabled) — mirrors the
+  // camp sites on/off switch in AdminCampSites.tsx. campPointsPerSite/campRewardThreshold ride
+  // along because PUT /api/admin/settings saves all three together; refetching every time this
+  // tab is opened (rather than once on AdminPortal mount) keeps them from clobbering a value
+  // just edited in the separate campSites tab.
+  const [groupCalcSettings, setGroupCalcSettings] = useState<{
+    campPointsPerSite: number;
+    campRewardThreshold: number;
+    groupCalculatorEnabled: boolean;
+  } | null>(null);
+  const [togglingGroupCalculator, setTogglingGroupCalculator] = useState(false);
+
+  const adminSettingsAuthHeaders = React.useMemo(() => ({
+    'Content-Type': 'application/json',
+    ...(authToken ? { Authorization: `Bearer ${authToken}` } : {})
+  }), [authToken]);
+
+  useEffect(() => {
+    if (activeSection !== 'settings') return;
+    fetch('/api/admin/settings', { headers: adminSettingsAuthHeaders })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!data) return;
+        setGroupCalcSettings({
+          campPointsPerSite: Number(data.campPointsPerSite) || 10,
+          campRewardThreshold: Number(data.campRewardThreshold) || 100,
+          groupCalculatorEnabled: data.groupCalculatorEnabled !== false,
+        });
+      })
+      .catch(() => {});
+  }, [activeSection, adminSettingsAuthHeaders]);
+
+  const handleToggleGroupCalculator = async () => {
+    if (!groupCalcSettings) return;
+    const next = !groupCalcSettings.groupCalculatorEnabled;
+    setTogglingGroupCalculator(true);
+    try {
+      const res = await fetch('/api/admin/settings', {
+        method: 'PUT',
+        headers: adminSettingsAuthHeaders,
+        body: JSON.stringify({
+          campPointsPerSite: groupCalcSettings.campPointsPerSite,
+          campRewardThreshold: groupCalcSettings.campRewardThreshold,
+          groupCalculatorEnabled: next,
+        }),
+      });
+      if (!res.ok) throw new Error();
+      setGroupCalcSettings({ ...groupCalcSettings, groupCalculatorEnabled: next });
+      if (onShowNotification) {
+        onShowNotification(
+          t(next ? 'adminPortal.priceCalculator.featureEnabledNotification' : 'adminPortal.priceCalculator.featureDisabledNotification'),
+          next ? 'success' : 'info'
+        );
+      }
+    } catch {
+      if (onShowNotification) onShowNotification(t('adminPortal.priceCalculator.settingsError'), 'error');
+    } finally {
+      setTogglingGroupCalculator(false);
+    }
+  };
+
   const [cbarLoading, setCbarLoading] = useState<boolean>(false);
   const [approvingTourIds, setApprovingTourIds] = useState<Set<string>>(new Set());
 
@@ -287,6 +351,99 @@ export default function AdminPortal({
       if (onShowNotification) onShowNotification(t('adminPortal.whatsappConnection.logoutSuccess'), 'info');
     } finally {
       setWhatsappActionLoading(false);
+    }
+  };
+
+  // Outbound email config (Resend or the vendor's own domain SMTP) — currently only powers the
+  // forgot-password flow. Secrets (API key / SMTP password) are never echoed back by GET, so
+  // resendApiKey/smtpPassword here always start blank; only a freshly-typed value is sent on
+  // save, and the "…Configured" flags drive the "already set" hint in the UI.
+  const [emailProvider, setEmailProvider] = useState<'none' | 'resend' | 'smtp'>('none');
+  const [resendApiKey, setResendApiKey] = useState('');
+  const [resendApiKeyConfigured, setResendApiKeyConfigured] = useState(false);
+  const [resendFromEmail, setResendFromEmail] = useState('');
+  const [resendFromName, setResendFromName] = useState('');
+  const [smtpHost, setSmtpHost] = useState('');
+  const [smtpPort, setSmtpPort] = useState<number>(587);
+  const [smtpSecure, setSmtpSecure] = useState(false);
+  const [smtpUser, setSmtpUser] = useState('');
+  const [smtpPassword, setSmtpPassword] = useState('');
+  const [smtpPasswordConfigured, setSmtpPasswordConfigured] = useState(false);
+  const [smtpFromEmail, setSmtpFromEmail] = useState('');
+  const [smtpFromName, setSmtpFromName] = useState('');
+  const [emailSettingsSaving, setEmailSettingsSaving] = useState(false);
+  const [emailTestSending, setEmailTestSending] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/admin/email-settings', { headers: whatsappAuthHeaders });
+        if (!res.ok || cancelled) return;
+        const data = await res.json();
+        setEmailProvider(data.activeProvider);
+        setResendApiKeyConfigured(!!data.resend?.apiKeyConfigured);
+        setResendFromEmail(data.resend?.fromEmail || '');
+        setResendFromName(data.resend?.fromName || '');
+        setSmtpHost(data.smtp?.host || '');
+        setSmtpPort(data.smtp?.port || 587);
+        setSmtpSecure(!!data.smtp?.secure);
+        setSmtpUser(data.smtp?.user || '');
+        setSmtpPasswordConfigured(!!data.smtp?.passwordConfigured);
+        setSmtpFromEmail(data.smtp?.fromEmail || '');
+        setSmtpFromName(data.smtp?.fromName || '');
+      } catch {
+        // Silent — the card simply keeps its defaults if this fails.
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [whatsappAuthHeaders]);
+
+  const handleSaveEmailSettings = async () => {
+    setEmailSettingsSaving(true);
+    try {
+      const res = await fetch('/api/admin/email-settings', {
+        method: 'PUT',
+        headers: whatsappAuthHeaders,
+        body: JSON.stringify({
+          activeProvider: emailProvider,
+          resendApiKey: resendApiKey || undefined,
+          resendFromEmail,
+          resendFromName,
+          smtpHost,
+          smtpPort: Number(smtpPort) || 587,
+          smtpSecure,
+          smtpUser,
+          smtpPassword: smtpPassword || undefined,
+          smtpFromEmail,
+          smtpFromName,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Unknown error');
+      setResendApiKeyConfigured(!!data.resend?.apiKeyConfigured);
+      setSmtpPasswordConfigured(!!data.smtp?.passwordConfigured);
+      setResendApiKey('');
+      setSmtpPassword('');
+      if (onShowNotification) onShowNotification(t('adminPortal.emailSettings.saveSuccess'), 'success');
+    } catch (err: any) {
+      if (onShowNotification) onShowNotification(t('adminPortal.emailSettings.saveError', { message: err.message }), 'error');
+    } finally {
+      setEmailSettingsSaving(false);
+    }
+  };
+
+  const handleTestEmailSettings = async () => {
+    setEmailTestSending(true);
+    try {
+      const res = await fetch('/api/admin/email-settings/test', { method: 'POST', headers: whatsappAuthHeaders });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Unknown error');
+      if (onShowNotification) onShowNotification(t('adminPortal.emailSettings.testSuccess'), 'success');
+    } catch (err: any) {
+      if (onShowNotification) onShowNotification(t('adminPortal.emailSettings.testError', { message: err.message }), 'error');
+    } finally {
+      setEmailTestSending(false);
     }
   };
 
@@ -512,13 +669,48 @@ export default function AdminPortal({
 
           {/* Section: Price Calculator Cost Elements */}
           <div className="bg-white p-5 rounded-xl border border-slate-200 space-y-4 shadow-xs">
-            <h3 className="text-xs font-bold text-slate-400 tracking-widest flex items-center gap-1.5">
-              <Calculator className="w-4 h-4 text-emerald-700" />
-              {t('adminPortal.priceCalculator.title')}
-            </h3>
-            <p className="text-xs text-slate-500 leading-normal">
-              {t('adminPortal.priceCalculator.description')}
-            </p>
+            <div className="flex items-start justify-between gap-4 flex-wrap">
+              <div>
+                <h3 className="text-xs font-bold text-slate-400 tracking-widest flex items-center gap-1.5">
+                  <Calculator className="w-4 h-4 text-emerald-700" />
+                  {t('adminPortal.priceCalculator.title')}
+                </h3>
+                <p className="text-xs text-slate-500 leading-normal mt-1.5">
+                  {t('adminPortal.priceCalculator.description')}
+                </p>
+              </div>
+              {/* Feature on/off switch: hides/shows the "Qrup hesabla" nav button on the customer side */}
+              {groupCalcSettings && (
+                <div className="flex items-center gap-3">
+                  <div className="text-right">
+                    <div className={`text-xs font-black ${groupCalcSettings.groupCalculatorEnabled ? 'text-emerald-700' : 'text-slate-400'}`}>
+                      {t(groupCalcSettings.groupCalculatorEnabled ? 'adminPortal.priceCalculator.featureOn' : 'adminPortal.priceCalculator.featureOff')}
+                    </div>
+                    <div className="text-[10px] text-slate-400 font-semibold max-w-[220px]">
+                      {t('adminPortal.priceCalculator.featureToggleHint')}
+                    </div>
+                  </div>
+                  <button
+                    onClick={handleToggleGroupCalculator}
+                    disabled={togglingGroupCalculator}
+                    role="switch"
+                    aria-checked={groupCalcSettings.groupCalculatorEnabled}
+                    title={t('adminPortal.priceCalculator.featureToggleHint')}
+                    className={`relative w-14 h-8 rounded-full transition-colors cursor-pointer disabled:opacity-60 shrink-0 ${
+                      groupCalcSettings.groupCalculatorEnabled ? 'bg-emerald-600' : 'bg-slate-300'
+                    }`}
+                  >
+                    <span
+                      className={`absolute top-1 w-6 h-6 bg-white rounded-full shadow-md flex items-center justify-center transition-all ${
+                        groupCalcSettings.groupCalculatorEnabled ? 'left-7' : 'left-1'
+                      }`}
+                    >
+                      <Power className={`w-3.5 h-3.5 ${groupCalcSettings.groupCalculatorEnabled ? 'text-emerald-600' : 'text-slate-400'}`} />
+                    </span>
+                  </button>
+                </div>
+              )}
+            </div>
 
             <div>
               <h4 className="text-[10px] font-extrabold text-slate-400 tracking-wide mb-2">{t('adminPortal.priceCalculator.destinationsLabel')}</h4>
@@ -759,6 +951,174 @@ export default function AdminPortal({
               )}
             </div>
           </div>
+
+          {/* Section: Outbound Email (Forgot Password) */}
+          <div className="bg-white p-5 rounded-xl border border-slate-200 space-y-4 shadow-xs">
+            <h3 className="text-xs font-bold text-slate-400 tracking-widest flex items-center gap-1.5">
+              <Mail className="w-4 h-4 text-emerald-700" />
+              {t('adminPortal.emailSettings.title')}
+            </h3>
+            <p className="text-xs text-slate-500 leading-normal">
+              {t('adminPortal.emailSettings.description')}
+            </p>
+
+            <div className="flex flex-wrap gap-2">
+              {(['none', 'resend', 'smtp'] as const).map((provider) => (
+                <button
+                  key={provider}
+                  type="button"
+                  onClick={() => setEmailProvider(provider)}
+                  className={`text-xs font-bold px-3 py-2 rounded-lg border transition-all ${
+                    emailProvider === provider
+                      ? 'bg-emerald-600 text-white border-emerald-600'
+                      : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
+                  }`}
+                >
+                  {t(`adminPortal.emailSettings.provider_${provider}`)}
+                </button>
+              ))}
+            </div>
+
+            {emailProvider === 'resend' && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-3 border-t border-slate-100">
+                <div className="md:col-span-2">
+                  <label className="block text-[10px] font-bold text-slate-400 mb-1">
+                    {t('adminPortal.emailSettings.resendApiKeyLabel')}
+                  </label>
+                  <input
+                    type="password"
+                    value={resendApiKey}
+                    onChange={(e) => setResendApiKey(e.target.value)}
+                    placeholder={resendApiKeyConfigured ? t('adminPortal.emailSettings.secretConfiguredPlaceholder') : 're_...'}
+                    className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono"
+                  />
+                  {resendApiKeyConfigured && (
+                    <span className="text-[10px] text-emerald-600 font-semibold">{t('adminPortal.emailSettings.secretConfiguredHint')}</span>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 mb-1">{t('adminPortal.emailSettings.fromEmailLabel')}</label>
+                  <input
+                    type="email"
+                    value={resendFromEmail}
+                    onChange={(e) => setResendFromEmail(e.target.value)}
+                    placeholder="noreply@sizinsayt.com"
+                    className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 mb-1">{t('adminPortal.emailSettings.fromNameLabel')}</label>
+                  <input
+                    type="text"
+                    value={resendFromName}
+                    onChange={(e) => setResendFromName(e.target.value)}
+                    className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+                  />
+                </div>
+              </div>
+            )}
+
+            {emailProvider === 'smtp' && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-3 border-t border-slate-100">
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 mb-1">{t('adminPortal.emailSettings.smtpHostLabel')}</label>
+                  <input
+                    type="text"
+                    value={smtpHost}
+                    onChange={(e) => setSmtpHost(e.target.value)}
+                    placeholder="smtp.zoho.com"
+                    className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 mb-1">{t('adminPortal.emailSettings.smtpPortLabel')}</label>
+                  <input
+                    type="number"
+                    value={smtpPort}
+                    onChange={(e) => setSmtpPort(Number(e.target.value))}
+                    className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 mb-1">{t('adminPortal.emailSettings.smtpUserLabel')}</label>
+                  <input
+                    type="text"
+                    value={smtpUser}
+                    onChange={(e) => setSmtpUser(e.target.value)}
+                    className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 mb-1">{t('adminPortal.emailSettings.smtpPasswordLabel')}</label>
+                  <input
+                    type="password"
+                    value={smtpPassword}
+                    onChange={(e) => setSmtpPassword(e.target.value)}
+                    placeholder={smtpPasswordConfigured ? t('adminPortal.emailSettings.secretConfiguredPlaceholder') : '••••••••'}
+                    className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+                  />
+                  {smtpPasswordConfigured && (
+                    <span className="text-[10px] text-emerald-600 font-semibold">{t('adminPortal.emailSettings.secretConfiguredHint')}</span>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 mb-1">{t('adminPortal.emailSettings.fromEmailLabel')}</label>
+                  <input
+                    type="email"
+                    value={smtpFromEmail}
+                    onChange={(e) => setSmtpFromEmail(e.target.value)}
+                    placeholder="noreply@sizinsayt.com"
+                    className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-slate-400 mb-1">{t('adminPortal.emailSettings.fromNameLabel')}</label>
+                  <input
+                    type="text"
+                    value={smtpFromName}
+                    onChange={(e) => setSmtpFromName(e.target.value)}
+                    className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+                  />
+                </div>
+                <label className="flex items-center gap-2 text-xs text-slate-600 md:col-span-2">
+                  <input type="checkbox" checked={smtpSecure} onChange={(e) => setSmtpSecure(e.target.checked)} />
+                  {t('adminPortal.emailSettings.smtpSecureLabel')}
+                </label>
+              </div>
+            )}
+
+            <div className="flex flex-wrap gap-3 pt-2">
+              <button
+                type="button"
+                disabled={emailSettingsSaving}
+                onClick={handleSaveEmailSettings}
+                className="bg-slate-950 hover:bg-slate-900 disabled:opacity-50 text-white font-bold text-xs px-4 py-2 rounded-lg transition-all"
+              >
+                {emailSettingsSaving ? t('adminPortal.emailSettings.saving') : t('adminPortal.common.save')}
+              </button>
+              {emailProvider !== 'none' && (
+                <button
+                  type="button"
+                  disabled={emailTestSending}
+                  onClick={handleTestEmailSettings}
+                  className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-bold text-xs px-4 py-2 rounded-lg transition-all"
+                >
+                  {emailTestSending ? t('adminPortal.emailSettings.testSending') : t('adminPortal.emailSettings.testButton')}
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Section: My Account — Recovery Email Verification (distinct from the outbound
+              provider settings above: this is the admin's OWN account proving it controls its
+              email, which forgot-password requires before it will ever mail a reset link) */}
+          <EmailVerificationCard
+            key={currentUser.email}
+            email={currentUser.email}
+            verified={!!currentUser.emailVerified}
+            authToken={authToken}
+            onShowNotification={onShowNotification}
+          />
 
         </div>
       )}

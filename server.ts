@@ -8,9 +8,10 @@ import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import { randomUUID } from "crypto";
+import { randomUUID, randomBytes, createHash } from "crypto";
 import { initializeDatabase } from "./server/db.ts";
 import dbClient from "./server/db.ts";
+import { getEmailConfigMasked, updateEmailConfig, sendEmail } from "./server/email.ts";
 import { scheduleTourTranslation, scheduleUserTranslation } from "./server/translate.ts";
 import { generateUniqueSlug } from "./server/slugify.ts";
 import {
@@ -25,8 +26,11 @@ import {
 } from "./server/whatsapp.ts";
 import {
   validateCampSiteSubmission,
+  validateAdminCampSiteInput,
+  insertAdminCampSite,
   findNearbyDuplicate,
   insertCampSite,
+  toDbBool,
   rowToPublicCampSite,
   rowToAdminCampSite,
   normalizeAzPhone,
@@ -34,10 +38,12 @@ import {
   getContributorStats,
   getCampPointsConfig,
   isCampSitesEnabled,
+  isGroupCalculatorEnabled,
   listContributors,
   setSetting,
 } from "./server/campSites.ts";
 import { parseBboxParam, getPoisForBbox } from "./server/overpass.ts";
+import { resolveGoogleMapsLink } from "./server/geo.ts";
 
 const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
@@ -164,6 +170,7 @@ function rowToUser(row: any) {
     createdAt: row.created_at,
     isArchived: !!row.deleted_at,
     isManuallyDeactivated: !!row.is_manually_deactivated,
+    emailVerified: !!row.email_verified_at,
   };
 }
 
@@ -386,9 +393,16 @@ app.put("/api/users/:id", authenticateUser, async (req: any, res) => {
       if (body.isManuallyDeactivated !== undefined) isManuallyDeactivated = !!body.isManuallyDeactivated;
     }
 
+    // Changing the email — whether the owner edits their own profile or an admin edits it for
+    // them — always throws away any prior verification. Otherwise an admin (or an attacker who
+    // compromised the profile form) could repoint a vendor's account at an inbox they don't
+    // control while keeping the "verified, safe for password-reset" status of the OLD address.
+    const emailChanged = email !== existingRow.email;
+    const emailVerifiedAt = emailChanged ? null : existingRow.email_verified_at;
+
     await dbClient.execute(
-      `UPDATE users SET name = ?, email = ?, username = ?, password_hash = ?, phone = ?, company_name = ?, avatar = ?, about = ?, subscription_valid_until = ?, extra_data = ?, is_manually_deactivated = ? WHERE id = ?`,
-      [name, email, username, passwordHash, phone, companyName, avatar, about, subscriptionValidUntil, JSON.stringify(extra), isManuallyDeactivated ? 1 : 0, req.params.id]
+      `UPDATE users SET name = ?, email = ?, username = ?, password_hash = ?, phone = ?, company_name = ?, avatar = ?, about = ?, subscription_valid_until = ?, extra_data = ?, is_manually_deactivated = ?, email_verified_at = ? WHERE id = ?`,
+      [name, email, username, passwordHash, phone, companyName, avatar, about, subscriptionValidUntil, JSON.stringify(extra), isManuallyDeactivated ? 1 : 0, emailVerifiedAt, req.params.id]
     );
 
     const updatedRows = await dbClient.query('SELECT * FROM users WHERE id = ?', [req.params.id]);
@@ -427,6 +441,192 @@ app.post("/api/auth/change-password", authenticateUser, async (req: any, res) =>
   } catch (error: any) {
     console.error("[POST /api/auth/change-password] error:", error);
     res.status(500).json({ error: "Şifrə yenilənə bilmədi: " + error.message });
+  }
+});
+
+// POST /api/auth/send-email-verification — the logged-in admin/vendor asks to prove they
+// control their OWN account's current email (not a draft value from an unsaved profile-form
+// edit) before it's trusted as a password-reset destination. A fresh code always overwrites any
+// unused previous one, so only the most recently sent code is ever valid.
+app.post("/api/auth/send-email-verification", authenticateUser, async (req: any, res) => {
+  try {
+    const rows = await dbClient.query('SELECT * FROM users WHERE id = ?', [req.operator.id]);
+    if (!rows.length) return res.status(404).json({ error: "İstifadəçi tapılmadı." });
+    const user = rows[0];
+
+    // 6-digit numeric code — short-lived (10 min) and single-use, so a 6-digit search space
+    // isn't the weak point a reset token would be; hashed the same way reset_token is, so the
+    // plaintext code only ever exists in the email itself, never at rest in the DB.
+    const code = String(Math.floor(100000 + Math.random() * 900000));
+    const codeHash = createHash("sha256").update(code).digest("hex");
+    const expires = new Date(Date.now() + 10 * 60 * 1000);
+
+    await dbClient.execute(
+      `UPDATE users SET email_verification_code = ?, email_verification_expires = ? WHERE id = ?`,
+      [codeHash, expires.toISOString(), user.id]
+    );
+
+    await sendEmail({
+      to: user.email,
+      subject: "E-poçt təsdiqləmə kodu - GedəkGörək",
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; color: #1e293b;">
+          <h2 style="color: #047857;">E-poçt ünvanınızı təsdiqləyin</h2>
+          <p>Salam ${user.name || ""},</p>
+          <p>Şifrə bərpası üçün bu e-poçt ünvanının sizə aid olduğunu təsdiqləmək üçün aşağıdakı kodu daxil edin. Kod 10 dəqiqə ərzində etibarlıdır.</p>
+          <p style="font-size: 28px; font-weight: bold; letter-spacing: 4px; color: #047857; margin: 24px 0;">${code}</p>
+          <p style="font-size: 12px; color: #64748b;">Əgər bu tələbi siz etməmisinizsə, bu emaili nəzərə almaya bilərsiniz.</p>
+        </div>
+      `
+    });
+
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error("[POST /api/auth/send-email-verification] error:", error);
+    // Unlike forgot-password, there's no user-enumeration concern here — the caller is already
+    // authenticated as this exact account — so the real error (e.g. "email sending disabled")
+    // is safe and useful to surface.
+    res.status(500).json({ error: error.message || "Təsdiqləmə kodu göndərilə bilmədi." });
+  }
+});
+
+// POST /api/auth/verify-email — consumes a code minted by /api/auth/send-email-verification
+// above and marks the CALLER's own account email as verified.
+app.post("/api/auth/verify-email", authenticateUser, async (req: any, res) => {
+  const code = String((req.body || {}).code || "").trim();
+  if (!code) {
+    return res.status(400).json({ error: "Təsdiqləmə kodunu daxil edin." });
+  }
+
+  try {
+    const rows = await dbClient.query('SELECT * FROM users WHERE id = ?', [req.operator.id]);
+    if (!rows.length) return res.status(404).json({ error: "İstifadəçi tapılmadı." });
+    const user = rows[0];
+
+    const codeHash = createHash("sha256").update(code).digest("hex");
+    if (
+      !user.email_verification_code ||
+      user.email_verification_code !== codeHash ||
+      !user.email_verification_expires ||
+      new Date(user.email_verification_expires).getTime() < Date.now()
+    ) {
+      return res.status(400).json({ error: "Kod yanlışdır və ya vaxtı bitib. Yenidən kod göndərin." });
+    }
+
+    await dbClient.execute(
+      `UPDATE users SET email_verified_at = CURRENT_TIMESTAMP, email_verification_code = NULL, email_verification_expires = NULL WHERE id = ?`,
+      [user.id]
+    );
+
+    const updatedRows = await dbClient.query('SELECT * FROM users WHERE id = ?', [user.id]);
+    res.json({ success: true, user: rowToUser(updatedRows[0]) });
+  } catch (error: any) {
+    console.error("[POST /api/auth/verify-email] error:", error);
+    res.status(500).json({ error: "Kod yoxlanıla bilmədi: " + error.message });
+  }
+});
+
+// POST /api/auth/forgot-password — logged-out admin/vendor requests a reset link by email
+// (or, for vendors, by username — same field the login screen accepts). Always responds with
+// the same generic success message whether or not the account exists, so this endpoint can't
+// be used to enumerate registered emails/usernames.
+// The raw token is only ever emailed to the user — the DB stores just its SHA-256 hash (see
+// server/db.ts's reset_token migration), so a database leak alone can't be replayed as a
+// working reset link.
+app.post("/api/auth/forgot-password", async (req, res) => {
+  const identifier = String((req.body || {}).identifier || "").trim();
+  const genericResponse = {
+    success: true,
+    message: "Əgər bu e-poçt/istifadəçi adı ilə hesab mövcuddursa, şifrə bərpası linki göndərildi."
+  };
+  if (!identifier) {
+    return res.status(400).json({ error: "E-poçt və ya istifadəçi adını daxil edin." });
+  }
+
+  try {
+    const rows = await dbClient.query(
+      `SELECT * FROM users WHERE (email = ? OR username = ?) AND role IN ('admin', 'vendor') AND deleted_at IS NULL`,
+      [identifier, identifier]
+    );
+    const user = rows[0];
+    // Same generic response whether the account doesn't exist OR its email was never verified
+    // (see POST /api/auth/send-email-verification) — an unverified address might not belong to
+    // the account holder at all (e.g. an admin fat-fingered a vendor's email), so a reset link
+    // must never be mailed there.
+    if (!user || !user.email_verified_at) {
+      return res.json(genericResponse);
+    }
+
+    const rawToken = randomBytes(32).toString("hex");
+    const tokenHash = createHash("sha256").update(rawToken).digest("hex");
+    const expires = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes
+
+    await dbClient.execute(
+      `UPDATE users SET reset_token = ?, reset_token_expires = ? WHERE id = ?`,
+      [tokenHash, expires.toISOString(), user.id]
+    );
+
+    const resetLink = `${getBaseUrl()}/reset-password?token=${rawToken}`;
+    try {
+      await sendEmail({
+        to: user.email,
+        subject: "Şifrənizi bərpa edin - GedəkGörək",
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; color: #1e293b;">
+            <h2 style="color: #047857;">Şifrənizi bərpa edin</h2>
+            <p>Salam ${user.name || ""},</p>
+            <p>Hesabınız üçün şifrə bərpası tələb olundu. Yeni şifrə təyin etmək üçün aşağıdakı düyməyə klikləyin. Bu link 30 dəqiqə ərzində etibarlıdır.</p>
+            <p style="margin: 24px 0;">
+              <a href="${resetLink}" style="background:#059669;color:#fff;padding:12px 20px;border-radius:8px;text-decoration:none;font-weight:bold;">Yeni şifrə təyin et</a>
+            </p>
+            <p style="font-size: 12px; color: #64748b;">Əgər bu tələbi siz etməmisinizsə, bu emaili nəzərə almaya bilərsiniz.</p>
+          </div>
+        `
+      });
+    } catch (emailError: any) {
+      // Sending can fail (misconfigured provider, etc.) but the response must stay generic —
+      // otherwise a failed send for a valid account would reveal that the account exists.
+      console.error("[POST /api/auth/forgot-password] email send error:", emailError.message);
+    }
+
+    return res.json(genericResponse);
+  } catch (error: any) {
+    console.error("[POST /api/auth/forgot-password] error:", error);
+    return res.status(500).json({ error: "Sorğu zamanı server xətası baş verdi." });
+  }
+});
+
+// POST /api/auth/reset-password — consumes a token minted by /api/auth/forgot-password above.
+// Looks the token up by its SHA-256 hash (never stored/compared in plaintext) and checks
+// expiry in JS rather than in SQL, since the two DB backends (Postgres/SQLite) don't share a
+// single portable "compare TIMESTAMP to now" expression through this project's `?`-placeholder
+// query layer.
+app.post("/api/auth/reset-password", async (req, res) => {
+  const { token, password } = req.body || {};
+  if (!token || !password) {
+    return res.status(400).json({ error: "Token və yeni şifrə tələb olunur." });
+  }
+  if (String(password).length < 6) {
+    return res.status(400).json({ error: "Yeni şifrə ən azı 6 simvol olmalıdır." });
+  }
+
+  try {
+    const tokenHash = createHash("sha256").update(String(token)).digest("hex");
+    const rows = await dbClient.query(`SELECT * FROM users WHERE reset_token = ?`, [tokenHash]);
+    const user = rows[0];
+    if (!user || !user.reset_token_expires || new Date(user.reset_token_expires).getTime() < Date.now()) {
+      return res.status(400).json({ error: "Link etibarsızdır və ya vaxtı bitib. Yenidən şifrə bərpası tələb edin." });
+    }
+
+    const newHash = await bcrypt.hash(String(password), 10);
+    await dbClient.execute(
+      `UPDATE users SET password_hash = ?, reset_token = NULL, reset_token_expires = NULL WHERE id = ?`,
+      [newHash, user.id]
+    );
+    return res.json({ success: true, role: user.role });
+  } catch (error: any) {
+    console.error("[POST /api/auth/reset-password] error:", error);
+    return res.status(500).json({ error: "Şifrə yenilənə bilmədi: " + error.message });
   }
 });
 
@@ -692,6 +892,17 @@ app.get("/api/camp-sites/config", async (req, res) => {
   }
 });
 
+// GET /api/group-calculator/config — public flag for whether the "Qrup hesabla" group price
+// calculator nav button is shown to customers (admin-controlled, mirrors /api/camp-sites/config).
+app.get("/api/group-calculator/config", async (req, res) => {
+  try {
+    res.json({ enabled: await isGroupCalculatorEnabled() });
+  } catch (error: any) {
+    console.error("[GET /api/group-calculator/config] error:", error);
+    res.status(500).json({ error: "Konfiqurasiya yüklənə bilmədi." });
+  }
+});
+
 // GET /api/camp-sites/points?phone=... — public contributor points lookup. Uses its own
 // (cheap, DB-only) rate limiter, not the WhatsApp one. Unknown phones get zeros rather than
 // 404 so the endpoint can't be used to enumerate which numbers have submitted sites.
@@ -782,6 +993,27 @@ app.get("/api/admin/camp-sites", authenticateUser, async (req: any, res) => {
   }
 });
 
+// POST /api/admin/camp-sites — admin creates a camp site directly: lands as 'approved'
+// immediately (no moderation queue), is excluded from contributor points (no phone), and may
+// carry the is_verified "checked by our team" badge from the start.
+app.post("/api/admin/camp-sites", authenticateUser, async (req: any, res) => {
+  if (req.operator.role !== 'admin') {
+    return res.status(403).json({ error: "Bu əməliyyat yalnız adminlər üçündür." });
+  }
+  const input = validateAdminCampSiteInput(req.body || {});
+  if ("error" in input) {
+    return res.status(400).json({ error: input.error });
+  }
+  try {
+    const id = await insertAdminCampSite(input);
+    const rows = await dbClient.query(`SELECT * FROM camp_sites WHERE id = ?`, [id]);
+    res.status(201).json({ campSite: rowToAdminCampSite(rows[0]) });
+  } catch (error: any) {
+    console.error("[POST /api/admin/camp-sites] error:", error);
+    res.status(500).json({ error: "Kamp yeri yaradıla bilmədi." });
+  }
+});
+
 // PUT /api/admin/camp-sites/:id — approve/reject, mirroring the tour moderation flow.
 // Approval stamps points_awarded with the CURRENT camp_points_per_site setting (a snapshot:
 // later setting changes never rewrite already-earned points) — but only when transitioning
@@ -795,17 +1027,33 @@ app.put("/api/admin/camp-sites/:id", authenticateUser, async (req: any, res) => 
     if (!rows.length) return res.status(404).json({ error: "Kamp yeri tapılmadı." });
     const existing = rows[0];
 
-    const status = (req.body || {}).status;
+    const body = req.body || {};
+    const status = body.status;
+
+    // Badge/flag updates (is_verified "checked by our team", is_paid) can come alone or
+    // alongside a status change — they never touch the points logic.
+    const hasFlagUpdate = body.isVerified !== undefined || body.isPaid !== undefined;
+    if (hasFlagUpdate) {
+      if (body.isVerified !== undefined) {
+        await dbClient.execute(`UPDATE camp_sites SET is_verified = ? WHERE id = ?`, [toDbBool(body.isVerified), req.params.id]);
+      }
+      if (body.isPaid !== undefined) {
+        await dbClient.execute(`UPDATE camp_sites SET is_paid = ? WHERE id = ?`, [toDbBool(body.isPaid), req.params.id]);
+      }
+    }
+
     if (status === 'approved') {
       if (existing.status !== 'approved') {
         const { pointsPerSite } = await getCampPointsConfig();
+        // Admin-created rows (no phone) never earn points even if re-approved after a reject.
+        const points = existing.submitter_phone_normalized ? pointsPerSite : 0;
         await dbClient.execute(
           `UPDATE camp_sites SET status = 'approved', points_awarded = ?, approved_at = CURRENT_TIMESTAMP, rejection_reason = NULL WHERE id = ?`,
-          [pointsPerSite, req.params.id]
+          [points, req.params.id]
         );
       }
     } else if (status === 'rejected') {
-      const reason = typeof (req.body || {}).rejectionReason === 'string' ? req.body.rejectionReason.trim() : '';
+      const reason = typeof body.rejectionReason === 'string' ? body.rejectionReason.trim() : '';
       if (!reason) {
         return res.status(400).json({ error: "Rədd etmək üçün səbəb qeyd edilməlidir." });
       }
@@ -813,8 +1061,10 @@ app.put("/api/admin/camp-sites/:id", authenticateUser, async (req: any, res) => 
         `UPDATE camp_sites SET status = 'rejected', points_awarded = 0, approved_at = NULL, rejection_reason = ? WHERE id = ?`,
         [reason, req.params.id]
       );
-    } else {
+    } else if (status !== undefined) {
       return res.status(400).json({ error: "Status 'approved' və ya 'rejected' olmalıdır." });
+    } else if (!hasFlagUpdate) {
+      return res.status(400).json({ error: "Yenilənəcək sahə göndərilməyib." });
     }
 
     const updated = await dbClient.query(`SELECT * FROM camp_sites WHERE id = ?`, [req.params.id]);
@@ -894,6 +1144,7 @@ app.get("/api/admin/settings", authenticateUser, async (req: any, res) => {
       campPointsPerSite: pointsPerSite,
       campRewardThreshold: threshold,
       campSitesEnabled: await isCampSitesEnabled(),
+      groupCalculatorEnabled: await isGroupCalculatorEnabled(),
     });
   } catch (error: any) {
     console.error("[GET /api/admin/settings] error:", error);
@@ -914,21 +1165,114 @@ app.put("/api/admin/settings", authenticateUser, async (req: any, res) => {
   if (body.campSitesEnabled !== undefined && typeof body.campSitesEnabled !== 'boolean') {
     return res.status(400).json({ error: "campSitesEnabled true/false olmalıdır." });
   }
+  if (body.groupCalculatorEnabled !== undefined && typeof body.groupCalculatorEnabled !== 'boolean') {
+    return res.status(400).json({ error: "groupCalculatorEnabled true/false olmalıdır." });
+  }
   try {
     await setSetting('camp_points_per_site', String(pointsPerSite));
     await setSetting('camp_reward_threshold', String(threshold));
     if (body.campSitesEnabled !== undefined) {
       await setSetting('camp_sites_enabled', body.campSitesEnabled ? 'true' : 'false');
     }
+    if (body.groupCalculatorEnabled !== undefined) {
+      await setSetting('group_calculator_enabled', body.groupCalculatorEnabled ? 'true' : 'false');
+    }
     res.json({
       campPointsPerSite: pointsPerSite,
       campRewardThreshold: threshold,
       campSitesEnabled: await isCampSitesEnabled(),
+      groupCalculatorEnabled: await isGroupCalculatorEnabled(),
     });
   } catch (error: any) {
     console.error("[PUT /api/admin/settings] error:", error);
     res.status(500).json({ error: "Parametrlər saxlanıla bilmədi." });
   }
+});
+
+// GET/PUT /api/admin/email-settings — lets an admin switch outbound email (used today only by
+// the forgot-password flow) between Resend and their own domain's SMTP, or turn it off, without
+// touching .env or restarting the server. GET never returns secret values themselves (API key /
+// SMTP password) — only whether one is currently set — since this response reaches the browser.
+app.get("/api/admin/email-settings", authenticateUser, async (req: any, res) => {
+  if (req.operator.role !== 'admin') {
+    return res.status(403).json({ error: "Bu əməliyyat yalnız adminlər üçündür." });
+  }
+  try {
+    res.json(await getEmailConfigMasked());
+  } catch (error: any) {
+    console.error("[GET /api/admin/email-settings] error:", error);
+    res.status(500).json({ error: "Email parametrləri yüklənə bilmədi." });
+  }
+});
+
+app.put("/api/admin/email-settings", authenticateUser, async (req: any, res) => {
+  if (req.operator.role !== 'admin') {
+    return res.status(403).json({ error: "Bu əməliyyat yalnız adminlər üçündür." });
+  }
+  const body = req.body || {};
+  if (body.activeProvider !== undefined && !['none', 'resend', 'smtp'].includes(body.activeProvider)) {
+    return res.status(400).json({ error: "activeProvider 'none', 'resend' və ya 'smtp' olmalıdır." });
+  }
+  try {
+    // Secret fields (resendApiKey/smtpPassword) are only overwritten when the admin actually
+    // typed a new value — an empty string means "leave the currently-saved secret unchanged",
+    // since GET never echoes it back for the form to keep pre-filled.
+    await updateEmailConfig({
+      activeProvider: body.activeProvider,
+      resendApiKey: typeof body.resendApiKey === 'string' ? body.resendApiKey.trim() : undefined,
+      resendFromEmail: typeof body.resendFromEmail === 'string' ? body.resendFromEmail.trim() : undefined,
+      resendFromName: typeof body.resendFromName === 'string' ? body.resendFromName.trim() : undefined,
+      smtpHost: typeof body.smtpHost === 'string' ? body.smtpHost.trim() : undefined,
+      smtpPort: body.smtpPort !== undefined ? Number(body.smtpPort) : undefined,
+      smtpSecure: typeof body.smtpSecure === 'boolean' ? body.smtpSecure : undefined,
+      smtpUser: typeof body.smtpUser === 'string' ? body.smtpUser.trim() : undefined,
+      smtpPassword: typeof body.smtpPassword === 'string' ? body.smtpPassword.trim() : undefined,
+      smtpFromEmail: typeof body.smtpFromEmail === 'string' ? body.smtpFromEmail.trim() : undefined,
+      smtpFromName: typeof body.smtpFromName === 'string' ? body.smtpFromName.trim() : undefined,
+    });
+    res.json(await getEmailConfigMasked());
+  } catch (error: any) {
+    console.error("[PUT /api/admin/email-settings] error:", error);
+    res.status(500).json({ error: "Email parametrləri saxlanıla bilmədi." });
+  }
+});
+
+// POST /api/admin/email-settings/test — sends a real test email to the logged-in admin's own
+// address using whatever provider is currently active, so they can confirm it works before
+// relying on it for the forgot-password flow. Unlike forgot-password, errors ARE surfaced here
+// verbatim — there's no user-enumeration concern since the admin is testing their own config.
+app.post("/api/admin/email-settings/test", authenticateUser, async (req: any, res) => {
+  if (req.operator.role !== 'admin') {
+    return res.status(403).json({ error: "Bu əməliyyat yalnız adminlər üçündür." });
+  }
+  try {
+    await sendEmail({
+      to: req.operator.email,
+      subject: "Test Email - GedəkGörək",
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; color: #1e293b;">
+          <h2 style="color: #047857;">Test uğurludur ✅</h2>
+          <p>Bu, GedəkGörək admin panelindən göndərilən test emailidir. Email tənzimləmələriniz düzgün işləyir.</p>
+        </div>
+      `
+    });
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error("[POST /api/admin/email-settings/test] error:", error);
+    res.status(500).json({ error: error.message || "Test email göndərilə bilmədi." });
+  }
+});
+
+// GET /api/geo/gmaps?url=... — turns a pasted Google Maps link into {lat, lon} for the
+// camp-site forms. Full links are parsed without any network call; Google short links
+// (maps.app.goo.gl…) are resolved by following their redirect, behind a host allowlist
+// and a small global budget (see server/geo.ts).
+app.get("/api/geo/gmaps", async (req, res) => {
+  const result = await resolveGoogleMapsLink(req.query.url);
+  if (!result.ok) {
+    return res.status(result.status || 500).json({ error: result.error });
+  }
+  res.json(result.coords);
 });
 
 // GET /api/osm/pois?bbox=minLat,minLon,maxLat,maxLon — cached Overpass (OpenStreetMap) proxy
@@ -1075,7 +1419,7 @@ app.get("/sitemap.xml", async (req, res) => {
     const rows = await dbClient.query(
       `SELECT slug FROM tours WHERE status = 'approved' AND slug IS NOT NULL AND slug != '' AND (is_active IS NULL OR is_active != false)`
     );
-    const staticPaths = ["", "/faq", "/calculator", "/camp-sites"];
+    const staticPaths = ["", "/faq", "/calculator", "/camp-sites", "/camp-sites/add"];
     const urls = [
       ...staticPaths.map((p) => `<url><loc>${SITE_URL}${p}</loc></url>`),
       ...rows.map((r: any) => `<url><loc>${SITE_URL}/tours/${r.slug}</loc></url>`),
@@ -2170,7 +2514,7 @@ async function startServer() {
   // Classify page navigations BEFORE the SPA fallbacks below: unknown routes (mistyped URLs,
   // deleted tour slugs) still render the SPA — whose router shows its NotFoundPage — but with
   // a real 404 status instead of a soft-404 (200 + HTML), which search engines would index.
-  const STATIC_CLIENT_ROUTES = new Set(['/', '/faq', '/calculator', '/wishlist', '/compare', '/camp-sites', '/vendor/login', '/admin/login']);
+  const STATIC_CLIENT_ROUTES = new Set(['/', '/faq', '/calculator', '/wishlist', '/compare', '/camp-sites', '/camp-sites/add', '/vendor/login', '/admin/login']);
   app.use(async (req, res, next) => {
     if (req.method !== 'GET') return next();
     // Only page navigations — assets (js/css/img) don't send an HTML accept header.

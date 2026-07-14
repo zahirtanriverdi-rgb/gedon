@@ -12,6 +12,7 @@ const VendorPortal = lazy(() => import('./components/VendorPortal'));
 const AdminPortal = lazy(() => import('./components/AdminPortal'));
 import OperatorLogin from './components/OperatorLogin';
 import AdminLogin from './components/AdminLogin';
+import ResetPasswordPage from './components/ResetPasswordPage';
 import { SearchDropdown } from './components/SearchDropdown';
 import { getRecentSearches, addRecentSearch } from './utils/recentSearches';
 import { getWishlist, WISHLIST_CHANGED_EVENT } from './utils/wishlist';
@@ -90,6 +91,17 @@ export default function App() {
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => setCampSitesEnabled(!!data && data.enabled !== false))
       .catch(() => setCampSitesEnabled(true)); // config endpoint down — don't hide the feature
+  }, []);
+
+  // Same admin-controlled feature flag pattern (settings table, group_calculator_enabled) for
+  // the "Qrup hesabla" price calculator nav button. Defaults to visible so the button doesn't
+  // flash away on the common case (feature left on) while the config request is in flight.
+  const [groupCalculatorEnabled, setGroupCalculatorEnabled] = useState<boolean>(true);
+  React.useEffect(() => {
+    fetch('/api/group-calculator/config')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => setGroupCalculatorEnabled(!!data && data.enabled !== false))
+      .catch(() => setGroupCalculatorEnabled(true)); // config endpoint down — don't hide the feature
   }, []);
 
   const [loggedInVendor, setLoggedInVendor] = useState<User | null>(null);
@@ -937,15 +949,17 @@ export default function App() {
                     </span>
                     <span className="hidden sm:block text-xs text-brand-text-main font-semibold whitespace-nowrap">{t('app.nav.guide')}</span>
                   </button>
-                  <button
-                    onClick={() => navigate('/calculator')}
-                    className="w-11 sm:w-auto sm:min-w-0 sm:px-2 h-16 sm:h-14 flex flex-col items-center justify-center gap-0.5 hover:text-emerald-600 transition group cursor-pointer bg-transparent border-none p-0"
-                  >
-                    <span className="w-11 h-8 sm:w-9 sm:h-7 flex items-center justify-center rounded-full transition-colors group-hover:bg-emerald-50">
-                      <Calculator className="w-6 h-6 sm:w-5 sm:h-5 stroke-[2px] transition-all duration-150 group-hover:stroke-emerald-500 group-hover:scale-110" />
-                    </span>
-                    <span className="hidden sm:block text-xs text-brand-text-main font-semibold whitespace-nowrap">{t('app.nav.calculator')}</span>
-                  </button>
+                  {groupCalculatorEnabled && (
+                    <button
+                      onClick={() => navigate('/calculator')}
+                      className="w-11 sm:w-auto sm:min-w-0 sm:px-2 h-16 sm:h-14 flex flex-col items-center justify-center gap-0.5 hover:text-emerald-600 transition group cursor-pointer bg-transparent border-none p-0"
+                    >
+                      <span className="w-11 h-8 sm:w-9 sm:h-7 flex items-center justify-center rounded-full transition-colors group-hover:bg-emerald-50">
+                        <Calculator className="w-6 h-6 sm:w-5 sm:h-5 stroke-[2px] transition-all duration-150 group-hover:stroke-emerald-500 group-hover:scale-110" />
+                      </span>
+                      <span className="hidden sm:block text-xs text-brand-text-main font-semibold whitespace-nowrap">{t('app.nav.calculator')}</span>
+                    </button>
+                  )}
                   {campSitesEnabled && (
                     <button
                       onClick={() => navigate('/camp-sites')}
@@ -1056,12 +1070,14 @@ export default function App() {
                       >
                         <BookOpen className="w-4 h-4" /> {t('app.nav.guide')}
                       </button>
-                      <button
-                        className="w-full text-left px-4 py-3 text-[13px] font-semibold text-slate-700 hover:bg-slate-50 transition-colors border-b border-slate-100 flex items-center gap-2"
-                        onClick={() => { navigate('/calculator'); setMobileMoreOpen(false); }}
-                      >
-                        <Calculator className="w-4 h-4" /> {t('app.nav.calculator')}
-                      </button>
+                      {groupCalculatorEnabled && (
+                        <button
+                          className="w-full text-left px-4 py-3 text-[13px] font-semibold text-slate-700 hover:bg-slate-50 transition-colors border-b border-slate-100 flex items-center gap-2"
+                          onClick={() => { navigate('/calculator'); setMobileMoreOpen(false); }}
+                        >
+                          <Calculator className="w-4 h-4" /> {t('app.nav.calculator')}
+                        </button>
+                      )}
                       {campSitesEnabled && (
                         <button
                           className="w-full text-left px-4 py-3 text-[13px] font-semibold text-slate-700 hover:bg-slate-50 transition-colors border-b border-slate-100 flex items-center gap-2"
@@ -1277,6 +1293,11 @@ export default function App() {
             ),
             false
           )}
+        />
+
+        <Route
+          path="/reset-password"
+          element={renderChrome(marketplaceLoadingOrError('chrome') || <ResetPasswordPage />, false)}
         />
 
         <Route

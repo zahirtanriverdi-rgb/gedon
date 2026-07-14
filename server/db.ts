@@ -119,6 +119,44 @@ export async function initializeDatabase() {
     // column already exists — safe to ignore
   }
 
+  // Password-reset flow (admin/vendor "forgot password" via email). `reset_token` stores a
+  // SHA-256 hash of the raw token emailed to the user — never the raw value — so a DB leak
+  // alone can't be used to reset accounts. Deliberately not UNIQUE: NULL is the common case
+  // for every row that never requested a reset, and most DBs don't enforce uniqueness on NULL
+  // consistently anyway (Postgres allows many NULLs; the token itself is random enough that a
+  // real collision is not a realistic concern).
+  try {
+    await dbClient.execute(`ALTER TABLE users ADD COLUMN reset_token VARCHAR(255)`);
+  } catch {
+    // column already exists — safe to ignore
+  }
+  try {
+    await dbClient.execute(`ALTER TABLE users ADD COLUMN reset_token_expires TIMESTAMP`);
+  } catch {
+    // column already exists — safe to ignore
+  }
+
+  // Email ownership verification — separate from the reset flow above. An admin/vendor must
+  // confirm they actually control `email` (by entering a code mailed to it) before that address
+  // is trusted as a password-reset destination; see POST /api/auth/send-email-verification and
+  // /verify-email. `email_verified_at` resets to NULL whenever `email` itself changes (PUT
+  // /api/users/:id), so editing the address always requires re-proving ownership.
+  try {
+    await dbClient.execute(`ALTER TABLE users ADD COLUMN email_verified_at TIMESTAMP`);
+  } catch {
+    // column already exists — safe to ignore
+  }
+  try {
+    await dbClient.execute(`ALTER TABLE users ADD COLUMN email_verification_code VARCHAR(255)`);
+  } catch {
+    // column already exists — safe to ignore
+  }
+  try {
+    await dbClient.execute(`ALTER TABLE users ADD COLUMN email_verification_expires TIMESTAMP`);
+  } catch {
+    // column already exists — safe to ignore
+  }
+
   // Tours & Accommodations
   // `extra_data` holds the rich/optional Tour fields (includes, images, itinerary, roomTypes,
   // international/active-lifestyle specifics, etc.) as a JSON string, since those vary a lot
@@ -317,6 +355,9 @@ export async function initializeDatabase() {
     // Admin-toggleable feature flag: when 'false', the camp sites feature disappears from the
     // customer side entirely (header nav, /camp-sites page, public API) — admin keeps access.
     ['camp_sites_enabled', 'true'],
+    // Admin-toggleable feature flag: when 'false', the "Qrup hesabla" group price calculator
+    // nav button disappears from the customer side entirely.
+    ['group_calculator_enabled', 'true'],
   ];
   for (const [key, value] of defaultSettings) {
     const existing = await dbClient.query(`SELECT key FROM settings WHERE key = ?`, [key]);

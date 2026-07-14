@@ -1,7 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import maplibregl from 'maplibre-gl';
 import { AdminCampSite, CampContributor } from '../../types';
 import { useLanguage } from '../../i18n/LanguageContext';
-import { Tent, Check, X, Trash2, MapPin, Gift, Save, Phone, Power } from 'lucide-react';
+import { createSatelliteStyle } from '../../utils/mapStyles';
+import { extractCoordsFromGoogleMapsUrl } from '../../utils/googleMapsLink';
+import { fileToDataUrl } from '../customer/CampSiteForm';
+import { Tent, Check, X, Trash2, MapPin, Gift, Save, Phone, Power, Plus, ImagePlus, BadgeCheck, Link2 } from 'lucide-react';
 
 type TabId = 'pending' | 'approved' | 'rejected' | 'contributors';
 
@@ -26,6 +30,22 @@ export default function AdminCampSites({ authToken, onShowNotification }: AdminC
   const [featureEnabled, setFeatureEnabled] = useState<boolean>(true);
   const [togglingFeature, setTogglingFeature] = useState<boolean>(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+
+  // Admin "create camp site" modal state — sites created here are auto-approved.
+  const [showCreate, setShowCreate] = useState(false);
+  const [createName, setCreateName] = useState('');
+  const [createDescription, setCreateDescription] = useState('');
+  const [createLat, setCreateLat] = useState('');
+  const [createLon, setCreateLon] = useState('');
+  const [createPhotos, setCreatePhotos] = useState<string[]>([]);
+  const [createIsPaid, setCreateIsPaid] = useState(false);
+  const [createIsVerified, setCreateIsVerified] = useState(true);
+  const [creating, setCreating] = useState(false);
+  const [createGmapsUrl, setCreateGmapsUrl] = useState('');
+  const [createGmapsStatus, setCreateGmapsStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const createMapContainerRef = useRef<HTMLDivElement | null>(null);
+  const createMapRef = useRef<maplibregl.Map | null>(null);
+  const createMarkerRef = useRef<maplibregl.Marker | null>(null);
 
   const authHeaders: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -145,6 +165,142 @@ export default function AdminCampSites({ authToken, onShowNotification }: AdminC
     }
   };
 
+  // Pin-picker map inside the create modal (created when the modal opens, torn down on close).
+  useEffect(() => {
+    if (!showCreate || !createMapContainerRef.current || createMapRef.current) return;
+    const map = new maplibregl.Map({
+      container: createMapContainerRef.current,
+      style: createSatelliteStyle(),
+      center: [47.6, 40.3],
+      zoom: 6,
+    });
+    map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'bottom-right');
+    map.on('click', (e) => {
+      const { lng, lat } = e.lngLat;
+      setCreateLat(lat.toFixed(6));
+      setCreateLon(lng.toFixed(6));
+      if (!createMarkerRef.current) {
+        createMarkerRef.current = new maplibregl.Marker({ color: '#C28E46' }).setLngLat([lng, lat]).addTo(map);
+      } else {
+        createMarkerRef.current.setLngLat([lng, lat]);
+      }
+    });
+    createMapRef.current = map;
+    return () => {
+      map.remove();
+      createMapRef.current = null;
+      createMarkerRef.current = null;
+    };
+  }, [showCreate]);
+
+  // Pasted Google Maps link → coordinates (same flow as the public form: parse locally,
+  // fall back to the server resolver for short links).
+  const handleCreateGmapsExtract = async () => {
+    const url = createGmapsUrl.trim();
+    if (!url || createGmapsStatus === 'loading') return;
+    setCreateGmapsStatus('loading');
+    let coords = extractCoordsFromGoogleMapsUrl(url);
+    if (!coords) {
+      try {
+        const res = await fetch(`/api/geo/gmaps?url=${encodeURIComponent(url)}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (Number.isFinite(data.lat) && Number.isFinite(data.lon)) coords = data;
+        }
+      } catch {
+        // Resolver unreachable — treated the same as "no coordinates found".
+      }
+    }
+    if (coords) {
+      const latStr = coords.lat.toFixed(6);
+      const lonStr = coords.lon.toFixed(6);
+      setCreateLat(latStr);
+      setCreateLon(lonStr);
+      const map = createMapRef.current;
+      if (map) {
+        if (!createMarkerRef.current) {
+          createMarkerRef.current = new maplibregl.Marker({ color: '#C28E46' }).setLngLat([coords.lon, coords.lat]).addTo(map);
+        } else {
+          createMarkerRef.current.setLngLat([coords.lon, coords.lat]);
+        }
+        map.flyTo({ center: [coords.lon, coords.lat], zoom: 13 });
+      }
+      setCreateGmapsStatus('success');
+    } else {
+      setCreateGmapsStatus('error');
+    }
+  };
+
+  const handleCreatePhotoPick = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const fileList = e.target.files;
+    const files: File[] = [];
+    if (fileList) {
+      const room = 3 - createPhotos.length;
+      for (let i = 0; i < fileList.length && files.length < room; i++) files.push(fileList[i]);
+    }
+    e.target.value = '';
+    for (const file of files) {
+      try {
+        const dataUrl = await fileToDataUrl(file);
+        setCreatePhotos((prev) => (prev.length < 3 ? [...prev, dataUrl] : prev));
+      } catch {
+        // Unreadable file — skip silently.
+      }
+    }
+  };
+
+  const handleCreate = async () => {
+    setCreating(true);
+    try {
+      const res = await fetch('/api/admin/camp-sites', {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({
+          name: createName,
+          description: createDescription,
+          lat: Number(createLat),
+          lon: Number(createLon),
+          photos: createPhotos,
+          isPaid: createIsPaid,
+          isVerified: createIsVerified,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        onShowNotification?.(data.error || t('adminPortal.campSites.actionError'), 'error');
+        return;
+      }
+      onShowNotification?.(t('adminPortal.campSites.createdNotification'), 'success');
+      setShowCreate(false);
+      setCreateName(''); setCreateDescription(''); setCreateLat(''); setCreateLon('');
+      setCreatePhotos([]); setCreateIsPaid(false); setCreateIsVerified(true);
+      setActiveTab('approved');
+      await loadCampSites();
+    } catch {
+      onShowNotification?.(t('adminPortal.campSites.actionError'), 'error');
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  // Flip the is_verified / is_paid badge on an existing site (independent of status).
+  const handleFlagToggle = async (site: AdminCampSite, flag: 'isVerified' | 'isPaid') => {
+    setBusyId(site.id);
+    try {
+      const res = await fetch(`/api/admin/camp-sites/${site.id}`, {
+        method: 'PUT',
+        headers: authHeaders,
+        body: JSON.stringify({ [flag]: !site[flag] }),
+      });
+      if (!res.ok) throw new Error();
+      await loadCampSites();
+    } catch {
+      onShowNotification?.(t('adminPortal.campSites.actionError'), 'error');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   // The on/off switch saves immediately (unlike the number inputs' explicit Save button):
   // an admin flipping visibility expects it to take effect right away.
   const handleToggleFeature = async () => {
@@ -249,8 +405,8 @@ export default function AdminCampSites({ authToken, onShowNotification }: AdminC
           </div>
         </div>
 
-        {/* Tabs */}
-        <div className="flex gap-2 mt-4 flex-wrap">
+        {/* Tabs + admin create button */}
+        <div className="flex gap-2 mt-4 flex-wrap items-center">
           {tabs.map((tab) => (
             <button
               key={tab.id}
@@ -267,6 +423,12 @@ export default function AdminCampSites({ authToken, onShowNotification }: AdminC
               )}
             </button>
           ))}
+          <button
+            onClick={() => setShowCreate(true)}
+            className="ml-auto flex items-center gap-1.5 bg-brand-accent hover:opacity-90 text-white text-xs font-bold px-4 py-2 rounded-full transition-opacity cursor-pointer"
+          >
+            <Plus className="w-3.5 h-3.5" /> {t('adminPortal.campSites.newButton')}
+          </button>
         </div>
 
         {/* Camp site cards */}
@@ -279,11 +441,28 @@ export default function AdminCampSites({ authToken, onShowNotification }: AdminC
                 <div key={site.id} className="border border-slate-200 rounded-2xl p-4">
                   <div className="flex items-start justify-between gap-2">
                     <h3 className="font-black text-slate-800 text-sm">{site.name}</h3>
-                    {site.status === 'approved' && (
+                    {site.status === 'approved' && !site.addedByAdmin && (
                       <span className="text-[10px] font-bold bg-emerald-50 text-emerald-700 px-2 py-1 rounded-full shrink-0">
                         {t('adminPortal.campSites.pointsAwarded', { points: site.pointsAwarded })}
                       </span>
                     )}
+                  </div>
+                  <div className="flex items-center gap-1.5 flex-wrap mt-1.5">
+                    {site.addedByAdmin && (
+                      <span className="text-[10px] font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full">
+                        {t('adminPortal.campSites.teamEntry')}
+                      </span>
+                    )}
+                    {site.isVerified && (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full">
+                        <BadgeCheck className="w-3 h-3" /> {t('campSites.page.verifiedBadge')}
+                      </span>
+                    )}
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+                      site.isPaid ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-sky-50 text-sky-700 border-sky-200'
+                    }`}>
+                      {t(site.isPaid ? 'campSites.page.paidBadge' : 'campSites.page.freeBadge')}
+                    </span>
                   </div>
                   {site.photos.length > 0 && (
                     <div className="flex gap-1.5 mt-2 overflow-x-auto">
@@ -338,6 +517,29 @@ export default function AdminCampSites({ authToken, onShowNotification }: AdminC
                     >
                       <Trash2 className="w-3.5 h-3.5" /> {t('adminPortal.campSites.delete')}
                     </button>
+                  </div>
+                  {/* Badge toggles — independent of the approve/reject status flow */}
+                  <div className="flex gap-3 mt-3 pt-3 border-t border-slate-100">
+                    <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={site.isVerified}
+                        disabled={busyId === site.id}
+                        onChange={() => handleFlagToggle(site, 'isVerified')}
+                        className="w-3.5 h-3.5 accent-[#1E3F20]"
+                      />
+                      <span className="text-[11px] font-bold text-slate-600">{t('adminPortal.campSites.verifiedToggle')}</span>
+                    </label>
+                    <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={site.isPaid}
+                        disabled={busyId === site.id}
+                        onChange={() => handleFlagToggle(site, 'isPaid')}
+                        className="w-3.5 h-3.5 accent-[#C28E46]"
+                      />
+                      <span className="text-[11px] font-bold text-slate-600">{t('adminPortal.campSites.paidToggle')}</span>
+                    </label>
                   </div>
                 </div>
               ))}
@@ -430,6 +632,122 @@ export default function AdminCampSites({ authToken, onShowNotification }: AdminC
           </button>
         </div>
       </div>
+
+      {/* Admin create modal — sites created here go live immediately as approved */}
+      {showCreate && (
+        <div className="fixed inset-0 z-[80] bg-black/50 flex items-center justify-center p-4" onClick={() => setShowCreate(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-xl max-h-[92vh] overflow-y-auto p-6" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-start justify-between gap-3">
+              <h3 className="text-base font-black text-slate-800">{t('adminPortal.campSites.createTitle')}</h3>
+              <button onClick={() => setShowCreate(false)} className="p-1 text-slate-400 hover:text-slate-700 cursor-pointer" aria-label="close">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <p className="text-xs text-slate-500 mt-1 mb-4">{t('adminPortal.campSites.createIntro')}</p>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1.5">{t('campSites.form.nameLabel')}</label>
+                <input
+                  value={createName} onChange={(e) => setCreateName(e.target.value)} maxLength={100}
+                  className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary/40"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1.5">{t('campSites.form.descriptionLabel')}</label>
+                <textarea
+                  value={createDescription} onChange={(e) => setCreateDescription(e.target.value)} maxLength={2000} rows={3}
+                  className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary/40"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1.5">{t('campSites.form.locationLabel')}</label>
+                <div ref={createMapContainerRef} className="w-full h-52 rounded-xl overflow-hidden border border-slate-300" />
+                {/* Google Maps link → coordinates */}
+                <div className="mt-2 flex gap-2">
+                  <div className="flex-1 min-w-0 relative">
+                    <Link2 className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      value={createGmapsUrl}
+                      onChange={(e) => { setCreateGmapsUrl(e.target.value); setCreateGmapsStatus('idle'); }}
+                      onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleCreateGmapsExtract(); } }}
+                      type="url"
+                      placeholder={t('campSites.form.gmapsPlaceholder')}
+                      className="w-full border border-slate-300 rounded-xl pl-8 pr-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary/40"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleCreateGmapsExtract}
+                    disabled={createGmapsStatus === 'loading' || !createGmapsUrl.trim()}
+                    className="shrink-0 bg-brand-primary hover:bg-brand-primary-hover disabled:opacity-50 text-white text-xs font-bold px-4 py-2 rounded-xl transition-colors cursor-pointer"
+                  >
+                    {createGmapsStatus === 'loading' ? t('campSites.form.gmapsExtracting') : t('campSites.form.gmapsExtract')}
+                  </button>
+                </div>
+                {createGmapsStatus === 'success' && (
+                  <p className="text-[11px] font-bold text-emerald-700 mt-1">{t('campSites.form.gmapsSuccess')}</p>
+                )}
+                {createGmapsStatus === 'error' && (
+                  <p className="text-[11px] font-bold text-rose-600 mt-1">{t('campSites.form.gmapsError')}</p>
+                )}
+                <div className="grid grid-cols-2 gap-3 mt-2">
+                  <input
+                    value={createLat} onChange={(e) => setCreateLat(e.target.value)} inputMode="decimal"
+                    placeholder={t('campSites.form.latLabel')}
+                    className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary/40"
+                  />
+                  <input
+                    value={createLon} onChange={(e) => setCreateLon(e.target.value)} inputMode="decimal"
+                    placeholder={t('campSites.form.lonLabel')}
+                    className="w-full border border-slate-300 rounded-xl px-3.5 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary/40"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-600 mb-1.5">{t('campSites.form.photosLabel')}</label>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {createPhotos.map((photo, i) => (
+                    <div key={i} className="relative">
+                      <img src={photo} alt="" className="w-20 h-16 object-cover rounded-lg border border-slate-200" />
+                      <button
+                        onClick={() => setCreatePhotos((prev) => prev.filter((_, idx) => idx !== i))}
+                        className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-rose-600 text-white rounded-full flex items-center justify-center shadow cursor-pointer"
+                        aria-label={t('campSites.form.removePhoto')}
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  ))}
+                  {createPhotos.length < 3 && (
+                    <label className="w-20 h-16 border-2 border-dashed border-slate-300 hover:border-brand-accent rounded-lg flex items-center justify-center cursor-pointer transition-colors">
+                      <ImagePlus className="w-5 h-5 text-slate-400" />
+                      <input type="file" accept="image/jpeg,image/png,image/webp" multiple className="hidden" onChange={handleCreatePhotoPick} />
+                    </label>
+                  )}
+                </div>
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input type="checkbox" checked={createIsVerified} onChange={(e) => setCreateIsVerified(e.target.checked)} className="w-4 h-4 accent-[#1E3F20]" />
+                  <span className="text-xs font-bold text-slate-700">{t('adminPortal.campSites.verifiedToggle')}</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer select-none">
+                  <input type="checkbox" checked={createIsPaid} onChange={(e) => setCreateIsPaid(e.target.checked)} className="w-4 h-4 accent-[#C28E46]" />
+                  <span className="text-xs font-bold text-slate-700">{t('adminPortal.campSites.paidToggle')}</span>
+                </label>
+              </div>
+              <button
+                onClick={handleCreate}
+                disabled={creating || !createName.trim() || !createLat || !createLon}
+                className="w-full bg-brand-primary hover:bg-brand-primary-hover disabled:opacity-50 text-white font-bold text-sm px-6 py-3 rounded-full transition-colors cursor-pointer"
+              >
+                {t('adminPortal.campSites.createSubmit')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Reject-with-reason modal */}
       {rejectingSite && (

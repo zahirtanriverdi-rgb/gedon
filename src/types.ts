@@ -28,6 +28,7 @@ export interface User {
   createdAt: string;
   isArchived?: boolean; // Soft-deleted by an admin — account can no longer log in, but its tours/slots/bookings are preserved for records
   isManuallyDeactivated?: boolean; // Admin can flip this on/off any time, independent of subscriptionValidUntil — hides the vendor's tours immediately without touching their subscription date
+  emailVerified?: boolean; // Owner has confirmed control of `email` via a mailed code — required before it can be used for password-reset. Resets to false whenever email changes.
 }
 
 export type TourCategory = 'peak' | 'camp' | 'hiking' | 'international' | 'active';
@@ -207,6 +208,9 @@ export interface CampSite {
   lon: number;
   photos: string[]; // base64 data URLs
   submitterName: string;
+  isVerified: boolean; // "checked by our team on site" badge, admin-set only
+  isPaid: boolean; // paid camp spot vs free
+  addedByAdmin: boolean;
   createdAt: string;
 }
 

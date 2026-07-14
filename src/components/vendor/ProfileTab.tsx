@@ -2,6 +2,7 @@ import { useState, useEffect, FormEvent } from 'react';
 import { User, Guide } from '../../types';
 import { useLanguage } from '../../i18n/LanguageContext';
 import { Plus, Trash, Eye, EyeOff, ShieldCheck } from 'lucide-react';
+import EmailVerificationCard from '../EmailVerificationCard';
 
 interface ProfileTabProps {
   currentUser: User;
@@ -490,6 +491,15 @@ export function ProfileTab({ currentUser, operatorToken, onShowNotification, onC
           </div>
         </form>
       </div>
+
+      <EmailVerificationCard
+        key={currentUser.email}
+        email={currentUser.email}
+        verified={!!currentUser.emailVerified}
+        authToken={operatorToken}
+        onVerified={onUserUpdated}
+        onShowNotification={onShowNotification}
+      />
     </div>
   );
 }

@@ -216,17 +216,19 @@ interface GpsMapOverlayProps {
 const GpsMapOverlay: React.FC<GpsMapOverlayProps> = ({ parsed, onClose }) => {
   const { t } = useLanguage();
   const [mapMode, setMapMode] = useState<'3d' | '2d'>('3d');
-  // OSM data layers: route-surroundings POIs + our community camp sites are on by default;
-  // the waymarkedtrails hiking overlay is opt-in (it visually competes with the GPX line).
-  const [layerToggles, setLayerToggles] = useState<{ pois: boolean; camps: boolean; trails: boolean }>({
+  // OSM data layers: route-surroundings POIs + our community camp sites, both on by default.
+  const [layerToggles, setLayerToggles] = useState<{ pois: boolean; camps: boolean }>({
     pois: true,
     camps: true,
-    trails: false,
   });
   const layerTogglesRef = useRef(layerToggles);
   useEffect(() => {
     layerTogglesRef.current = layerToggles;
   }, [layerToggles]);
+  // The camps pill only appears when the camps layer actually exists — when the admin has
+  // switched the camp sites feature off, /api/camp-sites returns [] and no layer is created,
+  // so the toggle disappears from here too.
+  const [hasCampsLayer, setHasCampsLayer] = useState<boolean>(false);
   const [isPlaying, setIsPlaying] = useState<boolean>(true);
   const [playbackSpeed, setPlaybackSpeed] = useState<number>(2.0);
   const [isFollowing, setIsFollowing] = useState<boolean>(true);
@@ -524,22 +526,6 @@ const GpsMapOverlay: React.FC<GpsMapOverlayProps> = ({ parsed, onClose }) => {
         }
       });
 
-      // OSM hiking-trails raster overlay (waymarkedtrails.org), inserted UNDER the GPX line
-      // so the orange route always stays on top. Hidden until toggled on.
-      map.addSource('waymarkedtrails', {
-        type: 'raster',
-        tiles: ['https://tile.waymarkedtrails.org/hiking/{z}/{x}/{y}.png'],
-        tileSize: 256,
-        attribution: '© Waymarked Trails, © OpenStreetMap contributors'
-      });
-      map.addLayer({
-        id: 'trails-layer',
-        type: 'raster',
-        source: 'waymarkedtrails',
-        layout: { visibility: layerTogglesRef.current.trails ? 'visible' : 'none' },
-        paint: { 'raster-opacity': 0.85 }
-      }, 'route-line');
-
       // Route-surroundings POIs (peaks, springs, waterfalls, shelters…) via our cached
       // Overpass proxy, and approved community camp sites from our own DB. Both are fetched
       // only when the overlay is open, and any failure is silent — the map must keep working.
@@ -663,6 +649,7 @@ const GpsMapOverlay: React.FC<GpsMapOverlayProps> = ({ parsed, onClose }) => {
               });
               map.on('mouseenter', 'db-camps-layer', () => { map.getCanvas().style.cursor = 'pointer'; });
               map.on('mouseleave', 'db-camps-layer', () => { map.getCanvas().style.cursor = ''; });
+              setHasCampsLayer(true);
             }
           }
         } catch {
@@ -813,7 +800,6 @@ const GpsMapOverlay: React.FC<GpsMapOverlayProps> = ({ parsed, onClose }) => {
     const mapping: Array<[string, boolean]> = [
       ['osm-pois-layer', layerToggles.pois],
       ['db-camps-layer', layerToggles.camps],
-      ['trails-layer', layerToggles.trails],
     ];
     for (const [layerId, visible] of mapping) {
       try {
@@ -948,31 +934,31 @@ const GpsMapOverlay: React.FC<GpsMapOverlayProps> = ({ parsed, onClose }) => {
         {/* Map Canvas */}
         <div ref={mapContainerRef} className="w-full h-full text-slate-900" style={{ outline: 'none' }} />
 
-        {/* TOP-LEFT: OSM layer toggle pills (POIs / community camps / hiking trails) */}
-        <div className="absolute top-4 left-4 z-[30] flex flex-col gap-1.5">
-          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-950/70 border border-white/15 rounded-full backdrop-blur-md text-[10px] font-black uppercase tracking-wider text-slate-300">
-            <Layers className="w-3.5 h-3.5 text-sky-400" />
-            {t('campSites.map.layers')}
-          </div>
-          {([
-            ['pois', t('campSites.map.layerPois')],
-            ['camps', t('campSites.map.layerCamps')],
-            ['trails', t('campSites.map.layerTrails')],
-          ] as Array<['pois' | 'camps' | 'trails', string]>).map(([key, label]) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => setLayerToggles((prev) => ({ ...prev, [key]: !prev[key] }))}
-              className={`px-3 py-1.5 rounded-full text-[10px] font-bold border backdrop-blur-md transition cursor-pointer text-left ${
-                layerToggles[key]
-                  ? 'bg-sky-600/90 border-sky-400/50 text-white'
-                  : 'bg-slate-950/60 border-white/15 text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+       {/* TOP-LEFT: OSM layer toggle pills (POIs / community camps) */}
+<div className="absolute top-4 left-4 z-[30] flex flex-col gap-1.5">
+  <div className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-950/70 border border-white/15 rounded-full backdrop-blur-md text-[10px] font-black uppercase tracking-wider text-slate-300">
+    <Layers className="w-3.5 h-3.5 text-sky-400" />
+    {t('campSites.map.layers')}
+  </div>
+  {([
+    ['pois', t('campSites.map.layerPois')],
+    // Camps toggle only exists while the layer does (feature flag off → no layer → no pill)
+    ...(hasCampsLayer ? ([['camps', t('campSites.map.layerCamps')]] as Array<['camps', string]>) : []),
+  ] as Array<['pois' | 'camps', string]>).map(([key, label]) => (
+    <button
+      key={key}
+      type="button"
+      onClick={() => setLayerToggles((prev) => ({ ...prev, [key]: !prev[key] }))}
+      className={`px-3 py-1.5 rounded-full text-[10px] font-bold border backdrop-blur-md transition cursor-pointer text-left ${
+        layerToggles[key]
+          ? 'bg-sky-600/90 border-sky-400/50 text-white'
+          : 'bg-slate-950/60 border-white/15 text-slate-400 hover:text-slate-200'
+      }`}
+    >
+      {label}
+    </button>
+  ))}
+</div>
 
         {/* ORBIT JOYSTICK: drag the knob to rotate/tilt the camera around the hiker marker */}
         <div

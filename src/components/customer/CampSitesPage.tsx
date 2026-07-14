@@ -1,12 +1,10 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Helmet } from 'react-helmet-async';
 import maplibregl from 'maplibre-gl';
-import { ArrowLeft, Tent, Plus, MapPin, ExternalLink, X, Award } from 'lucide-react';
+import { ArrowLeft, Tent, Plus, MapPin, X, BadgeCheck, Navigation } from 'lucide-react';
 import { CampSite } from '../../types';
 import { createSatelliteStyle } from '../../utils/mapStyles';
 import { useLanguage } from '../../i18n/LanguageContext';
-import { CampSiteFormModal } from './CampSiteFormModal';
-import { CampPointsChecker } from './CampPointsChecker';
 import NotFoundPage from '../NotFoundPage';
 
 // Azerbaijan-wide default view for the camp sites map.
@@ -15,46 +13,33 @@ const AZ_ZOOM = 6.3;
 
 interface CampSitesPageProps {
   onBack: () => void;
-  onShowNotification?: (message: string, type?: string) => void;
+  onAddSite: () => void;
 }
 
-export const CampSitesPage: React.FC<CampSitesPageProps> = ({ onBack, onShowNotification }) => {
+export const CampSitesPage: React.FC<CampSitesPageProps> = ({ onBack, onAddSite }) => {
   const { t, language } = useLanguage();
   const [campSites, setCampSites] = useState<CampSite[]>([]);
   const [loadError, setLoadError] = useState<boolean>(false);
   const [selectedSite, setSelectedSite] = useState<CampSite | null>(null);
-  const [showForm, setShowForm] = useState<boolean>(false);
-  const [config, setConfig] = useState<{ pointsPerSite: number; threshold: number }>({ pointsPerSite: 10, threshold: 100 });
-  // null = config still loading; false = admin switched the feature off → behave like a
-  // page that doesn't exist (matches the hidden header button).
+  // null = feature flag still loading; false = admin switched the feature off → behave like
+  // a page that doesn't exist (matches the hidden header button).
   const [featureEnabled, setFeatureEnabled] = useState<boolean | null>(null);
 
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<maplibregl.Map | null>(null);
   const markersRef = useRef<maplibregl.Marker[]>([]);
 
-  const loadCampSites = async () => {
-    try {
-      const res = await fetch('/api/camp-sites');
-      if (!res.ok) throw new Error('load failed');
-      const data = await res.json();
-      setCampSites(Array.isArray(data.campSites) ? data.campSites : []);
-      setLoadError(false);
-    } catch {
-      setLoadError(true);
-    }
-  };
-
   useEffect(() => {
-    loadCampSites();
+    fetch('/api/camp-sites')
+      .then((res) => (res.ok ? res.json() : Promise.reject()))
+      .then((data) => {
+        setCampSites(Array.isArray(data.campSites) ? data.campSites : []);
+        setLoadError(false);
+      })
+      .catch(() => setLoadError(true));
     fetch('/api/camp-sites/config')
       .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (data && Number(data.pointsPerSite) > 0 && Number(data.threshold) > 0) {
-          setConfig({ pointsPerSite: Number(data.pointsPerSite), threshold: Number(data.threshold) });
-        }
-        setFeatureEnabled(!data || data.enabled !== false);
-      })
+      .then((data) => setFeatureEnabled(!data || data.enabled !== false))
       .catch(() => setFeatureEnabled(true)); /* config endpoint down — don't hide the page */
   }, []);
 
@@ -80,18 +65,18 @@ export const CampSitesPage: React.FC<CampSitesPageProps> = ({ onBack, onShowNoti
       map.remove();
       mapRef.current = null;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [featureEnabled]);
 
-  // Markers follow the loaded list.
+  // Markers follow the loaded list. featureEnabled is a dep so markers still land when the
+  // map is created after the list has already loaded.
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
     markersRef.current.forEach((m) => m.remove());
     markersRef.current = campSites.map((site) => {
       const el = document.createElement('div');
-      el.className = 'w-9 h-9 bg-brand-accent border-2 border-white rounded-full flex items-center justify-center shadow-lg cursor-pointer hover:scale-110 transition-transform';
-      el.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 21 14 3"/><path d="M20.5 21 10 3"/><path d="M15.5 21 12 15l-3.5 6"/><path d="M2 21h20"/></svg>`;
+      el.className = 'w-9 h-9 cursor-pointer';
+      el.innerHTML = `<div class="w-full h-full bg-brand-accent border-2 border-white rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition-transform"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 21 14 3"/><path d="M20.5 21 10 3"/><path d="M15.5 21 12 15l-3.5 6"/><path d="M2 21h20"/></svg></div>`;
       el.addEventListener('click', () => setSelectedSite(site));
       const marker = new maplibregl.Marker({ element: el }).setLngLat([site.lon, site.lat]).addTo(map);
       return marker;
@@ -103,8 +88,6 @@ export const CampSitesPage: React.FC<CampSitesPageProps> = ({ onBack, onShowNoti
       );
       map.fitBounds(bounds, { padding: 80, maxZoom: 11 });
     }
-    // featureEnabled is a dep so markers land even when the map is created after the list loads
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [campSites, featureEnabled]);
 
   const focusSite = (site: CampSite) => {
@@ -122,6 +105,28 @@ export const CampSitesPage: React.FC<CampSitesPageProps> = ({ onBack, onShowNoti
       : language === 'ru' ? 'Проверенные места для кемпинга по всему Азербайджану — изучайте карту, стройте маршруты и добавляйте свои любимые стоянки.'
       : 'Azərbaycan üzrə icmanın paylaşdığı və yoxlanılmış kamp yerləri — xəritəni kəşf edin, yol tarifi alın və öz sevimli kamp yerinizi əlavə edin.',
   }), [language]);
+
+  // Small badge row shared by the detail panel and the cards.
+  const renderBadges = (site: CampSite) => (
+    <div className="flex items-center gap-1.5 flex-wrap mt-1.5">
+      {site.isVerified && (
+        <span
+          title={t('campSites.page.verifiedHint')}
+          className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold px-2 py-0.5 rounded-full"
+        >
+          <BadgeCheck className="w-3 h-3" />
+          {t('campSites.page.verifiedBadge')}
+        </span>
+      )}
+      <span className={`inline-flex items-center text-[10px] font-bold px-2 py-0.5 rounded-full border ${
+        site.isPaid
+          ? 'bg-amber-50 text-amber-700 border-amber-200'
+          : 'bg-sky-50 text-sky-700 border-sky-200'
+      }`}>
+        {t(site.isPaid ? 'campSites.page.paidBadge' : 'campSites.page.freeBadge')}
+      </span>
+    </div>
+  );
 
   // Admin switched the feature off — behave exactly like a page that doesn't exist.
   if (featureEnabled === false) {
@@ -141,7 +146,7 @@ export const CampSitesPage: React.FC<CampSitesPageProps> = ({ onBack, onShowNoti
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         {/* Header row */}
-        <div className="flex items-start justify-between gap-4 flex-wrap mb-4">
+        <div className="flex items-start justify-between gap-4 flex-wrap mb-5">
           <div>
             <button
               onClick={onBack}
@@ -157,20 +162,12 @@ export const CampSitesPage: React.FC<CampSitesPageProps> = ({ onBack, onShowNoti
             <p className="text-sm text-brand-text-muted mt-1">{t('campSites.page.subtitle')}</p>
           </div>
           <button
-            onClick={() => setShowForm(true)}
+            onClick={onAddSite}
             className="flex items-center gap-2 bg-brand-primary hover:bg-brand-primary-hover text-white font-bold text-sm px-5 py-3 rounded-full shadow-md transition-colors cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             {t('campSites.page.addButton')}
           </button>
-        </div>
-
-        {/* Reward banner */}
-        <div className="bg-brand-primary text-white rounded-2xl px-5 py-4 mb-5 flex items-center gap-3 shadow-sm">
-          <Award className="w-6 h-6 text-brand-accent shrink-0" />
-          <p className="text-sm font-semibold leading-snug">
-            {t('campSites.page.rewardBanner', { points: config.pointsPerSite, threshold: config.threshold })}
-          </p>
         </div>
 
         {/* Map */}
@@ -193,6 +190,7 @@ export const CampSitesPage: React.FC<CampSitesPageProps> = ({ onBack, onShowNoti
               <p className="text-[11px] text-brand-text-muted font-semibold mt-0.5">
                 {t('campSites.page.submittedBy', { name: selectedSite.submitterName })}
               </p>
+              {renderBadges(selectedSite)}
               {selectedSite.photos.length > 0 && (
                 <div className="flex gap-1.5 mt-2.5 overflow-x-auto">
                   {selectedSite.photos.map((photo, i) => (
@@ -213,12 +211,12 @@ export const CampSitesPage: React.FC<CampSitesPageProps> = ({ onBack, onShowNoti
                   {t('campSites.page.directionsGoogle')}
                 </a>
                 <a
-                  href={`https://www.openstreetmap.org/?mlat=${selectedSite.lat}&mlon=${selectedSite.lon}#map=15/${selectedSite.lat}/${selectedSite.lon}`}
+                  href={`https://waze.com/ul?ll=${selectedSite.lat},${selectedSite.lon}&navigate=yes`}
                   target="_blank" rel="noopener noreferrer"
-                  className="flex items-center justify-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold px-3 py-2 rounded-full transition-colors"
+                  className="flex items-center justify-center gap-1.5 bg-[#33CCFF]/15 hover:bg-[#33CCFF]/25 text-sky-700 text-xs font-bold px-3 py-2 rounded-full transition-colors"
                 >
-                  <ExternalLink className="w-3.5 h-3.5" />
-                  {t('campSites.page.directionsOsm')}
+                  <Navigation className="w-3.5 h-3.5" />
+                  {t('campSites.page.directionsWaze')}
                 </a>
               </div>
             </div>
@@ -233,11 +231,11 @@ export const CampSitesPage: React.FC<CampSitesPageProps> = ({ onBack, onShowNoti
 
         {/* Card list */}
         {campSites.length === 0 && !loadError ? (
-          <div className="bg-white border border-slate-200 rounded-2xl p-8 text-center text-sm text-brand-text-muted font-semibold mb-8">
+          <div className="bg-white border border-slate-200 rounded-2xl p-8 text-center text-sm text-brand-text-muted font-semibold">
             {t('campSites.page.empty')}
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {campSites.map((site) => (
               <button
                 key={site.id}
@@ -256,6 +254,7 @@ export const CampSitesPage: React.FC<CampSitesPageProps> = ({ onBack, onShowNoti
                   <p className="text-[11px] text-brand-text-muted font-semibold mt-1">
                     {t('campSites.page.submittedBy', { name: site.submitterName })}
                   </p>
+                  {renderBadges(site)}
                   {site.description && (
                     <p className="text-xs text-slate-500 mt-1.5 line-clamp-2">{site.description}</p>
                   )}
@@ -264,23 +263,7 @@ export const CampSitesPage: React.FC<CampSitesPageProps> = ({ onBack, onShowNoti
             ))}
           </div>
         )}
-
-        {/* Points checker */}
-        <CampPointsChecker />
       </div>
-
-      {showForm && (
-        <CampSiteFormModal
-          pointsPerSite={config.pointsPerSite}
-          onClose={() => setShowForm(false)}
-          onSubmitted={() => {
-            // The new site is pending — the public list won't include it yet, but refresh anyway
-            // in case the admin approves fast.
-            loadCampSites();
-          }}
-          onShowNotification={onShowNotification}
-        />
-      )}
     </div>
   );
 };

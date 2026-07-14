@@ -46,6 +46,13 @@ export async function isCampSitesEnabled(): Promise<boolean> {
   return (await getSetting("camp_sites_enabled", "true")) !== "false";
 }
 
+// Feature flag: admin can hide the "Qrup hesabla" group price calculator from customers with
+// one switch. Not camp-specific, but lives alongside isCampSitesEnabled since both are simple
+// settings-table flags read the same way.
+export async function isGroupCalculatorEnabled(): Promise<boolean> {
+  return (await getSetting("group_calculator_enabled", "true")) !== "false";
+}
+
 // --- Points lookup rate limiting ------------------------------------------------------------
 // Deliberately separate from whatsapp.ts's checkAndConsumeRateLimit: that limiter's global
 // budget protects the single connected WhatsApp number, and points lookups shouldn't burn it.
@@ -130,6 +137,11 @@ export function rowToAdminCampSite(row: any) {
   };
 }
 
+// Boolean columns arrive as 0/1 (SQLite) or true/false (Postgres); requests send booleans.
+export function toDbBool(value: any): number {
+  return value ? 1 : 0;
+}
+
 // --- Submission validation ----------------------------------------------------------------
 // Padded Azerbaijan bounding box — submissions outside it are rejected outright.
 const AZ_BBOX = { minLat: 38.0, maxLat: 42.5, minLon: 44.0, maxLon: 51.5 };
@@ -143,6 +155,7 @@ export type CampSiteSubmission = {
   lat: number;
   lon: number;
   photos: string[];
+  isPaid: boolean;
   submitterName: string;
   submitterSurname: string;
   submitterPhone: string;
@@ -189,9 +202,70 @@ export function validateCampSiteSubmission(body: any): CampSiteSubmission | { er
   return {
     name, description, lat, lon,
     photos: photos as string[],
+    isPaid: !!body?.isPaid,
     submitterName, submitterSurname, submitterPhone,
     submitterPhoneNormalized: normalized,
   };
+}
+
+// Admin-created camp sites skip captcha/rate-limit/dedupe and land directly as approved.
+// They carry no submitter phone (empty string), which keeps them out of the contributor
+// points system entirely, and are credited publicly to the GedəkGörək team.
+export type AdminCampSiteInput = {
+  name: string;
+  description: string;
+  lat: number;
+  lon: number;
+  photos: string[];
+  isPaid: boolean;
+  isVerified: boolean;
+};
+
+export function validateAdminCampSiteInput(body: any): AdminCampSiteInput | { error: string } {
+  const name = typeof body?.name === "string" ? body.name.trim() : "";
+  if (name.length < 3 || name.length > 100) {
+    return { error: "Kamp yerinin adı 3–100 simvol aralığında olmalıdır." };
+  }
+  const description = typeof body?.description === "string" ? body.description.trim() : "";
+  if (description.length > 2000) {
+    return { error: "Təsvir maksimum 2000 simvol ola bilər." };
+  }
+  const lat = Number(body?.lat);
+  const lon = Number(body?.lon);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+    return { error: "Xəritədə kamp yerinin yerini seçin." };
+  }
+  if (lat < AZ_BBOX.minLat || lat > AZ_BBOX.maxLat || lon < AZ_BBOX.minLon || lon > AZ_BBOX.maxLon) {
+    return { error: "Seçilən koordinatlar Azərbaycan ərazisindən kənardır." };
+  }
+  const photos = Array.isArray(body?.photos) ? body.photos : [];
+  if (photos.length > MAX_PHOTOS) {
+    return { error: `Maksimum ${MAX_PHOTOS} foto əlavə etmək olar.` };
+  }
+  for (const photo of photos) {
+    if (typeof photo !== "string" || !PHOTO_PREFIX_RE.test(photo) || photo.length > MAX_PHOTO_CHARS) {
+      return { error: "Fotolar JPEG/PNG/WebP formatında və maksimum ~1.5MB olmalıdır." };
+    }
+  }
+  return {
+    name, description, lat, lon,
+    photos: photos as string[],
+    isPaid: !!body?.isPaid,
+    isVerified: !!body?.isVerified,
+  };
+}
+
+export async function insertAdminCampSite(input: AdminCampSiteInput): Promise<string> {
+  const id = `camp-${randomUUID()}`;
+  await dbClient.execute(
+    `INSERT INTO camp_sites (id, name, description, lat, lon, photos, submitter_name, submitter_surname, submitter_phone, submitter_phone_normalized, status, points_awarded, is_verified, is_paid, added_by_admin, approved_at)
+     VALUES (?, ?, ?, ?, ?, ?, 'GedəkGörək', '', '', '', 'approved', 0, ?, ?, 1, CURRENT_TIMESTAMP)`,
+    [
+      id, input.name, input.description || null, input.lat, input.lon,
+      JSON.stringify(input.photos), toDbBool(input.isVerified), toDbBool(input.isPaid),
+    ]
+  );
+  return id;
 }
 
 // Anti-gaming dedupe: the same phone re-submitting (or nudging the pin a few meters) near an
@@ -222,12 +296,12 @@ export async function findNearbyDuplicate(submission: CampSiteSubmission): Promi
 export async function insertCampSite(submission: CampSiteSubmission): Promise<string> {
   const id = `camp-${randomUUID()}`;
   await dbClient.execute(
-    `INSERT INTO camp_sites (id, name, description, lat, lon, photos, submitter_name, submitter_surname, submitter_phone, submitter_phone_normalized, status, points_awarded)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending_approval', 0)`,
+    `INSERT INTO camp_sites (id, name, description, lat, lon, photos, submitter_name, submitter_surname, submitter_phone, submitter_phone_normalized, status, points_awarded, is_paid)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending_approval', 0, ?)`,
     [
       id, submission.name, submission.description || null, submission.lat, submission.lon,
       JSON.stringify(submission.photos), submission.submitterName, submission.submitterSurname,
-      submission.submitterPhone, submission.submitterPhoneNormalized,
+      submission.submitterPhone, submission.submitterPhoneNormalized, toDbBool(submission.isPaid),
     ]
   );
   return id;
@@ -289,9 +363,11 @@ export type ContributorSummary = {
 
 export async function listContributors(): Promise<ContributorSummary[]> {
   const { threshold } = await getCampPointsConfig();
+  // Admin-created rows carry an empty normalized phone — they are the team's own entries
+  // and never participate in the contributor points/reward system.
   const rows = await dbClient.query(
     `SELECT submitter_phone_normalized as phone, COALESCE(SUM(points_awarded), 0) as points, COUNT(*) as approved_count
-     FROM camp_sites WHERE status = 'approved'
+     FROM camp_sites WHERE status = 'approved' AND submitter_phone_normalized != ''
      GROUP BY submitter_phone_normalized`
   );
   const redemptions = await dbClient.query(

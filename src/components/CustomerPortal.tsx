@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Routes, Route, useLocation, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import { Compass, Heart, Scale, Menu, X, BookOpen, Calculator } from 'lucide-react';
+import { Compass, Heart, Scale, Menu, X, BookOpen, Calculator, Tent } from 'lucide-react';
 import { Tour, TourSlot, Booking, Review, User, PriceCalculatorConfig } from '../types';
 import FAQPage from './FAQPage';
 import { PriceCalculator } from './PriceCalculator';
@@ -9,6 +9,7 @@ import { ImageLightbox } from './customer/ImageLightbox';
 import { WishlistView } from './customer/WishlistView';
 import { CompareView } from './customer/CompareView';
 import { CampSitesPage } from './customer/CampSitesPage';
+import { CampSiteAddPage } from './customer/CampSiteAddPage';
 import { CompareSwapModal } from './tours/CompareSwapModal';
 import { ReviewSubmissionPanel } from './customer/ReviewSubmissionPanel';
 import { ToursHomeView } from './customer/ToursHomeView';
@@ -135,6 +136,7 @@ export default function CustomerPortal({
       navDiscover: "Kəşf et",
       navWishlist: "İstəklər",
       navCompare: "Müqayisə",
+      navCampSites: "Kamp yerləri",
       navMenu: "Menyu",
       navGuide: "Bələdçi",
       navCalculator: "Qrup hesabla"
@@ -157,6 +159,7 @@ export default function CustomerPortal({
       navDiscover: "Discover",
       navWishlist: "Wishlist",
       navCompare: "Compare",
+      navCampSites: "Camp sites",
       navMenu: "Menu",
       navGuide: "Guide",
       navCalculator: "Group calculator"
@@ -179,6 +182,7 @@ export default function CustomerPortal({
       navDiscover: "Обзор",
       navWishlist: "Избранное",
       navCompare: "Сравнить",
+      navCampSites: "Кемпинги",
       navMenu: "Меню",
       navGuide: "Гид",
       navCalculator: "Групповой калькулятор"
@@ -233,7 +237,30 @@ export default function CustomerPortal({
     if (mobileNavMenuOpen) document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [mobileNavMenuOpen]);
-  
+
+  // Admin-controlled feature flag (settings table, camp_sites_enabled) — mirrors the same
+  // check in App.tsx's header nav, fetched independently here since the mobile bottom nav
+  // bar lives in this component instead. Defaults to hidden until the config loads so the
+  // icon never flashes visible on installs where the admin has switched it off.
+  const [campSitesEnabled, setCampSitesEnabled] = useState<boolean>(false);
+  React.useEffect(() => {
+    fetch('/api/camp-sites/config')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => setCampSitesEnabled(!!data && data.enabled !== false))
+      .catch(() => setCampSitesEnabled(true)); // config endpoint down — don't hide the feature
+  }, []);
+
+  // Same admin-controlled feature flag pattern (settings table, group_calculator_enabled) for
+  // the "Qrup hesabla" button in this bottom nav's burger menu. Defaults to visible so the
+  // button doesn't flash away on the common case (feature left on) while the request is in flight.
+  const [groupCalculatorEnabled, setGroupCalculatorEnabled] = useState<boolean>(true);
+  React.useEffect(() => {
+    fetch('/api/group-calculator/config')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => setGroupCalculatorEnabled(!!data && data.enabled !== false))
+      .catch(() => setGroupCalculatorEnabled(true)); // config endpoint down — don't hide the feature
+  }, []);
+
   // Real search history, persisted to localStorage (shared with the header's search bar)
   const [recentSearches, setRecentSearches] = useState<string[]>(() => getRecentSearches());
   const recordSearch = (term: string) => setRecentSearches(addRecentSearch(term));
@@ -832,7 +859,12 @@ export default function CustomerPortal({
 
         <Route
           path="/camp-sites"
-          element={<CampSitesPage onBack={() => navigate('/')} onShowNotification={onShowNotification} />}
+          element={<CampSitesPage onBack={() => navigate('/')} onAddSite={() => navigate('/camp-sites/add')} />}
+        />
+
+        <Route
+          path="/camp-sites/add"
+          element={<CampSiteAddPage onBack={() => navigate('/camp-sites')} />}
         />
 
         <Route
@@ -995,6 +1027,19 @@ export default function CustomerPortal({
             <span className="text-[10px] font-bold">{t('navCompare')}</span>
           </button>
 
+          {campSitesEnabled && (
+            <button
+              type="button"
+              onClick={() => { setMobileNavMenuOpen(false); navigate('/camp-sites'); }}
+              className={`flex-1 flex flex-col items-center justify-center h-full gap-0.5 transition-colors ${
+                location.pathname.startsWith('/camp-sites') ? 'text-brand-primary' : 'text-brand-text-muted'
+              }`}
+            >
+              <Tent className="w-5 h-5" strokeWidth={location.pathname.startsWith('/camp-sites') ? 2.5 : 2} />
+              <span className="text-[10px] font-bold">{t('navCampSites')}</span>
+            </button>
+          )}
+
           <div className="flex-1 relative h-full flex" ref={mobileNavMenuRef}>
             <button
               type="button"
@@ -1020,14 +1065,16 @@ export default function CustomerPortal({
                   <BookOpen className="w-5 h-5 text-brand-text-muted" />
                   {t('navGuide')}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => { setMobileNavMenuOpen(false); navigate('/calculator'); }}
-                  className="w-full flex items-center gap-3 px-5 py-4 text-sm font-medium text-brand-text-main hover:bg-slate-50 transition-colors border-b border-slate-100"
-                >
-                  <Calculator className="w-5 h-5 text-brand-text-muted" />
-                  {t('navCalculator')}
-                </button>
+                {groupCalculatorEnabled && (
+                  <button
+                    type="button"
+                    onClick={() => { setMobileNavMenuOpen(false); navigate('/calculator'); }}
+                    className="w-full flex items-center gap-3 px-5 py-4 text-sm font-medium text-brand-text-main hover:bg-slate-50 transition-colors border-b border-slate-100"
+                  >
+                    <Calculator className="w-5 h-5 text-brand-text-muted" />
+                    {t('navCalculator')}
+                  </button>
+                )}
 
                 {/* Dil + valyuta seçimi — header-dəki desktop menyusu ilə eyni 4 cüt seçim
                     (AZ/AZN, RU/AZN, EN/USD, EN/EUR). Əvvəllər burada yalnız dil dəyişirdi,
