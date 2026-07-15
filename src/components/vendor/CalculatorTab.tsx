@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { Tour, TourCategory, TourSlot, User, GuideCalculatorConfig, OffroadVehicleType, DEFAULT_GUIDE_CALCULATOR_CONFIG } from '../../types';
+import React, { useState } from 'react';
+import { Tour, TourCategory, TourSlot, User, GuideCalculatorConfig, DEFAULT_GUIDE_CALCULATOR_CONFIG } from '../../types';
 import { useLanguage } from '../../i18n/LanguageContext';
 import { Calculator, Tags, Settings, ChevronDown, ChevronUp } from 'lucide-react';
 
@@ -22,7 +22,11 @@ function tierForCategory(category: TourCategory): GuideTier {
   return 'hiking';
 }
 
-const OFFROAD_TYPES: OffroadVehicleType[] = ['niva', 'uaz', 'gaz66'];
+// Editable draft mirrors GuideCalculatorConfig but allows '' mid-edit so a field can be fully
+// cleared before typing a new value — using `number` directly forces every clear to collapse to
+// 0, which then makes the next keystroke append after that 0 (e.g. typing "50" becomes "050").
+type RateDraft = { [K in keyof GuideCalculatorConfig]: number | '' };
+const resolveNum = (v: number | '') => (v === '' ? 0 : v);
 
 export function CalculatorTab({ tours, slots, currentUser, operatorToken, onUserUpdated, onShowNotification }: CalculatorTabProps) {
   const { t } = useLanguage();
@@ -35,17 +39,25 @@ export function CalculatorTab({ tours, slots, currentUser, operatorToken, onUser
   const [participants, setParticipants] = useState<number | ''>('');
   const [pricePerPerson, setPricePerPerson] = useState<number | ''>('');
   const [busPrice, setBusPrice] = useState<number | ''>('');
-  const [offroadType, setOffroadType] = useState<OffroadVehicleType | ''>('');
-  const [offroadQty, setOffroadQty] = useState<number | ''>('');
-  const [offroadUnitPrice, setOffroadUnitPrice] = useState<number | ''>('');
+  // Vendors can mix vehicle types on one tour (e.g. 1 UAZ + 2 Niva) — each type gets its own
+  // quantity + unit price rather than a single exclusive selection.
+  const [nivaQty, setNivaQty] = useState<number | ''>('');
+  const [nivaUnitPrice, setNivaUnitPrice] = useState<number | ''>(config.nivaPrice);
+  const [uazQty, setUazQty] = useState<number | ''>('');
+  const [uazUnitPrice, setUazUnitPrice] = useState<number | ''>(config.uazPrice);
+  const [gaz66Qty, setGaz66Qty] = useState<number | ''>('');
+  const [gaz66UnitPrice, setGaz66UnitPrice] = useState<number | ''>(config.gaz66Price);
   const [sandwichPrice, setSandwichPrice] = useState<number | ''>('');
   const [villageLunchPrice, setVillageLunchPrice] = useState<number | ''>('');
   const [villageTeaPrice, setVillageTeaPrice] = useState<number | ''>('');
   const [additionalBonus, setAdditionalBonus] = useState<number | ''>('');
-  const [netGuideTotalOverride, setNetGuideTotalOverride] = useState<number | null>(null);
+  // A 3rd guide on the tour is automatically treated as a second assistant guide — same rate,
+  // same role — so assistant-side pay scales by count rather than needing a separate rate tier.
+  const [hasThirdGuide, setHasThirdGuide] = useState(false);
+  const [netGuideTotalOverride, setNetGuideTotalOverride] = useState<number | '' | null>(null);
 
   const [ratesOpen, setRatesOpen] = useState(false);
-  const [rateDraft, setRateDraft] = useState<GuideCalculatorConfig>(config);
+  const [rateDraft, setRateDraft] = useState<RateDraft>(config);
   const [savingRates, setSavingRates] = useState(false);
 
   const myTours = tours.filter(tr => tr.vendorId === currentUser.id);
@@ -53,29 +65,24 @@ export function CalculatorTab({ tours, slots, currentUser, operatorToken, onUser
   const tourSlots = slots.filter(s => s.tourId === tourId);
   const selectedSlot = tourSlots.find(s => s.id === slotId);
 
-  useEffect(() => {
+  const handleTourChange = (id: string) => {
+    setTourId(id);
     setSlotId('');
     setNetGuideTotalOverride(null);
+    const tour = myTours.find(tr => tr.id === id);
     setParticipants('');
-    setPricePerPerson(selectedTour?.price !== undefined ? selectedTour.price : '');
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tourId]);
+    setPricePerPerson(tour?.price !== undefined ? tour.price : '');
+  };
 
-  useEffect(() => {
-    if (selectedSlot) {
-      setParticipants(selectedSlot.bookedCount);
-      setPricePerPerson(selectedSlot.price);
+  const handleSlotChange = (id: string) => {
+    setSlotId(id);
+    const slot = tourSlots.find(s => s.id === id);
+    if (slot) {
+      setParticipants(slot.bookedCount);
+      setPricePerPerson(slot.price);
     }
     setNetGuideTotalOverride(null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [slotId]);
-
-  useEffect(() => {
-    if (!offroadType) { setOffroadUnitPrice(''); return; }
-    const priceKey = offroadType === 'niva' ? 'nivaPrice' : offroadType === 'uaz' ? 'uazPrice' : 'gaz66Price';
-    setOffroadUnitPrice(config[priceKey]);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [offroadType]);
+  };
 
   if (!currentUser.calculatorEnabled) {
     return (
@@ -90,27 +97,40 @@ export function CalculatorTab({ tours, slots, currentUser, operatorToken, onUser
   const tier: GuideTier = selectedTour ? tierForCategory(selectedTour.category) : 'hiking';
   const mainGuideRate = tier === 'peak' ? config.peakBaseGuideDailyRate : tier === 'camp' ? config.campBaseGuideDailyRate : config.hikingBaseGuideDailyRate;
   const assistantGuideRate = tier === 'peak' ? config.peakAssistantGuideDailyRate : tier === 'camp' ? config.campAssistantGuideDailyRate : config.hikingAssistantGuideDailyRate;
+  // A 3rd guide is a second assistant guide — assistant-side base pay and second bonus scale by
+  // how many assistants there are (1 normally, 2 when hasThirdGuide is checked).
+  const numAssistants = hasThirdGuide ? 2 : 1;
   const mainGuidePayment = mainGuideRate * durationDays;
-  const assistantGuidePayment = assistantGuideRate * durationDays;
-  const participantsNum = participants === '' ? 0 : Number(participants);
+  const assistantGuidePaymentPerGuide = assistantGuideRate * durationDays;
+  const assistantGuidePayment = assistantGuidePaymentPerGuide * numAssistants;
+  const participantsNum = resolveNum(participants);
   // Main and assistant guide are different people — each gets their own second bonus, computed
   // from their own multiplier, not a shared pool.
   const mainGuideSecondBonus = participantsNum * config.mainGuideSecondBonusMultiplier;
-  const assistantGuideSecondBonus = participantsNum * config.assistantGuideSecondBonusMultiplier;
-  const additionalBonusNum = additionalBonus === '' ? 0 : Number(additionalBonus);
-  const mainGuideTotal = mainGuidePayment + mainGuideSecondBonus;
-  const assistantGuideTotal = assistantGuidePayment + assistantGuideSecondBonus;
-  const computedGuideTotal = mainGuideTotal + assistantGuideTotal + additionalBonusNum;
-  const netGuideTotal = netGuideTotalOverride !== null ? netGuideTotalOverride : computedGuideTotal;
+  const assistantGuideSecondBonusPerGuide = participantsNum * config.assistantGuideSecondBonusMultiplier;
+  const assistantGuideSecondBonus = assistantGuideSecondBonusPerGuide * numAssistants;
+  const additionalBonusNum = resolveNum(additionalBonus);
+  // Manual/discretionary bonus splits automatically: 60% to the main guide, 40% shared across
+  // the assistant guide(s).
+  const mainBonusShare = additionalBonusNum * 0.6;
+  const assistantBonusShare = additionalBonusNum * 0.4;
+  const mainGuideTotal = mainGuidePayment + mainGuideSecondBonus + mainBonusShare;
+  const assistantGuideTotal = assistantGuidePayment + assistantGuideSecondBonus + assistantBonusShare;
+  const computedGuideTotal = mainGuideTotal + assistantGuideTotal;
+  // The override field shows the live computed total until the vendor types their own number;
+  // resolving '' to 0 only happens for the math below, not for what's displayed while editing.
+  const netGuideTotalDisplay = netGuideTotalOverride !== null ? netGuideTotalOverride : computedGuideTotal;
+  const netGuideTotal = resolveNum(netGuideTotalDisplay);
 
-  const pricePerPersonNum = pricePerPerson === '' ? 0 : Number(pricePerPerson);
-  const busPriceNum = busPrice === '' ? 0 : Number(busPrice);
-  const offroadQtyNum = offroadQty === '' ? 0 : Number(offroadQty);
-  const offroadUnitPriceNum = offroadUnitPrice === '' ? 0 : Number(offroadUnitPrice);
-  const offroadTotal = offroadType ? offroadQtyNum * offroadUnitPriceNum : 0;
-  const sandwichTotal = (sandwichPrice === '' ? 0 : Number(sandwichPrice)) * participantsNum;
-  const villageLunchTotal = (villageLunchPrice === '' ? 0 : Number(villageLunchPrice)) * participantsNum;
-  const villageTeaTotal = (villageTeaPrice === '' ? 0 : Number(villageTeaPrice)) * participantsNum;
+  const pricePerPersonNum = resolveNum(pricePerPerson);
+  const busPriceNum = resolveNum(busPrice);
+  const nivaTotal = resolveNum(nivaQty) * resolveNum(nivaUnitPrice);
+  const uazTotal = resolveNum(uazQty) * resolveNum(uazUnitPrice);
+  const gaz66Total = resolveNum(gaz66Qty) * resolveNum(gaz66UnitPrice);
+  const offroadTotal = nivaTotal + uazTotal + gaz66Total;
+  const sandwichTotal = resolveNum(sandwichPrice) * participantsNum;
+  const villageLunchTotal = resolveNum(villageLunchPrice) * participantsNum;
+  const villageTeaTotal = resolveNum(villageTeaPrice) * participantsNum;
   const foodTotal = sandwichTotal + villageLunchTotal + villageTeaTotal;
   const otherCostsTotal = busPriceNum + offroadTotal + foodTotal;
 
@@ -143,7 +163,7 @@ export function CalculatorTab({ tours, slots, currentUser, operatorToken, onUser
         type="number"
         step="0.1"
         value={rateDraft[key]}
-        onChange={(e) => setRateDraft(prev => ({ ...prev, [key]: Number(e.target.value) }))}
+        onChange={(e) => setRateDraft(prev => ({ ...prev, [key]: e.target.value === '' ? '' : Number(e.target.value) }))}
         className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
       />
     </div>
@@ -152,13 +172,16 @@ export function CalculatorTab({ tours, slots, currentUser, operatorToken, onUser
   const handleSaveRates = async () => {
     setSavingRates(true);
     try {
+      const payload: GuideCalculatorConfig = Object.fromEntries(
+        Object.entries(rateDraft).map(([k, v]) => [k, resolveNum(v as number | '')])
+      ) as unknown as GuideCalculatorConfig;
       const response = await fetch(`/api/users/${currentUser.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
           ...(operatorToken ? { Authorization: `Bearer ${operatorToken}` } : {}),
         },
-        body: JSON.stringify({ calculatorConfig: rateDraft }),
+        body: JSON.stringify({ calculatorConfig: payload }),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error);
@@ -176,6 +199,31 @@ export function CalculatorTab({ tours, slots, currentUser, operatorToken, onUser
     <div className="flex justify-between border-b border-slate-700 pb-1.5">
       <span className="text-slate-400">{label}</span>
       <span className={bold ? 'font-black' : 'font-bold'}>{value.toFixed(2)} AZN</span>
+    </div>
+  );
+
+  const offroadRow = (
+    label: string,
+    qty: number | '',
+    setQty: (v: number | '') => void,
+    unitPrice: number | '',
+    setUnitPrice: (v: number | '') => void,
+    total: number
+  ) => (
+    <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
+      <div className="text-xs font-bold text-slate-700">{label}</div>
+      <div className="space-y-1.5">
+        <label className="block text-[10px] font-semibold text-slate-500">{t('vendorCalculator.offroad.quantityLabel')}</label>
+        {numberInput(qty, setQty, { min: 0 })}
+      </div>
+      <div className="space-y-1.5">
+        <label className="block text-[10px] font-semibold text-slate-500">{t('vendorCalculator.offroad.unitPriceLabel')}</label>
+        {numberInput(unitPrice, setUnitPrice, { min: 0 })}
+      </div>
+      <div className="space-y-1.5">
+        <label className="block text-[10px] font-semibold text-slate-500">{t('vendorCalculator.offroad.totalLabel')}</label>
+        <div className="w-full bg-slate-100 text-slate-700 p-2.5 text-xs rounded-xl font-bold">{total.toFixed(2)} AZN</div>
+      </div>
     </div>
   );
 
@@ -248,7 +296,7 @@ export function CalculatorTab({ tours, slots, currentUser, operatorToken, onUser
             <label className="block text-xs font-semibold text-slate-700">{t('vendorCalculator.tourPicker.tourLabel')}</label>
             <select
               value={tourId}
-              onChange={(e) => setTourId(e.target.value)}
+              onChange={(e) => handleTourChange(e.target.value)}
               className="w-full bg-white border border-slate-200 text-slate-700 p-2.5 text-xs rounded-xl focus:outline-none focus:border-emerald-700 focus:ring-1 focus:ring-emerald-700/50 transition shadow-xs font-bold"
             >
               <option value="">{t('vendorCalculator.tourPicker.tourPlaceholder')}</option>
@@ -261,7 +309,7 @@ export function CalculatorTab({ tours, slots, currentUser, operatorToken, onUser
             <label className="block text-xs font-semibold text-slate-700">{t('vendorCalculator.tourPicker.slotLabel')}</label>
             <select
               value={slotId}
-              onChange={(e) => setSlotId(e.target.value)}
+              onChange={(e) => handleSlotChange(e.target.value)}
               disabled={!tourId}
               className="w-full bg-white border border-slate-200 text-slate-700 p-2.5 text-xs rounded-xl focus:outline-none focus:border-emerald-700 focus:ring-1 focus:ring-emerald-700/50 transition shadow-xs disabled:bg-slate-100 disabled:text-slate-400 font-bold"
             >
@@ -281,12 +329,23 @@ export function CalculatorTab({ tours, slots, currentUser, operatorToken, onUser
       {tourId && (
         <>
           {/* Category-derived guide rate tier */}
-          <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
-            <h4 className="text-xs font-bold text-slate-700 flex items-center gap-2 mb-3">
-              <Tags className="w-4 h-4 text-emerald-700" />
-              {t('vendorCalculator.tier.label')}
-            </h4>
-            <span className={`text-xs font-bold px-3 py-1.5 rounded-lg ${tierBadgeClass}`}>{tierLabel}</span>
+          <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-4">
+            <div>
+              <h4 className="text-xs font-bold text-slate-700 flex items-center gap-2 mb-3">
+                <Tags className="w-4 h-4 text-emerald-700" />
+                {t('vendorCalculator.tier.label')}
+              </h4>
+              <span className={`text-xs font-bold px-3 py-1.5 rounded-lg ${tierBadgeClass}`}>{tierLabel}</span>
+            </div>
+            <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={hasThirdGuide}
+                onChange={(e) => setHasThirdGuide(e.target.checked)}
+                className="w-4 h-4 accent-emerald-600"
+              />
+              {t('vendorCalculator.thirdGuide.checkboxLabel')}
+            </label>
           </div>
 
           {/* Core inputs */}
@@ -320,46 +379,17 @@ export function CalculatorTab({ tours, slots, currentUser, operatorToken, onUser
                   {t('vendorCalculator.inputs.netGuideTotalLabel')}
                   <span className="block text-[10px] font-normal text-slate-400">{t('vendorCalculator.inputs.netGuideTotalHint')}</span>
                 </label>
-                {numberInput(netGuideTotal, (v) => setNetGuideTotalOverride(v === '' ? 0 : v), { min: 0 })}
+                {numberInput(netGuideTotalDisplay, setNetGuideTotalOverride, { min: 0 })}
               </div>
             </div>
           </div>
 
-          {/* Offroad */}
-          <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
-            <h4 className="text-xs font-bold text-slate-700 mb-3">{t('vendorCalculator.offroad.title')}</h4>
-            <div className="flex flex-wrap gap-2 mb-3">
-              {OFFROAD_TYPES.map(vt => (
-                <button
-                  key={vt}
-                  type="button"
-                  onClick={() => setOffroadType(offroadType === vt ? '' : vt)}
-                  className={`text-xs font-bold px-3 py-2 rounded-lg border transition ${
-                    offroadType === vt
-                      ? 'bg-emerald-600 text-white border-emerald-600'
-                      : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
-                  }`}
-                >
-                  {t(`vendorCalculator.offroad.${vt}`)}
-                </button>
-              ))}
-            </div>
-            {offroadType && (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="space-y-1.5">
-                  <label className="block text-xs font-semibold text-slate-700">{t('vendorCalculator.offroad.quantityLabel')}</label>
-                  {numberInput(offroadQty, setOffroadQty, { min: 0 })}
-                </div>
-                <div className="space-y-1.5">
-                  <label className="block text-xs font-semibold text-slate-700">{t('vendorCalculator.offroad.unitPriceLabel')}</label>
-                  {numberInput(offroadUnitPrice, setOffroadUnitPrice, { min: 0 })}
-                </div>
-                <div className="space-y-1.5">
-                  <label className="block text-xs font-semibold text-slate-700">{t('vendorCalculator.offroad.totalLabel')}</label>
-                  <div className="w-full bg-slate-100 text-slate-700 p-2.5 text-xs rounded-xl font-bold">{offroadTotal.toFixed(2)} AZN</div>
-                </div>
-              </div>
-            )}
+          {/* Offroad — vendor can mix vehicle types (e.g. 1 UAZ + 2 Niva) in one calculation */}
+          <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs space-y-4">
+            <h4 className="text-xs font-bold text-slate-700">{t('vendorCalculator.offroad.title')}</h4>
+            {offroadRow(t('vendorCalculator.offroad.niva'), nivaQty, setNivaQty, nivaUnitPrice, setNivaUnitPrice, nivaTotal)}
+            {offroadRow(t('vendorCalculator.offroad.uaz'), uazQty, setUazQty, uazUnitPrice, setUazUnitPrice, uazTotal)}
+            {offroadRow(t('vendorCalculator.offroad.gaz66'), gaz66Qty, setGaz66Qty, gaz66UnitPrice, setGaz66UnitPrice, gaz66Total)}
           </div>
 
           {/* Food */}
@@ -395,6 +425,12 @@ export function CalculatorTab({ tours, slots, currentUser, operatorToken, onUser
                     <span>{t('vendorCalculator.results.mainGuideBonusLabel')}</span>
                     <span>{mainGuideSecondBonus.toFixed(2)} AZN</span>
                   </div>
+                  {mainBonusShare > 0 && (
+                    <div className="flex justify-between text-slate-400">
+                      <span>{t('vendorCalculator.results.mainBonusShareLabel')}</span>
+                      <span>{mainBonusShare.toFixed(2)} AZN</span>
+                    </div>
+                  )}
                   <div className="flex justify-between items-center pt-1.5 border-t border-slate-700">
                     <span className="font-bold">{t('vendorCalculator.results.mainGuidePaymentLabel')}</span>
                     <span className="font-black">{mainGuideTotal.toFixed(2)} AZN</span>
@@ -409,13 +445,25 @@ export function CalculatorTab({ tours, slots, currentUser, operatorToken, onUser
                     <span>{t('vendorCalculator.results.assistantGuideBonusLabel')}</span>
                     <span>{assistantGuideSecondBonus.toFixed(2)} AZN</span>
                   </div>
+                  {assistantBonusShare > 0 && (
+                    <div className="flex justify-between text-slate-400">
+                      <span>{t('vendorCalculator.results.assistantBonusShareLabel')}</span>
+                      <span>{assistantBonusShare.toFixed(2)} AZN</span>
+                    </div>
+                  )}
                   <div className="flex justify-between items-center pt-1.5 border-t border-slate-700">
-                    <span className="font-bold">{t('vendorCalculator.results.assistantGuidePaymentLabel')}</span>
+                    <span className="font-bold">
+                      {hasThirdGuide ? t('vendorCalculator.results.assistantGuidePaymentLabelPlural') : t('vendorCalculator.results.assistantGuidePaymentLabel')}
+                    </span>
                     <span className="font-black">{assistantGuideTotal.toFixed(2)} AZN</span>
                   </div>
+                  {hasThirdGuide && (
+                    <div className="text-[10px] text-slate-500 text-right">
+                      {t('vendorCalculator.results.perGuideNote', { amount: (assistantGuideTotal / 2).toFixed(2) })}
+                    </div>
+                  )}
                 </div>
               </div>
-              {additionalBonusNum > 0 && resultRow(t('vendorCalculator.inputs.additionalBonusLabel'), additionalBonusNum)}
               <div className="flex justify-between items-center pt-2">
                 <span className="text-xs font-bold text-slate-300">{t('vendorCalculator.results.guideTotalLabel')}</span>
                 <span className="text-sm font-black">{netGuideTotal.toFixed(2)} AZN</span>
@@ -426,7 +474,9 @@ export function CalculatorTab({ tours, slots, currentUser, operatorToken, onUser
               <h4 className="text-xs font-bold tracking-widest text-slate-300 mb-2">{t('vendorCalculator.results.otherCostsTitle')}</h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                 {resultRow(t('vendorCalculator.results.busCostLabel'), busPriceNum)}
-                {offroadType && resultRow(t('vendorCalculator.results.offroadCostLabel'), offroadTotal)}
+                {nivaTotal > 0 && resultRow(t('vendorCalculator.offroad.niva'), nivaTotal)}
+                {uazTotal > 0 && resultRow(t('vendorCalculator.offroad.uaz'), uazTotal)}
+                {gaz66Total > 0 && resultRow(t('vendorCalculator.offroad.gaz66'), gaz66Total)}
                 {sandwichTotal > 0 && resultRow(t('vendorCalculator.food.sandwichLabel'), sandwichTotal)}
                 {villageLunchTotal > 0 && resultRow(t('vendorCalculator.food.villageLunchLabel'), villageLunchTotal)}
                 {villageTeaTotal > 0 && resultRow(t('vendorCalculator.food.villageTeaLabel'), villageTeaTotal)}
