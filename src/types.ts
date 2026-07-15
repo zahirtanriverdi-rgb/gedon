@@ -51,9 +51,9 @@ export interface GuideCalculatorConfig {
   nivaPrice: number; // AZN per Niva used
   uazPrice: number; // AZN per UAZ used
   gaz66Price: number; // AZN per Gaz-66 used
-  sandwichLunchPrice: number; // AZN/person — sandwich lunch
-  villageHouseLunchPrice: number; // AZN/person — village house ("kənd evi") lunch
-  villageHouseTeaPrice: number; // AZN/person — village house tea table ("çay süfrəsi")
+  // Food/tea/entrance-fee unit prices are NOT stored here — the user found a saved "default"
+  // meaningless for these (unlike vehicle rental, they vary too much tour to tour), so they're
+  // entered fresh in the calculator itself every time (CalculatorTab.tsx food section).
 }
 
 export const DEFAULT_GUIDE_CALCULATOR_CONFIG: GuideCalculatorConfig = {
@@ -68,9 +68,6 @@ export const DEFAULT_GUIDE_CALCULATOR_CONFIG: GuideCalculatorConfig = {
   nivaPrice: 80,
   uazPrice: 100,
   gaz66Price: 150,
-  sandwichLunchPrice: 4,
-  villageHouseLunchPrice: 15,
-  villageHouseTeaPrice: 5,
 };
 
 // A transport record (bus, offroad vehicle, or any other vehicle) sent to a tour. Visible to
@@ -82,10 +79,55 @@ export interface VendorBus {
   vendorName?: string; // Snapshot of the adding vendor's name/company, shown since the list is shared
   tourId?: string;
   tourName: string; // Snapshot of the tour name at the time the record was made
-  plateNumber: string; // Mandatory vehicle registration/plate number
-  vehicleDescription?: string; // Optional extra detail (company, vehicle type, etc.)
+  contactPhone: string; // Mandatory driver/contact phone number
+  vehicleDescription?: string; // Optional extra detail (plate number, company, vehicle type, etc.)
   price: number; // In AZN
   travelDate: string; // ISO date string
+  createdAt?: string;
+}
+
+// A driver a vendor is warning other vendors about. Shared list (same visibility model as
+// VendorBus): every vendor reads every entry, but only the reporting vendor may edit/delete it.
+export interface DriverBlacklistEntry {
+  id: string;
+  vendorId: string;
+  vendorName?: string; // Snapshot of the reporting vendor's name/company
+  driverName: string;
+  phoneNumber: string;
+  reason: string;
+  createdAt?: string;
+}
+
+// A snapshot of one guide-payment/net-income calculation, saved so a vendor can look up what
+// they worked out for a given tour departure later. Private to the vendor who saved it — unlike
+// VendorBus/DriverBlacklistEntry this is financial data, not something other vendors should see.
+export interface SavedGuideCalculation {
+  id: string;
+  vendorId: string;
+  tourId?: string;
+  tourName: string; // Snapshot of the tour name at the time it was saved
+  slotId?: string;
+  slotDate?: string; // Snapshot of the chosen slot's date, if one was picked
+  participants: number;
+  pricePerPerson: number;
+  durationDays: number;
+  tier: 'hiking' | 'camp' | 'peak';
+  mainGuideTotal: number;
+  assistantGuideTotal: number;
+  guideTotal: number; // Net payment to guides (after any manual override)
+  busPrice: number;
+  // Itemized rather than lumped into offroadTotal/foodTotal — so a saved record (and its
+  // PDF/Excel export) can show exactly what money went where, not just category subtotals.
+  nivaTotal: number;
+  uazTotal: number;
+  gaz66Total: number;
+  sandwichTotal: number;
+  villageLunchTotal: number;
+  villageTeaTotal: number;
+  nationalParkTotal: number;
+  otherCostsTotal: number;
+  collected: number;
+  netIncome: number;
   createdAt?: string;
 }
 

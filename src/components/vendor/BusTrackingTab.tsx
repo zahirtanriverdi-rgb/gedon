@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Tour, User, VendorBus } from '../../types';
+import { Tour, User, VendorBus, DriverBlacklistEntry } from '../../types';
 import { useLanguage } from '../../i18n/LanguageContext';
-import { Truck, Plus, Pencil, Trash2, X, Check, Info } from 'lucide-react';
+import { Truck, Plus, Pencil, Trash2, X, Check, Info, ShieldAlert } from 'lucide-react';
 
 interface BusTrackingTabProps {
   tours: Tour[];
@@ -12,13 +12,21 @@ interface BusTrackingTabProps {
 
 interface BusFormState {
   tourId: string;
-  plateNumber: string;
+  contactPhone: string;
   vehicleDescription: string;
   price: number | '';
   travelDate: string;
 }
 
-const emptyForm: BusFormState = { tourId: '', plateNumber: '', vehicleDescription: '', price: '', travelDate: '' };
+const emptyForm: BusFormState = { tourId: '', contactPhone: '', vehicleDescription: '', price: '', travelDate: '' };
+
+interface BlacklistFormState {
+  driverName: string;
+  phoneNumber: string;
+  reason: string;
+}
+
+const emptyBlacklistForm: BlacklistFormState = { driverName: '', phoneNumber: '', reason: '' };
 
 export function BusTrackingTab({ tours, currentUser, operatorToken, onShowNotification }: BusTrackingTabProps) {
   const { t } = useLanguage();
@@ -28,6 +36,13 @@ export function BusTrackingTab({ tours, currentUser, operatorToken, onShowNotifi
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState<BusFormState>(emptyForm);
   const [saving, setSaving] = useState(false);
+
+  const [blacklist, setBlacklist] = useState<DriverBlacklistEntry[]>([]);
+  const [blacklistLoading, setBlacklistLoading] = useState(true);
+  const [isAddingBlacklist, setIsAddingBlacklist] = useState(false);
+  const [editingBlacklistId, setEditingBlacklistId] = useState<string | null>(null);
+  const [blacklistForm, setBlacklistForm] = useState<BlacklistFormState>(emptyBlacklistForm);
+  const [savingBlacklist, setSavingBlacklist] = useState(false);
 
   const myTours = tours.filter(tr => tr.vendorId === currentUser.id);
 
@@ -45,8 +60,18 @@ export function BusTrackingTab({ tours, currentUser, operatorToken, onShowNotifi
       .finally(() => setLoading(false));
   };
 
+  const loadBlacklist = () => {
+    setBlacklistLoading(true);
+    fetch('/api/driver-blacklist', { headers: authHeaders })
+      .then(res => res.json())
+      .then(data => setBlacklist(Array.isArray(data.entries) ? data.entries : []))
+      .catch(() => setBlacklist([]))
+      .finally(() => setBlacklistLoading(false));
+  };
+
   useEffect(() => {
     loadBuses();
+    loadBlacklist();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [operatorToken]);
 
@@ -66,7 +91,7 @@ export function BusTrackingTab({ tours, currentUser, operatorToken, onShowNotifi
   };
 
   const startEdit = (bus: VendorBus) => {
-    setForm({ tourId: bus.tourId || '', plateNumber: bus.plateNumber, vehicleDescription: bus.vehicleDescription || '', price: bus.price, travelDate: bus.travelDate });
+    setForm({ tourId: bus.tourId || '', contactPhone: bus.contactPhone, vehicleDescription: bus.vehicleDescription || '', price: bus.price, travelDate: bus.travelDate });
     setEditingId(bus.id);
     setIsAdding(true);
   };
@@ -79,7 +104,7 @@ export function BusTrackingTab({ tours, currentUser, operatorToken, onShowNotifi
 
   const handleSave = async () => {
     const tourName = myTours.find(tr => tr.id === form.tourId)?.name || '';
-    if (!tourName || !form.plateNumber.trim() || form.price === '' || !form.travelDate) {
+    if (!tourName || !form.contactPhone.trim() || form.price === '' || !form.travelDate) {
       if (onShowNotification) onShowNotification(t('vendorBusTracking.notifications.missingFields'), 'warning');
       return;
     }
@@ -88,7 +113,7 @@ export function BusTrackingTab({ tours, currentUser, operatorToken, onShowNotifi
       const payload = {
         tourId: form.tourId || undefined,
         tourName,
-        plateNumber: form.plateNumber.trim(),
+        contactPhone: form.contactPhone.trim(),
         vehicleDescription: form.vehicleDescription.trim() || undefined,
         price: Number(form.price),
         travelDate: form.travelDate,
@@ -124,6 +149,70 @@ export function BusTrackingTab({ tours, currentUser, operatorToken, onShowNotifi
       if (onShowNotification) onShowNotification(t('vendorBusTracking.notifications.deleteSuccess'), 'success');
     } catch {
       if (onShowNotification) onShowNotification(t('vendorBusTracking.notifications.error'), 'error');
+    }
+  };
+
+  const startAddBlacklist = () => {
+    setBlacklistForm(emptyBlacklistForm);
+    setEditingBlacklistId(null);
+    setIsAddingBlacklist(true);
+  };
+
+  const startEditBlacklist = (entry: DriverBlacklistEntry) => {
+    setBlacklistForm({ driverName: entry.driverName, phoneNumber: entry.phoneNumber, reason: entry.reason });
+    setEditingBlacklistId(entry.id);
+    setIsAddingBlacklist(true);
+  };
+
+  const cancelBlacklistForm = () => {
+    setIsAddingBlacklist(false);
+    setEditingBlacklistId(null);
+    setBlacklistForm(emptyBlacklistForm);
+  };
+
+  const handleSaveBlacklist = async () => {
+    if (!blacklistForm.driverName.trim() || !blacklistForm.phoneNumber.trim() || !blacklistForm.reason.trim()) {
+      if (onShowNotification) onShowNotification(t('vendorBusTracking.blacklist.missingFields'), 'warning');
+      return;
+    }
+    setSavingBlacklist(true);
+    try {
+      const payload = {
+        driverName: blacklistForm.driverName.trim(),
+        phoneNumber: blacklistForm.phoneNumber.trim(),
+        reason: blacklistForm.reason.trim(),
+      };
+      const url = editingBlacklistId ? `/api/driver-blacklist/${editingBlacklistId}` : '/api/driver-blacklist';
+      const method = editingBlacklistId ? 'PUT' : 'POST';
+      const response = await fetch(url, { method, headers: authHeaders, body: JSON.stringify(payload) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'error');
+
+      if (editingBlacklistId) {
+        setBlacklist(prev => prev.map(e => e.id === editingBlacklistId ? data.entry : e));
+        if (onShowNotification) onShowNotification(t('vendorBusTracking.blacklist.updateSuccess'), 'success');
+      } else {
+        setBlacklist(prev => [data.entry, ...prev]);
+        if (onShowNotification) onShowNotification(t('vendorBusTracking.blacklist.addSuccess'), 'success');
+      }
+      cancelBlacklistForm();
+    } catch {
+      if (onShowNotification) onShowNotification(t('vendorBusTracking.blacklist.error'), 'error');
+    } finally {
+      setSavingBlacklist(false);
+    }
+  };
+
+  const handleDeleteBlacklist = async (entry: DriverBlacklistEntry) => {
+    const confirmed = window.confirm(t('vendorBusTracking.blacklist.deleteConfirm'));
+    if (!confirmed) return;
+    try {
+      const response = await fetch(`/api/driver-blacklist/${entry.id}`, { method: 'DELETE', headers: authHeaders });
+      if (!response.ok) throw new Error();
+      setBlacklist(prev => prev.filter(e => e.id !== entry.id));
+      if (onShowNotification) onShowNotification(t('vendorBusTracking.blacklist.deleteSuccess'), 'success');
+    } catch {
+      if (onShowNotification) onShowNotification(t('vendorBusTracking.blacklist.error'), 'error');
     }
   };
 
@@ -171,13 +260,13 @@ export function BusTrackingTab({ tours, currentUser, operatorToken, onShowNotifi
               </select>
             </div>
             <div className="space-y-1.5">
-              <label className="block text-[10px] font-bold text-slate-400">{t('vendorBusTracking.form.plateNumberLabel')} *</label>
+              <label className="block text-[10px] font-bold text-slate-400">{t('vendorBusTracking.form.contactPhoneLabel')} *</label>
               <input
-                type="text"
+                type="tel"
                 required
-                value={form.plateNumber}
-                onChange={(e) => setForm(f => ({ ...f, plateNumber: e.target.value }))}
-                placeholder={t('vendorBusTracking.form.plateNumberPlaceholder')}
+                value={form.contactPhone}
+                onChange={(e) => setForm(f => ({ ...f, contactPhone: e.target.value }))}
+                placeholder={t('vendorBusTracking.form.contactPhonePlaceholder')}
                 className="w-full bg-white border border-slate-200 text-slate-700 p-2.5 text-xs rounded-xl"
               />
             </div>
@@ -245,7 +334,7 @@ export function BusTrackingTab({ tours, currentUser, operatorToken, onShowNotifi
                 <tr className="text-left text-[10px] font-bold text-slate-400 border-b border-slate-200">
                   <th className="py-2 pr-3">{t('vendorBusTracking.table.headers.vendor')}</th>
                   <th className="py-2 pr-3">{t('vendorBusTracking.table.headers.tour')}</th>
-                  <th className="py-2 pr-3">{t('vendorBusTracking.table.headers.plateNumber')}</th>
+                  <th className="py-2 pr-3">{t('vendorBusTracking.table.headers.contactPhone')}</th>
                   <th className="py-2 pr-3">{t('vendorBusTracking.table.headers.description')}</th>
                   <th className="py-2 pr-3">{t('vendorBusTracking.table.headers.price')}</th>
                   <th className="py-2 pr-3">{t('vendorBusTracking.table.headers.date')}</th>
@@ -259,7 +348,7 @@ export function BusTrackingTab({ tours, currentUser, operatorToken, onShowNotifi
                     <tr key={bus.id} className="border-b border-slate-100">
                       <td className="py-2 pr-3 text-slate-500">{bus.vendorName || '—'}</td>
                       <td className="py-2 pr-3 font-semibold text-slate-700">{bus.tourName}</td>
-                      <td className="py-2 pr-3 font-bold">{bus.plateNumber}</td>
+                      <td className="py-2 pr-3 font-bold">{bus.contactPhone}</td>
                       <td className="py-2 pr-3">{bus.vehicleDescription || '—'}</td>
                       <td className="py-2 pr-3">{bus.price} AZN</td>
                       <td className="py-2 pr-3">{bus.travelDate}</td>
@@ -282,6 +371,133 @@ export function BusTrackingTab({ tours, currentUser, operatorToken, onShowNotifi
             </table>
           </div>
         )}
+      </div>
+
+      {/* Driver blacklist */}
+      <div className="bg-white p-5 rounded-xl border border-slate-200 shadow-xs">
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div>
+            <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2">
+              <ShieldAlert className="w-4 h-4 text-red-600" />
+              {t('vendorBusTracking.blacklist.title')}
+            </h3>
+            <p className="text-xs text-slate-500 mt-1">{t('vendorBusTracking.blacklist.subtitle')}</p>
+          </div>
+          {!isAddingBlacklist && (
+            <button
+              type="button"
+              onClick={startAddBlacklist}
+              className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs px-4 py-2.5 rounded-lg flex items-center gap-1.5 transition"
+            >
+              <Plus className="w-4 h-4" />
+              {t('vendorBusTracking.blacklist.addButton')}
+            </button>
+          )}
+        </div>
+
+        {isAddingBlacklist && (
+          <div className="mt-5 p-4 bg-slate-50 border border-slate-200 rounded-xl grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+            <div className="space-y-1.5">
+              <label className="block text-[10px] font-bold text-slate-400">{t('vendorBusTracking.blacklist.driverNameLabel')} *</label>
+              <input
+                type="text"
+                required
+                value={blacklistForm.driverName}
+                onChange={(e) => setBlacklistForm(f => ({ ...f, driverName: e.target.value }))}
+                placeholder={t('vendorBusTracking.blacklist.driverNamePlaceholder')}
+                className="w-full bg-white border border-slate-200 text-slate-700 p-2.5 text-xs rounded-xl"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="block text-[10px] font-bold text-slate-400">{t('vendorBusTracking.blacklist.phoneNumberLabel')} *</label>
+              <input
+                type="tel"
+                required
+                value={blacklistForm.phoneNumber}
+                onChange={(e) => setBlacklistForm(f => ({ ...f, phoneNumber: e.target.value }))}
+                placeholder={t('vendorBusTracking.blacklist.phoneNumberPlaceholder')}
+                className="w-full bg-white border border-slate-200 text-slate-700 p-2.5 text-xs rounded-xl"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="block text-[10px] font-bold text-slate-400">{t('vendorBusTracking.blacklist.reasonLabel')} *</label>
+              <input
+                type="text"
+                required
+                value={blacklistForm.reason}
+                onChange={(e) => setBlacklistForm(f => ({ ...f, reason: e.target.value }))}
+                placeholder={t('vendorBusTracking.blacklist.reasonPlaceholder')}
+                className="w-full bg-white border border-slate-200 text-slate-700 p-2.5 text-xs rounded-xl"
+              />
+            </div>
+            <div className="md:col-span-3 flex gap-2 justify-end">
+              <button
+                type="button"
+                onClick={cancelBlacklistForm}
+                className="text-xs font-bold px-4 py-2.5 rounded-lg bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 flex items-center gap-1.5"
+              >
+                <X className="w-3.5 h-3.5" />
+                {t('vendorBusTracking.form.cancelButton')}
+              </button>
+              <button
+                type="button"
+                disabled={savingBlacklist}
+                onClick={handleSaveBlacklist}
+                className="text-xs font-bold px-4 py-2.5 rounded-lg bg-red-600 hover:bg-red-700 text-white flex items-center gap-1.5 disabled:opacity-50"
+              >
+                <Check className="w-3.5 h-3.5" />
+                {t('vendorBusTracking.form.saveButton')}
+              </button>
+            </div>
+          </div>
+        )}
+
+        <div className="mt-5">
+          {blacklistLoading ? (
+            <p className="text-xs text-slate-400">…</p>
+          ) : blacklist.length === 0 ? (
+            <p className="text-xs text-slate-400">{t('vendorBusTracking.blacklist.empty')}</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="text-left text-[10px] font-bold text-slate-400 border-b border-slate-200">
+                    <th className="py-2 pr-3">{t('vendorBusTracking.blacklist.headers.vendor')}</th>
+                    <th className="py-2 pr-3">{t('vendorBusTracking.blacklist.headers.driverName')}</th>
+                    <th className="py-2 pr-3">{t('vendorBusTracking.blacklist.headers.phoneNumber')}</th>
+                    <th className="py-2 pr-3">{t('vendorBusTracking.blacklist.headers.reason')}</th>
+                    <th className="py-2 pr-3"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {blacklist.map(entry => {
+                    const isOwn = entry.vendorId === currentUser.id;
+                    return (
+                      <tr key={entry.id} className="border-b border-slate-100">
+                        <td className="py-2 pr-3 text-slate-500">{entry.vendorName || '—'}</td>
+                        <td className="py-2 pr-3 font-semibold text-slate-700">{entry.driverName}</td>
+                        <td className="py-2 pr-3 font-bold">{entry.phoneNumber}</td>
+                        <td className="py-2 pr-3">{entry.reason}</td>
+                        <td className="py-2 pr-3">
+                          {isOwn && (
+                            <div className="flex gap-2 justify-end">
+                              <button type="button" onClick={() => startEditBlacklist(entry)} className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600" title={t('vendorBusTracking.table.editButton')}>
+                                <Pencil className="w-3.5 h-3.5" />
+                              </button>
+                              <button type="button" onClick={() => handleDeleteBlacklist(entry)} className="p-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-600" title={t('vendorBusTracking.table.deleteButton')}>
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

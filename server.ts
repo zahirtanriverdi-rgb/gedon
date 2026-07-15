@@ -1991,7 +1991,7 @@ function rowToVendorBus(row: any) {
     vendorName: row.vendor_name || undefined,
     tourId: row.tour_id || undefined,
     tourName: row.tour_name,
-    plateNumber: row.plate_number || '',
+    contactPhone: row.contact_phone || '',
     vehicleDescription: row.bus_name || undefined,
     price: Number(row.price) || 0,
     travelDate: row.travel_date,
@@ -2044,9 +2044,9 @@ app.post("/api/vendor-buses", authenticateUser, async (req: any, res) => {
     }
 
     const body = req.body || {};
-    const { tourName, plateNumber, price, travelDate } = body;
-    if (!tourName || !plateNumber || price === undefined || !travelDate) {
-      return res.status(400).json({ error: "Zəhmət olmasa bütün məcburi sahələri doldurun (tourName, plateNumber, price, travelDate)." });
+    const { tourName, contactPhone, price, travelDate } = body;
+    if (!tourName || !contactPhone || price === undefined || !travelDate) {
+      return res.status(400).json({ error: "Zəhmət olmasa bütün məcburi sahələri doldurun (tourName, contactPhone, price, travelDate)." });
     }
 
     const vendorRows = await dbClient.query('SELECT name, company_name FROM users WHERE id = ?', [req.operator.id]);
@@ -2054,9 +2054,9 @@ app.post("/api/vendor-buses", authenticateUser, async (req: any, res) => {
 
     const id = `bus-${randomUUID()}`;
     await dbClient.execute(
-      `INSERT INTO vendor_buses (id, vendor_id, vendor_name, tour_id, tour_name, plate_number, bus_name, price, travel_date)
+      `INSERT INTO vendor_buses (id, vendor_id, vendor_name, tour_id, tour_name, contact_phone, bus_name, price, travel_date)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [id, req.operator.id, vendorName || null, body.tourId || null, tourName, plateNumber, body.vehicleDescription || null, Number(price), travelDate]
+      [id, req.operator.id, vendorName || null, body.tourId || null, tourName, contactPhone, body.vehicleDescription || null, Number(price), travelDate]
     );
 
     const rows = await dbClient.query('SELECT * FROM vendor_buses WHERE id = ?', [id]);
@@ -2079,18 +2079,18 @@ app.put("/api/vendor-buses/:id", authenticateUser, async (req: any, res) => {
     const body = req.body || {};
     const tourId = body.tourId !== undefined ? body.tourId : existing.tour_id;
     const tourName = body.tourName !== undefined ? body.tourName : existing.tour_name;
-    const plateNumber = body.plateNumber !== undefined ? body.plateNumber : existing.plate_number;
+    const contactPhone = body.contactPhone !== undefined ? body.contactPhone : existing.contact_phone;
     const vehicleDescription = body.vehicleDescription !== undefined ? body.vehicleDescription : existing.bus_name;
     const price = body.price !== undefined ? Number(body.price) : Number(existing.price);
     const travelDate = body.travelDate !== undefined ? body.travelDate : existing.travel_date;
 
-    if (!plateNumber) {
-      return res.status(400).json({ error: "Nömrə mütləq daxil edilməlidir." });
+    if (!contactPhone) {
+      return res.status(400).json({ error: "Əlaqə nömrəsi mütləq daxil edilməlidir." });
     }
 
     await dbClient.execute(
-      `UPDATE vendor_buses SET tour_id = ?, tour_name = ?, plate_number = ?, bus_name = ?, price = ?, travel_date = ? WHERE id = ?`,
-      [tourId || null, tourName, plateNumber, vehicleDescription || null, price, travelDate, req.params.id]
+      `UPDATE vendor_buses SET tour_id = ?, tour_name = ?, contact_phone = ?, bus_name = ?, price = ?, travel_date = ? WHERE id = ?`,
+      [tourId || null, tourName, contactPhone, vehicleDescription || null, price, travelDate, req.params.id]
     );
 
     const rows = await dbClient.query('SELECT * FROM vendor_buses WHERE id = ?', [req.params.id]);
@@ -2115,6 +2115,250 @@ app.delete("/api/vendor-buses/:id", authenticateUser, async (req: any, res) => {
   } catch (error: any) {
     console.error("[DELETE /api/vendor-buses/:id] error:", error);
     res.status(500).json({ error: "Avtobus qeydi silinə bilmədi: " + error.message });
+  }
+});
+
+// Driver blacklist — CRUD for "which drivers other vendors should avoid". Same shared-read /
+// owner-write model as vendor_buses, gated by the same busTrackingEnabled flag.
+function rowToDriverBlacklistEntry(row: any) {
+  return {
+    id: row.id,
+    vendorId: row.vendor_id,
+    vendorName: row.vendor_name || undefined,
+    driverName: row.driver_name,
+    phoneNumber: row.phone_number,
+    reason: row.reason,
+    createdAt: row.created_at,
+  };
+}
+
+app.get("/api/driver-blacklist", authenticateUser, async (req: any, res) => {
+  try {
+    const user = req.operator;
+    const conditions: string[] = [];
+    const params: any[] = [];
+
+    if (user.role === 'vendor') {
+      // Shared list — every vendor sees every reported driver.
+    } else if (user.role === 'admin') {
+      if (req.query.vendorId) { conditions.push('vendor_id = ?'); params.push(String(req.query.vendorId)); }
+    } else {
+      return res.status(403).json({ error: "Bu bölməyə icazəniz yoxdur." });
+    }
+
+    const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+    const rows = await dbClient.query(`SELECT * FROM driver_blacklist ${whereClause} ORDER BY created_at DESC`, params);
+    res.json({ entries: rows.map(rowToDriverBlacklistEntry) });
+  } catch (error: any) {
+    console.error("[GET /api/driver-blacklist] error:", error);
+    res.status(500).json({ error: "Qara siyahı gətirilə bilmədi: " + error.message });
+  }
+});
+
+app.post("/api/driver-blacklist", authenticateUser, async (req: any, res) => {
+  try {
+    if (req.operator.role !== 'vendor') {
+      return res.status(403).json({ error: "Yalnız operatorlar qara siyahıya əlavə edə bilər." });
+    }
+    if (!(await isBusTrackingEnabledForVendor(req.operator.id))) {
+      return res.status(403).json({ error: "Nəqliyyat izləmə bu hesab üçün aktiv deyil." });
+    }
+
+    const body = req.body || {};
+    const { driverName, phoneNumber, reason } = body;
+    if (!driverName || !phoneNumber || !reason) {
+      return res.status(400).json({ error: "Zəhmət olmasa bütün məcburi sahələri doldurun (driverName, phoneNumber, reason)." });
+    }
+
+    const vendorRows = await dbClient.query('SELECT name, company_name FROM users WHERE id = ?', [req.operator.id]);
+    const vendorName = vendorRows.length ? (vendorRows[0].company_name || vendorRows[0].name) : undefined;
+
+    const id = `blacklist-${randomUUID()}`;
+    await dbClient.execute(
+      `INSERT INTO driver_blacklist (id, vendor_id, vendor_name, driver_name, phone_number, reason)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [id, req.operator.id, vendorName || null, driverName, phoneNumber, reason]
+    );
+
+    const rows = await dbClient.query('SELECT * FROM driver_blacklist WHERE id = ?', [id]);
+    res.status(201).json({ entry: rowToDriverBlacklistEntry(rows[0]) });
+  } catch (error: any) {
+    console.error("[POST /api/driver-blacklist] error:", error);
+    res.status(500).json({ error: "Qara siyahıya əlavə edilə bilmədi: " + error.message });
+  }
+});
+
+app.put("/api/driver-blacklist/:id", authenticateUser, async (req: any, res) => {
+  try {
+    const existingRows = await dbClient.query('SELECT * FROM driver_blacklist WHERE id = ?', [req.params.id]);
+    if (!existingRows.length) return res.status(404).json({ error: "Qeyd tapılmadı." });
+    const existing = existingRows[0];
+    if (req.operator.role !== 'vendor' || existing.vendor_id !== req.operator.id) {
+      return res.status(403).json({ error: "Bu qeyd sizin hesabınıza aid deyil." });
+    }
+
+    const body = req.body || {};
+    const driverName = body.driverName !== undefined ? body.driverName : existing.driver_name;
+    const phoneNumber = body.phoneNumber !== undefined ? body.phoneNumber : existing.phone_number;
+    const reason = body.reason !== undefined ? body.reason : existing.reason;
+
+    if (!driverName || !phoneNumber || !reason) {
+      return res.status(400).json({ error: "Zəhmət olmasa bütün məcburi sahələri doldurun (driverName, phoneNumber, reason)." });
+    }
+
+    await dbClient.execute(
+      `UPDATE driver_blacklist SET driver_name = ?, phone_number = ?, reason = ? WHERE id = ?`,
+      [driverName, phoneNumber, reason, req.params.id]
+    );
+
+    const rows = await dbClient.query('SELECT * FROM driver_blacklist WHERE id = ?', [req.params.id]);
+    res.json({ entry: rowToDriverBlacklistEntry(rows[0]) });
+  } catch (error: any) {
+    console.error("[PUT /api/driver-blacklist/:id] error:", error);
+    res.status(500).json({ error: "Qeyd yenilənə bilmədi: " + error.message });
+  }
+});
+
+app.delete("/api/driver-blacklist/:id", authenticateUser, async (req: any, res) => {
+  try {
+    const existingRows = await dbClient.query('SELECT * FROM driver_blacklist WHERE id = ?', [req.params.id]);
+    if (!existingRows.length) return res.status(404).json({ error: "Qeyd tapılmadı." });
+    const existing = existingRows[0];
+    if (req.operator.role !== 'vendor' || existing.vendor_id !== req.operator.id) {
+      return res.status(403).json({ error: "Bu qeyd sizin hesabınıza aid deyil." });
+    }
+
+    await dbClient.execute('DELETE FROM driver_blacklist WHERE id = ?', [req.params.id]);
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error("[DELETE /api/driver-blacklist/:id] error:", error);
+    res.status(500).json({ error: "Qeyd silinə bilmədi: " + error.message });
+  }
+});
+
+// Saved guide-payment/net-income calculations — snapshots a vendor keeps from the Kalkulyator
+// tab. Unlike vendor_buses/driver_blacklist, this is private financial data: every read and
+// write below is scoped to the owning vendor, never a shared list.
+function rowToSavedCalculation(row: any) {
+  return {
+    id: row.id,
+    vendorId: row.vendor_id,
+    tourId: row.tour_id || undefined,
+    tourName: row.tour_name,
+    slotId: row.slot_id || undefined,
+    slotDate: row.slot_date || undefined,
+    participants: Number(row.participants) || 0,
+    pricePerPerson: Number(row.price_per_person) || 0,
+    durationDays: Number(row.duration_days) || 0,
+    tier: row.tier,
+    mainGuideTotal: Number(row.main_guide_total) || 0,
+    assistantGuideTotal: Number(row.assistant_guide_total) || 0,
+    guideTotal: Number(row.guide_total) || 0,
+    busPrice: Number(row.bus_price) || 0,
+    nivaTotal: Number(row.niva_total) || 0,
+    uazTotal: Number(row.uaz_total) || 0,
+    gaz66Total: Number(row.gaz66_total) || 0,
+    sandwichTotal: Number(row.sandwich_total) || 0,
+    villageLunchTotal: Number(row.village_lunch_total) || 0,
+    villageTeaTotal: Number(row.village_tea_total) || 0,
+    nationalParkTotal: Number(row.national_park_total) || 0,
+    otherCostsTotal: Number(row.other_costs_total) || 0,
+    collected: Number(row.collected) || 0,
+    netIncome: Number(row.net_income) || 0,
+    createdAt: row.created_at,
+  };
+}
+
+async function isCalculatorEnabledForVendor(vendorId: string): Promise<boolean> {
+  const rows = await dbClient.query('SELECT extra_data FROM users WHERE id = ?', [vendorId]);
+  if (!rows.length) return false;
+  try {
+    const extra = rows[0].extra_data ? JSON.parse(rows[0].extra_data) : {};
+    return !!extra.calculatorEnabled;
+  } catch {
+    return false;
+  }
+}
+
+app.get("/api/guide-calculations", authenticateUser, async (req: any, res) => {
+  try {
+    const user = req.operator;
+    const conditions: string[] = [];
+    const params: any[] = [];
+
+    if (user.role === 'vendor') {
+      conditions.push('vendor_id = ?');
+      params.push(user.id);
+    } else if (user.role === 'admin') {
+      if (req.query.vendorId) { conditions.push('vendor_id = ?'); params.push(String(req.query.vendorId)); }
+    } else {
+      return res.status(403).json({ error: "Bu bölməyə icazəniz yoxdur." });
+    }
+
+    if (req.query.tourId) { conditions.push('tour_id = ?'); params.push(String(req.query.tourId)); }
+
+    const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+    const rows = await dbClient.query(`SELECT * FROM guide_calculations ${whereClause} ORDER BY created_at DESC`, params);
+    res.json({ calculations: rows.map(rowToSavedCalculation) });
+  } catch (error: any) {
+    console.error("[GET /api/guide-calculations] error:", error);
+    res.status(500).json({ error: "Hesablamalar gətirilə bilmədi: " + error.message });
+  }
+});
+
+app.post("/api/guide-calculations", authenticateUser, async (req: any, res) => {
+  try {
+    if (req.operator.role !== 'vendor') {
+      return res.status(403).json({ error: "Yalnız operatorlar hesablama yadda saxlaya bilər." });
+    }
+    if (!(await isCalculatorEnabledForVendor(req.operator.id))) {
+      return res.status(403).json({ error: "Kalkulyator bu hesab üçün aktiv deyil." });
+    }
+
+    const body = req.body || {};
+    const { tourName, participants, pricePerPerson, durationDays, tier, mainGuideTotal, assistantGuideTotal, guideTotal } = body;
+    if (!tourName || participants === undefined || pricePerPerson === undefined || !durationDays || !tier || guideTotal === undefined) {
+      return res.status(400).json({ error: "Zəhmət olmasa bütün məcburi sahələri doldurun." });
+    }
+
+    const id = `calc-${randomUUID()}`;
+    await dbClient.execute(
+      `INSERT INTO guide_calculations (id, vendor_id, tour_id, tour_name, slot_id, slot_date, participants, price_per_person, duration_days, tier, main_guide_total, assistant_guide_total, guide_total, bus_price, niva_total, uaz_total, gaz66_total, sandwich_total, village_lunch_total, village_tea_total, national_park_total, other_costs_total, collected, net_income)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        id, req.operator.id, body.tourId || null, tourName, body.slotId || null, body.slotDate || null,
+        Number(participants), Number(pricePerPerson), Number(durationDays), tier,
+        Number(mainGuideTotal) || 0, Number(assistantGuideTotal) || 0, Number(guideTotal),
+        Number(body.busPrice) || 0,
+        Number(body.nivaTotal) || 0, Number(body.uazTotal) || 0, Number(body.gaz66Total) || 0,
+        Number(body.sandwichTotal) || 0, Number(body.villageLunchTotal) || 0, Number(body.villageTeaTotal) || 0,
+        Number(body.nationalParkTotal) || 0,
+        Number(body.otherCostsTotal) || 0, Number(body.collected) || 0, Number(body.netIncome) || 0,
+      ]
+    );
+
+    const rows = await dbClient.query('SELECT * FROM guide_calculations WHERE id = ?', [id]);
+    res.status(201).json({ calculation: rowToSavedCalculation(rows[0]) });
+  } catch (error: any) {
+    console.error("[POST /api/guide-calculations] error:", error);
+    res.status(500).json({ error: "Hesablama yadda saxlanıla bilmədi: " + error.message });
+  }
+});
+
+app.delete("/api/guide-calculations/:id", authenticateUser, async (req: any, res) => {
+  try {
+    const existingRows = await dbClient.query('SELECT * FROM guide_calculations WHERE id = ?', [req.params.id]);
+    if (!existingRows.length) return res.status(404).json({ error: "Hesablama tapılmadı." });
+    const existing = existingRows[0];
+    if (req.operator.role !== 'vendor' || existing.vendor_id !== req.operator.id) {
+      return res.status(403).json({ error: "Bu hesablama sizin hesabınıza aid deyil." });
+    }
+
+    await dbClient.execute('DELETE FROM guide_calculations WHERE id = ?', [req.params.id]);
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error("[DELETE /api/guide-calculations/:id] error:", error);
+    res.status(500).json({ error: "Hesablama silinə bilmədi: " + error.message });
   }
 });
 
@@ -2657,6 +2901,157 @@ app.post("/api/bookings/generate-ticket", async (req, res) => {
   } catch (error: any) {
     console.error("PDF generation exception:", error);
     return res.status(500).json({ error: "PDF bilet yaradılması zamanı xətalar baş verdi: " + error.message });
+  }
+});
+
+// Itemized PDF export of a guide-payment/net-income calculation. Generated on demand from
+// whatever the vendor currently has on screen (not a stored record) — this way every last
+// sub-line (bonus splits, per-vehicle/per-item qty x price) shows up in the export even though
+// the saved-history table only keeps the item-level totals, not every intermediate number.
+// Reuses the same jsPDF + Roboto-font setup as the ticket generator above so Azerbaijani
+// characters (Ə, ə, ı, İ, etc.) render natively instead of falling back to transliteration.
+app.post("/api/guide-calculations/pdf", authenticateUser, async (req: any, res) => {
+  try {
+    if (req.operator.role !== 'vendor') {
+      return res.status(403).json({ error: "Yalnız operatorlar hesablama PDF-i yükləyə bilər." });
+    }
+    if (!(await isCalculatorEnabledForVendor(req.operator.id))) {
+      return res.status(403).json({ error: "Kalkulyator bu hesab üçün aktiv deyil." });
+    }
+
+    const body = req.body || {};
+    const { tourName } = body;
+    if (!tourName) return res.status(400).json({ error: "Tur adı tələb olunur." });
+
+    const num = (v: any) => Number(v) || 0;
+
+    const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
+
+    let hasCustomFonts = false;
+    if (robotoRegularBase64 && robotoBoldBase64) {
+      try {
+        doc.addFileToVFS("Roboto-Regular.ttf", robotoRegularBase64);
+        doc.addFont("Roboto-Regular.ttf", "Roboto", "normal");
+        doc.addFileToVFS("Roboto-Bold.ttf", robotoBoldBase64);
+        doc.addFont("Roboto-Bold.ttf", "Roboto", "bold");
+        doc.setFont("Roboto", "normal");
+        hasCustomFonts = true;
+      } catch (e) {
+        console.error("Failed to register Roboto fonts in jsPDF:", e);
+      }
+    }
+    const fontName = hasCustomFonts ? "Roboto" : "Helvetica";
+
+    const toAscii = (str: string) => (str || "")
+      .replace(/Ə/g, "E").replace(/ə/g, "e")
+      .replace(/ı/g, "i").replace(/İ/g, "I")
+      .replace(/Ö/g, "O").replace(/ö/g, "o")
+      .replace(/Ü/g, "U").replace(/ü/g, "u")
+      .replace(/Ç/g, "C").replace(/ç/g, "c")
+      .replace(/Ş/g, "S").replace(/ş/g, "s")
+      .replace(/Ğ/g, "G").replace(/ğ/g, "g");
+    const displayText = (str: string) => hasCustomFonts ? (str || "") : toAscii(str);
+
+    const pageWidth = 595;
+    const marginX = 40;
+    let y = 50;
+
+    doc.setFont(fontName, "bold");
+    doc.setFontSize(16);
+    doc.setTextColor(15, 23, 42);
+    doc.text(displayText("BƏLƏDÇİ ÖDƏNİŞİ VƏ NET GƏLİR HESABLAMASI"), pageWidth / 2, y, { align: "center" });
+    y += 20;
+
+    doc.setFont(fontName, "normal");
+    doc.setFontSize(10);
+    doc.setTextColor(71, 85, 105);
+    doc.text(displayText(`${tourName}${body.slotDate ? ' — ' + body.slotDate : ''}`), pageWidth / 2, y, { align: "center" });
+    y += 14;
+    doc.setFontSize(8.5);
+    doc.setTextColor(148, 163, 184);
+    doc.text(displayText(new Date().toLocaleDateString('az-AZ')), pageWidth / 2, y, { align: "center" });
+    y += 26;
+
+    const drawRow = (label: string, value: string, opts: { bold?: boolean; indent?: number; size?: number; color?: [number, number, number] } = {}) => {
+      const { bold = false, indent = 0, size = 10, color = [15, 23, 42] } = opts;
+      doc.setFont(fontName, bold ? "bold" : "normal");
+      doc.setFontSize(size);
+      doc.setTextColor(color[0], color[1], color[2]);
+      doc.text(displayText(label), marginX + indent, y);
+      doc.text(displayText(value), pageWidth - marginX, y, { align: "right" });
+      y += size + 7;
+    };
+
+    const drawSectionTitle = (title: string) => {
+      y += 4;
+      doc.setDrawColor(203, 213, 225);
+      doc.setLineWidth(0.75);
+      doc.line(marginX, y, pageWidth - marginX, y);
+      y += 18;
+      doc.setFont(fontName, "bold");
+      doc.setFontSize(11.5);
+      doc.setTextColor(6, 95, 70); // emerald-800
+      doc.text(displayText(title), marginX, y);
+      y += 16;
+    };
+
+    const tierLabel = body.tier === 'peak' ? 'Zirvə' : body.tier === 'camp' ? 'Kamp' : 'Hiking';
+
+    drawSectionTitle("Tur Məlumatları");
+    drawRow("İştirakçı sayı", `${num(body.participants)} nəfər`);
+    drawRow("Turun qiyməti (nəfər başına)", `${num(body.pricePerPerson).toFixed(2)} AZN`);
+    drawRow("Tur müddəti", `${num(body.durationDays) || 1} gün`);
+    drawRow("Bələdçi qiymət kateqoriyası", tierLabel);
+
+    // A saved (historical) calculation only carries item-level totals, not every intermediate
+    // number (base pay / second bonus / discretionary bonus share, or each item's qty x unit
+    // price) — those sub-lines only render when the caller actually provides them (the live
+    // in-progress calculator does; a saved-row export doesn't), so a saved export shows one
+    // clean total per line instead of misleading "0.00 AZN" sub-rows.
+    const has = (v: any) => v !== undefined && v !== null;
+    const qtyDetail = (qty: any, price: any) => has(qty) && has(price) ? ` (${num(qty)} x ${num(price).toFixed(2)} AZN)` : '';
+
+    drawSectionTitle("Bələdçilərə Ödəniş");
+    const hasMainBreakdown = has(body.mainGuidePayment);
+    if (hasMainBreakdown) {
+      drawRow("Əsas bələdçi — əsas ödəniş", `${num(body.mainGuidePayment).toFixed(2)} AZN`, { indent: 10 });
+      drawRow("Əsas bələdçi — ikinci bonus", `${num(body.mainGuideSecondBonus).toFixed(2)} AZN`, { indent: 10 });
+      if (num(body.mainBonusShare) > 0) drawRow("Əsas bələdçi — əlavə bonus payı", `${num(body.mainBonusShare).toFixed(2)} AZN`, { indent: 10 });
+    }
+    drawRow("Əsas bələdçiyə cəmi", `${num(body.mainGuideTotal).toFixed(2)} AZN`, { indent: hasMainBreakdown ? 10 : 0, bold: true });
+    const hasAssistantBreakdown = has(body.assistantGuidePayment);
+    if (hasAssistantBreakdown) {
+      drawRow(body.hasThirdGuide ? "Köməkçi bələdçilər — əsas ödəniş" : "Köməkçi bələdçi — əsas ödəniş", `${num(body.assistantGuidePayment).toFixed(2)} AZN`, { indent: 10 });
+      drawRow("Köməkçi — ikinci bonus", `${num(body.assistantGuideSecondBonus).toFixed(2)} AZN`, { indent: 10 });
+      if (num(body.assistantBonusShare) > 0) drawRow("Köməkçi — əlavə bonus payı", `${num(body.assistantBonusShare).toFixed(2)} AZN`, { indent: 10 });
+    }
+    drawRow(body.hasThirdGuide ? "Köməkçi bələdçilərə cəmi" : "Köməkçi bələdçiyə cəmi", `${num(body.assistantGuideTotal).toFixed(2)} AZN`, { indent: hasAssistantBreakdown ? 10 : 0, bold: true });
+    drawRow("Bələdçilərə ödəniş cəmi", `${num(body.guideTotal).toFixed(2)} AZN`, { bold: true, color: [6, 95, 70] });
+
+    drawSectionTitle("Digər Xərclər");
+    if (num(body.busPrice) > 0) drawRow("Nəqliyyat", `${num(body.busPrice).toFixed(2)} AZN`, { indent: 10 });
+    if (num(body.nivaTotal) > 0) drawRow(`Niva${qtyDetail(body.nivaQty, body.nivaUnitPrice)}`, `${num(body.nivaTotal).toFixed(2)} AZN`, { indent: 10 });
+    if (num(body.uazTotal) > 0) drawRow(`UAZ${qtyDetail(body.uazQty, body.uazUnitPrice)}`, `${num(body.uazTotal).toFixed(2)} AZN`, { indent: 10 });
+    if (num(body.gaz66Total) > 0) drawRow(`Gaz-66${qtyDetail(body.gaz66Qty, body.gaz66UnitPrice)}`, `${num(body.gaz66Total).toFixed(2)} AZN`, { indent: 10 });
+    if (num(body.sandwichTotal) > 0) drawRow(`Sendviç nahar${qtyDetail(body.sandwichQty, body.sandwichUnitPrice)}`, `${num(body.sandwichTotal).toFixed(2)} AZN`, { indent: 10 });
+    if (num(body.villageLunchTotal) > 0) drawRow(`Kənd evində nahar${qtyDetail(body.villageLunchQty, body.villageLunchUnitPrice)}`, `${num(body.villageLunchTotal).toFixed(2)} AZN`, { indent: 10 });
+    if (num(body.villageTeaTotal) > 0) drawRow("Kənd evində çay süfrəsi (cəmi)", `${num(body.villageTeaTotal).toFixed(2)} AZN`, { indent: 10 });
+    if (num(body.nationalParkTotal) > 0) drawRow(`Milli park girişi${qtyDetail(body.nationalParkQty, body.nationalParkUnitPrice)}`, `${num(body.nationalParkTotal).toFixed(2)} AZN`, { indent: 10 });
+    drawRow("Digər xərclər cəmi", `${num(body.otherCostsTotal).toFixed(2)} AZN`, { bold: true });
+
+    drawSectionTitle("Yekun");
+    drawRow("Yığılan pul", `${num(body.collected).toFixed(2)} AZN`);
+    drawRow("Turdan olan net gəlir", `${num(body.netIncome).toFixed(2)} AZN`, { bold: true, size: 13, color: [6, 95, 70] });
+
+    const pdfArrayBuffer = doc.output("arraybuffer");
+    const safeName = toAscii(tourName).replace(/[^a-zA-Z0-9 ]/g, '').trim().replace(/\s+/g, '_').slice(0, 60) || 'hesablama';
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${safeName}.pdf"`);
+    res.send(Buffer.from(pdfArrayBuffer));
+  } catch (error: any) {
+    console.error("[POST /api/guide-calculations/pdf] error:", error);
+    res.status(500).json({ error: "PDF yaradıla bilmədi: " + error.message });
   }
 });
 

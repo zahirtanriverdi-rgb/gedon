@@ -278,7 +278,7 @@ export async function initializeDatabase() {
       vendor_name VARCHAR(255),
       tour_id VARCHAR(255),
       tour_name VARCHAR(255) NOT NULL,
-      plate_number VARCHAR(255) NOT NULL DEFAULT '',
+      contact_phone VARCHAR(255) NOT NULL DEFAULT '',
       bus_name VARCHAR(255),
       price DECIMAL NOT NULL,
       travel_date VARCHAR(255) NOT NULL,
@@ -289,10 +289,90 @@ export async function initializeDatabase() {
   await dbClient.execute(
     `CREATE INDEX IF NOT EXISTS idx_vendor_buses_vendor ON vendor_buses(vendor_id)`
   );
-  // Migration for the table as it existed before plate_number/vendor_name existed.
+  // Migration for the table as it existed before contact_phone/vendor_name existed. Note
+  // plate_number was this column's very first name (renamed same day the field's real meaning
+  // — a driver contact phone, not a vehicle plate — was clarified); a fresh install never sees
+  // that column at all, so no migration reads from it.
   for (const alter of [
-    `ALTER TABLE vendor_buses ADD COLUMN plate_number VARCHAR(255) NOT NULL DEFAULT ''`,
+    `ALTER TABLE vendor_buses ADD COLUMN contact_phone VARCHAR(255) NOT NULL DEFAULT ''`,
     `ALTER TABLE vendor_buses ADD COLUMN vendor_name VARCHAR(255)`,
+  ]) {
+    try {
+      await dbClient.execute(alter);
+    } catch {
+      // column already exists — safe to ignore
+    }
+  }
+
+  // Driver blacklist — a vendor flags a bad driver (name/phone/reason) so other vendors avoid
+  // them. Same shared-read/owner-write model as vendor_buses, gated by the same
+  // busTrackingEnabled flag since it's part of the same "transport" workflow.
+  await dbClient.execute(`
+    CREATE TABLE IF NOT EXISTS driver_blacklist (
+      id VARCHAR(255) PRIMARY KEY,
+      vendor_id VARCHAR(255) NOT NULL,
+      vendor_name VARCHAR(255),
+      driver_name VARCHAR(255) NOT NULL,
+      phone_number VARCHAR(255) NOT NULL,
+      reason TEXT NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (vendor_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+  `);
+  await dbClient.execute(
+    `CREATE INDEX IF NOT EXISTS idx_driver_blacklist_vendor ON driver_blacklist(vendor_id)`
+  );
+
+  // Saved guide-payment/net-income calculations — a snapshot a vendor keeps for a tour departure
+  // after using the Kalkulyator tab. Unlike vendor_buses/driver_blacklist this is private
+  // financial data: never shared across vendors, only ever queried/written scoped to vendor_id.
+  await dbClient.execute(`
+    CREATE TABLE IF NOT EXISTS guide_calculations (
+      id VARCHAR(255) PRIMARY KEY,
+      vendor_id VARCHAR(255) NOT NULL,
+      tour_id VARCHAR(255),
+      tour_name VARCHAR(255) NOT NULL,
+      slot_id VARCHAR(255),
+      slot_date VARCHAR(255),
+      participants INTEGER NOT NULL,
+      price_per_person DECIMAL NOT NULL,
+      duration_days INTEGER NOT NULL,
+      tier VARCHAR(50) NOT NULL,
+      main_guide_total DECIMAL NOT NULL,
+      assistant_guide_total DECIMAL NOT NULL,
+      guide_total DECIMAL NOT NULL,
+      bus_price DECIMAL NOT NULL DEFAULT 0,
+      niva_total DECIMAL NOT NULL DEFAULT 0,
+      uaz_total DECIMAL NOT NULL DEFAULT 0,
+      gaz66_total DECIMAL NOT NULL DEFAULT 0,
+      sandwich_total DECIMAL NOT NULL DEFAULT 0,
+      village_lunch_total DECIMAL NOT NULL DEFAULT 0,
+      village_tea_total DECIMAL NOT NULL DEFAULT 0,
+      national_park_total DECIMAL NOT NULL DEFAULT 0,
+      other_costs_total DECIMAL NOT NULL DEFAULT 0,
+      collected DECIMAL NOT NULL DEFAULT 0,
+      net_income DECIMAL NOT NULL DEFAULT 0,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (vendor_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+  `);
+  await dbClient.execute(
+    `CREATE INDEX IF NOT EXISTS idx_guide_calculations_vendor ON guide_calculations(vendor_id)`
+  );
+  await dbClient.execute(
+    `CREATE INDEX IF NOT EXISTS idx_guide_calculations_tour ON guide_calculations(tour_id)`
+  );
+  // Migration for the table as it existed before costs were itemized (it originally lumped
+  // everything into offroad_total/food_total) — those two old columns are left in place, unused,
+  // on databases that already have them; harmless since nothing reads or writes them anymore.
+  for (const alter of [
+    `ALTER TABLE guide_calculations ADD COLUMN niva_total DECIMAL NOT NULL DEFAULT 0`,
+    `ALTER TABLE guide_calculations ADD COLUMN uaz_total DECIMAL NOT NULL DEFAULT 0`,
+    `ALTER TABLE guide_calculations ADD COLUMN gaz66_total DECIMAL NOT NULL DEFAULT 0`,
+    `ALTER TABLE guide_calculations ADD COLUMN sandwich_total DECIMAL NOT NULL DEFAULT 0`,
+    `ALTER TABLE guide_calculations ADD COLUMN village_lunch_total DECIMAL NOT NULL DEFAULT 0`,
+    `ALTER TABLE guide_calculations ADD COLUMN village_tea_total DECIMAL NOT NULL DEFAULT 0`,
+    `ALTER TABLE guide_calculations ADD COLUMN national_park_total DECIMAL NOT NULL DEFAULT 0`,
   ]) {
     try {
       await dbClient.execute(alter);
