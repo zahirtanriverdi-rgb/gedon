@@ -24,6 +24,7 @@ import { getWishlist, toggleWishlist } from '../utils/wishlist';
 import { getCompareList, toggleCompareList, replaceInCompareList } from '../utils/compare';
 import { useLanguage } from '../i18n/LanguageContext';
 import { computeFeaturedTourIds } from '../utils/featuredTours';
+import { UrgentDealsBell } from './customer/UrgentDealsBell';
 import { normalizeAzText } from '../utils/searchNormalize';
 import { useEffect, useRef } from 'react';
 
@@ -1029,6 +1030,12 @@ export default function CustomerPortal({
             </span>
             <span className="text-[10px] font-bold">{t('navCompare')}</span>
           </button>
+
+          {/* "Təcili fürsətlər" — mirrors the desktop header's UrgentDealsBell (App.tsx), which
+              is hidden on mobile along with the rest of that icon row; this is the mobile-only
+              equivalent, opening a bottom sheet instead of a header-anchored dropdown since a
+              small popup wouldn't fit hanging off a bottom-fixed nav icon. */}
+          <UrgentDealsBell tours={tours} slots={slots} appLanguage={appLanguage} variant="mobileNav" />
 
           {campSitesEnabled && (
             <button

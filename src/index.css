@@ -315,6 +315,42 @@
     animation: spin-slow 8s linear infinite;
   }
 
+  /* "Ringing bell" attention wiggle for the urgent-deals notification button — fires only
+     while at least one tour has dwindling seats (see UrgentDealsBell). Pauses on hover so
+     the icon holds still while the customer aims for it. */
+  @keyframes bell-ring {
+    0%, 60%, 100% { transform: rotate(0deg); }
+    5%, 25% { transform: rotate(12deg); }
+    15%, 35% { transform: rotate(-12deg); }
+    45% { transform: rotate(6deg); }
+    55% { transform: rotate(-6deg); }
+  }
+  .animate-bell-ring {
+    transform-origin: 50% 12%;
+    animation: bell-ring 2.2s ease-in-out infinite;
+  }
+  .group:hover .animate-bell-ring {
+    animation-play-state: paused;
+  }
+
+  /* Mobile bottom-sheet entrance for UrgentDealsBell's mobileNav variant — the small
+     button-anchored dropdown used on desktop doesn't fit next to a bottom-fixed nav icon,
+     so mobile gets a real sheet sliding up from the bottom instead. */
+  @keyframes sheet-slide-up {
+    from { transform: translateY(100%); }
+    to { transform: translateY(0); }
+  }
+  .animate-sheet-slide-up {
+    animation: sheet-slide-up 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  @keyframes sheet-backdrop-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  .animate-sheet-backdrop-in {
+    animation: sheet-backdrop-in 0.2s ease-out;
+  }
+
   .scrollbar-hide {
     scrollbar-width: none;
     -ms-overflow-style: none;
