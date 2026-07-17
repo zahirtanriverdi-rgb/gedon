@@ -20,6 +20,7 @@ import { getCompareList, COMPARE_CHANGED_EVENT } from './utils/compare';
 import { useLanguage } from './i18n/LanguageContext';
 import LanguageSwitcher from './components/LanguageSwitcher';
 import { useExpandingMenu } from './hooks/useExpandingMenu';
+import { UrgentDealsBell } from './components/customer/UrgentDealsBell';
 import {
   ShieldAlert,
   RefreshCw,
@@ -965,6 +966,12 @@ export default function App() {
                   </span>
                   <span className="hidden sm:block text-xs text-brand-text-main font-semibold">{t('app.nav.wishlist')}</span>
                 </button>
+
+                {/* "Təcili fürsətlər" — rings + shows an amber badge whenever any approved tour
+                    has an upcoming departure with fewer than 5 seats left; opens a popup listing
+                    them with direct "Bilet al" links. Derived live from tours/slots, so it
+                    self-refreshes as soon as the marketplace data loads or changes. */}
+                <UrgentDealsBell tours={tours} slots={slots} appLanguage={appLanguage} />
 
                 {/* Guide/Calculator/Language stay inline on desktop; on mobile they move
                     into the single burger dropdown below so the header only ever shows
