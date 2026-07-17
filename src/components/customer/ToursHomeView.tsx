@@ -168,6 +168,25 @@ export function ToursHomeView({
     if (selectedCategory !== 'hiking' || hikingSubcategory === 'all') return sortedAndFilteredTours;
     return sortedAndFilteredTours.filter((tour) => matchesHikingSubcategory(tour, hikingSubcategory));
   }, [sortedAndFilteredTours, selectedCategory, hikingSubcategory]);
+  // A search is "active" the moment the query box holds anything. While it is,
+  // the Yaxınlaşan Turlar slider is suppressed so only genuine search hits show.
+  const isSearchActive = currentSearchQuery.trim().length > 0;
+  // Fallback list shown when a search returns nothing: bestseller/featured tours first,
+  // then the highest-rated of the rest, ignoring the active search & filters entirely.
+  const recommendedTours = React.useMemo(() => {
+    const eligible = tours.filter((t) => t.status === 'approved' && t.isActive !== false);
+    return [...eligible]
+      .sort((a, b) => {
+        const af = featuredTourIds.has(a.id) ? 1 : 0;
+        const bf = featuredTourIds.has(b.id) ? 1 : 0;
+        if (af !== bf) return bf - af;
+        return (b.rating ?? 0) - (a.rating ?? 0);
+      })
+      .slice(0, 8);
+  }, [tours, featuredTourIds]);
+  // When the search yields no results, fall back to recommendations instead of an empty state.
+  const showingRecommended = isSearchActive && visibleTours.length === 0 && recommendedTours.length > 0;
+  const displayTours = showingRecommended ? recommendedTours : visibleTours;
   // Drives the dot indicator on the filter icon button — true whenever any of the
   // bottom-sheet's fields differ from their defaults.
   const hasCalendarSelection = !!calendarDateStart || calendarSelectedDates.length > 0;
@@ -729,8 +748,9 @@ export function ToursHomeView({
             )}
           </div>
 
-          {/* Horizontal Slider for Upcoming Tours (Minimal) */}
-          {uniqueUpcomingTours.length > 0 && (
+          {/* Horizontal Slider for Upcoming Tours (Minimal) — hidden while a search is active
+              so the results grid stands on its own. */}
+          {!isSearchActive && uniqueUpcomingTours.length > 0 && (
               <div className="mb-3 mt-0 w-full animate-fadeIn relative">
                 <div className="flex items-center justify-between mb-2 px-1">
                   <h3 className="text-[24px] font-medium text-brand-text-main tracking-tight">
@@ -860,13 +880,29 @@ export function ToursHomeView({
       {/* Grid of Tours */}
       <div id="tours-list" className="space-y-16 mt-10">
 
+      {/* When a search returns nothing we still surface recommendations below, so the
+          "no results" message becomes a prominent notice above them rather than a full empty
+          state — amber/bold so the customer can't miss that their search itself had no hits. */}
+      {showingRecommended && (
+        <div className="mb-5 flex items-center gap-3 rounded-2xl border border-amber-300 bg-amber-50 px-5 py-4 shadow-sm">
+          <span className="flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-full bg-amber-100">
+            <AlertCircle className="w-5 h-5 text-amber-600" />
+          </span>
+          <div className="min-w-0">
+            <p className="text-[15px] font-bold text-amber-900">{t('noToursFound')}</p>
+            <p className="text-xs text-amber-700 mt-0.5">{t('noToursDesc')}</p>
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center justify-between mb-2 px-1">
         <h3 className="text-[24px] font-medium text-brand-text-main tracking-tight">
-          {tt('customerHome.toursHomeView.allToursSectionTitle')}
+          {showingRecommended ? t('recommendedTours') : tt('customerHome.toursHomeView.allToursSectionTitle')}
         </h3>
       </div>
 
-      {selectedCategory === 'hiking' && (
+
+      {!showingRecommended && selectedCategory === 'hiking' && (
         <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-3 mb-1 -mx-1 px-1">
           {HIKING_SUBCATEGORIES.map((sub) => {
             const isActive = hikingSubcategory === sub.id;
@@ -887,7 +923,7 @@ export function ToursHomeView({
           })}
         </div>
       )}
-      {visibleTours.length === 0 ? (
+      {displayTours.length === 0 ? (
         <div className="text-center py-16 bg-white rounded-2xl border border-slate-200 p-8 space-y-3 shadow-xs">
           <AlertCircle className="w-8 h-8 text-slate-300 mx-auto" />
           <h3 className="text-sm font-bold text-brand-text-main">{t('noToursFound')}</h3>
@@ -900,7 +936,7 @@ export function ToursHomeView({
         
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 xl:gap-6">
-          {visibleTours.map((tour) => {
+          {displayTours.map((tour) => {
             const tourSlots = slots.filter(s => s.tourId === tour.id);
             const priceList = tourSlots.map(s => s.price);
             const minPrice = priceList.length > 0 ? Math.min(...priceList) : 25;
