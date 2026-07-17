@@ -49,6 +49,7 @@ interface VendorPortalProps {
   operatorToken?: string | null;
   onAddSlot: (newSlot: TourSlot) => Promise<void>;
   onDeleteSlot?: (slotId: string) => Promise<void>;
+  onUpdateSlot?: (slotId: string, updates: Partial<TourSlot>) => Promise<void>;
   onAddTour: (newTour: Tour) => Promise<void>;
   onEditTour?: (updatedTour: Tour) => Promise<void>;
   onDeleteTour?: (tourId: string) => Promise<void>;
@@ -73,6 +74,7 @@ export default function VendorPortal({
   operatorToken,
   onAddSlot,
   onDeleteSlot,
+  onUpdateSlot,
   onAddTour,
   onEditTour,
   onDeleteTour,
@@ -331,6 +333,7 @@ export default function VendorPortal({
             onAddTour={onAddTour}
             onAddSlot={onAddSlot}
             onDeleteSlot={onDeleteSlot}
+            onUpdateSlot={onUpdateSlot}
             onShowNotification={onShowNotification}
             onNavigateBack={() => setActiveSubTab('my-tours')}
           />
@@ -406,6 +409,7 @@ export default function VendorPortal({
         onDeleteTour={onDeleteTour}
         onAddSlot={onAddSlot}
         onDeleteSlot={onDeleteSlot}
+        onUpdateSlot={onUpdateSlot}
         onShowNotification={onShowNotification}
         onClose={() => setEditingTour(null)}
       />

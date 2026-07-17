@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Tour, TourSlot, User, Guide } from '../../types';
 import { parseGpsFile } from '../../utils/gpxParser';
 import { Plus, X, Check } from 'lucide-react';
@@ -30,6 +30,7 @@ interface TourFormProps {
   onDeleteTour?: (tourId: string) => Promise<void>;
   onAddSlot: (newSlot: TourSlot) => Promise<void>;
   onDeleteSlot?: (slotId: string) => Promise<void>;
+  onUpdateSlot?: (slotId: string, updates: Partial<TourSlot>) => Promise<void>;
   onShowNotification?: (message: string, type?: 'success' | 'info' | 'error' | 'warning') => void;
   onNavigateBack: () => void;
 }
@@ -37,7 +38,7 @@ interface TourFormProps {
 // Unified create/edit form for domestic (peak/camp/hiking/active) tours. Same component is
 // used from VendorPortal's "add-tour" tab (tour=null) and from the edit modal (tour set) —
 // only the Danger Zone is mode-specific.
-export function TourForm({ currentUser, tour, slots, category: tourCategory, onCategoryChange: setTourCategory, onAddTour, onEditTour, onDeleteTour, onAddSlot, onDeleteSlot, onShowNotification, onNavigateBack }: TourFormProps) {
+export function TourForm({ currentUser, tour, slots, category: tourCategory, onCategoryChange: setTourCategory, onAddTour, onEditTour, onDeleteTour, onAddSlot, onDeleteSlot, onUpdateSlot, onShowNotification, onNavigateBack }: TourFormProps) {
   const { t } = useLanguage();
   const isEditMode = !!tour;
 
@@ -70,6 +71,10 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
   // starts pre-verified since that number was already checked when the tour was first created.
   const [isWhatsAppVerified, setIsWhatsAppVerified] = useState<boolean>(!!tour);
   const [tourPrice, setTourPrice] = useState<number | ''>(35);
+  const [tourCapacity, setTourCapacity] = useState<number | ''>(20);
+  // Per-date seat overrides, keyed by ISO date — lets a vendor give each departure date its
+  // own capacity instead of every date sharing the single `tourCapacity` default above.
+  const [slotCapacities, setSlotCapacities] = useState<Record<string, number | ''>>({});
   const [tourDiscountPrice, setTourDiscountPrice] = useState<string>('');
   const [tourRating, setTourRating] = useState<number | ''>('');
   const [selectedDates, setSelectedDates] = useState<Date[]>([]);
@@ -142,6 +147,33 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
     else alert(message);
     return false;
   };
+
+  // This tour's existing slots, keyed by ISO date — used to seed/display each date's current
+  // capacity and booked count (remaining-seats indicator) in the per-date list below.
+  const existingSlotByDate = useMemo(() => {
+    const tourSlots = tour ? slots.filter((s) => s.tourId === tour.id) : [];
+    return new Map(tourSlots.map((s) => [toIsoDate(new Date(s.startDate)), s]));
+  }, [slots, tour]);
+
+  // Keeps slotCapacities in sync with the calendar's selectedDates: a newly-picked date gets a
+  // starting value (its existing slot's capacity if there is one, otherwise the form's default
+  // tourCapacity), and a deselected date's override is dropped so it doesn't linger.
+  useEffect(() => {
+    setSlotCapacities((prev) => {
+      const next: Record<string, number | ''> = {};
+      for (const date of selectedDates) {
+        const iso = toIsoDate(date);
+        if (prev[iso] !== undefined) {
+          next[iso] = prev[iso];
+        } else {
+          const existing = existingSlotByDate.get(iso);
+          next[iso] = existing ? existing.capacity : (Number(tourCapacity) || 20);
+        }
+      }
+      return next;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDates, existingSlotByDate]);
 
   // New tour (create mode): pre-fill the WhatsApp guide number with the vendor's own official
   // contact number instead of a hardcoded placeholder. Still editable — a vendor may want a
@@ -219,6 +251,7 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
     const tourSlots = slots.filter(s => s.tourId === tour.id);
     setSelectedDates(tourSlots.map(s => new Date(s.startDate)));
     setTourPrice(tour.price !== undefined ? tour.price : (tourSlots.length > 0 ? tourSlots[0].price : 35));
+    setTourCapacity(tourSlots.length > 0 ? tourSlots[0].capacity : 20);
     setTourDiscountPrice(tour.discountPrice !== undefined ? String(tour.discountPrice) : '');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tour]);
@@ -348,16 +381,20 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
 
       for (const date of selectedDates) {
         const iso = toIsoDate(date);
-        if (!existingByDate.has(iso)) {
+        const existing = existingByDate.get(iso);
+        const desiredCapacity = Number(slotCapacities[iso]) || Number(tourCapacity) || 20;
+        if (!existing) {
           await onAddSlot({
             id: 'slot-' + Math.floor(Math.random() * 90000 + 10000),
             tourId,
             startDate: iso,
             endDate: iso,
             price: Number(tourPrice || 35),
-            capacity: 20,
+            capacity: desiredCapacity,
             bookedCount: 0,
           });
+        } else if (onUpdateSlot && desiredCapacity !== existing.capacity) {
+          await onUpdateSlot(existing.id, { capacity: desiredCapacity });
         }
       }
       if (onDeleteSlot) {
@@ -847,17 +884,22 @@ const handleMediaFilesChange = async (e: React.ChangeEvent<HTMLInputElement>) =>
         <div className="space-y-5">
           <div className="bg-primary-50/60 p-4 rounded-xl border border-emerald-100 space-y-3">
             <h4 className="text-[10px] font-extrabold text-emerald-800 tracking-widest">{t('vendorTourForms.tourForm.pricingSection.heading')}</h4>
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 sm:max-w-3xl">
+            <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 sm:max-w-4xl">
               <div>
-                <label className="block text-[11px] font-bold text-slate-500 tracking-wide mb-1">{t('vendorTourForms.tourForm.fields.price.label')}</label>
+                <label className="flex items-end min-h-[30px] mb-1 text-[11px] font-bold text-slate-500 tracking-wide leading-tight">{t('vendorTourForms.tourForm.fields.price.label')}</label>
                 <input type="number" min="1" required value={tourPrice} onChange={handleNumberInput(setTourPrice)} className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-800" />
               </div>
               <div>
-                <label className="block text-[11px] font-bold text-rose-600 tracking-wide mb-1">{t('vendorTourForms.tourForm.fields.discountPrice.label')}</label>
+                <label className="flex items-end min-h-[30px] mb-1 text-[11px] font-bold text-slate-500 tracking-wide leading-tight">{t('vendorTourForms.tourForm.fields.capacity.label')}</label>
+                <input type="number" min="1" max="200" required value={tourCapacity} onChange={handleNumberInput(setTourCapacity)} className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-800" />
+                <p className="text-[9px] text-slate-400 mt-1">{t('vendorTourForms.tourForm.fields.capacity.hint')}</p>
+              </div>
+              <div>
+                <label className="flex items-end min-h-[30px] mb-1 text-[11px] font-bold text-rose-600 tracking-wide leading-tight">{t('vendorTourForms.tourForm.fields.discountPrice.label')}</label>
                 <input type="number" min="0" placeholder={t('vendorTourForms.tourForm.fields.discountPrice.placeholder')} value={tourDiscountPrice} onChange={(e) => setTourDiscountPrice(e.target.value)} className="w-full px-3 py-2 bg-white border border-rose-200 rounded-lg text-xs font-bold text-rose-700 placeholder-rose-300" />
               </div>
               <div>
-                <label className="block text-[11px] font-bold text-slate-500 tracking-wide mb-1">{t('vendorTourForms.tourForm.fields.cancellationHours.label')}</label>
+                <label className="flex items-end min-h-[30px] mb-1 text-[11px] font-bold text-slate-500 tracking-wide leading-tight">{t('vendorTourForms.tourForm.fields.cancellationHours.label')}</label>
                 <select value={tourCancellationHours} onChange={(e) => setTourCancellationHours(Number(e.target.value))} className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-800">
                   <option value={24}>{t('vendorTourForms.tourForm.fields.cancellationHours.option24')}</option>
                   <option value={48}>{t('vendorTourForms.tourForm.fields.cancellationHours.option48')}</option>
@@ -866,12 +908,50 @@ const handleMediaFilesChange = async (e: React.ChangeEvent<HTMLInputElement>) =>
                 </select>
               </div>
               <div>
-                <label className="block text-[11px] font-bold text-amber-600 tracking-wide mb-1">{t('vendorTourForms.tourForm.fields.rating.label')}</label>
+                <label className="flex items-end min-h-[30px] mb-1 text-[11px] font-bold text-amber-600 tracking-wide leading-tight">{t('vendorTourForms.tourForm.fields.rating.label')}</label>
                 <input type="number" min="1" max="5" step="0.1" placeholder={t('vendorTourForms.tourForm.fields.rating.placeholder')} value={tourRating} onChange={handleNumberInput(setTourRating)} className="w-full px-3 py-2 bg-white border border-amber-200 rounded-lg text-xs font-bold text-amber-800 placeholder-amber-300" />
                 <p className="text-[9px] text-slate-400 mt-1">{t('vendorTourForms.tourForm.fields.rating.hint')}</p>
               </div>
             </div>
             <MultiDateCalendar selectedDates={selectedDates} onChange={setSelectedDates} />
+            {selectedDates.length > 0 && (
+              <div className="space-y-1.5">
+                <label className="block text-[11px] font-bold text-slate-500 tracking-wide">{t('vendorTourForms.tourForm.fields.perDateCapacity.label')}</label>
+                <div className="space-y-1.5">
+                  {[...selectedDates].sort((a, b) => a.getTime() - b.getTime()).map((date) => {
+                    const iso = toIsoDate(date);
+                    const existing = existingSlotByDate.get(iso);
+                    const value = slotCapacities[iso] ?? tourCapacity;
+                    return (
+                      <div key={iso} className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-3 py-1.5">
+                        <span className="text-[11px] font-bold text-slate-600 flex-shrink-0">📅 {iso}</span>
+                        <input
+                          type="number"
+                          min="1"
+                          max="200"
+                          value={value}
+                          onChange={(e) => {
+                            const raw = e.target.value;
+                            setSlotCapacities((prev) => ({ ...prev, [iso]: raw === '' ? '' : Number(raw) }));
+                          }}
+                          className="w-20 px-2 py-1 border border-slate-200 rounded text-xs font-bold text-slate-800"
+                        />
+                        {existing ? (
+                          <span className="text-[10px] font-semibold text-slate-400">
+                            {t('vendorTourForms.tourForm.fields.perDateCapacity.remaining', {
+                              capacity: Number(value) || 0,
+                              remaining: Math.max(0, (Number(value) || 0) - existing.bookedCount),
+                            })}
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-semibold text-emerald-500">{t('vendorTourForms.tourForm.fields.perDateCapacity.newBadge')}</span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
             {tourCategory === 'active' && (
               <div>
                 <label className="block text-[11px] font-bold text-emerald-700 tracking-wide mb-1">{t('vendorTourForms.tourForm.fields.scheduleFrequency.label')}</label>

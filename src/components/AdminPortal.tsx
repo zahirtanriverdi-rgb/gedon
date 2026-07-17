@@ -108,6 +108,7 @@ interface AdminPortalProps {
   onDeleteTour?: (tourId: string) => Promise<void>;
   onAddSlot: (newSlot: TourSlot) => Promise<void>;
   onDeleteSlot?: (slotId: string) => Promise<void>;
+  onUpdateSlot?: (slotId: string, updates: Partial<TourSlot>) => Promise<void>;
   onShowNotification?: (message: string, type?: 'success' | 'info' | 'error' | 'warning') => void;
   exchangeRates: { USD: number; EUR: number };
   onUpdateExchangeRates: (newRates: { USD: number; EUR: number }) => void;
@@ -133,6 +134,7 @@ export default function AdminPortal({
   onDeleteTour,
   onAddSlot,
   onDeleteSlot,
+  onUpdateSlot,
   onShowNotification,
   exchangeRates,
   onUpdateExchangeRates,
@@ -1710,6 +1712,7 @@ export default function AdminPortal({
                   onDeleteTour={onDeleteTour}
                   onAddSlot={onAddSlot}
                   onDeleteSlot={onDeleteSlot}
+                  onUpdateSlot={onUpdateSlot}
                   onShowNotification={onShowNotification}
                   onNavigateBack={() => setEditingTour(null)}
                 />

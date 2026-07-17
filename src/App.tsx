@@ -47,6 +47,41 @@ async function parseApiResponse(response: Response): Promise<any> {
   }
 }
 
+// Operator (vendor/admin) sessions persist to localStorage so a page reload doesn't silently
+// bounce a logged-in vendor/admin back to the login screen — the JWT itself is valid for 24h
+// (see server.ts), but auth state used to live only in React memory and vanished on any reload.
+type StoredSession = { user: User; token: string };
+
+function loadSession(key: string): StoredSession | null {
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed && parsed.user && parsed.token ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveSession(key: string, session: StoredSession) {
+  try {
+    window.localStorage.setItem(key, JSON.stringify(session));
+  } catch {
+    // localStorage unavailable (private browsing, quota) — session just won't survive a reload
+  }
+}
+
+function clearSession(key: string) {
+  try {
+    window.localStorage.removeItem(key);
+  } catch {
+    // ignore
+  }
+}
+
+const VENDOR_SESSION_KEY = 'gedekgorek_vendor_session';
+const ADMIN_SESSION_KEY = 'gedekgorek_admin_session';
+
 // Shown briefly while a lazy-loaded portal's own chunk (and its heavy dependencies — vendor
 // form components, jspdf, maplibre-gl, etc.) is fetched on first navigation into that role.
 function PortalLoadingFallback() {
@@ -105,30 +140,34 @@ export default function App() {
       .catch(() => setGroupCalculatorEnabled(true)); // config endpoint down — don't hide the feature
   }, []);
 
-  const [loggedInVendor, setLoggedInVendor] = useState<User | null>(null);
-  // JWT from /api/auth/operator/login — kept in memory only (not localStorage), matches
-  // the token's own short lifetime and is cleared on logout.
-  const [operatorToken, setOperatorToken] = useState<string | null>(null);
+  const [loggedInVendor, setLoggedInVendor] = useState<User | null>(() => loadSession(VENDOR_SESSION_KEY)?.user ?? null);
+  // JWT from /api/auth/operator/login — persisted to localStorage (see saveSession above) so
+  // it survives a page reload; still cleared on explicit logout.
+  const [operatorToken, setOperatorToken] = useState<string | null>(() => loadSession(VENDOR_SESSION_KEY)?.token ?? null);
   const handleOperatorLogin = (user: User, token: string) => {
     setLoggedInVendor(user);
     setOperatorToken(token);
+    saveSession(VENDOR_SESSION_KEY, { user, token });
   };
   const handleOperatorLogout = () => {
     setLoggedInVendor(null);
     setOperatorToken(null);
+    clearSession(VENDOR_SESSION_KEY);
   };
 
-  const [loggedInAdmin, setLoggedInAdmin] = useState<User | null>(null);
-  // JWT from /api/auth/admin/login — kept in memory only (not localStorage), matches
-  // the token's own short lifetime and is cleared on logout.
-  const [adminToken, setAdminToken] = useState<string | null>(null);
+  const [loggedInAdmin, setLoggedInAdmin] = useState<User | null>(() => loadSession(ADMIN_SESSION_KEY)?.user ?? null);
+  // JWT from /api/auth/admin/login — persisted to localStorage (see saveSession above) so it
+  // survives a page reload; still cleared on explicit logout.
+  const [adminToken, setAdminToken] = useState<string | null>(() => loadSession(ADMIN_SESSION_KEY)?.token ?? null);
   const handleAdminLogin = (user: User, token: string) => {
     setLoggedInAdmin(user);
     setAdminToken(token);
+    saveSession(ADMIN_SESSION_KEY, { user, token });
   };
   const handleAdminLogout = () => {
     setLoggedInAdmin(null);
     setAdminToken(null);
+    clearSession(ADMIN_SESSION_KEY);
   };
 
   // Legacy entry points from before real routing existed (?portal=vendor / ?portal=admin
@@ -623,7 +662,12 @@ export default function App() {
     // `currentUser` inside VendorPortal comes from `loggedInVendor`, a separate piece of state
     // set once at login — without this, a vendor's own profile/rate edits save correctly to the
     // server but never show up in their own session until they log out and back in.
-    setLoggedInVendor(prev => (prev && prev.id === updatedUser.id ? { ...prev, ...updatedUser } : prev));
+    setLoggedInVendor(prev => {
+      if (!prev || prev.id !== updatedUser.id) return prev;
+      const merged = { ...prev, ...updatedUser };
+      if (operatorToken) saveSession(VENDOR_SESSION_KEY, { user: merged, token: operatorToken });
+      return merged;
+    });
   };
 
   const handleAddSlot = async (newSlot: TourSlot) => {
@@ -638,6 +682,23 @@ export default function App() {
 
       setSlots(prev => [...prev, data.slot]);
       showNotification(t('app.notifications.slotAdded'), 'success');
+    } catch (e: any) {
+      showNotification(e.message || t('app.notifications.slotAddError'), 'error');
+      throw e;
+    }
+  };
+
+  const handleUpdateSlot = async (slotId: string, updates: Partial<TourSlot>) => {
+    try {
+      const response = await fetch(`/api/slots/${slotId}`, {
+        method: 'PUT',
+        headers: authHeaders(),
+        body: JSON.stringify(updates),
+      });
+      const data = await parseApiResponse(response);
+      if (!response.ok) throw new Error(data.error || 'Tarix yenilənə bilmədi.');
+
+      setSlots(prev => prev.map(s => s.id === slotId ? data.slot : s));
     } catch (e: any) {
       showNotification(e.message || t('app.notifications.slotAddError'), 'error');
       throw e;
@@ -1263,6 +1324,7 @@ export default function App() {
                     operatorToken={operatorToken}
                     onAddSlot={handleAddSlot}
                     onDeleteSlot={handleDeleteSlot}
+                    onUpdateSlot={handleUpdateSlot}
                     onAddTour={handleAddTour}
                     onEditTour={handleEditTour}
                     onDeleteTour={handleDeleteTour}
@@ -1306,6 +1368,7 @@ export default function App() {
                     onDeleteTour={handleDeleteTour}
                     onAddSlot={handleAddSlot}
                     onDeleteSlot={handleDeleteSlot}
+                    onUpdateSlot={handleUpdateSlot}
                     onShowNotification={showNotification}
                     exchangeRates={exchangeRates}
                     onUpdateExchangeRates={handleUpdateExchangeRates}

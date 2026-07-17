@@ -67,6 +67,12 @@ export const vendorTourForms = {
             empty: 'Hələ heç bir media əlavə edilməyib.',
           },
           price: { label: 'Qiymət (AZN):' },
+          capacity: { label: 'Yeni tarix üçün defolt yer sayı:', hint: 'Yeni əlavə etdiyiniz tarixlər bu qədər yerlə yaradılır — hər tarixin öz yer sayını aşağıdakı siyahıdan dəyişə bilərsiniz.' },
+          perDateCapacity: {
+            label: 'Tarixlər üzrə yer sayı:',
+            remaining: '{{capacity}} yerdən {{remaining}} yer qalıb',
+            newBadge: 'Yeni',
+          },
           discountPrice: { label: 'Endirimli Qiymət (opsional):', placeholder: 'Məs: 25' },
           rating: { label: 'Reytinq (1-5, opsional):', placeholder: 'Məs: 4.8', hint: 'Boş saxlasanız defolt dəyər tətbiq olunur. Real rəylər toplandıqca reytinq avtomatik onlara keçir.' },
           cancellationHours: {
@@ -354,6 +360,12 @@ export const vendorTourForms = {
             empty: 'No media has been added yet.',
           },
           price: { label: 'Price (AZN):' },
+          capacity: { label: 'Default seats for a new date:', hint: 'Newly added dates are created with this many seats — you can change each date\'s own seat count in the list below.' },
+          perDateCapacity: {
+            label: 'Seats per date:',
+            remaining: '{{remaining}} of {{capacity}} seats left',
+            newBadge: 'New',
+          },
           discountPrice: { label: 'Discount Price (optional):', placeholder: 'e.g.: 25' },
           rating: { label: 'Rating (1-5, optional):', placeholder: 'e.g.: 4.8', hint: 'Leave blank to use the default value. Once real reviews accumulate, the rating switches to them automatically.' },
           cancellationHours: {
@@ -641,6 +653,12 @@ export const vendorTourForms = {
             empty: 'Медиафайлы еще не добавлены.',
           },
           price: { label: 'Цена (AZN):' },
+          capacity: { label: 'Мест по умолчанию для новой даты:', hint: 'Новые добавленные даты создаются с этим количеством мест — количество мест для каждой даты можно изменить в списке ниже.' },
+          perDateCapacity: {
+            label: 'Мест по датам:',
+            remaining: 'Осталось {{remaining}} из {{capacity}} мест',
+            newBadge: 'Новая',
+          },
           discountPrice: { label: 'Цена со скидкой (опционально):', placeholder: 'Например: 25' },
           rating: { label: 'Рейтинг (1-5, опционально):', placeholder: 'Например: 4.8', hint: 'Оставьте пустым для значения по умолчанию. Как только накопятся реальные отзывы, рейтинг автоматически перейдёт на них.' },
           cancellationHours: {

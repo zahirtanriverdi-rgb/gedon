@@ -13,6 +13,7 @@ interface EditTourModalProps {
   onDeleteTour?: (tourId: string) => Promise<void>;
   onAddSlot: (newSlot: TourSlot) => Promise<void>;
   onDeleteSlot?: (slotId: string) => Promise<void>;
+  onUpdateSlot?: (slotId: string, updates: Partial<TourSlot>) => Promise<void>;
   onShowNotification?: (message: string, type?: 'success' | 'info' | 'error' | 'warning') => void;
   onClose: () => void;
 }
@@ -20,7 +21,7 @@ interface EditTourModalProps {
 // Thin modal shell around the same TourForm/InternationalTourForm components used for
 // creating tours — editing is just those components rendered with `tour` set instead of a
 // dedicated duplicate form.
-export function EditTourModal({ tour, slots, currentUser, onAddTour, onEditTour, onDeleteTour, onAddSlot, onDeleteSlot, onShowNotification, onClose }: EditTourModalProps) {
+export function EditTourModal({ tour, slots, currentUser, onAddTour, onEditTour, onDeleteTour, onAddSlot, onDeleteSlot, onUpdateSlot, onShowNotification, onClose }: EditTourModalProps) {
   const { t } = useLanguage();
   if (!tour) return null;
   const isIntl = tour.isInternational || tour.category === 'international';
@@ -73,6 +74,7 @@ export function EditTourModal({ tour, slots, currentUser, onAddTour, onEditTour,
               onDeleteTour={onDeleteTour}
               onAddSlot={onAddSlot}
               onDeleteSlot={onDeleteSlot}
+              onUpdateSlot={onUpdateSlot}
               onShowNotification={onShowNotification}
               onNavigateBack={onClose}
             />
