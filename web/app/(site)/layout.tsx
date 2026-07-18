@@ -1,6 +1,7 @@
 import { SiteHeader } from '@/components/site/SiteHeader';
 import { SiteFooter } from '@/components/site/SiteFooter';
 import { MobileBottomNav } from '@/components/site/MobileBottomNav';
+import { GlobalSearchProvider } from '@/components/site/GlobalSearchContext';
 import { getTours } from '@/lib/api';
 
 /** Chrome for the public marketing/customer pages (header + SEO footer + mobile bottom nav).
@@ -11,11 +12,14 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
   const tours = await getTours();
 
   return (
-    <div className="flex min-h-screen flex-col bg-[var(--color-bg-page)]">
-      <SiteHeader />
-      <main className="flex-1 pb-16 sm:pb-0">{children}</main>
-      <SiteFooter tours={tours} />
-      <MobileBottomNav />
-    </div>
+    <GlobalSearchProvider>
+      <div className="flex min-h-screen flex-col bg-[var(--color-bg-page)]">
+        {/* Tours feed the header's inline search suggestions dropdown (desktop, on scroll). */}
+        <SiteHeader tours={tours} />
+        <main className="flex-1 pb-16 sm:pb-0">{children}</main>
+        <SiteFooter tours={tours} />
+        <MobileBottomNav />
+      </div>
+    </GlobalSearchProvider>
   );
 }

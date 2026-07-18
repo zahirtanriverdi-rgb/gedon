@@ -15,6 +15,7 @@ import { useNotification } from '@/lib/notification';
 import { useCurrency, makeConvertedPriceInfo } from '@/lib/currency';
 import { computeFeaturedTourIds } from '@/utils/featuredTours';
 import { normalizeAzText } from '@/utils/searchNormalize';
+import { useGlobalSearch } from '@/components/site/GlobalSearchContext';
 
 // Automatic rating boost applied to tours currently flagged as this month's bestseller
 // (computeFeaturedTourIds), on top of whichever base rating (vendor-set or review average) applies.
@@ -163,7 +164,10 @@ export function HomeClient({ tours, slots, reviews, users, bookings }: HomeClien
     setPendingCompareTourId(null);
   };
 
-  const [localSearchQuery, setLocalSearchQuery] = useState('');
+  // Search query lives in the (site) layout's GlobalSearchProvider, not local state — the
+  // header's inline search bar (shown on desktop once scrolled) binds to the same value, so
+  // both boxes always stay in sync, exactly like the old SPA's App.tsx globalSearchQuery.
+  const { query: localSearchQuery, setQuery: setLocalSearchQuery } = useGlobalSearch();
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const searchContainerRef = React.useRef<HTMLDivElement>(null!);
 

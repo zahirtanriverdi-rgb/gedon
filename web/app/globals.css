@@ -351,6 +351,17 @@
     animation: sheet-backdrop-in 0.2s ease-out;
   }
 
+  /* Header inline search bar entrance — it pops into the header row only once the page is
+     scrolled past the home page's own search box (SiteHeader), so a quick fade keeps the
+     appearance from feeling like a layout jump. */
+  @keyframes header-search-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  .animate-header-search-in {
+    animation: header-search-in 0.2s ease-out;
+  }
+
   .scrollbar-hide {
     scrollbar-width: none;
     -ms-overflow-style: none;
