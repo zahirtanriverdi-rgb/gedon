@@ -3,10 +3,11 @@
 // (server onları S3-uyğun storage-a və ya dev-də public/uploads/ diskinə yazır)
 // və formda yalnız qaytarılan URL saxlanılır.
 
-// Brauzer API ilə nisbi /api/* URL-ləri üzərindən danışır — Next-in rewrite-i
-// (next.config.ts) onları Express origin-inə ötürür. Cross-origin yükləmə üçün
-// NEXT_PUBLIC_API_BASE_URL ilə açıq base verilə bilər.
-const getBaseUrl = () => process.env.NEXT_PUBLIC_API_BASE_URL || '';
+// Brauzer API ilə HƏMİŞƏ nisbi /api/* URL-ləri üzərindən danışır — Next-in rewrite-i
+// (next.config.ts) onları Express origin-inə ötürür (clientFetch ilə eyni konvensiya).
+// NEXT_PUBLIC_API_BASE_URL burada istifadə OLUNMUR: brauzerdən birbaşa Express-ə
+// cross-origin POST CORS preflight-a düşür və Express-də CORS olmadığı üçün yükləmə
+// ERR_FAILED ilə sınırdı (vendor formada "şəkil əlavə olunmur" bagı).
 
 // /api/upload authenticateUser tələb edir. Token AuthProvider-in persist etdiyi sessiya
 // açarlarından oxunur (VENDOR_SESSION_KEY / ADMIN_SESSION_KEY ilə eyni format) —
@@ -40,7 +41,7 @@ export async function uploadMediaFiles(files: File[] | FileList): Promise<Upload
   list.forEach(file => formData.append('files', file));
 
   const token = getOperatorToken();
-  const res = await fetch(`${getBaseUrl()}/api/upload`, {
+  const res = await fetch('/api/upload', {
     method: 'POST',
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     body: formData,
