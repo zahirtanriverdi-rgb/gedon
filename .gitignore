@@ -11,6 +11,8 @@ playwright-report/
 !.env.example
 database.sqlite
 /data/whatsapp-auth
+# Dev-fallback media upload qovluğu (S3 konfiqurasiya olunmayanda) — runtime çıxışıdır
+/public/uploads/
 .claude/settings.local.json
 .claude/scheduled_tasks.lock
 .vercel

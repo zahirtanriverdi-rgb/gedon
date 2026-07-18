@@ -3,6 +3,7 @@ import { User, Guide } from '../../types';
 import { useLanguage } from '../../i18n/LanguageContext';
 import { Plus, Trash, Eye, EyeOff, ShieldCheck } from 'lucide-react';
 import EmailVerificationCard from '../EmailVerificationCard';
+import { uploadSingleImage } from '../../utils/uploadMedia';
 
 interface ProfileTabProps {
   currentUser: User;
@@ -218,15 +219,16 @@ export function ProfileTab({ currentUser, operatorToken, onShowNotification, onC
                 <input
                   type="file"
                   accept="image/*"
-                  onChange={(e) => {
+                  onChange={async (e) => {
                     const file = e.target.files?.[0];
                     if (file) {
-                      const reader = new FileReader();
-                      reader.onloadend = () => {
-                        setProfileAvatar(reader.result as string);
+                      try {
+                        const url = await uploadSingleImage(file);
+                        setProfileAvatar(url);
                         if (onShowNotification) onShowNotification(t('vendorMisc.profileTab.imageUploaded'), 'success');
-                      };
-                      reader.readAsDataURL(file);
+                      } catch (err: any) {
+                        if (onShowNotification) onShowNotification(err?.message || 'Şəkil yüklənmədi.', 'error');
+                      }
                     }
                   }}
                   className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
@@ -321,17 +323,16 @@ export function ProfileTab({ currentUser, operatorToken, onShowNotification, onC
                             <input
                               type="file"
                               accept="image/*"
-                              onChange={(e) => {
+                              onChange={async (e) => {
                                 const file = e.target.files?.[0];
                                 if (file) {
-                                  const reader = new FileReader();
-                                  reader.onloadend = () => {
-                                    const newGuides = [...profileGuides];
-                                    newGuides[idx].avatar = reader.result as string;
-                                    setProfileGuides(newGuides);
+                                  try {
+                                    const url = await uploadSingleImage(file);
+                                    setProfileGuides(prev => prev.map((g, i) => i === idx ? { ...g, avatar: url } : g));
                                     if (onShowNotification) onShowNotification(t('vendorMisc.profileTab.imageUploaded'), 'success');
-                                  };
-                                  reader.readAsDataURL(file);
+                                  } catch (err: any) {
+                                    if (onShowNotification) onShowNotification(err?.message || 'Şəkil yüklənmədi.', 'error');
+                                  }
                                 }
                               }}
                               className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"

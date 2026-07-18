@@ -9,11 +9,7 @@ import { TourDangerZone } from './TourDangerZone';
 import { WhatsAppVerifyField } from '../shared/WhatsAppVerifyField';
 import { handleNumberInput, useStepWizard } from './useTourFormWizard';
 import { useLanguage } from '../../i18n/LanguageContext';
-
-const getBaseUrl = () => {
-  return import.meta.env.VITE_API_BASE_URL || 
-         (import.meta.env.DEV ? 'http://localhost:3000' : 'https://gedekgorek.onrender.com');
-};
+import { uploadMediaFiles } from '../../utils/uploadMedia';
 
 // Older guides saved before Guide.id existed have no stable identifier — fall back to their
 // name so tour-guide assignment still works for pre-existing profile data.
@@ -459,39 +455,27 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
     reader.readAsText(file);
   };
 
-// Unified media upload to server
+// Unified media upload to server (S3-compatible storage və ya dev-də lokal disk;
+// bax src/utils/uploadMedia.ts) — DB-yə yalnız URL yazılır, base64 yox.
 const handleMediaFilesChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
   const files = e.target.files;
   if (!files || files.length === 0) return;
 
-  const formData = new FormData();
-  Array.from<File>(files).forEach(file => formData.append('files', file));
-
   try {
-    const res = await fetch(`${getBaseUrl()}/api/upload`, {
-      method: 'POST',
-      body: formData,
-    });
+    const { images: imageUrls, videos: videoUrls } = await uploadMediaFiles(files);
 
-    const data = await res.json();
+    setTourImages(prev => [...prev, ...imageUrls]);
+    setTourVideos(prev => [...prev, ...videoUrls]);
 
-    if (data.success && data.urls?.length > 0) {
-      const imageUrls = data.urls.filter((url: string) => url.match(/\.(jpg|jpeg|png|webp|gif)$/i));
-      const videoUrls = data.urls.filter((url: string) => url.match(/\.(mp4|webm|ogg)$/i));
+    if (imageUrls.length > 0 && !tourImage) setTourImage(imageUrls[0]);
 
-      setTourImages(prev => [...prev, ...imageUrls]);
-      setTourVideos(prev => [...prev, ...videoUrls]);
-
-      if (imageUrls.length > 0 && !tourImage) setTourImage(imageUrls[0]);
-
-      if (onShowNotification) {
-        onShowNotification(`✅ ${imageUrls.length} şəkil və ${videoUrls.length} video yükləndi`, 'success');
-      }
-      clearFieldError('media');
+    if (onShowNotification) {
+      onShowNotification(`✅ ${imageUrls.length} şəkil və ${videoUrls.length} video yükləndi`, 'success');
     }
-  } catch (err) {
+    if (imageUrls.length > 0 || videoUrls.length > 0) clearFieldError('media');
+  } catch (err: any) {
     console.error(err);
-    if (onShowNotification) onShowNotification("Şəkil yüklənərkən xəta baş verdi", 'error');
+    if (onShowNotification) onShowNotification(err?.message || "Şəkil yüklənərkən xəta baş verdi", 'error');
   }
 };
 

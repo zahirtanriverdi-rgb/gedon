@@ -16,6 +16,7 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1090.0",
     "@google/genai": "^1.29.0",
     "@hapi/boom": "^10.0.1",
     "@tailwindcss/vite": "^4.1.14",

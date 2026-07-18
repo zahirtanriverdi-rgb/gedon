@@ -44,6 +44,8 @@ import {
 } from "./server/campSites.ts";
 import { parseBboxParam, getPoisForBbox } from "./server/overpass.ts";
 import { resolveGoogleMapsLink } from "./server/geo.ts";
+import multer from "multer";
+import { storeMediaFile, isAllowedMediaType, isS3Enabled } from "./server/storage.ts";
 
 const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
@@ -67,6 +69,7 @@ const getBaseUrl = () => {
 
 console.log(`[Static] Serving files from: ${publicDir}`);
 console.log(`[Base URL] Current base: ${getBaseUrl()}`);
+console.log(`[Storage] Media uploads → ${isS3Enabled() ? "S3-compatible bucket" : "local disk (public/uploads) — S3 env not configured"}`);
 
 // Lazy initialize GoogleGenAI client
 let aiClient: GoogleGenAI | null = null;
@@ -184,6 +187,54 @@ function verifyPasswordAndIssueToken(user: any, password: string): { token: stri
   const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: "24h" });
   return { token };
 }
+
+// ===================== MEDIA UPLOAD =====================
+// Vendor formları (TourForm/InternationalTourForm/ProfileTab) şəkil/videonu artıq base64
+// kimi DB-yə YAZMIR — bura yükləyir, cavabdakı URL-i saxlayır. Fayllar S3-uyğun storage-a
+// (və ya S3 konfiqurasiya olunmayıbsa dev-də public/uploads/ diskinə) gedir — bax server/storage.ts.
+const mediaUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 100 * 1024 * 1024, files: 10 }, // video üçün 100MB tavan; şəkil limiti aşağıda ayrıca
+  fileFilter: (_req, file, cb) => {
+    if (isAllowedMediaType(file.mimetype)) cb(null, true);
+    else cb(new Error(`Dəstəklənməyən fayl tipi: ${file.mimetype}`));
+  },
+});
+
+const MAX_IMAGE_BYTES = 15 * 1024 * 1024;
+
+app.post("/api/upload", authenticateUser, (req: any, res) => {
+  mediaUpload.array("files", 10)(req, res, async (err: any) => {
+    if (err) {
+      const msg = err.code === "LIMIT_FILE_SIZE"
+        ? "Fayl çox böyükdür (maksimum 100MB)."
+        : err.message || "Fayl yüklənmədi.";
+      return res.status(400).json({ success: false, error: msg });
+    }
+    const files = (req.files || []) as Express.Multer.File[];
+    if (files.length === 0) {
+      return res.status(400).json({ success: false, error: "Heç bir fayl göndərilməyib." });
+    }
+    const oversizedImage = files.find(f => f.mimetype.startsWith("image/") && f.size > MAX_IMAGE_BYTES);
+    if (oversizedImage) {
+      return res.status(400).json({ success: false, error: "Şəkil çox böyükdür (maksimum 15MB)." });
+    }
+    try {
+      const stored = await Promise.all(files.map(f => storeMediaFile(f.buffer, f.mimetype)));
+      // `urls` köhnə TourForm müqaviləsi ilə uyğunluq üçün qalır; `images`/`videos` mimetype-a
+      // görə serverdə ayrılır ki, client fayl uzantısını təxmin etməli olmasın.
+      return res.json({
+        success: true,
+        urls: stored.map(s => s.url),
+        images: stored.filter(s => s.kind === "image").map(s => s.url),
+        videos: stored.filter(s => s.kind === "video").map(s => s.url),
+      });
+    } catch (e: any) {
+      console.error("[Upload] Media storage failed:", e);
+      return res.status(500).json({ success: false, error: "Fayl saxlanarkən xəta baş verdi." });
+    }
+  });
+});
 
 // ADMIN LOGIN (JWT Sign & Return) — checks the real `users` table (Postgres/SQLite via
 // server/db.ts).
