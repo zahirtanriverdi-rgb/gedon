@@ -38,15 +38,16 @@ export function SiteHeader() {
           GedəkGörək
         </Link>
         <nav className="flex items-center gap-1 sm:gap-3">
+          {/* Icon-only by request — each label survives as tooltip (title) + aria-label. */}
           {nav.map(({ href, label, Icon }) => (
             <Link
               key={href}
               href={href}
-              className="flex items-center gap-1.5 rounded-full px-3 py-2 text-sm font-semibold text-[var(--color-text-muted)] transition-colors hover:bg-[var(--background-secondary)] hover:text-[var(--color-primary)]"
+              className="flex items-center rounded-full p-2.5 text-[var(--color-text-muted)] transition-colors hover:bg-[var(--background-secondary)] hover:text-[var(--color-primary)]"
               title={label}
+              aria-label={label}
             >
               <Icon className="h-5 w-5" />
-              <span className="hidden md:inline">{label}</span>
             </Link>
           ))}
           {/* "Təcili fürsətlər" — rings + shows an amber badge whenever any approved tour

@@ -288,37 +288,35 @@ export function UrgentDealsBell({ variant = 'header' }: UrgentDealsBellProps) {
 
   return (
     <div className="relative">
+      {/* Icon-only to match the header nav — the title survives as tooltip + aria-label. */}
       <button
         ref={menu.buttonRef}
         onClick={() => menu.setOpen((v) => !v)}
-        className="relative w-11 sm:w-auto sm:min-w-0 sm:px-2 h-16 sm:h-14 flex flex-col items-center justify-center gap-0.5 hover:text-emerald-600 transition group cursor-pointer bg-transparent border-none p-0"
+        className="relative flex items-center justify-center hover:text-emerald-600 transition group cursor-pointer bg-transparent border-none p-0"
         title={s.title}
         aria-label={s.title}
         aria-haspopup="true"
         aria-expanded={menu.open}
       >
         <span
-          className={`relative w-11 h-8 sm:w-9 sm:h-7 flex items-center justify-center rounded-full transition-colors group-hover:bg-amber-50 ${
+          className={`relative w-10 h-10 flex items-center justify-center rounded-full transition-colors group-hover:bg-amber-50 ${
             menu.open ? 'bg-amber-50 text-amber-600' : ''
           }`}
         >
           <Bell
-            className={`w-6 h-6 sm:w-5 sm:h-5 stroke-[2px] transition-colors ${
+            className={`w-5 h-5 stroke-[2px] transition-colors ${
               hasUrgent ? 'text-amber-500 animate-bell-ring' : 'group-hover:stroke-amber-500'
             }`}
           />
           {hasUrgent && (
-            <span className="absolute -top-1 right-0.5 flex items-center justify-center">
+            <span className="absolute -top-0.5 right-0 flex items-center justify-center">
               {/* Pulsing halo behind the count for extra pull toward the seat shortage. */}
               <span className="absolute inline-flex w-5 h-5 rounded-full bg-amber-400 opacity-60 animate-ping" />
-              <span className="relative min-w-[20px] h-5 px-1 bg-amber-500 text-white text-xs font-bold rounded-full flex items-center justify-center shadow-sm">
+              <span className="relative min-w-[18px] h-[18px] px-1 bg-amber-500 text-white text-[11px] font-bold rounded-full flex items-center justify-center shadow-sm">
                 {count}
               </span>
             </span>
           )}
-        </span>
-        <span className="hidden sm:block text-xs text-brand-text-main font-semibold whitespace-nowrap">
-          {s.title}
         </span>
       </button>
 
