@@ -18,6 +18,7 @@ import { TourReviewsList } from './customer/TourReviewsList';
 import { TourDetailPage } from './customer/TourDetailPage';
 import { TourDetailRoute } from './customer/TourDetailRoute';
 import { OrganizerRoute } from './customer/OrganizerRoute';
+import { SiteFooter } from './customer/SiteFooter';
 import NotFoundPage from './NotFoundPage';
 import { getRecentSearches, addRecentSearch } from '../utils/recentSearches';
 import { getWishlist, toggleWishlist } from '../utils/wishlist';
@@ -283,17 +284,28 @@ export default function CustomerPortal({
   // lands back on the home route (logo click -> navigate('/'), or the browser back button),
   // fully reset search + filters so it's a genuinely blank homepage state, not just the view —
   // otherwise a stale query/filter combo from before stays applied to the tour list underneath.
-  // Keyed on pathname so it only re-fires when the route actually changes to '/', not on every
-  // render while already there.
+  // Keyed on pathname+search so it re-fires when the route changes to '/' OR the query string
+  // changes (footer internal links), not on every render while already there.
+  //
+  // SEO daxili linkləmə (SiteFooter): /?region=Quba, /?category=hiking və /?q=şəlalə query
+  // param-ları boş sıfırlama əvəzinə müvafiq filtri tətbiq edir — beləliklə footer-dəki
+  // destinasiya/kateqoriya linkləri həqiqi, paylaşıla bilən URL-lərdir.
   const isHomeRoute = location.pathname === '/';
   React.useEffect(() => {
     if (!isHomeRoute) return;
-    setLocalSearchQuery('');
-    if (onSearchChange) onSearchChange('');
+    const params = new URLSearchParams(location.search);
+    const regionParam = params.get('region')?.trim() || 'all';
+    const rawCategory = params.get('category')?.trim() || 'all';
+    // Naməlum kateqoriya dəyəri (köhnə link, əl ilə yazılmış URL) "boş nəticə" ekranına
+    // yox, adi "hamısı" görünüşünə düşsün.
+    const categoryParam = ['peak', 'camp', 'hiking', 'active', 'international'].includes(rawCategory) ? rawCategory : 'all';
+    const qParam = params.get('q')?.trim() || '';
+    setLocalSearchQuery(qParam);
+    if (onSearchChange) onSearchChange(qParam);
     setIsSearchFocused(false);
-    setSelectedCategory('all');
+    setSelectedCategory(categoryParam);
     setSelectedDifficulty('all');
-    setSelectedRegion('all');
+    setSelectedRegion(regionParam);
     setSelectedMonth('');
     setSortBy('default');
     setCalendarDateStart('');
@@ -302,7 +314,7 @@ export default function CustomerPortal({
     setShowCalendarWidget(false);
     setIsFiltersExpanded(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.pathname]);
+  }, [location.pathname, location.search]);
 
   React.useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -914,6 +926,10 @@ export default function CustomerPortal({
 
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
+
+      {/* SEO daxili linkləmə footer-i — bütün müştəri səhifələrində görünür (vendor/admin
+          panellərində yox: onlar App.tsx-də ayrıca route-lardır və bu komponentə girmir). */}
+      <SiteFooter tours={tours} />
 
       {pendingCompareTourId && (
         <CompareSwapModal
