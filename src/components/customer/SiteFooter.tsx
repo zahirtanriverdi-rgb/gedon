@@ -129,7 +129,11 @@ export function SiteFooter({ tours }: SiteFooterProps) {
                 <li><Link to="/faq" className={linkClass}>{t('customerMisc.siteFooter.faq')}</Link></li>
                 <li><Link to="/compare" className={linkClass}>{t('customerMisc.siteFooter.compare')}</Link></li>
                 <li><Link to="/wishlist" className={linkClass}>{t('customerMisc.siteFooter.wishlist')}</Link></li>
-                <li><Link to="/vendor/login" className={linkClass}>{t('customerMisc.siteFooter.forOrganizers')}</Link></li>
+                <li>
+                  <a href="https://wa.me/994706717804" target="_blank" rel="noopener noreferrer" className={linkClass}>
+                    {t('app.footer.supportLink')}
+                  </a>
+                </li>
               </ul>
             </nav>
           </div>

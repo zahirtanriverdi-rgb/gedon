@@ -42,7 +42,6 @@ export const customerMisc = {
         faq: 'Məlumat və FAQ',
         compare: 'Turları müqayisə et',
         wishlist: 'İstəklərim',
-        forOrganizers: 'Tur təşkilatçıları üçün',
         rightsReserved: 'Bütün hüquqlar qorunur.',
       },
       faqPage: {
@@ -141,7 +140,6 @@ export const customerMisc = {
         faq: 'Info & FAQ',
         compare: 'Compare tours',
         wishlist: 'Wishlist',
-        forOrganizers: 'For tour organizers',
         rightsReserved: 'All rights reserved.',
       },
       faqPage: {
@@ -240,7 +238,6 @@ export const customerMisc = {
         faq: 'Информация и FAQ',
         compare: 'Сравнить туры',
         wishlist: 'Избранное',
-        forOrganizers: 'Для организаторов туров',
         rightsReserved: 'Все права защищены.',
       },
       faqPage: {

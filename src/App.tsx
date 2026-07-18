@@ -1248,19 +1248,9 @@ export default function App() {
         </div>
       </main>
 
-      {/* Modern High Quality Footer */}
-      <footer className="bg-slate-900 text-slate-400 py-8 border-t border-slate-850 text-xs">
-        <div className="max-w-[var(--global-max-width)] mx-auto px-5 flex flex-col md:flex-row items-center justify-between gap-4">
-          <div>
-            <p className="text-slate-500 mt-1">{t('app.footer.tagline')}</p>
-          </div>
-          <div className="flex gap-4">
-            <a href="/faq" className="hover:text-white transition">{t('app.footer.faqLink')}</a>
-            <span className="text-slate-750">|</span>
-            <a href="https://wa.me/994706717804" target="_blank" rel="noopener noreferrer" className="hover:text-white transition">{t('app.footer.supportLink')}</a>
-          </div>
-        </div>
-      </footer>
+      {/* Sayt footer-i artıq CustomerPortal-ın SiteFooter-idir (SEO daxili linkləmə +
+          buradakı köhnə footer-in dəstək linki ora birləşdirilib) — iki footer görünməsin
+          deyə chrome-un öz footer-i silindi. */}
     </>
   );
 
