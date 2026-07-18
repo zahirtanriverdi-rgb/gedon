@@ -1436,6 +1436,10 @@ app.get("/api/tours", async (req, res) => {
       // or an admin rejects one, it disappears from the marketplace immediately — no exceptions,
       // and no "keep showing the stale approved version while a proposal is under review".
       conditions.push("status = 'approved'");
+      // Deactivated tours (vendor danger-zone toggle / admin edit) are hidden server-side too —
+      // the client-side `isActive !== false` filters only cover the list surfaces, not the
+      // detail page, wishlist or compare, so without this the toggle "didn't work" there.
+      conditions.push("(is_active IS NULL OR is_active != false)");
       // A vendor keeps showing up for 3 days past subscriptionValidUntil (grace period —
       // matches the copy in AdminPortal's subscription section); only once that grace
       // period has fully elapsed do their tours disappear from the public marketplace.
@@ -1505,7 +1509,7 @@ app.get("/api/tours/:id", async (req, res) => {
     const user = getOptionalUser(req);
     const isOwnerVendor = !!user && user.role === 'vendor' && user.id === tour.vendorId;
     const isAdmin = !!user && user.role === 'admin';
-    if (!isAdmin && !isOwnerVendor && tour.status !== 'approved') {
+    if (!isAdmin && !isOwnerVendor && (tour.status !== 'approved' || tour.isActive === false)) {
       return res.status(404).json({ error: "Tur tapılmadı." });
     }
 
