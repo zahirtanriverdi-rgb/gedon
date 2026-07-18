@@ -41,6 +41,9 @@ const nextConfig: NextConfig = {
   // maplibre-gl ships modern ESM that Next may need to transpile for the client bundle.
   transpilePackages: ['maplibre-gl'],
   eslint: { ignoreDuringBuilds: true },
+  // Hide the floating "N" dev-tools indicator (bottom-left) during `next dev` — it was read
+  // as part of the UI. Dev-only feature; production builds never show it either way.
+  devIndicators: false,
 };
 
 export default nextConfig;
