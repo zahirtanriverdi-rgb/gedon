@@ -29,15 +29,20 @@ export function SiteHeader() {
   ];
 
   return (
+    // Sticky only from sm up — on mobile the header scrolls away with the logo and the home
+    // page's own search bar takes over the viewport top (its sticky top-0 pins flush there,
+    // exactly like the old SPA). Making this sticky on mobile would cover that search bar.
     <header
-      className="sticky top-0 z-40 border-b border-[var(--border-primary)] bg-white/90 backdrop-blur"
+      className="relative sm:sticky top-0 z-40 border-b border-[var(--border-primary)] bg-white/90 backdrop-blur"
       style={{ height: 'var(--header-height)' }}
     >
       <div className="mx-auto flex h-full max-w-[var(--global-max-width)] items-center justify-between gap-4 px-4 sm:px-6">
         <Link href="/" className="text-xl font-black tracking-tight text-[var(--color-primary)]">
           GedəkGörək
         </Link>
-        <nav className="flex items-center gap-1 sm:gap-3">
+        {/* Hidden below sm — on mobile these all live in the fixed bottom nav instead
+            (wishlist/compare/camp/bell as tabs, calculator + language in its burger menu). */}
+        <nav className="hidden sm:flex items-center gap-1 sm:gap-3">
           {/* Icon-only by request — each label survives as tooltip (title) + aria-label. */}
           {nav.map(({ href, label, Icon }) => (
             <Link

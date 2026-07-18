@@ -590,8 +590,13 @@ export function HomeClient({ tours, slots, reviews, users, bookings }: HomeClien
   }, [tours, compareList, pendingCompareTourId]);
 
   return (
+    // Same workspace frame the old App.tsx <main> gave the customer home: ToursHomeView's
+    // root cancels this px-5 with -mx-5 to apply its own per-breakpoint side padding, so
+    // without this exact frame the mobile layout shifts off-canvas. Deliberately no
+    // transform/filter/animation here — that would silently break the search bar's
+    // position:sticky on mobile (the old SPA hit this exact gotcha).
     // Bottom padding for the mobile nav lives on the (site) layout's <main>, not here.
-    <div>
+    <div className="max-w-[var(--global-max-width)] mx-auto px-5 py-8 w-full">
       <ToursHomeView
         tours={tours}
         slots={slots}
