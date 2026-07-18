@@ -190,7 +190,15 @@ export default function App() {
   // vendor's own rows server-side (not just in the UI), with an admin token they return
   // everything, and with no token they keep the public/unfiltered shape the customer
   // marketplace relies on.
-  const authToken = operatorToken || adminToken;
+  // Route-aware: both a vendor and an admin session can now be live at once (they persist to
+  // localStorage independently), so pick the token that matches the portal the user is actually
+  // in. A blanket `operatorToken || adminToken` here once made the admin panel silently send a
+  // stale vendor token — approving a tour then re-submitted it as pending instead of approving.
+  const authToken = location.pathname.startsWith('/admin')
+    ? adminToken
+    : location.pathname.startsWith('/vendor')
+      ? operatorToken
+      : (operatorToken || adminToken);
   const authHeaders = (): Record<string, string> => {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (authToken) headers['Authorization'] = `Bearer ${authToken}`;

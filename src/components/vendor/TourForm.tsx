@@ -73,8 +73,12 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
   const [tourPrice, setTourPrice] = useState<number | ''>(35);
   const [tourCapacity, setTourCapacity] = useState<number | ''>(20);
   // Per-date seat overrides, keyed by ISO date — lets a vendor give each departure date its
-  // own capacity instead of every date sharing the single `tourCapacity` default above.
+  // own total capacity (slotCapacities) and its own remaining/free seats (slotRemaining)
+  // instead of every date sharing the single `tourCapacity` default above. "Taken" seats
+  // (booked_count, which includes this platform's own bookings) are derived on submit as
+  // total − remaining, so a vendor can account for registrations that came in off-platform.
   const [slotCapacities, setSlotCapacities] = useState<Record<string, number | ''>>({});
+  const [slotRemaining, setSlotRemaining] = useState<Record<string, number | ''>>({});
   const [tourDiscountPrice, setTourDiscountPrice] = useState<string>('');
   const [tourRating, setTourRating] = useState<number | ''>('');
   const [selectedDates, setSelectedDates] = useState<Date[]>([]);
@@ -155,9 +159,10 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
     return new Map(tourSlots.map((s) => [toIsoDate(new Date(s.startDate)), s]));
   }, [slots, tour]);
 
-  // Keeps slotCapacities in sync with the calendar's selectedDates: a newly-picked date gets a
-  // starting value (its existing slot's capacity if there is one, otherwise the form's default
-  // tourCapacity), and a deselected date's override is dropped so it doesn't linger.
+  // Keeps slotCapacities + slotRemaining in sync with the calendar's selectedDates: a newly-
+  // picked date seeds its total from its existing slot's capacity (or the form's default
+  // tourCapacity) and its remaining from the existing slot's free seats (capacity − bookedCount),
+  // or the full total for a brand-new date. Deselected dates are dropped so they don't linger.
   useEffect(() => {
     setSlotCapacities((prev) => {
       const next: Record<string, number | ''> = {};
@@ -168,6 +173,21 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
         } else {
           const existing = existingSlotByDate.get(iso);
           next[iso] = existing ? existing.capacity : (Number(tourCapacity) || 20);
+        }
+      }
+      return next;
+    });
+    setSlotRemaining((prev) => {
+      const next: Record<string, number | ''> = {};
+      for (const date of selectedDates) {
+        const iso = toIsoDate(date);
+        if (prev[iso] !== undefined) {
+          next[iso] = prev[iso];
+        } else {
+          const existing = existingSlotByDate.get(iso);
+          next[iso] = existing
+            ? Math.max(0, existing.capacity - existing.bookedCount)
+            : (Number(tourCapacity) || 20);
         }
       }
       return next;
@@ -383,6 +403,14 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
         const iso = toIsoDate(date);
         const existing = existingByDate.get(iso);
         const desiredCapacity = Number(slotCapacities[iso]) || Number(tourCapacity) || 20;
+        // "Taken" seats are derived from what the vendor entered as remaining: a blank
+        // remaining field means "all free". bookedCount = total − remaining, clamped so it
+        // can't exceed the total or go negative. This bookedCount includes this platform's
+        // own bookings plus any off-platform registrations the vendor accounted for.
+        const desiredRemaining = slotRemaining[iso] === '' || slotRemaining[iso] === undefined
+          ? desiredCapacity
+          : Number(slotRemaining[iso]);
+        const desiredBooked = Math.min(desiredCapacity, Math.max(0, desiredCapacity - desiredRemaining));
         if (!existing) {
           await onAddSlot({
             id: 'slot-' + Math.floor(Math.random() * 90000 + 10000),
@@ -391,10 +419,10 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
             endDate: iso,
             price: Number(tourPrice || 35),
             capacity: desiredCapacity,
-            bookedCount: 0,
+            bookedCount: desiredBooked,
           });
-        } else if (onUpdateSlot && desiredCapacity !== existing.capacity) {
-          await onUpdateSlot(existing.id, { capacity: desiredCapacity });
+        } else if (onUpdateSlot && (desiredCapacity !== existing.capacity || desiredBooked !== existing.bookedCount)) {
+          await onUpdateSlot(existing.id, { capacity: desiredCapacity, bookedCount: desiredBooked });
         }
       }
       if (onDeleteSlot) {
@@ -917,33 +945,57 @@ const handleMediaFilesChange = async (e: React.ChangeEvent<HTMLInputElement>) =>
             {selectedDates.length > 0 && (
               <div className="space-y-1.5">
                 <label className="block text-[11px] font-bold text-slate-500 tracking-wide">{t('vendorTourForms.tourForm.fields.perDateCapacity.label')}</label>
+                <p className="text-[9px] text-slate-400 -mt-0.5">{t('vendorTourForms.tourForm.fields.perDateCapacity.hint')}</p>
                 <div className="space-y-1.5">
                   {[...selectedDates].sort((a, b) => a.getTime() - b.getTime()).map((date) => {
                     const iso = toIsoDate(date);
                     const existing = existingSlotByDate.get(iso);
-                    const value = slotCapacities[iso] ?? tourCapacity;
+                    const totalValue = slotCapacities[iso] ?? tourCapacity;
+                    const remainingValue = slotRemaining[iso] ?? '';
+                    const totalNum = Number(totalValue) || 0;
+                    const remainingNum = remainingValue === '' ? totalNum : Number(remainingValue);
+                    const takenNum = Math.min(totalNum, Math.max(0, totalNum - remainingNum));
+                    const overbooked = remainingNum > totalNum;
                     return (
-                      <div key={iso} className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg px-3 py-1.5">
-                        <span className="text-[11px] font-bold text-slate-600 flex-shrink-0">📅 {iso}</span>
-                        <input
-                          type="number"
-                          min="1"
-                          max="200"
-                          value={value}
-                          onChange={(e) => {
-                            const raw = e.target.value;
-                            setSlotCapacities((prev) => ({ ...prev, [iso]: raw === '' ? '' : Number(raw) }));
-                          }}
-                          className="w-20 px-2 py-1 border border-slate-200 rounded text-xs font-bold text-slate-800"
-                        />
-                        {existing ? (
-                          <span className="text-[10px] font-semibold text-slate-400">
-                            {t('vendorTourForms.tourForm.fields.perDateCapacity.remaining', {
-                              capacity: Number(value) || 0,
-                              remaining: Math.max(0, (Number(value) || 0) - existing.bookedCount),
-                            })}
-                          </span>
+                      <div key={iso} className="flex flex-wrap items-center gap-x-3 gap-y-1 bg-white border border-slate-200 rounded-lg px-3 py-2">
+                        <span className="text-[11px] font-bold text-slate-600 flex-shrink-0 w-24">📅 {iso}</span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] font-semibold text-slate-500">{t('vendorTourForms.tourForm.fields.perDateCapacity.totalLabel')}</span>
+                          <input
+                            type="number"
+                            min="1"
+                            max="500"
+                            value={totalValue}
+                            onChange={(e) => {
+                              const raw = e.target.value;
+                              setSlotCapacities((prev) => ({ ...prev, [iso]: raw === '' ? '' : Number(raw) }));
+                            }}
+                            className="w-16 px-2 py-1 border border-slate-200 rounded text-xs font-bold text-slate-800"
+                          />
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] font-semibold text-slate-500">{t('vendorTourForms.tourForm.fields.perDateCapacity.remainingLabel')}</span>
+                          <input
+                            type="number"
+                            min="0"
+                            max={totalNum || undefined}
+                            value={remainingValue}
+                            placeholder={String(totalNum)}
+                            onChange={(e) => {
+                              const raw = e.target.value;
+                              setSlotRemaining((prev) => ({ ...prev, [iso]: raw === '' ? '' : Number(raw) }));
+                            }}
+                            className={`w-16 px-2 py-1 border rounded text-xs font-bold ${overbooked ? 'border-red-400 text-red-600' : 'border-slate-200 text-slate-800'}`}
+                          />
+                        </div>
+                        {overbooked ? (
+                          <span className="text-[10px] font-semibold text-red-500">{t('vendorTourForms.tourForm.fields.perDateCapacity.overbooked')}</span>
                         ) : (
+                          <span className="text-[10px] font-semibold text-slate-400">
+                            {t('vendorTourForms.tourForm.fields.perDateCapacity.taken', { taken: takenNum })}
+                          </span>
+                        )}
+                        {!existing && (
                           <span className="text-[10px] font-semibold text-emerald-500">{t('vendorTourForms.tourForm.fields.perDateCapacity.newBadge')}</span>
                         )}
                       </div>
