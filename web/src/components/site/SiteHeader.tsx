@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { Heart, Scale, Calculator, Tent } from 'lucide-react';
 import { useLanguage } from '@/i18n/LanguageContext';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
+import { UrgentDealsBell } from '@/components/customer/UrgentDealsBell';
 
 /**
  * Site chrome header. Replaces the old App.tsx renderChrome header. Kept intentionally small and
@@ -48,6 +49,10 @@ export function SiteHeader() {
               <span className="hidden md:inline">{label}</span>
             </Link>
           ))}
+          {/* "Təcili fürsətlər" — rings + shows an amber badge whenever any approved tour
+              has an upcoming departure with fewer than 5 seats left; opens a popup listing
+              them with direct "Bilet al" links. */}
+          <UrgentDealsBell />
           <LanguageSwitcher />
         </nav>
       </div>

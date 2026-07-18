@@ -7,6 +7,7 @@ import { ImageLightbox } from '@/components/customer/ImageLightbox';
 import { useLanguage } from '@/i18n/LanguageContext';
 import { useNotification } from '@/lib/notification';
 import { getWishlist, toggleWishlist } from '@/utils/wishlist';
+import { useCurrency, makeConvertedPriceInfo } from '@/lib/currency';
 import { useRouter } from 'next/navigation';
 
 interface TourDetailClientProps {
@@ -29,40 +30,9 @@ export function TourDetailClient({ tour, tours, slots, reviews, users }: TourDet
   // Guest customer — the public booking flow verifies identity via WhatsApp OTP, not a login.
   const guestUser = { id: 'guest', name: '', phone: '', balance: 0, email: '' };
 
-  // Default CBAR-ish rates; the old app fetched /api/exchange-rates/cbar but AZN display (the
-  // default) needs no conversion, so static fallbacks are fine here.
-  const exchangeRates = { USD: 1.7, EUR: 1.85 };
-  const displayCurrency = 'AZN' as 'AZN' | 'USD' | 'EUR';
-
-  const getConvertedPriceInfo = (price: number, currency?: 'AZN' | 'USD' | 'EUR') => {
-    const usdRate = exchangeRates.USD;
-    const eurRate = exchangeRates.EUR;
-    let aznPrice = price;
-    if (currency === 'USD') aznPrice = price * usdRate;
-    if (currency === 'EUR') aznPrice = price * eurRate;
-
-    let displayPrice = aznPrice;
-    let symbol = '₼';
-    let code = 'AZN';
-    if (displayCurrency === 'USD') {
-      displayPrice = aznPrice / usdRate;
-      symbol = '$';
-      code = 'USD';
-    } else if (displayCurrency === 'EUR') {
-      displayPrice = aznPrice / eurRate;
-      symbol = '€';
-      code = 'EUR';
-    }
-    const finalPrice = Math.round(displayPrice);
-    return {
-      azn: aznPrice,
-      currencySymbol: symbol,
-      currencyCode: code,
-      original: `${finalPrice} ${symbol}`,
-      both: `${finalPrice} ${symbol}`,
-      detailed: `${finalPrice} ${symbol}`,
-    };
-  };
+  // Shared display-currency selection + live CBAR rates (see lib/currency).
+  const { displayCurrency, exchangeRates } = useCurrency();
+  const getConvertedPriceInfo = makeConvertedPriceInfo(displayCurrency, exchangeRates);
 
   const getReviewsCount = (tourId: string) => {
     const tourReviews = reviews.filter((r) => r.tourId === tourId);
@@ -71,7 +41,10 @@ export function TourDetailClient({ tour, tours, slots, reviews, users }: TourDet
     return t2?.reviewsCount ?? 0;
   };
 
-  const [wishlist, setWishlist] = useState<string[]>(() => getWishlist());
+  // Loaded after mount — reading localStorage during render would run on the server too
+  // (SSR pass) and desync the hydrated HTML from the client's real wishlist.
+  const [wishlist, setWishlist] = useState<string[]>([]);
+  React.useEffect(() => setWishlist(getWishlist()), []);
   const handleToggleWishlist = (tourId: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     setWishlist(toggleWishlist(tourId));

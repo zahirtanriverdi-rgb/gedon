@@ -10,14 +10,15 @@ import { useMarketplace } from '@/hooks/useMarketplace';
 
 export default function VendorDashboardRoute() {
   const router = useRouter();
-  const { user, token, logout } = useAuth();
+  const { user, token, ready, logout, updateUser } = useAuth();
   const { showNotification } = useNotification();
   const mp = useMarketplace(token);
 
-  // Hard refresh clears the in-memory token → bounce to login.
+  // No stored session once hydration finished → bounce to login. (The session persists to
+  // localStorage, so a hard refresh only logs you out if there was nothing stored.)
   useEffect(() => {
-    if (!user) router.replace('/vendor/login');
-  }, [user, router]);
+    if (ready && !user) router.replace('/vendor/login');
+  }, [ready, user, router]);
 
   if (!user) return null;
 
@@ -38,6 +39,7 @@ export default function VendorDashboardRoute() {
       operatorToken={token}
       onAddSlot={mp.handleAddSlot}
       onDeleteSlot={mp.handleDeleteSlot}
+      onUpdateSlot={mp.handleUpdateSlot}
       onAddTour={mp.handleAddTour}
       onEditTour={mp.handleEditTour}
       onDeleteTour={mp.handleDeleteTour}
@@ -50,7 +52,13 @@ export default function VendorDashboardRoute() {
       exchangeRates={mp.exchangeRates}
       onUpdateExchangeRates={mp.handleUpdateExchangeRates}
       onToggleFeatured={mp.handleToggleFeatured}
-      onUserUpdated={mp.handleVendorProfileUpdated}
+      onUserUpdated={(updatedUser) => {
+        mp.handleVendorProfileUpdated(updatedUser);
+        // Also merge into the auth session (and its stored copy) — `currentUser` comes from
+        // there, so without this a vendor's own profile edits save but never show up until
+        // they log out and back in.
+        updateUser(updatedUser);
+      }}
       onLogout={() => {
         logout();
         router.replace('/vendor/login');

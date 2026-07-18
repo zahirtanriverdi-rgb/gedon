@@ -1,6 +1,6 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import dbClient from "./db";
-import type { Guide } from "../src/types";
+import type { Guide } from "../shared/types";
 
 // Gemini-powered translation for tour/vendor content (source: Azerbaijani -> English/Russian).
 // Domain-aware prompting handles tourism vocabulary (zirvə/şəlalə/yürüş etc.) far more

@@ -1,9 +1,12 @@
+'use client';
+
 import React from 'react';
 import { createPortal } from 'react-dom';
-import { useNavigate } from 'react-router-dom';
+import { useRouter } from 'next/navigation';
 import { Bell, Ticket, Flame, X } from 'lucide-react';
-import { Tour, TourSlot } from '../../types';
-import { useExpandingMenu } from '../../hooks/useExpandingMenu';
+import type { Tour, TourSlot } from '@/types';
+import { useExpandingMenu } from '@/hooks/useExpandingMenu';
+import { useLanguage } from '@/i18n/LanguageContext';
 
 // A slot is a "təcili fürsət" (urgent opportunity) when it still has seats left but fewer
 // than this many — few enough that the customer should act now. 0 remaining means sold out,
@@ -18,14 +21,9 @@ const PANEL_WIDTH = 340;
 type AppLanguage = 'az' | 'en' | 'ru';
 
 interface UrgentDealsBellProps {
-  tours: Tour[];
-  slots: TourSlot[];
-  appLanguage: AppLanguage;
-  // 'header': small dropdown panel anchored under the button — used in the desktop header,
-  // which already hides this whole icon row on mobile (see App.tsx's showCustomerNav wrapper).
-  // 'mobileNav': matches CustomerPortal's bottom tab-bar icon style and opens a full bottom
-  // sheet instead of a dropdown — a small panel anchored to a bottom-fixed nav icon would run
-  // off the bottom of the screen with nowhere to expand into.
+  // 'header': small dropdown panel anchored under the button — used in the site header.
+  // 'mobileNav': bottom tab-bar icon style that opens a full bottom sheet instead of a
+  // dropdown — a small panel anchored to a bottom-fixed nav icon would run off-screen.
   variant?: 'header' | 'mobileNav';
 }
 
@@ -85,18 +83,43 @@ function formatDate(dateStr: string, appLanguage: AppLanguage): string {
 
 /**
  * "Təcili fürsətlər" notification button — desktop header dropdown (variant="header") or
- * mobile bottom-nav bell that opens a bottom sheet (variant="mobileNav").
+ * mobile bell that opens a bottom sheet (variant="mobileNav").
  *
- * Continuously derives — straight from the live tours/slots props, so it re-checks and
- * refreshes automatically the moment the marketplace data loads or changes, with no manual
- * trigger — the set of approved, active tours that have an upcoming departure with fewer than
- * URGENT_SEATS_THRESHOLD seats left. When there's at least one, the bell animates (rings) and
- * shows an amber count badge to pull the eye. Opening it lists those tours, most-urgent first,
- * each with a direct "Bilet al" link to its booking page.
+ * Unlike the old SPA (which received live tours/slots props from the App god-component),
+ * the Next site header has no client-side marketplace store — the public pages are
+ * server-rendered — so the bell fetches the public tours/slots endpoints itself on mount
+ * and derives the set of approved, active tours that have an upcoming departure with fewer
+ * than URGENT_SEATS_THRESHOLD seats left. When there's at least one, the bell rings and
+ * shows an amber count badge. Opening it lists those tours, most-urgent first, each with a
+ * direct "Bilet al" link to its booking page.
  */
-export function UrgentDealsBell({ tours, slots, appLanguage, variant = 'header' }: UrgentDealsBellProps) {
-  const navigate = useNavigate();
+export function UrgentDealsBell({ variant = 'header' }: UrgentDealsBellProps) {
+  const router = useRouter();
+  const { language } = useLanguage();
+  const appLanguage = (language as AppLanguage) || 'az';
   const s = STRINGS[appLanguage] || STRINGS.az;
+
+  const [tours, setTours] = React.useState<Tour[]>([]);
+  const [slots, setSlots] = React.useState<TourSlot[]>([]);
+
+  React.useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const [toursRes, slotsRes] = await Promise.all([fetch('/api/tours'), fetch('/api/slots')]);
+        if (!toursRes.ok || !slotsRes.ok || cancelled) return;
+        const [toursData, slotsData] = await Promise.all([toursRes.json(), slotsRes.json()]);
+        if (cancelled) return;
+        setTours(toursData.tours || []);
+        setSlots(slotsData.slots || []);
+      } catch {
+        /* best-effort widget — a failed fetch just leaves the bell quiet */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const menu = useExpandingMenu((rect) => {
     // Right-align the panel to the button, kept fully on-screen with an 8px margin.
@@ -144,7 +167,7 @@ export function UrgentDealsBell({ tours, slots, appLanguage, variant = 'header' 
   const closePanel = variant === 'mobileNav' ? () => setSheetOpen(false) : () => menu.setOpen(false);
   const handleBuy = (deal: UrgentDeal) => {
     closePanel();
-    navigate(`/tours/${deal.tour.slug || deal.tour.id}`);
+    router.push(`/tours/${deal.tour.slug || deal.tour.id}`);
   };
 
   // Shared header strip + list/empty-state markup — only the outer panel chrome differs

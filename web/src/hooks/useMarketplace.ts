@@ -63,6 +63,7 @@ export interface UseMarketplaceResult {
   // handlers
   handleAddSlot: (newSlot: TourSlot) => Promise<void>;
   handleDeleteSlot: (slotId: string) => Promise<void>;
+  handleUpdateSlot: (slotId: string, updates: Partial<TourSlot>) => Promise<void>;
   handleAddTour: (newTour: Tour) => Promise<void>;
   handleEditTour: (updatedTour: Tour) => Promise<void>;
   handleDeleteTour: (tourId: string) => Promise<void>;
@@ -196,6 +197,22 @@ export function useMarketplace(authToken: string | null): UseMarketplaceResult {
       if (!response.ok) throw new Error(data.error || 'Tarix əlavə edilə bilmədi.');
       setSlots((prev) => [...prev, data.slot]);
       showNotification(t('app.notifications.slotAdded'), 'success');
+    } catch (e: any) {
+      showNotification(e.message || t('app.notifications.slotAddError'), 'error');
+      throw e;
+    }
+  };
+
+  const handleUpdateSlot = async (slotId: string, updates: Partial<TourSlot>) => {
+    try {
+      const response = await fetch(`/api/slots/${slotId}`, {
+        method: 'PUT',
+        headers: authHeaders(),
+        body: JSON.stringify(updates),
+      });
+      const data = await parseApiResponse(response);
+      if (!response.ok) throw new Error(data.error || 'Tarix yenilənə bilmədi.');
+      setSlots((prev) => prev.map((s) => (s.id === slotId ? data.slot : s)));
     } catch (e: any) {
       showNotification(e.message || t('app.notifications.slotAddError'), 'error');
       throw e;
@@ -510,6 +527,7 @@ export function useMarketplace(authToken: string | null): UseMarketplaceResult {
     reload,
     handleAddSlot,
     handleDeleteSlot,
+    handleUpdateSlot,
     handleAddTour,
     handleEditTour,
     handleDeleteTour,

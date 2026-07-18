@@ -4,7 +4,6 @@ import express from "express";
 import path from "path";
 import fs from "fs";
 import { jsPDF } from "jspdf";
-import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
@@ -3122,76 +3121,19 @@ async function startServer() {
   // only logged, never thrown.
   startWhatsApp().catch((err) => console.error("[WhatsApp] Başlanğıc qoşulma xətası:", err));
 
-  // Any /api/* path that didn't match one of the routes above is a genuine 404, not a page to
-  // render — without this, both the dev Vite middleware and the production static/SPA fallback
-  // below would happily serve index.html (200 + HTML) for a typo'd or removed endpoint, which
-  // breaks response.json() on the client instead of surfacing a clear error.
+  // Any /api/* path that didn't match one of the routes above is a genuine 404. Without this
+  // a typo'd or removed endpoint would fall through to the catch-all below and return HTML,
+  // which breaks response.json() on the client instead of surfacing a clear error.
   app.use('/api', (req, res) => {
     res.status(404).json({ error: "Belə bir API endpoint mövcud deyil." });
   });
 
-  // Classify page navigations BEFORE the SPA fallbacks below: unknown routes (mistyped URLs,
-  // deleted tour slugs) still render the SPA — whose router shows its NotFoundPage — but with
-  // a real 404 status instead of a soft-404 (200 + HTML), which search engines would index.
-  const STATIC_CLIENT_ROUTES = new Set(['/', '/faq', '/calculator', '/wishlist', '/compare', '/camp-sites', '/camp-sites/add', '/vendor/login', '/admin/login']);
-  app.use(async (req, res, next) => {
-    if (req.method !== 'GET') return next();
-    // Only page navigations — assets (js/css/img) don't send an HTML accept header.
-    if (!(req.headers.accept || '').includes('text/html')) return next();
-    const p = (req.path || '/').replace(/\/+$/, '') || '/';
-
-    let known = STATIC_CLIENT_ROUTES.has(p)
-      || p.startsWith('/vendor/dashboard')
-      || p.startsWith('/admin/dashboard');
-    try {
-      if (!known && p.startsWith('/tours/')) {
-        const slug = decodeURIComponent(p.slice('/tours/'.length));
-        const rows = await dbClient.query(`SELECT id FROM tours WHERE slug = ?`, [slug]);
-        known = rows.length > 0;
-      } else if (!known && p.startsWith('/organizer/')) {
-        const vendorId = decodeURIComponent(p.slice('/organizer/'.length));
-        const rows = await dbClient.query(`SELECT id FROM users WHERE id = ? AND role = 'vendor'`, [vendorId]);
-        known = rows.length > 0;
-      }
-    } catch {
-      known = true; // DB hiccup — never 404 a potentially valid page
-    }
-
-    if (!known) {
-      res.status(404);
-      (req as any).spaNotFound = true;
-    }
-    next();
+  // The frontend is the standalone Next.js app in web/ (SSR, own port) — this process is
+  // API + static uploads only, so anything else is a 404. Page-level 404 semantics (unknown
+  // tour slugs etc.) are handled by Next itself via notFound().
+  app.use((req, res) => {
+    res.status(404).json({ error: "Bu server yalnız API-yə xidmət edir — sayt Next.js (web/) tərəfindədir." });
   });
-
-  // Vite middleware for development
-  if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    });
-    // Vite's own html middleware always responds 200, wiping the 404 the classifier above
-    // set — so unknown pages get their (transformed) index.html served here instead, with
-    // the real 404 status. The SPA router still renders its NotFoundPage.
-    app.use(async (req, res, next) => {
-      if (!(req as any).spaNotFound) return next();
-      try {
-        const template = fs.readFileSync(path.join(process.cwd(), "index.html"), "utf-8");
-        const html = await vite.transformIndexHtml(req.originalUrl, template);
-        res.status(404).set({ "Content-Type": "text/html" }).end(html);
-      } catch {
-        next();
-      }
-    });
-    app.use(vite.middlewares);
-  } else {
-    const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
-    // SPA fallback handling — .status() keeps whatever the classifier above decided.
-    app.get('*', (req, res) => {
-      res.status(res.statusCode || 200).sendFile(path.join(distPath, 'index.html'));
-    });
-  }
 
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://localhost:${PORT}`);

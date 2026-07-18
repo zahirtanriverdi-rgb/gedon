@@ -1,5 +1,5 @@
 'use client';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Tour, TourSlot, User, Guide } from '../../types';
 import { parseGpsFile } from '../../utils/gpxParser';
 import { Plus, X, Check } from 'lucide-react';
@@ -10,11 +10,7 @@ import { TourDangerZone } from './TourDangerZone';
 import { WhatsAppVerifyField } from '../shared/WhatsAppVerifyField';
 import { handleNumberInput, useStepWizard } from './useTourFormWizard';
 import { useLanguage } from '../../i18n/LanguageContext';
-
-// The browser talks to the API through relative /api/* urls, which Next's rewrite
-// (next.config.ts) proxies to the Express origin — so no absolute base is needed here.
-// An explicit NEXT_PUBLIC_API_BASE_URL can still override it for cross-origin uploads.
-const getBaseUrl = () => process.env.NEXT_PUBLIC_API_BASE_URL || '';
+import { uploadMediaFiles } from '../../utils/uploadMedia';
 
 // Older guides saved before Guide.id existed have no stable identifier — fall back to their
 // name so tour-guide assignment still works for pre-existing profile data.
@@ -31,6 +27,7 @@ interface TourFormProps {
   onDeleteTour?: (tourId: string) => Promise<void>;
   onAddSlot: (newSlot: TourSlot) => Promise<void>;
   onDeleteSlot?: (slotId: string) => Promise<void>;
+  onUpdateSlot?: (slotId: string, updates: Partial<TourSlot>) => Promise<void>;
   onShowNotification?: (message: string, type?: 'success' | 'info' | 'error' | 'warning') => void;
   onNavigateBack: () => void;
 }
@@ -38,7 +35,7 @@ interface TourFormProps {
 // Unified create/edit form for domestic (peak/camp/hiking/active) tours. Same component is
 // used from VendorPortal's "add-tour" tab (tour=null) and from the edit modal (tour set) —
 // only the Danger Zone is mode-specific.
-export function TourForm({ currentUser, tour, slots, category: tourCategory, onCategoryChange: setTourCategory, onAddTour, onEditTour, onDeleteTour, onAddSlot, onDeleteSlot, onShowNotification, onNavigateBack }: TourFormProps) {
+export function TourForm({ currentUser, tour, slots, category: tourCategory, onCategoryChange: setTourCategory, onAddTour, onEditTour, onDeleteTour, onAddSlot, onDeleteSlot, onUpdateSlot, onShowNotification, onNavigateBack }: TourFormProps) {
   const { t } = useLanguage();
   const isEditMode = !!tour;
 
@@ -71,6 +68,14 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
   // starts pre-verified since that number was already checked when the tour was first created.
   const [isWhatsAppVerified, setIsWhatsAppVerified] = useState<boolean>(!!tour);
   const [tourPrice, setTourPrice] = useState<number | ''>(35);
+  const [tourCapacity, setTourCapacity] = useState<number | ''>(20);
+  // Per-date seat overrides, keyed by ISO date — lets a vendor give each departure date its
+  // own total capacity (slotCapacities) and its own remaining/free seats (slotRemaining)
+  // instead of every date sharing the single `tourCapacity` default above. "Taken" seats
+  // (booked_count, which includes this platform's own bookings) are derived on submit as
+  // total − remaining, so a vendor can account for registrations that came in off-platform.
+  const [slotCapacities, setSlotCapacities] = useState<Record<string, number | ''>>({});
+  const [slotRemaining, setSlotRemaining] = useState<Record<string, number | ''>>({});
   const [tourDiscountPrice, setTourDiscountPrice] = useState<string>('');
   const [tourRating, setTourRating] = useState<number | ''>('');
   const [selectedDates, setSelectedDates] = useState<Date[]>([]);
@@ -143,6 +148,49 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
     else alert(message);
     return false;
   };
+
+  // This tour's existing slots, keyed by ISO date — used to seed/display each date's current
+  // capacity and booked count (remaining-seats indicator) in the per-date list below.
+  const existingSlotByDate = useMemo(() => {
+    const tourSlots = tour ? slots.filter((s) => s.tourId === tour.id) : [];
+    return new Map(tourSlots.map((s) => [toIsoDate(new Date(s.startDate)), s]));
+  }, [slots, tour]);
+
+  // Keeps slotCapacities + slotRemaining in sync with the calendar's selectedDates: a newly-
+  // picked date seeds its total from its existing slot's capacity (or the form's default
+  // tourCapacity) and its remaining from the existing slot's free seats (capacity − bookedCount),
+  // or the full total for a brand-new date. Deselected dates are dropped so they don't linger.
+  useEffect(() => {
+    setSlotCapacities((prev) => {
+      const next: Record<string, number | ''> = {};
+      for (const date of selectedDates) {
+        const iso = toIsoDate(date);
+        if (prev[iso] !== undefined) {
+          next[iso] = prev[iso];
+        } else {
+          const existing = existingSlotByDate.get(iso);
+          next[iso] = existing ? existing.capacity : (Number(tourCapacity) || 20);
+        }
+      }
+      return next;
+    });
+    setSlotRemaining((prev) => {
+      const next: Record<string, number | ''> = {};
+      for (const date of selectedDates) {
+        const iso = toIsoDate(date);
+        if (prev[iso] !== undefined) {
+          next[iso] = prev[iso];
+        } else {
+          const existing = existingSlotByDate.get(iso);
+          next[iso] = existing
+            ? Math.max(0, existing.capacity - existing.bookedCount)
+            : (Number(tourCapacity) || 20);
+        }
+      }
+      return next;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDates, existingSlotByDate]);
 
   // New tour (create mode): pre-fill the WhatsApp guide number with the vendor's own official
   // contact number instead of a hardcoded placeholder. Still editable — a vendor may want a
@@ -220,6 +268,7 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
     const tourSlots = slots.filter(s => s.tourId === tour.id);
     setSelectedDates(tourSlots.map(s => new Date(s.startDate)));
     setTourPrice(tour.price !== undefined ? tour.price : (tourSlots.length > 0 ? tourSlots[0].price : 35));
+    setTourCapacity(tourSlots.length > 0 ? tourSlots[0].capacity : 20);
     setTourDiscountPrice(tour.discountPrice !== undefined ? String(tour.discountPrice) : '');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tour]);
@@ -349,16 +398,28 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
 
       for (const date of selectedDates) {
         const iso = toIsoDate(date);
-        if (!existingByDate.has(iso)) {
+        const existing = existingByDate.get(iso);
+        const desiredCapacity = Number(slotCapacities[iso]) || Number(tourCapacity) || 20;
+        // "Taken" seats are derived from what the vendor entered as remaining: a blank
+        // remaining field means "all free". bookedCount = total − remaining, clamped so it
+        // can't exceed the total or go negative. This bookedCount includes this platform's
+        // own bookings plus any off-platform registrations the vendor accounted for.
+        const desiredRemaining = slotRemaining[iso] === '' || slotRemaining[iso] === undefined
+          ? desiredCapacity
+          : Number(slotRemaining[iso]);
+        const desiredBooked = Math.min(desiredCapacity, Math.max(0, desiredCapacity - desiredRemaining));
+        if (!existing) {
           await onAddSlot({
             id: 'slot-' + Math.floor(Math.random() * 90000 + 10000),
             tourId,
             startDate: iso,
             endDate: iso,
             price: Number(tourPrice || 35),
-            capacity: 20,
-            bookedCount: 0,
+            capacity: desiredCapacity,
+            bookedCount: desiredBooked,
           });
+        } else if (onUpdateSlot && (desiredCapacity !== existing.capacity || desiredBooked !== existing.bookedCount)) {
+          await onUpdateSlot(existing.id, { capacity: desiredCapacity, bookedCount: desiredBooked });
         }
       }
       if (onDeleteSlot) {
@@ -395,39 +456,27 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
     reader.readAsText(file);
   };
 
-// Unified media upload to server
+// Unified media upload to server (S3-compatible storage və ya dev-də lokal disk;
+// bax src/utils/uploadMedia.ts) — DB-yə yalnız URL yazılır, base64 yox.
 const handleMediaFilesChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
   const files = e.target.files;
   if (!files || files.length === 0) return;
 
-  const formData = new FormData();
-  Array.from<File>(files).forEach(file => formData.append('files', file));
-
   try {
-    const res = await fetch(`${getBaseUrl()}/api/upload`, {
-      method: 'POST',
-      body: formData,
-    });
+    const { images: imageUrls, videos: videoUrls } = await uploadMediaFiles(files);
 
-    const data = await res.json();
+    setTourImages(prev => [...prev, ...imageUrls]);
+    setTourVideos(prev => [...prev, ...videoUrls]);
 
-    if (data.success && data.urls?.length > 0) {
-      const imageUrls = data.urls.filter((url: string) => url.match(/\.(jpg|jpeg|png|webp|gif)$/i));
-      const videoUrls = data.urls.filter((url: string) => url.match(/\.(mp4|webm|ogg)$/i));
+    if (imageUrls.length > 0 && !tourImage) setTourImage(imageUrls[0]);
 
-      setTourImages(prev => [...prev, ...imageUrls]);
-      setTourVideos(prev => [...prev, ...videoUrls]);
-
-      if (imageUrls.length > 0 && !tourImage) setTourImage(imageUrls[0]);
-
-      if (onShowNotification) {
-        onShowNotification(`✅ ${imageUrls.length} şəkil və ${videoUrls.length} video yükləndi`, 'success');
-      }
-      clearFieldError('media');
+    if (onShowNotification) {
+      onShowNotification(`✅ ${imageUrls.length} şəkil və ${videoUrls.length} video yükləndi`, 'success');
     }
-  } catch (err) {
+    if (imageUrls.length > 0 || videoUrls.length > 0) clearFieldError('media');
+  } catch (err: any) {
     console.error(err);
-    if (onShowNotification) onShowNotification("Şəkil yüklənərkən xəta baş verdi", 'error');
+    if (onShowNotification) onShowNotification(err?.message || "Şəkil yüklənərkən xəta baş verdi", 'error');
   }
 };
 
@@ -848,17 +897,22 @@ const handleMediaFilesChange = async (e: React.ChangeEvent<HTMLInputElement>) =>
         <div className="space-y-5">
           <div className="bg-primary-50/60 p-4 rounded-xl border border-emerald-100 space-y-3">
             <h4 className="text-[10px] font-extrabold text-emerald-800 tracking-widest">{t('vendorTourForms.tourForm.pricingSection.heading')}</h4>
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 sm:max-w-3xl">
+            <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 sm:max-w-4xl">
               <div>
-                <label className="block text-[11px] font-bold text-slate-500 tracking-wide mb-1">{t('vendorTourForms.tourForm.fields.price.label')}</label>
+                <label className="flex items-end min-h-[30px] mb-1 text-[11px] font-bold text-slate-500 tracking-wide leading-tight">{t('vendorTourForms.tourForm.fields.price.label')}</label>
                 <input type="number" min="1" required value={tourPrice} onChange={handleNumberInput(setTourPrice)} className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-800" />
               </div>
               <div>
-                <label className="block text-[11px] font-bold text-rose-600 tracking-wide mb-1">{t('vendorTourForms.tourForm.fields.discountPrice.label')}</label>
+                <label className="flex items-end min-h-[30px] mb-1 text-[11px] font-bold text-slate-500 tracking-wide leading-tight">{t('vendorTourForms.tourForm.fields.capacity.label')}</label>
+                <input type="number" min="1" max="200" required value={tourCapacity} onChange={handleNumberInput(setTourCapacity)} className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-800" />
+                <p className="text-[9px] text-slate-400 mt-1">{t('vendorTourForms.tourForm.fields.capacity.hint')}</p>
+              </div>
+              <div>
+                <label className="flex items-end min-h-[30px] mb-1 text-[11px] font-bold text-rose-600 tracking-wide leading-tight">{t('vendorTourForms.tourForm.fields.discountPrice.label')}</label>
                 <input type="number" min="0" placeholder={t('vendorTourForms.tourForm.fields.discountPrice.placeholder')} value={tourDiscountPrice} onChange={(e) => setTourDiscountPrice(e.target.value)} className="w-full px-3 py-2 bg-white border border-rose-200 rounded-lg text-xs font-bold text-rose-700 placeholder-rose-300" />
               </div>
               <div>
-                <label className="block text-[11px] font-bold text-slate-500 tracking-wide mb-1">{t('vendorTourForms.tourForm.fields.cancellationHours.label')}</label>
+                <label className="flex items-end min-h-[30px] mb-1 text-[11px] font-bold text-slate-500 tracking-wide leading-tight">{t('vendorTourForms.tourForm.fields.cancellationHours.label')}</label>
                 <select value={tourCancellationHours} onChange={(e) => setTourCancellationHours(Number(e.target.value))} className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-800">
                   <option value={24}>{t('vendorTourForms.tourForm.fields.cancellationHours.option24')}</option>
                   <option value={48}>{t('vendorTourForms.tourForm.fields.cancellationHours.option48')}</option>
@@ -867,12 +921,74 @@ const handleMediaFilesChange = async (e: React.ChangeEvent<HTMLInputElement>) =>
                 </select>
               </div>
               <div>
-                <label className="block text-[11px] font-bold text-amber-600 tracking-wide mb-1">{t('vendorTourForms.tourForm.fields.rating.label')}</label>
+                <label className="flex items-end min-h-[30px] mb-1 text-[11px] font-bold text-amber-600 tracking-wide leading-tight">{t('vendorTourForms.tourForm.fields.rating.label')}</label>
                 <input type="number" min="1" max="5" step="0.1" placeholder={t('vendorTourForms.tourForm.fields.rating.placeholder')} value={tourRating} onChange={handleNumberInput(setTourRating)} className="w-full px-3 py-2 bg-white border border-amber-200 rounded-lg text-xs font-bold text-amber-800 placeholder-amber-300" />
                 <p className="text-[9px] text-slate-400 mt-1">{t('vendorTourForms.tourForm.fields.rating.hint')}</p>
               </div>
             </div>
             <MultiDateCalendar selectedDates={selectedDates} onChange={setSelectedDates} />
+            {selectedDates.length > 0 && (
+              <div className="space-y-1.5">
+                <label className="block text-[11px] font-bold text-slate-500 tracking-wide">{t('vendorTourForms.tourForm.fields.perDateCapacity.label')}</label>
+                <p className="text-[9px] text-slate-400 -mt-0.5">{t('vendorTourForms.tourForm.fields.perDateCapacity.hint')}</p>
+                <div className="space-y-1.5">
+                  {[...selectedDates].sort((a, b) => a.getTime() - b.getTime()).map((date) => {
+                    const iso = toIsoDate(date);
+                    const existing = existingSlotByDate.get(iso);
+                    const totalValue = slotCapacities[iso] ?? tourCapacity;
+                    const remainingValue = slotRemaining[iso] ?? '';
+                    const totalNum = Number(totalValue) || 0;
+                    const remainingNum = remainingValue === '' ? totalNum : Number(remainingValue);
+                    const takenNum = Math.min(totalNum, Math.max(0, totalNum - remainingNum));
+                    const overbooked = remainingNum > totalNum;
+                    return (
+                      <div key={iso} className="flex flex-wrap items-center gap-x-3 gap-y-1 bg-white border border-slate-200 rounded-lg px-3 py-2">
+                        <span className="text-[11px] font-bold text-slate-600 flex-shrink-0 w-24">📅 {iso}</span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] font-semibold text-slate-500">{t('vendorTourForms.tourForm.fields.perDateCapacity.totalLabel')}</span>
+                          <input
+                            type="number"
+                            min="1"
+                            max="500"
+                            value={totalValue}
+                            onChange={(e) => {
+                              const raw = e.target.value;
+                              setSlotCapacities((prev) => ({ ...prev, [iso]: raw === '' ? '' : Number(raw) }));
+                            }}
+                            className="w-16 px-2 py-1 border border-slate-200 rounded text-xs font-bold text-slate-800"
+                          />
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] font-semibold text-slate-500">{t('vendorTourForms.tourForm.fields.perDateCapacity.remainingLabel')}</span>
+                          <input
+                            type="number"
+                            min="0"
+                            max={totalNum || undefined}
+                            value={remainingValue}
+                            placeholder={String(totalNum)}
+                            onChange={(e) => {
+                              const raw = e.target.value;
+                              setSlotRemaining((prev) => ({ ...prev, [iso]: raw === '' ? '' : Number(raw) }));
+                            }}
+                            className={`w-16 px-2 py-1 border rounded text-xs font-bold ${overbooked ? 'border-red-400 text-red-600' : 'border-slate-200 text-slate-800'}`}
+                          />
+                        </div>
+                        {overbooked ? (
+                          <span className="text-[10px] font-semibold text-red-500">{t('vendorTourForms.tourForm.fields.perDateCapacity.overbooked')}</span>
+                        ) : (
+                          <span className="text-[10px] font-semibold text-slate-400">
+                            {t('vendorTourForms.tourForm.fields.perDateCapacity.taken', { taken: takenNum })}
+                          </span>
+                        )}
+                        {!existing && (
+                          <span className="text-[10px] font-semibold text-emerald-500">{t('vendorTourForms.tourForm.fields.perDateCapacity.newBadge')}</span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
             {tourCategory === 'active' && (
               <div>
                 <label className="block text-[11px] font-bold text-emerald-700 tracking-wide mb-1">{t('vendorTourForms.tourForm.fields.scheduleFrequency.label')}</label>

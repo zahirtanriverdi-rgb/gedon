@@ -21,8 +21,6 @@ export const app = {
         retry: 'Yenidən cəhd et',
       },
       footer: {
-        tagline: 'GedəkGörək — Azərbaycanda dağ yürüşləri, kamp və aktiv istirahət turları üçün onlayn marketplace.',
-        faqLink: 'Bələdçi & FAQ',
         supportLink: 'Texniki dəstək (WhatsApp)',
       },
       notifications: {
@@ -84,8 +82,6 @@ export const app = {
         retry: 'Retry',
       },
       footer: {
-        tagline: 'GedəkGörək — the online marketplace for hiking, camping and active-lifestyle tours in Azerbaijan.',
-        faqLink: 'Guide & FAQ',
         supportLink: 'Technical support (WhatsApp)',
       },
       notifications: {
@@ -147,8 +143,6 @@ export const app = {
         retry: 'Повторить попытку',
       },
       footer: {
-        tagline: 'GedəkGörək — онлайн-маркетплейс горных походов, кемпинга и активного отдыха в Азербайджане.',
-        faqLink: 'Гид и FAQ',
         supportLink: 'Техническая поддержка (WhatsApp)',
       },
       notifications: {

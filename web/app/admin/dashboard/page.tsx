@@ -10,13 +10,13 @@ import { useMarketplace } from '@/hooks/useMarketplace';
 
 export default function AdminDashboardRoute() {
   const router = useRouter();
-  const { user, token, logout } = useAuth();
+  const { user, token, ready, logout } = useAuth();
   const { showNotification } = useNotification();
   const mp = useMarketplace(token);
 
   useEffect(() => {
-    if (!user) router.replace('/admin/login');
-  }, [user, router]);
+    if (ready && !user) router.replace('/admin/login');
+  }, [ready, user, router]);
 
   if (!user) return null;
 
@@ -43,6 +43,7 @@ export default function AdminDashboardRoute() {
       onDeleteTour={mp.handleDeleteTour}
       onAddSlot={mp.handleAddSlot}
       onDeleteSlot={mp.handleDeleteSlot}
+      onUpdateSlot={mp.handleUpdateSlot}
       onShowNotification={showNotification}
       exchangeRates={mp.exchangeRates}
       onUpdateExchangeRates={mp.handleUpdateExchangeRates}

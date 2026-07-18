@@ -2,9 +2,9 @@
 // src/data/toursData.ts) into the already-seeded database rows for these tours, without
 // touching bookings/slots/reviews and without clobbering existing extra_data (translations).
 import dbClient from '../server/db';
-import { seedTours } from '../src/data/toursData';
+import { seedTours } from '../shared/data/toursData';
 import { translateTourContent } from '../server/translate';
-import type { Tour } from '../src/types';
+import type { Tour } from '../shared/types';
 
 const TOUR_IDS = [
   'tour-mucu-lahic',

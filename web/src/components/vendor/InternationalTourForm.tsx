@@ -9,6 +9,7 @@ import { TourDangerZone } from './TourDangerZone';
 import { WhatsAppVerifyField } from '../shared/WhatsAppVerifyField';
 import { handleNumberInput, useStepWizard } from './useTourFormWizard';
 import { useLanguage } from '../../i18n/LanguageContext';
+import { uploadSingleImage } from '../../utils/uploadMedia';
 
 interface InternationalTourFormProps {
   currentUser: User;
@@ -571,12 +572,15 @@ export function InternationalTourForm({ currentUser, tour, slots, onAddTour, onE
                           id={`intl-itinerary-file-${index}`}
                           accept="image/*"
                           className="hidden"
-                          onChange={(e) => {
+                          onChange={async (e) => {
                             const file = e.target.files?.[0];
                             if (file) {
-                              const reader = new FileReader();
-                              reader.onloadend = () => handleIntlItineraryChange(index, 'image', reader.result as string);
-                              reader.readAsDataURL(file);
+                              try {
+                                const url = await uploadSingleImage(file);
+                                handleIntlItineraryChange(index, 'image', url);
+                              } catch (err: any) {
+                                if (onShowNotification) onShowNotification(err?.message || 'Şəkil yüklənmədi.', 'error');
+                              }
                             }
                           }}
                         />
@@ -655,14 +659,18 @@ export function InternationalTourForm({ currentUser, tour, slots, onAddTour, onE
                 <div
                   onDragOver={(e) => { e.preventDefault(); setIntlDragActive(true); }}
                   onDragLeave={() => setIntlDragActive(false)}
-                  onDrop={(e) => {
+                  onDrop={async (e) => {
                     e.preventDefault();
                     setIntlDragActive(false);
                     const file = e.dataTransfer.files?.[0];
                     if (file) {
-                      const reader = new FileReader();
-                      reader.onloadend = () => { setIntlTourImage(reader.result as string); clearFieldError('image'); };
-                      reader.readAsDataURL(file);
+                      try {
+                        const url = await uploadSingleImage(file);
+                        setIntlTourImage(url);
+                        clearFieldError('image');
+                      } catch (err: any) {
+                        if (onShowNotification) onShowNotification(err?.message || 'Şəkil yüklənmədi.', 'error');
+                      }
                     }
                   }}
                   onClick={() => document.getElementById('intl-file-uploader-input')?.click()}
@@ -673,12 +681,16 @@ export function InternationalTourForm({ currentUser, tour, slots, onAddTour, onE
                     id="intl-file-uploader-input"
                     accept="image/*"
                     className="hidden"
-                    onChange={(e) => {
+                    onChange={async (e) => {
                       const file = e.target.files?.[0];
                       if (file) {
-                        const reader = new FileReader();
-                        reader.onloadend = () => { setIntlTourImage(reader.result as string); clearFieldError('image'); };
-                        reader.readAsDataURL(file);
+                        try {
+                          const url = await uploadSingleImage(file);
+                          setIntlTourImage(url);
+                          clearFieldError('image');
+                        } catch (err: any) {
+                          if (onShowNotification) onShowNotification(err?.message || 'Şəkil yüklənmədi.', 'error');
+                        }
                       }
                     }}
                   />

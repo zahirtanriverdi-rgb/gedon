@@ -1,25 +1,25 @@
-import { getTours } from '@/lib/api';
-import { TourGrid } from '@/components/site/TourGrid';
+import type { Metadata } from 'next';
+import { getTours, getSlots, getReviews } from '@/lib/api';
+import { seedUsers } from '@/data/toursData';
+import { HomeClient } from './HomeClient';
 
 // Home is SSR'd on every request so the tour list (and its crawlable links) is in the initial
-// HTML. Interactive filtering/search is a client enhancement layered on top later.
+// HTML. The full interactive experience (search, filters, calendar, quick-book modal) is the
+// HomeClient state layer on top of that same data — the complete port of the old
+// CustomerPortal home view.
 export const dynamic = 'force-dynamic';
 
-export default async function HomePage() {
-  const tours = await getTours();
-  const approved = tours.filter((t) => t.status === 'approved' && t.isActive !== false);
+// Ported from the old CustomerPortal's Helmet block (AZ default — the html lang is az).
+export const metadata: Metadata = {
+  title: 'GedəkGörək Marketplace | Azərbaycanda Turlar və Aktiv İstirahət',
+  description:
+    'Azərbaycanın ən yaxşı hiking, kamp, zirvə və xarici turlarını kəşf edin — GedəkGörək ilə asanlıqla rezerv edin.',
+};
 
-  return (
-    <div className="mx-auto max-w-[var(--global-max-width)] px-4 py-8 sm:px-6">
-      <section className="mb-8">
-        <h1 className="text-3xl font-black text-[var(--color-text-main)] sm:text-4xl">
-          Xəyalınızdakı Turları Kəşf Edin
-        </h1>
-        <p className="mt-2 text-[var(--color-text-muted)]">
-          Azərbaycan boyu turlar, kamp yerləri və təbiət səyahətləri.
-        </p>
-      </section>
-      <TourGrid tours={approved} />
-    </div>
-  );
+export default async function HomePage() {
+  const [tours, slots, reviews] = await Promise.all([getTours(), getSlots(), getReviews()]);
+
+  // Same public users source the tour-detail page uses (organizer cards in the quick-book
+  // modal); the real vendor list is admin-only.
+  return <HomeClient tours={tours} slots={slots} reviews={reviews} users={seedUsers} bookings={[]} />;
 }

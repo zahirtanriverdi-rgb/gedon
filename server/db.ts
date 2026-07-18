@@ -3,9 +3,9 @@ import path from 'path';
 import fs from 'fs';
 import { DatabaseSync } from 'node:sqlite';
 import bcrypt from 'bcryptjs';
-import { seedUsers, seedTours, seedTourSlots } from '../src/data/toursData';
+import { seedUsers, seedTours, seedTourSlots } from '../shared/data/toursData';
 import { seedPasswords, SEED_FALLBACK_PASSWORD } from './seedCredentials';
-import type { Tour } from '../src/types';
+import type { Tour } from '../shared/types';
 import { generateUniqueSlug } from './slugify';
 
 // This abstracts the database layer, allowing seamless transition from Local SQLite to Production PostgreSQL.

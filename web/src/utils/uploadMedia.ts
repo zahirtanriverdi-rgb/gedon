@@ -3,12 +3,12 @@
 // (server onları S3-uyğun storage-a və ya dev-də public/uploads/ diskinə yazır)
 // və formda yalnız qaytarılan URL saxlanılır.
 
-const getBaseUrl = () => {
-  return import.meta.env.VITE_API_BASE_URL ||
-         (import.meta.env.DEV ? 'http://localhost:3000' : 'https://gedekgorek.onrender.com');
-};
+// Brauzer API ilə nisbi /api/* URL-ləri üzərindən danışır — Next-in rewrite-i
+// (next.config.ts) onları Express origin-inə ötürür. Cross-origin yükləmə üçün
+// NEXT_PUBLIC_API_BASE_URL ilə açıq base verilə bilər.
+const getBaseUrl = () => process.env.NEXT_PUBLIC_API_BASE_URL || '';
 
-// /api/upload authenticateUser tələb edir. Token App.tsx-in persist etdiyi sessiya
+// /api/upload authenticateUser tələb edir. Token AuthProvider-in persist etdiyi sessiya
 // açarlarından oxunur (VENDOR_SESSION_KEY / ADMIN_SESSION_KEY ilə eyni format) —
 // upload edən komponentlərin heç biri tokeni prop kimi almır, ona görə buradan oxuyuruq.
 function getOperatorToken(): string | null {

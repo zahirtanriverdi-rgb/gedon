@@ -101,6 +101,18 @@ export function TourDetailPage({
   const [showTourSlots, setShowTourSlots] = useState<boolean>(false);
   const isFeaturedThisMonth = React.useMemo(() => computeFeaturedTourIds(tours, slots).has(selectedTour.id), [tours, slots, selectedTour.id]);
 
+  // "You might also like" picks: deterministic order for SSR + first client render (a
+  // Math.random() sort during render desyncs hydration), then shuffled after mount so the
+  // suggestions still vary per visit like they did in the old SPA.
+  const relatedToursBase = React.useMemo(
+    () => tours.filter(t => t.id !== selectedTour.id),
+    [tours, selectedTour.id]
+  );
+  const [relatedTours, setRelatedTours] = useState(() => relatedToursBase.slice(0, 4));
+  React.useEffect(() => {
+    setRelatedTours([...relatedToursBase].sort(() => 0.5 - Math.random()).slice(0, 4));
+  }, [relatedToursBase]);
+
   // Tours created before the per-tour WhatsApp field existed (or where a vendor left it blank)
   // fall back to the organizing vendor's own profile phone, never a hardcoded stranger's number.
   const vendorFallbackPhone = React.useMemo(
@@ -1987,10 +1999,7 @@ export function TourDetailPage({
           <div className="mt-16 pt-16 border-t border-slate-200">
             <h2 className="text-2xl font-extrabold text-label-primary mb-8">{t('tourDetailPage.relatedTours.title')}</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 w-full">
-                {tours
-                  .filter(t => t.id !== selectedTour.id)
-                  .sort(() => 0.5 - Math.random()) // Randomize for varied suggestions
-                  .slice(0, 4)
+                {relatedTours
                   .map(tour => {
                     const priceList = slots.filter(s => s.tourId === tour.id).map(s => s.price);
                     const minPrice = priceList.length > 0 ? Math.min(...priceList) : null;

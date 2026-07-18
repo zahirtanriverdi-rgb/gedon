@@ -1,4 +1,4 @@
-import { extractCoordsFromGoogleMapsUrl, asValidCoords, type LatLon } from "../src/utils/googleMapsLink";
+import { extractCoordsFromGoogleMapsUrl, asValidCoords, type LatLon } from "../shared/utils/googleMapsLink";
 
 // Resolves a Google Maps link to coordinates for the camp-site forms. Full links are parsed
 // directly (no network); only genuine Google short links (maps.app.goo.gl etc.) are fetched

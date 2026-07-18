@@ -2,7 +2,7 @@
 // translations from src/data/tourTranslations.ts, replacing the unreliable LibreTranslate
 // output that migrate-tours.ts originally populated.
 import dbClient from '../server/db';
-import { seedTours } from '../src/data/toursData';
+import { seedTours } from '../shared/data/toursData';
 
 async function main() {
   let updated = 0;

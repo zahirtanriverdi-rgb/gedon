@@ -4,9 +4,9 @@
 // so the new tours are immediately readable in all three languages instead of waiting on the
 // fire-and-forget background job.
 import dbClient from '../server/db';
-import { seedTours, seedTourSlots } from '../src/data/toursData';
+import { seedTours, seedTourSlots } from '../shared/data/toursData';
 import { translateTourContent } from '../server/translate';
-import type { Tour } from '../src/types';
+import type { Tour } from '../shared/types';
 
 async function main() {
   const categoriesToReplace = ['peak', 'camp', 'hiking'];
