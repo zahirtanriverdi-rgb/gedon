@@ -8,6 +8,7 @@ import { getWishlist, WISHLIST_CHANGED_EVENT } from '@/utils/wishlist';
 import { getCompareList, COMPARE_CHANGED_EVENT } from '@/utils/compare';
 import { useLanguage } from '@/i18n/LanguageContext';
 import { useCurrency } from '@/lib/currency';
+import { useSiteFeatureFlags } from './useSiteFeatureFlags';
 
 // Local nav strings — same inline dictionary the old CustomerPortal's bottom nav carried.
 const NAV_STRINGS = {
@@ -58,23 +59,8 @@ export function MobileBottomNav() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [menuOpen]);
 
-  // Admin-controlled feature flags (settings table) — same defaults as the old CustomerPortal:
-  // camp sites hidden until the config loads (never flashes on installs where it's off), the
-  // calculator visible until told otherwise (never flashes away in the common case).
-  const [campSitesEnabled, setCampSitesEnabled] = useState<boolean>(false);
-  React.useEffect(() => {
-    fetch('/api/camp-sites/config')
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => setCampSitesEnabled(!!data && data.enabled !== false))
-      .catch(() => setCampSitesEnabled(true));
-  }, []);
-  const [groupCalculatorEnabled, setGroupCalculatorEnabled] = useState<boolean>(true);
-  React.useEffect(() => {
-    fetch('/api/group-calculator/config')
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => setGroupCalculatorEnabled(!!data && data.enabled !== false))
-      .catch(() => setGroupCalculatorEnabled(true));
-  }, []);
+  // Admin-controlled feature flags (settings table) — shared with the desktop SiteHeader.
+  const { campSitesEnabled, groupCalculatorEnabled } = useSiteFeatureFlags();
 
   const go = (href: string) => {
     setMenuOpen(false);

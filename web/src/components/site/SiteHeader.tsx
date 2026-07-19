@@ -11,6 +11,7 @@ import { UrgentDealsBell } from '@/components/customer/UrgentDealsBell';
 import { SearchDropdown } from '@/components/SearchDropdown';
 import { getRecentSearches, addRecentSearch } from '@/utils/recentSearches';
 import { useGlobalSearch } from './GlobalSearchContext';
+import { useSiteFeatureFlags } from './useSiteFeatureFlags';
 
 /**
  * Site chrome header. Replaces the old App.tsx renderChrome header. Kept intentionally small and
@@ -33,11 +34,14 @@ export function SiteHeader({ tours }: { tours: Tour[] }) {
   const router = useRouter();
   const pathname = usePathname();
   const labels = NAV_LABELS[language] || NAV_LABELS.az;
+  // Camp sites / group calculator are admin-toggled features — their nav icons must disappear
+  // when the admin turns them off (the mobile bottom nav already does this via the same flags).
+  const { campSitesEnabled, groupCalculatorEnabled } = useSiteFeatureFlags();
   const nav = [
     { href: '/wishlist', label: labels.wishlist, Icon: Heart },
     { href: '/compare', label: labels.compare, Icon: Scale },
-    { href: '/camp-sites', label: labels.camp, Icon: Tent },
-    { href: '/calculator', label: labels.calc, Icon: Calculator },
+    ...(campSitesEnabled ? [{ href: '/camp-sites', label: labels.camp, Icon: Tent }] : []),
+    ...(groupCalculatorEnabled ? [{ href: '/calculator', label: labels.calc, Icon: Calculator }] : []),
   ];
 
   // Inline search bar state — desktop (sm+) only, revealed once scrolled past the home page's
