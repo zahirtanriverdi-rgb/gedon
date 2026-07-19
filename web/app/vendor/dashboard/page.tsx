@@ -48,6 +48,7 @@ export default function VendorDashboardRoute() {
       onEditBooking={mp.handleEditBooking}
       onDeleteBooking={mp.handleDeleteBooking}
       onAddBooking={mp.handleAddBooking}
+      onReloadBookings={mp.reloadBookings}
       onUpdateSlotBookedCount={mp.handleUpdateSlotBookedCount}
       exchangeRates={mp.exchangeRates}
       onUpdateExchangeRates={mp.handleUpdateExchangeRates}

@@ -60,6 +60,7 @@ export interface UseMarketplaceResult {
   isLoading: boolean;
   error: string | null;
   reload: () => Promise<void>;
+  reloadBookings: () => Promise<void>;
   // handlers
   handleAddSlot: (newSlot: TourSlot) => Promise<void>;
   handleDeleteSlot: (slotId: string) => Promise<void>;
@@ -141,6 +142,27 @@ export function useMarketplace(authToken: string | null): UseMarketplaceResult {
   useEffect(() => {
     reload();
   }, [reload]);
+
+  // Yalnız sifarişləri yenidən çəkir — müştəri rezervasiya sorğusu göndərəndə server avtomatik
+  // "gözləmədə" sifariş yaradır, ona görə CRM "bütün sifarişlər" cədvəli 60 saniyədən bir
+  // yenilənir ki, yeni rezervasiyalar operator əl ilə yeniləmədən gorünsün.
+  const reloadBookings = useCallback(async () => {
+    if (!authToken) return;
+    try {
+      const res = await fetch('/api/bookings', { headers: { Authorization: `Bearer ${authToken}` } });
+      if (!res.ok) return;
+      const data = await res.json();
+      setBookings(data.bookings || []);
+    } catch {
+      /* şəbəkə xətası — mövcud siyahı qalır, növbəti dövrə düzəldəcək */
+    }
+  }, [authToken]);
+
+  useEffect(() => {
+    if (!authToken) return;
+    const timer = setInterval(reloadBookings, 60_000);
+    return () => clearInterval(timer);
+  }, [authToken, reloadBookings]);
 
   // Live CBAR exchange rates (best-effort).
   useEffect(() => {
@@ -525,6 +547,7 @@ export function useMarketplace(authToken: string | null): UseMarketplaceResult {
     isLoading,
     error,
     reload,
+    reloadBookings,
     handleAddSlot,
     handleDeleteSlot,
     handleUpdateSlot,

@@ -2235,6 +2235,39 @@ app.post("/api/inquiries", async (req, res) => {
       [`ntf-${randomUUID()}`, tour.vendor_id, notifTitle, notifBody, notifData]
     );
 
+    // Rezervasiya sorğusu avtomatik olaraq CRM "bütün sifarişlər" cədvəlinə "gözləmədə" sifariş
+    // kimi düşür — vendor artıq ayrı panelə baxmadan onu adi sifariş kimi idarə edir (təsdiq/ödəniş/
+    // ləğv, bilet, PDF). Sorğu cavabları extra_data-da saxlanır və operator qeydinə xülasə düşür.
+    // Sifariş yalnız etibarlı tarix (slot) olduqda yaradılır; slot NOT NULL olduğu üçün şərtdir.
+    try {
+      if (slotId) {
+        const slotRows = await dbClient.query('SELECT id, price FROM tour_slots WHERE id = ? AND tour_id = ?', [slotId, tour.id]);
+        if (slotRows.length) {
+          const price = Number(slotRows[0].price) || 0;
+          const bookingId = `book-${randomUUID()}`;
+          const bookingRef = `#TUR-${Math.floor(1000 + Math.random() * 9000)}`;
+          const noteSummary = answers.map(a => a.answer).filter(Boolean).join(' • ');
+          const extra = {
+            paymentStatus: 'Ödənilməyib',
+            attendanceStatus: 'Gözləmədə',
+            smsNotificationSent: false,
+            source: 'inquiry',
+            inquiryId: id,
+            operatorNote: noteSummary,
+            answers,
+          };
+          await dbClient.execute(
+            `INSERT INTO bookings (id, tour_id, slot_id, vendor_id, customer_id, customer_name, customer_phone, booking_reference, participants_count, total_amount, status, payment_method, extra_data)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 'Sorğu', ?)`,
+            [bookingId, tour.id, slotId, tour.vendor_id, null, name, phone, bookingRef, count, price * count, JSON.stringify(extra)]
+          );
+          await dbClient.execute('UPDATE tour_slots SET booked_count = booked_count + ? WHERE id = ?', [count, slotId]);
+        }
+      }
+    } catch (err) {
+      console.error("[POST /api/inquiries] avtomatik sifariş yaradıla bilmədi:", err);
+    }
+
     // Cavabı gecikdirməmək üçün Telegram göndərişi arxa planda gedir
     res.status(201).json({ inquiry: rowToInquiry((await dbClient.query('SELECT * FROM inquiries WHERE id = ?', [id]))[0]) });
 

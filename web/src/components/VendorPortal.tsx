@@ -15,7 +15,7 @@ import { BusTrackingTab } from './vendor/BusTrackingTab';
 import DashboardSidebarLayout, { DashboardNavItem } from './layout/DashboardSidebarLayout';
 import StatCard from './layout/StatCard';
 import LanguageSwitcher from './LanguageSwitcher';
-import { InquiriesPanel, WaTemplatesEditor, NotificationsBell } from './shared/InquiriesPanel';
+import { WaTemplatesEditor, NotificationsBell } from './shared/InquiriesPanel';
 import {
   Users,
   DollarSign,
@@ -60,6 +60,7 @@ interface VendorPortalProps {
   onEditBooking?: (updatedBooking: Booking) => Promise<void>;
   onDeleteBooking?: (bookingId: string) => Promise<void>;
   onAddBooking?: (newBooking: Booking) => Promise<void>;
+  onReloadBookings?: () => Promise<void>;
   onUpdateSlotBookedCount?: (slotId: string, qty: number) => void;
   exchangeRates: { USD: number; EUR: number };
   onUpdateExchangeRates: (newRates: { USD: number; EUR: number }) => void;
@@ -85,6 +86,7 @@ export default function VendorPortal({
   onEditBooking,
   onDeleteBooking,
   onAddBooking,
+  onReloadBookings,
   onUpdateSlotBookedCount,
   exchangeRates,
   onUpdateExchangeRates,
@@ -229,7 +231,7 @@ export default function VendorPortal({
       rightSlot={
         <>
           {/* Social-media stilli bildirişlər — klik olunan bildiriş avtomatik oxunur və CRM-ə aparır */}
-          <NotificationsBell token={operatorToken} onOpenItem={() => setActiveSubTab('crm')} />
+          <NotificationsBell token={operatorToken} onOpenItem={() => { setActiveSubTab('crm'); if (onReloadBookings) onReloadBookings(); }} />
           <LanguageSwitcher />
           <button
             onClick={onLogout}
@@ -307,14 +309,21 @@ export default function VendorPortal({
         />
       )}
 
-      {/* Subtab Content: CRM & Tour Manifest — sorğular (leads) avtomatik bura düşür */}
+      {/* Subtab Content: CRM & Tour Manifest — rezervasiya sorğuları avtomatik "bütün sifarişlər" cədvəlinə düşür */}
       {activeSubTab === 'crm' && (
         <div className="space-y-5">
-          {/* Rezervasiya sorğuları (leads) — bildirişə klik bura gətirir */}
-          <InquiriesPanel
-            token={operatorToken}
-            waTemplates={currentUser.waTemplates || []}
+          {/* Bütün sifarişlər — müştəri rezervasiya sorğuları avtomatik burada "gözləmədə" kimi görünür */}
+          <CrmTab
+            tours={tours}
+            slots={slots}
+            bookings={bookings}
+            currentUser={currentUser}
+            operatorToken={operatorToken}
+            onEditBooking={onEditBooking}
+            onDeleteBooking={onDeleteBooking}
+            onAddBooking={onAddBooking}
             onShowNotification={onShowNotification}
+            triggerTicketGeneration={triggerTicketGeneration}
           />
 
           {/* Hazır WhatsApp cavab şablonları — Telegram düymələri bunlardan istifadə edir */}
@@ -345,19 +354,6 @@ export default function VendorPortal({
                 : t('inquiriesPanel.telegram.vendorNoChats')}
             </p>
           </div>
-
-          <CrmTab
-            tours={tours}
-            slots={slots}
-            bookings={bookings}
-            currentUser={currentUser}
-            operatorToken={operatorToken}
-            onEditBooking={onEditBooking}
-            onDeleteBooking={onDeleteBooking}
-            onAddBooking={onAddBooking}
-            onShowNotification={onShowNotification}
-            triggerTicketGeneration={triggerTicketGeneration}
-          />
         </div>
       )}
 
