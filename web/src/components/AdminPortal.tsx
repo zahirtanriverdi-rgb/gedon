@@ -7,9 +7,9 @@ import { useLanguage } from '../i18n/LanguageContext';
 import DashboardSidebarLayout, { DashboardNavItem } from './layout/DashboardSidebarLayout';
 import AdminCampSites from './admin/AdminCampSites';
 import AdminVendorCalculator from './admin/AdminVendorCalculator';
-import AdminInquiriesTab from './admin/AdminInquiriesTab';
-import AdminVendorTelegram from './admin/AdminVendorTelegram';
-import { useNotificationsBadge } from './shared/InquiriesPanel';
+import AdminTelegramSettings from './admin/AdminTelegramSettings';
+import AdminVendorEditModal from './admin/AdminVendorEditModal';
+import { NotificationsBell } from './shared/InquiriesPanel';
 import StatCard from './layout/StatCard';
 import LanguageSwitcher from './LanguageSwitcher';
 import EmailVerificationCard from './EmailVerificationCard';
@@ -37,8 +37,7 @@ import {
   Settings,
   Tent,
   Power,
-  Mail,
-  Bell
+  Mail
 } from 'lucide-react';
 
 function isTourInternational(t: Tour): boolean {
@@ -151,7 +150,7 @@ export default function AdminPortal({
   onLogout
 }: AdminPortalProps) {
   const { t } = useLanguage();
-  const [activeSection, setActiveSection] = useState<'dashboard' | 'tours' | 'vendors' | 'campSites' | 'settings' | 'inquiries'>('dashboard');
+  const [activeSection, setActiveSection] = useState<'dashboard' | 'tours' | 'vendors' | 'campSites' | 'settings'>('dashboard');
 
   // Price calculator cost elements (destinations + rates) — editable draft, synced from
   // platformConfig whenever it changes elsewhere, saved explicitly via the button below.
@@ -493,27 +492,10 @@ export default function AdminPortal({
   const totalVendors = users.filter(u => u.role === 'vendor' && !u.isArchived).length;
   const totalCustomers = users.filter(u => u.role === 'customer').length;
 
-  // Password management states
-  const [editingVendorAuth, setEditingVendorAuth] = useState<string | null>(null);
-  const [vendorUsername, setVendorUsername] = useState<string>('');
-  const [vendorPassword, setVendorPassword] = useState<string>('');
-
-  const handleUpdateVendorAuth = (vendorId: string) => {
-    if (onUpdateUser) {
-      if (!vendorUsername) {
-        if (onShowNotification) onShowNotification(t('adminPortal.loginCredentials.emptyFieldsError'), 'error');
-        return;
-      }
-      // Password is optional here — an admin renaming just the login shouldn't have to also
-      // set a new password. Only send it (and thus only overwrite the real hash) when the
-      // admin actually typed one.
-      const payload: { username: string; password?: string } = { username: vendorUsername };
-      if (vendorPassword) payload.password = vendorPassword;
-      onUpdateUser(vendorId, payload);
-      setEditingVendorAuth(null);
-      if (onShowNotification) onShowNotification(t('adminPortal.loginCredentials.updateSuccess'), 'success');
-    }
-  };
+  // Vendor "Düzəliş et" modalı — login/parol, abunəlik və Telegram chat ID-ləri bir yerdə.
+  // Modal `users`-dəki canlı obyekti göstərir ki, onUpdateUser-dan sonra dərhal yenilənsin.
+  const [editingVendorId, setEditingVendorId] = useState<string | null>(null);
+  const editingVendor = editingVendorId ? users.find(u => u.id === editingVendorId) || null : null;
 
   // New vendor/operator account creation
   const [newVendorCompanyName, setNewVendorCompanyName] = useState<string>('');
@@ -579,12 +561,8 @@ export default function AdminPortal({
     }
   };
 
-  // Sorğu bildirişləri — sidebar-dakı "Bildirişlər" tabının oxunmamış sayğacı
-  const { unreadCount, markAllRead } = useNotificationsBadge(authToken);
-
   const navItems: DashboardNavItem[] = [
     { id: 'dashboard', label: t('adminPortal.sidebar.dashboard'), icon: LayoutDashboard },
-    { id: 'inquiries', label: t('inquiriesPanel.tabLabel'), icon: Bell, badgeCount: unreadCount },
     { id: 'tours', label: t('adminPortal.sidebar.tours'), icon: Compass },
     { id: 'vendors', label: t('adminPortal.sidebar.vendors'), icon: Building2 },
     { id: 'campSites', label: t('adminPortal.sidebar.campSites'), icon: Tent },
@@ -598,13 +576,13 @@ export default function AdminPortal({
       subtitle={t('adminPortal.sidebar.subtitle')}
       navItems={navItems}
       activeId={activeSection}
-      onSelect={(id) => {
-        setActiveSection(id as typeof activeSection);
-        if (id === 'inquiries') markAllRead();
-      }}
+      onSelect={(id) => setActiveSection(id as typeof activeSection)}
       title={activeNavItem?.label ?? ''}
       rightSlot={
         <>
+          {/* Vendor hadisələri (yeni tur / düzəliş) — klik olunan bildiriş avtomatik oxunur
+              və Turlar (təsdiq növbəsi) bölməsinə aparır */}
+          <NotificationsBell token={authToken} onOpenItem={() => setActiveSection('tours')} />
           <LanguageSwitcher />
           <button
             onClick={onLogout}
@@ -615,11 +593,6 @@ export default function AdminPortal({
         </>
       }
     >
-      {/* Bildirişlər — bütün rezervasiya sorğuları + admin Telegram parametrləri */}
-      {activeSection === 'inquiries' && (
-        <AdminInquiriesTab authToken={authToken} onShowNotification={onShowNotification} />
-      )}
-
       {activeSection === 'dashboard' && (
       <>
       {/* Metrics board */}
@@ -686,6 +659,9 @@ export default function AdminPortal({
 
       {activeSection === 'settings' && (
         <div className="space-y-6">
+
+          {/* Section: Telegram — adminin öz chat ID-ləri (vendor tur hadisələri bura gedir) */}
+          <AdminTelegramSettings authToken={authToken} onShowNotification={onShowNotification} />
 
           {/* Section: Price Calculator Cost Elements */}
           <div className="bg-white p-5 rounded-xl border border-slate-200 space-y-4 shadow-xs">
@@ -1197,55 +1173,15 @@ export default function AdminPortal({
                         )}
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="date"
-                        className="p-1.5 border border-slate-300 rounded text-xs bg-white"
-                        value={subDate ? subDate.toISOString().split('T')[0] : ''}
-                        onChange={(e) => {
-                          if (onUpdateUser) {
-                            onUpdateUser(vendor.id, { subscriptionValidUntil: e.target.value ? new Date(e.target.value).toISOString() : undefined });
-                          }
-                        }}
-                      />
-                      <button
-                        onClick={() => {
-                          if (onUpdateUser) {
-                            const newDate = new Date();
-                            newDate.setMonth(newDate.getMonth() + 1);
-                            onUpdateUser(vendor.id, { subscriptionValidUntil: newDate.toISOString() });
-                            if (onShowNotification) {
-                              onShowNotification(t('adminPortal.subscriptions.extendSuccess', { name: vendor.name }), 'success');
-                            }
-                          }
-                        }}
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold min-h-[44px] px-3 flex items-center justify-center rounded text-xs transition"
-                      >
-                        {t('adminPortal.subscriptions.extendOneMonth')}
-                      </button>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {/* Vendor üzrə bütün düzəlişlər (login/parol, abunəlik, Telegram chat ID-ləri)
+                          bir modalda — bax AdminVendorEditModal */}
                       <button
                         type="button"
-                        onClick={() => {
-                          if (onUpdateUser) {
-                            const next = !vendor.isManuallyDeactivated;
-                            onUpdateUser(vendor.id, { isManuallyDeactivated: next });
-                            if (onShowNotification) {
-                              onShowNotification(
-                                next
-                                  ? t('adminPortal.subscriptions.deactivateSuccess', { name: vendor.name })
-                                  : t('adminPortal.subscriptions.reactivateSuccess', { name: vendor.name }),
-                                'success'
-                              );
-                            }
-                          }
-                        }}
-                        className={`font-bold min-h-[44px] px-3 flex items-center justify-center rounded text-xs transition border ${
-                          vendor.isManuallyDeactivated
-                            ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border-emerald-200'
-                            : 'bg-amber-50 hover:bg-amber-100 text-amber-700 border-amber-200'
-                        }`}
+                        onClick={() => setEditingVendorId(vendor.id)}
+                        className="bg-slate-900 hover:bg-slate-800 text-white font-bold min-h-[44px] px-4 flex items-center justify-center gap-1.5 rounded text-xs transition cursor-pointer"
                       >
-                        {vendor.isManuallyDeactivated ? t('adminPortal.subscriptions.activate') : t('adminPortal.subscriptions.deactivate')}
+                        <Edit className="w-3.5 h-3.5" /> {t('inquiriesPanel.vendorEdit.editButton')}
                       </button>
                       {onDeleteVendor && (
                         <button
@@ -1262,13 +1198,6 @@ export default function AdminPortal({
               })}
             </div>
           </div>
-
-          {/* Section: Vendor Telegram chat ID-ləri — sorğu bildirişlərinin ünvanları */}
-          <AdminVendorTelegram
-            vendors={users}
-            onUpdateUser={onUpdateUser}
-            onShowNotification={onShowNotification}
-          />
 
           {/* Section: Guide Calculator & Bus Tracking — per-vendor toggles + rate config */}
           <AdminVendorCalculator
@@ -1332,76 +1261,6 @@ export default function AdminPortal({
                 </div>
               </div>
             </form>
-          </div>
-
-          {/* Section: Operator Login Credentials Management */}
-          <div className="bg-white p-5 rounded-xl border border-slate-200 space-y-4 shadow-xs">
-            <h3 className="text-xs font-bold text-slate-400 tracking-widest flex items-center gap-1.5">
-               <ShieldAlert className="w-4 h-4 text-emerald-700" />
-               {t('adminPortal.loginCredentials.title')}
-            </h3>
-            <p className="text-[10px] text-slate-500 mb-2">
-               {t('adminPortal.loginCredentials.description')}
-            </p>
-            <div className="space-y-3">
-              {users.filter(u => u.role === 'vendor' && !u.isArchived).map(vendor => (
-                <div key={`auth-${vendor.id}`} className="flex flex-col gap-2 p-3 bg-slate-50 border border-slate-200 rounded-lg text-xs">
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <strong className="text-slate-900 block">{vendor.name} </strong>
-                      <span className="text-[10px] text-slate-500">{vendor.companyName} | {t('adminPortal.loginCredentials.currentLogin')}: <span className="font-mono text-emerald-700 bg-emerald-50 px-1 rounded">{vendor.username || vendor.email}</span></span>
-                    </div>
-                    {editingVendorAuth !== vendor.id && (
-                      <button
-                        onClick={() => {
-                           setEditingVendorAuth(vendor.id);
-                           setVendorUsername(vendor.username || vendor.email);
-                           // Never pre-fill with vendor.password — that field is stale mock/seed
-                           // data, not the real (irreversibly-hashed) current password. Start
-                           // empty so the admin always types a genuine new password.
-                           setVendorPassword('');
-                        }}
-                        className="bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold min-h-[44px] px-3 flex items-center justify-center rounded text-xs transition"
-                      >
-                         {t('adminPortal.loginCredentials.changeLogin')}
-                      </button>
-                    )}
-                  </div>
-                  {editingVendorAuth === vendor.id && (
-                    <div className="mt-2 pt-2 border-t border-slate-200 flex flex-col md:flex-row gap-2">
-                       <input
-                         type="text"
-                         className="flex-1 p-1.5 border border-slate-300 rounded text-xs font-mono"
-                         placeholder={t('adminPortal.loginCredentials.usernamePlaceholder')}
-                         value={vendorUsername}
-                         onChange={(e) => setVendorUsername(e.target.value)}
-                       />
-                       <input
-                         type="text"
-                         className="flex-1 p-1.5 border border-slate-300 rounded text-xs font-mono"
-                         placeholder={t('adminPortal.loginCredentials.newPasswordPlaceholder')}
-                         value={vendorPassword}
-                         onChange={(e) => setVendorPassword(e.target.value)}
-                       />
-                       <div className="flex gap-2">
-                         <button
-                           onClick={() => handleUpdateVendorAuth(vendor.id)}
-                           className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold min-h-[44px] px-3 flex items-center justify-center rounded text-xs transition"
-                         >
-                           {t('adminPortal.common.confirm')}
-                         </button>
-                         <button
-                           onClick={() => setEditingVendorAuth(null)}
-                           className="bg-red-50 hover:bg-red-100 text-red-600 font-bold min-h-[44px] px-3 flex items-center justify-center rounded text-xs transition"
-                         >
-                           {t('adminPortal.common.cancel')}
-                         </button>
-                       </div>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
           </div>
 
         </div>
@@ -1798,6 +1657,14 @@ export default function AdminPortal({
           </div>
         </div>
       )}
+
+      {/* Vendor "Düzəliş et" modalı — login, abunəlik, Telegram chat ID-ləri bir yerdə */}
+      <AdminVendorEditModal
+        vendor={editingVendor}
+        onClose={() => setEditingVendorId(null)}
+        onUpdateUser={onUpdateUser}
+        onShowNotification={onShowNotification}
+      />
 
     </DashboardSidebarLayout>
   );

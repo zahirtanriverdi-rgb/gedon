@@ -15,7 +15,7 @@ import { BusTrackingTab } from './vendor/BusTrackingTab';
 import DashboardSidebarLayout, { DashboardNavItem } from './layout/DashboardSidebarLayout';
 import StatCard from './layout/StatCard';
 import LanguageSwitcher from './LanguageSwitcher';
-import { InquiriesPanel, WaTemplatesEditor, useNotificationsBadge } from './shared/InquiriesPanel';
+import { InquiriesPanel, WaTemplatesEditor, NotificationsBell } from './shared/InquiriesPanel';
 import {
   Users,
   DollarSign,
@@ -28,8 +28,7 @@ import {
   CalendarPlus,
   User as UserIcon,
   Calculator,
-  Truck,
-  Bell
+  Truck
 } from 'lucide-react';
 
 // Shown in place of a tour create/edit form once the vendor's subscription has expired
@@ -94,11 +93,7 @@ export default function VendorPortal({
   onLogout
 }: VendorPortalProps) {
   const { t } = useLanguage();
-  const [activeSubTab, setActiveSubTab] = useState<'my-tours' | 'add-tour' | 'add-intl-tour' | 'add-slot' | 'profile' | 'crm' | 'calculator' | 'buses' | 'inquiries'>('my-tours');
-
-  // Sorğu bildirişləri — sidebar-dakı "Bildirişlər" tabının oxunmamış sayğacı. Tab açılanda
-  // hamısı oxundu sayılır (siyahının özü sorğu statuslarını ayrıca idarə edir).
-  const { unreadCount, markAllRead } = useNotificationsBadge(operatorToken);
+  const [activeSubTab, setActiveSubTab] = useState<'my-tours' | 'add-tour' | 'add-intl-tour' | 'add-slot' | 'profile' | 'crm' | 'calculator' | 'buses'>('my-tours');
   const [tourSearchTerm, setTourSearchTerm] = useState('');
   const [selectedTicketBooking, setSelectedTicketBooking] = useState<Booking | null>(null);
 
@@ -198,7 +193,6 @@ export default function VendorPortal({
   // sharing the same activeSubTab value, so the active pill needs its own derived id.
   const navItems: DashboardNavItem[] = [
     { id: 'my-tours', label: t('vendorMisc.vendorPortal.tabMyTours'), icon: LayoutList },
-    { id: 'inquiries', label: t('inquiriesPanel.tabLabel'), icon: Bell, badgeCount: unreadCount },
     { id: 'crm', label: t('vendorMisc.vendorPortal.tabCrm'), icon: BarChart3 },
     { id: 'add-tour', label: t('vendorMisc.vendorPortal.tabAddTour'), icon: PlusCircle },
     { id: 'add-active-tour', label: t('vendorMisc.vendorPortal.tabAddActiveTour'), icon: Activity },
@@ -220,7 +214,6 @@ export default function VendorPortal({
       setNewTourCategory('active');
     } else {
       setActiveSubTab(id as typeof activeSubTab);
-      if (id === 'inquiries') markAllRead();
     }
   };
   const activeNavItem = navItems.find((item) => item.id === activeNavId);
@@ -235,6 +228,8 @@ export default function VendorPortal({
       title={activeNavItem?.label ?? ''}
       rightSlot={
         <>
+          {/* Social-media stilli bildirişlər — klik olunan bildiriş avtomatik oxunur və CRM-ə aparır */}
+          <NotificationsBell token={operatorToken} onOpenItem={() => setActiveSubTab('crm')} />
           <LanguageSwitcher />
           <button
             onClick={onLogout}
@@ -312,15 +307,17 @@ export default function VendorPortal({
         />
       )}
 
-      {/* Subtab Content: Bildirişlər — rezervasiya sorğuları + Hazır mesajlar + Telegram info */}
-      {activeSubTab === 'inquiries' && (
+      {/* Subtab Content: CRM & Tour Manifest — sorğular (leads) avtomatik bura düşür */}
+      {activeSubTab === 'crm' && (
         <div className="space-y-5">
+          {/* Rezervasiya sorğuları (leads) — bildirişə klik bura gətirir */}
           <InquiriesPanel
             token={operatorToken}
             waTemplates={currentUser.waTemplates || []}
             onShowNotification={onShowNotification}
           />
 
+          {/* Hazır WhatsApp cavab şablonları — Telegram düymələri bunlardan istifadə edir */}
           <WaTemplatesEditor
             templates={currentUser.waTemplates || []}
             onShowNotification={onShowNotification}
@@ -348,24 +345,20 @@ export default function VendorPortal({
                 : t('inquiriesPanel.telegram.vendorNoChats')}
             </p>
           </div>
-        </div>
-      )}
 
-      {/* Subtab Content: CRM & Tour Manifest */}
-      {/* CRM & Bookings Tab */}
-      {activeSubTab === 'crm' && (
-        <CrmTab
-          tours={tours}
-          slots={slots}
-          bookings={bookings}
-          currentUser={currentUser}
-          operatorToken={operatorToken}
-          onEditBooking={onEditBooking}
-          onDeleteBooking={onDeleteBooking}
-          onAddBooking={onAddBooking}
-          onShowNotification={onShowNotification}
-          triggerTicketGeneration={triggerTicketGeneration}
-        />
+          <CrmTab
+            tours={tours}
+            slots={slots}
+            bookings={bookings}
+            currentUser={currentUser}
+            operatorToken={operatorToken}
+            onEditBooking={onEditBooking}
+            onDeleteBooking={onDeleteBooking}
+            onAddBooking={onAddBooking}
+            onShowNotification={onShowNotification}
+            triggerTicketGeneration={triggerTicketGeneration}
+          />
+        </div>
       )}
 
       {/* Subtab HTML Form: Add Tour */}

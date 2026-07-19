@@ -3,6 +3,20 @@ export const inquiriesPanel = {
   az: {
     inquiriesPanel: {
       tabLabel: 'Bildirişlər',
+      bell: {
+        title: 'Bildirişlər',
+        empty: 'Yeni bildiriş yoxdur.',
+        markAll: 'Hamısını oxundu et',
+        minutesAgo: '{{count}} dəq əvvəl',
+        hoursAgo: '{{count}} saat əvvəl',
+      },
+      vendorEdit: {
+        editButton: 'Düzəliş et',
+        title: 'Vendor düzəlişi',
+        close: 'Bağla',
+        saveCredentials: 'Giriş məlumatlarını yadda saxla',
+        telegramTitle: 'Telegram chat ID-ləri',
+      },
       status: {
         new: 'YENİ',
         read: 'OXUNUB',
@@ -25,6 +39,7 @@ export const inquiriesPanel = {
         title: 'Hazır mesajlar (WhatsApp cavabları)',
         subtitle: 'Telegram bildirişindəki "WhatsApp-dan cavabla" düyməsi bu şablonlardan istifadə edir.',
         placeholdersHint: 'Şablonda bu dəyişənlərdən istifadə edə bilərsiniz:',
+        insertHint: 'Klikləyib əlavə et:',
         add: 'Yeni şablon',
         namePlaceholder: 'Şablon adı (məs: Salamlama)',
         textPlaceholder: 'Salam {ad}! "{tur}" turu ({tarix}, {say} nəfər) üçün sorğunuzu aldıq...',
@@ -43,6 +58,7 @@ export const inquiriesPanel = {
         adminSettingsTitle: 'Telegram parametrləri (Admin)',
         adminChatIdsLabel: 'Admin chat ID-ləri',
         adminChatIdsHint: 'Hər sorğu bu chat-lərə də bildiriş kimi gedəcək. Chat ID öyrənmək üçün bota /start yazın.',
+        adminChatIdsHintTourEvents: 'Vendor hadisələri (yeni tur / tur düzəlişi — təsdiq gözləyən) bu chat-lərə bildiriş kimi gedir. Chat ID öyrənmək üçün bota /start yazın.',
         chatIdPlaceholder: 'Məs: 123456789',
         addChatId: 'Chat ID əlavə et',
         botDisabled: 'Telegram botu deaktivdir — serverdə TELEGRAM_BOT_TOKEN təyin olunmayıb.',
@@ -74,6 +90,20 @@ export const inquiriesPanel = {
   en: {
     inquiriesPanel: {
       tabLabel: 'Notifications',
+      bell: {
+        title: 'Notifications',
+        empty: 'No new notifications.',
+        markAll: 'Mark all as read',
+        minutesAgo: '{{count}} min ago',
+        hoursAgo: '{{count}} h ago',
+      },
+      vendorEdit: {
+        editButton: 'Edit',
+        title: 'Edit vendor',
+        close: 'Close',
+        saveCredentials: 'Save login credentials',
+        telegramTitle: 'Telegram chat IDs',
+      },
       status: {
         new: 'NEW',
         read: 'READ',
@@ -96,6 +126,7 @@ export const inquiriesPanel = {
         title: 'Saved messages (WhatsApp replies)',
         subtitle: 'The "Reply on WhatsApp" button in Telegram notifications uses these templates.',
         placeholdersHint: 'You can use these variables in a template:',
+        insertHint: 'Click to insert:',
         add: 'New template',
         namePlaceholder: 'Template name (e.g. Greeting)',
         textPlaceholder: 'Hello {ad}! We received your inquiry for "{tur}" ({tarix}, {say} people)...',
@@ -114,6 +145,7 @@ export const inquiriesPanel = {
         adminSettingsTitle: 'Telegram settings (Admin)',
         adminChatIdsLabel: 'Admin chat IDs',
         adminChatIdsHint: 'Every inquiry is also sent to these chats. Send /start to the bot to find a chat ID.',
+        adminChatIdsHintTourEvents: 'Vendor events (new tour / tour edit — pending approval) are sent to these chats as notifications. Send /start to the bot to find a chat ID.',
         chatIdPlaceholder: 'E.g. 123456789',
         addChatId: 'Add chat ID',
         botDisabled: 'Telegram bot is disabled — TELEGRAM_BOT_TOKEN is not set on the server.',
@@ -145,6 +177,20 @@ export const inquiriesPanel = {
   ru: {
     inquiriesPanel: {
       tabLabel: 'Уведомления',
+      bell: {
+        title: 'Уведомления',
+        empty: 'Новых уведомлений нет.',
+        markAll: 'Отметить все прочитанными',
+        minutesAgo: '{{count}} мин назад',
+        hoursAgo: '{{count}} ч назад',
+      },
+      vendorEdit: {
+        editButton: 'Редактировать',
+        title: 'Редактирование вендора',
+        close: 'Закрыть',
+        saveCredentials: 'Сохранить данные входа',
+        telegramTitle: 'Telegram chat ID',
+      },
       status: {
         new: 'НОВЫЙ',
         read: 'ПРОЧИТАН',
@@ -167,6 +213,7 @@ export const inquiriesPanel = {
         title: 'Готовые сообщения (ответы WhatsApp)',
         subtitle: 'Кнопка «Ответить в WhatsApp» в Telegram-уведомлениях использует эти шаблоны.',
         placeholdersHint: 'В шаблоне можно использовать переменные:',
+        insertHint: 'Нажмите, чтобы вставить:',
         add: 'Новый шаблон',
         namePlaceholder: 'Название шаблона (напр.: Приветствие)',
         textPlaceholder: 'Здравствуйте, {ad}! Мы получили ваш запрос по туру «{tur}» ({tarix}, {say} чел.)...',
@@ -185,6 +232,7 @@ export const inquiriesPanel = {
         adminSettingsTitle: 'Настройки Telegram (Админ)',
         adminChatIdsLabel: 'Chat ID администраторов',
         adminChatIdsHint: 'Каждый запрос также отправляется в эти чаты. Отправьте /start боту, чтобы узнать chat ID.',
+        adminChatIdsHintTourEvents: 'События вендоров (новый тур / изменение тура — ожидают одобрения) приходят в эти чаты как уведомления. Отправьте /start боту, чтобы узнать chat ID.',
         chatIdPlaceholder: 'Напр.: 123456789',
         addChatId: 'Добавить chat ID',
         botDisabled: 'Telegram-бот отключён — на сервере не задан TELEGRAM_BOT_TOKEN.',

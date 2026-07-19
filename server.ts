@@ -47,6 +47,7 @@ import {
   escapeHtml,
   broadcastTelegram,
   startTelegramPolling,
+  setTelegramCallbackHandler,
 } from "./server/telegram.ts";
 import { parseBboxParam, getPoisForBbox } from "./server/overpass.ts";
 import { resolveGoogleMapsLink } from "./server/geo.ts";
@@ -1590,6 +1591,14 @@ app.post("/api/tours", authenticateUser, async (req: any, res) => {
 
     const rows = await dbClient.query('SELECT * FROM tours WHERE id = ?', [id]);
     scheduleTourTranslation(id, { name, description: description || null, includes: body.includes, notIncluded: body.notIncluded, highlights: body.highlights });
+
+    // Vendor yeni tur əlavə etdi → adminlərə bildiriş (admin özü yaradanda yox)
+    if (!isAdmin) {
+      const vendorRows = await dbClient.query('SELECT name, company_name FROM users WHERE id = ?', [vendorId]);
+      const vendorName = vendorRows[0]?.company_name || vendorRows[0]?.name || body.vendorName || 'Vendor';
+      notifyAdminsTourEvent('tour_created', { id, name }, vendorName);
+    }
+
     res.status(201).json({ tour: rowToTour(rows[0]) });
   } catch (error: any) {
     console.error("[POST /api/tours] error:", error);
@@ -1680,6 +1689,7 @@ app.put("/api/tours/:id", authenticateUser, async (req: any, res) => {
         `UPDATE tours SET status = 'pending_approval', pending_data = ? WHERE id = ?`,
         [JSON.stringify(proposal), req.params.id]
       );
+      notifyAdminsTourEvent('tour_edited', { id: req.params.id, name: existing.name }, existing.vendorName || 'Vendor');
     } else {
       // Vendor editing a tour that's still under review (or was rejected) — no live/public
       // version exists yet, so apply the edit directly and (re)submit for approval.
@@ -1688,6 +1698,7 @@ app.put("/api/tours/:id", authenticateUser, async (req: any, res) => {
       delete merged.isApproved;
       delete merged.rejectionReason; // resubmitting clears the old reason — it no longer applies
       await writeLiveTourRow(req.params.id, merged, 'pending_approval', null);
+      notifyAdminsTourEvent('tour_edited', { id: req.params.id, name: merged.name || existing.name }, existing.vendorName || 'Vendor');
     }
 
     const rows = await dbClient.query('SELECT * FROM tours WHERE id = ?', [req.params.id]);
@@ -2101,6 +2112,38 @@ async function getAdminWaTemplates(): Promise<WaTemplate[]> {
   } catch { return []; }
 }
 
+// Admin bildirişləri yalnız vendor hadisələri üçündür: yeni tur / mövcud tura düzəliş
+// (hər ikisi təsdiq gözləyir). Panel bildirişi + admin chat-lərinə Telegram.
+async function notifyAdminsTourEvent(
+  kind: 'tour_created' | 'tour_edited',
+  tour: { id: string; name: string },
+  vendorName: string
+): Promise<void> {
+  try {
+    const title = kind === 'tour_created' ? `Yeni tur: ${tour.name}` : `Tur düzəlişi: ${tour.name}`;
+    const body = `${vendorName} • təsdiq gözləyir`;
+    await dbClient.execute(
+      `INSERT INTO notifications (id, recipient_id, recipient_role, type, title, body, data) VALUES (?, NULL, 'admin', ?, ?, ?, ?)`,
+      [`ntf-${randomUUID()}`, kind, title, body, JSON.stringify({ tourId: tour.id })]
+    );
+    const adminChatIds = await getAdminChatIds();
+    if (adminChatIds.length) {
+      const emoji = kind === 'tour_created' ? '🆕' : '✏️';
+      const label = kind === 'tour_created' ? 'Yeni tur əlavə olundu' : 'Tura düzəliş göndərildi';
+      await broadcastTelegram(
+        adminChatIds,
+        `${emoji} <b>${label}</b>\n\n` +
+          `🏔 <b>Tur:</b> ${escapeHtml(tour.name)}\n` +
+          `🏢 <b>Vendor:</b> ${escapeHtml(vendorName)}\n` +
+          `⏳ Admin təsdiqi gözləyir — admin paneldən yoxlayın.`
+      );
+    }
+  } catch (err) {
+    // Bildiriş çatmasa da turun özü yaradılıb/yenilənib — əsas əməliyyatı pozmuruq.
+    console.error(`[notifyAdminsTourEvent] ${kind} bildirişi alınmadı:`, err);
+  }
+}
+
 // {ad} {tur} {tarix} {say} placeholder-lərini real dəyərlərlə əvəz edir
 function fillWaTemplate(text: string, vars: Record<string, string>): string {
   return String(text || '').replace(/\{(ad|tur|tarix|say)\}/g, (_, key) => vars[key] ?? '');
@@ -2181,17 +2224,15 @@ app.post("/api/inquiries", async (req, res) => {
       [id, tour.id, tour.name, tour.vendor_id, slotId || null, date, name, phone, count, JSON.stringify(answers)]
     );
 
-    // Panel bildirişləri — vendor üçün ünvanlı, adminlər üçün ümumi
+    // Panel bildirişi — yalnız vendor üçün. Admin sorğu bildirişi almır (admin bildirişləri
+    // vendorların tur yaratma/düzəliş hadisələri üçündür) — sorğunun özü onsuz da vendorun
+    // CRM-inə düşür.
     const notifTitle = `Yeni sorğu: ${tour.name}`;
     const notifBody = `${name} • ${phone} • ${count} nəfər${date ? ' • ' + date : ''}`;
     const notifData = JSON.stringify({ inquiryId: id, tourId: tour.id });
     await dbClient.execute(
       `INSERT INTO notifications (id, recipient_id, recipient_role, type, title, body, data) VALUES (?, ?, 'vendor', 'inquiry', ?, ?, ?)`,
       [`ntf-${randomUUID()}`, tour.vendor_id, notifTitle, notifBody, notifData]
-    );
-    await dbClient.execute(
-      `INSERT INTO notifications (id, recipient_id, recipient_role, type, title, body, data) VALUES (?, NULL, 'admin', 'inquiry', ?, ?, ?)`,
-      [`ntf-${randomUUID()}`, notifTitle, notifBody, notifData]
     );
 
     // Cavabı gecikdirməmək üçün Telegram göndərişi arxa planda gedir
@@ -2219,12 +2260,13 @@ app.post("/api/inquiries", async (req, res) => {
           answerLines;
 
         if (vendorChatIds.length) {
-          await broadcastTelegram(vendorChatIds, text, buildWaReplyButtons(vendorTemplates, phone, vars));
-        }
-        const adminChatIds = await getAdminChatIds();
-        if (adminChatIds.length) {
-          const adminTemplates = await getAdminWaTemplates();
-          await broadcastTelegram(adminChatIds, text, buildWaReplyButtons(adminTemplates, phone, vars));
+          // Son düymə "Oxundu işarələ" — basılanda sorğu CRM-də oxundu olur və panel
+          // bildirişi silinir (bax setTelegramCallbackHandler, startServer).
+          const buttons = [
+            ...buildWaReplyButtons(vendorTemplates, phone, vars),
+            { text: '✅ Oxundu işarələ', callback_data: `inqread:${id}` },
+          ];
+          await broadcastTelegram(vendorChatIds, text, buttons);
         }
       } catch (err) {
         console.error("[POST /api/inquiries] Telegram göndərişi alınmadı:", err);
@@ -3484,9 +3526,26 @@ async function startServer() {
     startWhatsApp().catch((err) => console.error("[WhatsApp] Başlanğıc qoşulma xətası:", err));
   }
 
-  // Telegram bot — token yoxdursa no-op. Long polling yalnız chat ID köməkçisi üçündür
-  // (bota yazan hər kəsə öz chat ID-sini qaytarır); bildiriş göndərmək polling-dən asılı deyil.
+  // Telegram bot — token yoxdursa no-op. Long polling həm chat ID köməkçisidir (bota yazan
+  // hər kəsə öz chat ID-sini qaytarır), həm də inline düymə callback-lərini emal edir;
+  // bildiriş göndərmək polling-dən asılı deyil.
   if (isTelegramEnabled()) {
+    // "✅ Oxundu işarələ" düyməsi: sorğu CRM-də oxundu statusuna keçir və aid panel
+    // bildirişi oxunmuş sayılır (zəng siyahısından düşür). İdempotentdir.
+    setTelegramCallbackHandler(async (data) => {
+      if (!data.startsWith("inqread:")) return;
+      const inquiryId = data.slice("inqread:".length);
+      const rows = await dbClient.query('SELECT id, status FROM inquiries WHERE id = ?', [inquiryId]);
+      if (!rows.length) return "Sorğu tapılmadı";
+      if (rows[0].status === 'new') {
+        await dbClient.execute(`UPDATE inquiries SET status = 'read' WHERE id = ?`, [inquiryId]);
+      }
+      await dbClient.execute(
+        `UPDATE notifications SET is_read = ? WHERE data LIKE ?`,
+        [1, `%"inquiryId":"${inquiryId}"%`]
+      );
+      return "✅ Oxundu — sorğu CRM-ə köçdü";
+    });
     startTelegramPolling();
   } else {
     console.log("[Telegram] TELEGRAM_BOT_TOKEN yoxdur — Telegram bildirişləri deaktivdir.");

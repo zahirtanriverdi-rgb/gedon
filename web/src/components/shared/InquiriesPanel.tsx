@@ -1,8 +1,8 @@
 'use client';
-import React, { useCallback, useEffect, useState } from 'react';
-import { Inquiry, WaTemplate } from '../../types';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { AppNotification, Inquiry, WaTemplate } from '../../types';
 import { useLanguage } from '../../i18n/LanguageContext';
-import { MessageCircle, Phone, Users, Calendar, RefreshCw, Trash2, Plus } from 'lucide-react';
+import { MessageCircle, Phone, Users, Calendar, RefreshCw, Trash2, Plus, Bell } from 'lucide-react';
 
 // {ad} {tur} {tarix} {say} placeholder doldurma — server tərəfdəki fillWaTemplate ilə eyni qayda
 export function fillWaTemplate(text: string, inquiry: Inquiry): string {
@@ -54,6 +54,145 @@ export function useNotificationsBadge(token: string | null | undefined) {
   return { unreadCount, refresh, markAllRead };
 }
 
+// ===================== HEADER ZƏNG BİLDİRİŞLƏRİ =====================
+
+interface NotificationsBellProps {
+  token: string | null | undefined;
+  // Bildirişə klik — parent müvafiq bölməyə keçir (vendor→CRM, admin→Turlar).
+  onOpenItem: (notification: AppNotification) => void;
+}
+
+// Social-media stilli bildiriş zəngi: sağ yuxarı headerdə sayğaclı zəng, dropdown-da yalnız
+// oxunmamış bildirişlər. İtem-ə klik avtomatik "oxundu" edir (siyahıdan düşür) və yönləndirir.
+// Telegram-dakı "✅ Oxundu işarələ" düyməsi də eyni bildirişi oxunmuş edir — 30 san-lıq poll
+// növbəti dövrədə onu buradan silir.
+export function NotificationsBell({ token, onOpenItem }: NotificationsBellProps) {
+  const { t } = useLanguage();
+  const [isOpen, setIsOpen] = useState(false);
+  const [unread, setUnread] = useState<AppNotification[]>([]);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  const refresh = useCallback(async () => {
+    if (!token) return;
+    try {
+      const res = await fetch('/api/notifications', { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) return;
+      const data = await res.json();
+      setUnread((data.notifications || []).filter((n: AppNotification) => !n.isRead));
+    } catch {
+      // şəbəkə xətası — köhnə siyahı qalır
+    }
+  }, [token]);
+
+  useEffect(() => {
+    refresh();
+    const timer = setInterval(refresh, 30_000);
+    return () => clearInterval(timer);
+  }, [refresh]);
+
+  // Kənara klik → dropdown bağlanır
+  useEffect(() => {
+    if (!isOpen) return;
+    const onDown = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setIsOpen(false);
+    };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [isOpen]);
+
+  const markRead = async (ids: string[]) => {
+    if (!token || !ids.length) return;
+    setUnread(prev => prev.filter(n => !ids.includes(n.id)));
+    try {
+      await fetch('/api/notifications/read', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ ids }),
+      });
+    } catch {
+      // növbəti poll düzəldəcək
+    }
+  };
+
+  const formatTime = (createdAt: string) => {
+    try {
+      const d = new Date(createdAt.includes('T') ? createdAt : createdAt.replace(' ', 'T') + 'Z');
+      const mins = Math.max(0, Math.round((Date.now() - d.getTime()) / 60000));
+      if (mins < 60) return t('inquiriesPanel.bell.minutesAgo', { count: mins });
+      if (mins < 60 * 24) return t('inquiriesPanel.bell.hoursAgo', { count: Math.round(mins / 60) });
+      return d.toLocaleDateString();
+    } catch {
+      return '';
+    }
+  };
+
+  const typeEmoji = (type: string) =>
+    type === 'inquiry' ? '🔔' : type === 'tour_created' ? '🆕' : type === 'tour_edited' ? '✏️' : '📣';
+
+  return (
+    <div className="relative" ref={containerRef}>
+      <button
+        type="button"
+        aria-label={t('inquiriesPanel.bell.title')}
+        onClick={() => setIsOpen(prev => !prev)}
+        className="relative w-11 h-11 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center transition-all cursor-pointer"
+      >
+        <Bell className="w-5 h-5" />
+        {unread.length > 0 && (
+          <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center border-2 border-white">
+            {unread.length > 99 ? '99+' : unread.length}
+          </span>
+        )}
+      </button>
+
+      {isOpen && (
+        <div className="absolute right-0 top-full mt-2 w-80 max-w-[calc(100vw-24px)] bg-white rounded-2xl border border-slate-200 shadow-2xl z-[130] overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
+            <span className="text-sm font-extrabold text-slate-800">{t('inquiriesPanel.bell.title')}</span>
+            {unread.length > 0 && (
+              <button
+                type="button"
+                onClick={() => markRead(unread.map(n => n.id))}
+                className="text-[11px] font-bold text-emerald-700 hover:underline cursor-pointer"
+              >
+                {t('inquiriesPanel.bell.markAll')}
+              </button>
+            )}
+          </div>
+          <div className="max-h-96 overflow-y-auto">
+            {unread.length === 0 ? (
+              <p className="text-xs text-slate-400 text-center py-8 px-4">{t('inquiriesPanel.bell.empty')}</p>
+            ) : (
+              unread.map(n => (
+                <button
+                  key={n.id}
+                  type="button"
+                  onClick={() => {
+                    markRead([n.id]);
+                    setIsOpen(false);
+                    onOpenItem(n);
+                  }}
+                  className="w-full text-left px-4 py-3 hover:bg-slate-50 border-b border-slate-50 last:border-0 cursor-pointer"
+                >
+                  <div className="flex items-start gap-2.5">
+                    <span className="text-base leading-none mt-0.5">{typeEmoji(n.type)}</span>
+                    <div className="min-w-0 flex-1">
+                      <div className="text-xs font-bold text-slate-800 truncate">{n.title}</div>
+                      {n.body && <div className="text-[11px] text-slate-500 truncate mt-0.5">{n.body}</div>}
+                      <div className="text-[10px] text-slate-400 mt-1">{formatTime(n.createdAt)}</div>
+                    </div>
+                    <span className="w-2 h-2 rounded-full bg-red-500 shrink-0 mt-1.5" />
+                  </div>
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ===================== HAZIR MESAJLAR EDİTORU =====================
 
 interface WaTemplatesEditorProps {
@@ -62,12 +201,33 @@ interface WaTemplatesEditorProps {
   onShowNotification?: (message: string, type?: 'success' | 'info' | 'error' | 'warning') => void;
 }
 
+const TEMPLATE_PLACEHOLDERS = ['{ad}', '{tur}', '{tarix}', '{say}'] as const;
+
 export function WaTemplatesEditor({ templates, onSave, onShowNotification }: WaTemplatesEditorProps) {
   const { t } = useLanguage();
   const [draft, setDraft] = useState<WaTemplate[]>(templates);
   const [isSaving, setIsSaving] = useState(false);
+  const textareaRefs = useRef<Record<string, HTMLTextAreaElement | null>>({});
 
   useEffect(() => { setDraft(templates); }, [templates]);
+
+  // Placeholder çipinə klik — tokeni textarea-da kursorun olduğu yerə salır
+  const insertPlaceholder = (idx: number, templateId: string, token: string) => {
+    const el = textareaRefs.current[templateId];
+    const current = draft[idx]?.text ?? '';
+    const start = el ? el.selectionStart : current.length;
+    const end = el ? el.selectionEnd : current.length;
+    const next = current.slice(0, start) + token + current.slice(end);
+    setDraft(prev => prev.map((x, i) => (i === idx ? { ...x, text: next } : x)));
+    // state yazıldıqdan sonra kursoru tokenin arxasına qaytar
+    requestAnimationFrame(() => {
+      const node = textareaRefs.current[templateId];
+      if (node) {
+        node.focus();
+        node.selectionStart = node.selectionEnd = start + token.length;
+      }
+    });
+  };
 
   const handleSave = async () => {
     const cleaned = draft.filter(tp => tp.text.trim());
@@ -129,12 +289,27 @@ export function WaTemplatesEditor({ templates, onSave, onShowNotification }: WaT
               </button>
             </div>
             <textarea
+              ref={(el) => { textareaRefs.current[tp.id] = el; }}
               value={tp.text}
               onChange={(e) => setDraft(prev => prev.map((x, i) => i === idx ? { ...x, text: e.target.value } : x))}
               placeholder={t('inquiriesPanel.templates.textPlaceholder')}
               rows={3}
               className="w-full px-3 py-2 text-xs border border-slate-200 rounded-lg text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-emerald-500 resize-y"
             />
+            {/* Klik-lə mətnə əlavə olunan hazır placeholder çipləri */}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[10px] text-slate-400 font-medium">{t('inquiriesPanel.templates.insertHint')}</span>
+              {TEMPLATE_PLACEHOLDERS.map(token => (
+                <button
+                  key={token}
+                  type="button"
+                  onClick={() => insertPlaceholder(idx, tp.id, token)}
+                  className="text-[11px] font-mono font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 px-2 py-1 rounded-md cursor-pointer transition"
+                >
+                  {token}
+                </button>
+              ))}
+            </div>
           </div>
         ))}
       </div>

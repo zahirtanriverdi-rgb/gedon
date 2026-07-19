@@ -23,7 +23,8 @@ export function escapeHtml(s: string): string {
 
 export interface TelegramButton {
   text: string;
-  url: string;
+  url?: string; // wa.me linki və s.
+  callback_data?: string; // bot-daxili əməliyyat (məs. "inqread:<inquiryId>")
 }
 
 // Bir chat-ə mesaj. Uğursuzluq atmır — nəticəni qaytarır ki, çağıran log yaza bilsin.
@@ -42,7 +43,11 @@ export async function sendTelegramMessage(
     };
     if (buttons && buttons.length) {
       // Hər düymə öz sətrində — şablon adları uzun ola bilər, yan-yana sığmır.
-      body.reply_markup = { inline_keyboard: buttons.map((b) => [{ text: b.text, url: b.url }]) };
+      body.reply_markup = {
+        inline_keyboard: buttons.map((b) =>
+          [b.url ? { text: b.text, url: b.url } : { text: b.text, callback_data: b.callback_data || '' }]
+        ),
+      };
     }
     const res = await fetch(`${API_BASE}/sendMessage`, {
       method: "POST",
@@ -77,7 +82,45 @@ export async function broadcastTelegram(
   );
 }
 
-// ===================== CHAT ID KÖMƏKÇİSİ (long polling) =====================
+// ===================== CHAT ID KÖMƏKÇİSİ + CALLBACK (long polling) =====================
+
+// İnline callback düymələri üçün handler — server.ts qeydiyyatdan keçirir (DB işi orada qalır).
+// Qaytarılan mətn istifadəçiyə toast (answerCallbackQuery) kimi göstərilir.
+type CallbackHandler = (data: string) => Promise<string | void>;
+let callbackHandler: CallbackHandler | null = null;
+export function setTelegramCallbackHandler(handler: CallbackHandler): void {
+  callbackHandler = handler;
+}
+
+async function answerCallbackQuery(callbackQueryId: string, text?: string): Promise<void> {
+  try {
+    await fetch(`${API_BASE}/answerCallbackQuery`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ callback_query_id: callbackQueryId, text: text || undefined }),
+    });
+  } catch {
+    // toast göstərilməsə də əməliyyat onsuz da yerinə yetirilib
+  }
+}
+
+// "Oxundu" basılandan sonra düyməni işarələnmiş vəziyyətə salır (təkrar basılmanın qarşısı
+// vizual olaraq alınır; təkrar basılsa da handler idempotentdir).
+async function markMessageButtonDone(chatId: string | number, messageId: number): Promise<void> {
+  try {
+    await fetch(`${API_BASE}/editMessageReplyMarkup`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chat_id: chatId,
+        message_id: messageId,
+        reply_markup: { inline_keyboard: [[{ text: "✅ Oxundu", callback_data: "noop" }]] },
+      }),
+    });
+  } catch {
+    // düymə köhnə halda qalsa problem deyil
+  }
+}
 
 let pollingStarted = false;
 
@@ -114,6 +157,28 @@ export function startTelegramPolling(): void {
         }
         for (const update of json.result) {
           offset = Math.max(offset, update.update_id + 1);
+
+          // İnline düymə basıldı (məs. "✅ Oxundu işarələ")
+          const cb = update.callback_query;
+          if (cb && cb.data && cb.data !== "noop") {
+            let toast: string | void;
+            try {
+              toast = callbackHandler ? await callbackHandler(String(cb.data)) : undefined;
+            } catch (err) {
+              console.error("[Telegram] callback emalı alınmadı:", err);
+              toast = "Xəta baş verdi";
+            }
+            await answerCallbackQuery(cb.id, typeof toast === "string" ? toast : undefined);
+            if (cb.message && typeof toast === "string" && toast.startsWith("✅")) {
+              await markMessageButtonDone(cb.message.chat.id, cb.message.message_id);
+            }
+            continue;
+          }
+          if (cb) {
+            await answerCallbackQuery(cb.id);
+            continue;
+          }
+
           const msg = update.message;
           if (!msg || !msg.chat) continue;
           const chatId = String(msg.chat.id);
