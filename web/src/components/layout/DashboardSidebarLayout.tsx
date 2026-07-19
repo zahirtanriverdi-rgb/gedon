@@ -6,6 +6,7 @@ export interface DashboardNavItem {
   id: string;
   label: string;
   icon: LucideIcon;
+  badgeCount?: number; // e.g. unread notifications — hidden when 0/undefined
 }
 
 interface DashboardSidebarLayoutProps {
@@ -33,7 +34,7 @@ export default function DashboardSidebarLayout({
 
   const navList = (
     <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-      {navItems.map(({ id, label, icon: Icon }) => {
+      {navItems.map(({ id, label, icon: Icon, badgeCount }) => {
         const isActive = id === activeId;
         return (
           <button
@@ -49,7 +50,12 @@ export default function DashboardSidebarLayout({
             }`}
           >
             <Icon className="w-5 h-5 shrink-0" />
-            <span className="text-left">{label}</span>
+            <span className="text-left flex-1">{label}</span>
+            {!!badgeCount && (
+              <span className="shrink-0 min-w-[20px] h-5 px-1.5 rounded-full bg-red-500 text-white text-[11px] font-bold flex items-center justify-center">
+                {badgeCount > 99 ? '99+' : badgeCount}
+              </span>
+            )}
           </button>
         );
       })}

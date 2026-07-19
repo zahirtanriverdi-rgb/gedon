@@ -5,18 +5,15 @@ import { REVIEWS_ENABLED } from '../../config/features';
 import { computeFeaturedTourIds } from '../../utils/featuredTours';
 import { useLanguage } from '../../i18n/LanguageContext';
 import { getLocalizedTourName, getLocalizedTourDescription, getLocalizedTourIncludes, getLocalizedTourNotIncluded, getLocalizedTourHighlights, getLocalizedGuideBio, getLocalizedGuideSpecialty } from '../../i18n/tourLocalization';
-import { DIAL_CODES, DEFAULT_DIAL_CODE, isoToFlagEmoji } from '../../data/dialCodes';
 import {
   Calendar,
   Check,
   CheckCircle,
   ChevronDown,
   Clock,
-  Copy,
   Globe,
   Grid2X2,
   Heart,
-  MessageCircle,
   Minus,
   Star,
   Users,
@@ -29,6 +26,7 @@ import { TourReviewsList } from './TourReviewsList';
 import { parseStoredGpxData, getRouteDurationHours } from '../../utils/gpxParser';
 import { TourRouteStatsCard } from '../tours/TourRouteStatsCard';
 import { ShareMenuButton } from '../tours/ShareMenuButton';
+import { TourInquirySheet, MaybeBodyPortal } from './TourInquirySheet';
 
 type ConvertedPriceInfo = {
   azn: number;
@@ -98,7 +96,10 @@ export function TourDetailPage({
   const [bookingQty, setBookingQty] = useState<number>(1);
   const [showParticipantsDropdown, setShowParticipantsDropdown] = useState<boolean>(false);
   const [showDateDropdown, setShowDateDropdown] = useState<boolean>(false);
-  const [showTourSlots, setShowTourSlots] = useState<boolean>(false);
+  // Mobile gallery: which media the big image shows (thumb strip below swaps it)
+  const [mobileGalleryIndex, setMobileGalleryIndex] = useState<number>(0);
+  // Day-program (itinerary) section starts open, collapsible like the approved mockup
+  const [isItineraryExpanded, setIsItineraryExpanded] = useState<boolean>(true);
   const isFeaturedThisMonth = React.useMemo(() => computeFeaturedTourIds(tours, slots).has(selectedTour.id), [tours, slots, selectedTour.id]);
 
   // "You might also like" picks: deterministic order for SSR + first client render (a
@@ -112,13 +113,6 @@ export function TourDetailPage({
   React.useEffect(() => {
     setRelatedTours([...relatedToursBase].sort(() => 0.5 - Math.random()).slice(0, 4));
   }, [relatedToursBase]);
-
-  // Tours created before the per-tour WhatsApp field existed (or where a vendor left it blank)
-  // fall back to the organizing vendor's own profile phone, never a hardcoded stranger's number.
-  const vendorFallbackPhone = React.useMemo(
-    () => users.find(u => u.id === selectedTour.vendorId)?.phone || '+994706717804',
-    [users, selectedTour.vendorId]
-  );
 
   // Opening a tour carries over whatever scroll position the home page list was at (e.g. the
   // user had scrolled down to see this card), so without this the detail page renders already
@@ -135,61 +129,6 @@ export function TourDetailPage({
       setBookingQty(prev => Math.min(Math.max(1, prev), availableCapacity));
     }
   }, [selectedSlot]);
-  const [isBookingStep, setIsBookingStep] = useState<boolean>(false);
-  const [isProcessingPayment, setIsProcessingPayment] = useState<boolean>(false);
-
-  // Scroll to the booking form once it actually exists in the DOM. Doing this in the click
-  // handler that opens it doesn't work — setIsBookingStep(true) is an async state update, so
-  // the #booking-form-section node isn't rendered yet at the time of that click.
-  React.useEffect(() => {
-    if (isBookingStep) {
-      const formEl = document.getElementById('booking-form-section');
-      if (formEl) formEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-  }, [isBookingStep]);
-
-  // Same DOM-timing reasoning as above: scroll to the tour-slots-calendar section only after
-  // showTourSlots flips to true and React has actually rendered it. Re-run once more after a
-  // beat — late-loading images above the section shift the layout mid-animation, which used
-  // to leave the viewport far from the calendar (the button just seemed to "do nothing").
-  React.useEffect(() => {
-    if (!showTourSlots) return;
-    const scrollToCalendar = () => {
-      const el = document.getElementById('tour-slots-calendar');
-      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    };
-    scrollToCalendar();
-    const settleTimer = setTimeout(scrollToCalendar, 450);
-    return () => clearTimeout(settleTimer);
-  }, [showTourSlots]);
-  const [bookingSubmitError, setBookingSubmitError] = useState<string | null>(null);
-  const [bookingSuccessData, setBookingSuccessData] = useState<any>(null);
-
-  // Guest booking details (replacing previous registration requirement)
-  const [bookingCustomerName, setBookingCustomerName] = useState<string>('');
-  // Local/national number only — the dial code lives separately in phoneCountryDialCode and
-  // is combined via getFullPhoneNumber() below, since customers commonly type the number with
-  // its domestic trunk "0" prefix (e.g. 0501234567) once a country is already selected.
-  const [bookingCustomerPhone, setBookingCustomerPhone] = useState<string>('');
-  const [phoneCountryDialCode, setPhoneCountryDialCode] = useState<string>(DEFAULT_DIAL_CODE);
-  const [isPhoneVerified, setIsPhoneVerified] = useState<boolean>(false);
-  const [isCheckingNumber, setIsCheckingNumber] = useState<boolean>(false);
-
-  // The dial code always starts at +994 (DEFAULT_DIAL_CODE): almost every customer is booking
-  // an Azerbaijan tour with an Azerbaijani number, and the previous IP-geolocation lookup
-  // (ipapi.co) silently preselected surprising codes for VPN/roaming visitors — a wrong code
-  // is far more costly here than one manual selection for the rare foreign customer.
-
-  // Domestic numbers are usually typed with their trunk "0" prefix (e.g. 0501234567) even
-  // after a country code has been selected — that 0 isn't part of the actual E.164 number,
-  // so it's stripped here rather than wherever this is called from.
-  const getFullPhoneNumber = () => {
-    const nationalDigits = bookingCustomerPhone.replace(/\D/g, '').replace(/^0+/, '');
-    return `${phoneCountryDialCode}${nationalDigits}`;
-  };
-
-  // Small math captcha gating the real WhatsApp lookup (see /api/whatsapp/captcha) — one-time
-  // use, so a fresh one is fetched after every attempt (success or failure).
   // Human-readable, localized date for raw ISO slot dates ("2026-07-18" → "18 İyul 2026").
   // Reuses the month names already translated for the weather widget.
   const MONTH_TRANSLATION_KEYS = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
@@ -200,340 +139,48 @@ export function TourDetailPage({
     return `${Number(d)} ${monthName} ${y}`;
   };
 
-  const [captchaId, setCaptchaId] = useState<string | null>(null);
-  const [captchaQuestion, setCaptchaQuestion] = useState<string | null>(null);
-  // Persistent inline verification error — a toast alone auto-dismisses, leaving the user
-  // staring at a silently refreshed captcha with no idea what went wrong.
-  const [verifyErrorMessage, setVerifyErrorMessage] = useState<string | null>(null);
-  // null = unknown (endpoint unreachable / not yet asked) — treated as "assume online" so the
-  // badge doesn't flash red for everyone on a transient fetch hiccup.
-  const [whatsappSystemOnline, setWhatsappSystemOnline] = useState<boolean | null>(null);
+  // Booking-inquiry sheet ("Yerləri yoxla" → sorğu axını). Replaces the old direct-WhatsApp
+  // booking form: the customer answers the pre-reservation questions and the vendor gets the
+  // lead in their panel + Telegram, replying over WhatsApp themselves.
+  const [showInquiry, setShowInquiry] = useState<boolean>(false);
 
-  const refreshWhatsappSystemStatus = async () => {
-    try {
-      const res = await fetch('/api/whatsapp/public-status');
-      const data = await res.json();
-      setWhatsappSystemOnline(!!data.connected);
-    } catch {
-      setWhatsappSystemOnline(null);
-    }
-  };
-  const [captchaAnswer, setCaptchaAnswer] = useState<string>('');
+  const earliestAvailableSlot = React.useMemo(
+    () =>
+      slots
+        .filter(s => s.tourId === selectedTour.id && s.capacity - s.bookedCount > 0)
+        .sort((a, b) => a.startDate.localeCompare(b.startDate))[0] || null,
+    [slots, selectedTour.id]
+  );
 
-  const fetchCaptchaChallenge = async () => {
-    setCaptchaAnswer('');
-    try {
-      const res = await fetch('/api/whatsapp/captcha');
-      const data = await res.json();
-      setCaptchaId(data.id);
-      setCaptchaQuestion(data.question);
-    } catch {
-      setCaptchaId(null);
-      setCaptchaQuestion(null);
-    }
+  const handleOpenInquiry = (slot?: TourSlot | null) => {
+    const target = slot || selectedSlot || earliestAvailableSlot;
+    if (target) setSelectedSlot(target);
+    setShowInquiry(true);
   };
 
-  // Active Lifestyle Booking States
-  const [usingOwnEquipment, setUsingOwnEquipment] = useState<boolean>(false);
-  const [rentEquipment, setRentEquipment] = useState<boolean>(false);
-  const [bookingRegType, setBookingRegType] = useState<'individual' | 'team'>('individual');
-  const [bookingTeamName, setBookingTeamName] = useState<string>('');
-  const [bookingTeamMembers, setBookingTeamMembers] = useState<Array<{ name: string; phone: string }>>([
-    { name: '', phone: '' },
-    { name: '', phone: '' },
-    { name: '', phone: '' },
-    { name: '', phone: '' },
-    { name: '', phone: '' }
-  ]);
-  const [safetyAcknowledged, setSafetyAcknowledged] = useState<boolean>(false);
-
-  // Helper calculation for Volleyball & Adventure sports
-  const getActiveCalculatedPrice = () => {
-    if (!selectedSlot || !selectedTour) return { perPerson: 0, total: 0, qty: 1, desc: '' };
-
-    let perPerson = selectedSlot.price;
-    const descParts: string[] = [];
-
-    if (selectedTour.category === 'active' || selectedTour.isActiveLife) {
-      if (selectedTour.equipmentIncluded && usingOwnEquipment) {
-        const discount = selectedTour.equipmentRentalPrice || 10;
-        perPerson = Math.max(0, perPerson - discount);
-        descParts.push(t('tourDetailPage.priceCalc.ownEquipmentDiscount', { discount, currency: selectedTour.priceCurrency || 'AZN' }));
-      } else if (!selectedTour.equipmentIncluded && rentEquipment) {
-        const rental = selectedTour.equipmentRentalPrice || 15;
-        perPerson = perPerson + rental;
-        descParts.push(t('tourDetailPage.priceCalc.equipmentRental', { rental, currency: selectedTour.priceCurrency || 'AZN' }));
-      }
-    }
-
-    const qty = bookingRegType === 'team' ? 6 : bookingQty;
-    const total = perPerson * qty;
-
-    return {
-      perPerson,
-      total,
-      qty,
-      desc: descParts.join(', ')
-    };
-  };
-
-  const handleOpenBooking = (slot: TourSlot) => {
-    setSelectedSlot(slot);
-    setIsBookingStep(true);
-    setBookingCustomerName('');
-    setBookingCustomerPhone('');
-    setIsPhoneVerified(false);
-    setIsCheckingNumber(false);
-    setVerifyErrorMessage(null);
-    fetchCaptchaChallenge();
-    refreshWhatsappSystemStatus();
-
-    // Active Lifestyle States Reset
-    setUsingOwnEquipment(false);
-    setRentEquipment(false);
-    setBookingRegType('individual');
-    setBookingTeamName('');
-    setBookingTeamMembers([
-      { name: '', phone: '' },
-      { name: '', phone: '' },
-      { name: '', phone: '' },
-      { name: '', phone: '' },
-      { name: '', phone: '' }
-    ]);
-    setSafetyAcknowledged(false);
-  };
-
-  // Quick-reserve popup entry point (see CustomerPortal's home-page WhatsApp card button):
-  // skip straight to the booking form using the tour's earliest slot with open capacity,
-  // instead of making the customer scroll down and pick a date themselves.
+  // Quick-reserve popup entry point (see the home page's quick-book card button): open the
+  // inquiry sheet straight away using the tour's earliest slot with open capacity.
   React.useEffect(() => {
     if (!autoOpenBooking) return;
-    const earliestAvailableSlot = slots
-      .filter(s => s.tourId === selectedTour.id && s.capacity - s.bookedCount > 0)
-      .sort((a, b) => a.startDate.localeCompare(b.startDate))[0];
-    if (earliestAvailableSlot) handleOpenBooking(earliestAvailableSlot);
-    // Only ever run once per popup open — handleOpenBooking itself resets the form fields,
-    // so re-running it on every render (e.g. after selectedSlot changes) would wipe user input.
+    if (earliestAvailableSlot) handleOpenInquiry(earliestAvailableSlot);
+    // Only ever run once per popup open — re-running on every render would reopen the sheet
+    // the user just closed.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoOpenBooking, selectedTour.id]);
 
-  // Checks the number against the real WhatsApp session (server/whatsapp.ts) — no code is
-  // sent or entered, a positive result IS the verification. Gated by a small captcha answer
-  // so a scripted loop can't cheaply hammer the connected number by varying phone numbers.
-  const handleVerifyPhoneNumber = async () => {
-    if (!bookingCustomerName.trim()) {
-      if (onShowNotification) onShowNotification(t('tourDetailPage.booking.validation.nameRequired'), 'warning');
-      return;
-    }
-    if (!bookingCustomerPhone.trim()) {
-      if (onShowNotification) onShowNotification(t('tourDetailPage.booking.validation.phoneRequired'), 'warning');
-      return;
-    }
-
-    const fullPhone = getFullPhoneNumber();
-    if (fullPhone.replace(/\D/g, '').length < 7) {
-      if (onShowNotification) onShowNotification(t('tourDetailPage.booking.validation.phoneInvalid'), 'warning');
-      return;
-    }
-    if (!captchaAnswer.trim()) {
-      if (onShowNotification) onShowNotification(t('tourDetailPage.booking.validation.captchaRequired'), 'warning');
-      return;
-    }
-
-    setIsCheckingNumber(true);
-    setVerifyErrorMessage(null);
-    try {
-      const res = await fetch('/api/whatsapp/verify-number', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: fullPhone, captchaId, captchaAnswer: Number(captchaAnswer) })
-      });
-      const data = await res.json().catch(() => ({}));
-
-      if (res.ok && data.hasWhatsapp) {
-        setIsPhoneVerified(true);
-        setVerifyErrorMessage(null);
-        if (onShowNotification) onShowNotification(t('tourDetailPage.booking.validation.otpVerified'), 'success');
-        return;
-      }
-
-      let message = data.error || t('tourDetailPage.booking.validation.otpSendFailed');
-      if (res.status === 422 && data.hasWhatsapp === false) {
-        message = t('tourDetailPage.booking.validation.otpNoWhatsapp');
-      } else if (data.captchaExpired) {
-        message = t('tourDetailPage.booking.validation.captchaExpired');
-      } else if (data.captchaFailed) {
-        message = t('tourDetailPage.booking.validation.captchaWrong');
-      } else if (res.status === 429) {
-        message = t('tourDetailPage.booking.validation.otpRateLimited');
-      } else if (res.status === 503) {
-        message = t('tourDetailPage.booking.validation.otpServiceUnavailable');
-        setWhatsappSystemOnline(false);
-      }
-      setIsPhoneVerified(false);
-      setVerifyErrorMessage(message);
-      if (onShowNotification) onShowNotification(message, 'error');
-      // The captcha was consumed server-side by this attempt (whatever the outcome), so the
-      // next retry needs a fresh one.
-      fetchCaptchaChallenge();
-    } catch {
-      setIsPhoneVerified(false);
-      setVerifyErrorMessage(t('tourDetailPage.booking.validation.otpServiceUnavailable'));
-      if (onShowNotification) onShowNotification(t('tourDetailPage.booking.validation.otpServiceUnavailable'), 'error');
-      fetchCaptchaChallenge();
-    } finally {
-      setIsCheckingNumber(false);
-    }
-  };
-
-  // State for WhatsApp redirection status
-  const [isRedirecting, setIsRedirecting] = useState<boolean>(false);
-
-  // WhatsApp click & lead tracking plus auto-redirection with exactly 1-second delay
-  const handleProceedBookingSimulate = async () => {
-    if (!selectedSlot || !selectedTour) return;
-
-    // Generate custom unique booking_reference of format TUR-XXXX
-    const randomRefNum = Math.floor(Math.random() * 9000 + 1000); // 1000 to 9999
-    const bookingRef = `TUR-${randomRefNum}`;
-
-    // Dynamic price calculation
-    const priceDetails = getActiveCalculatedPrice();
-    const finalQty = priceDetails.qty;
-    const totalCost = getConvertedPriceInfo(priceDetails.total, selectedTour.priceCurrency).azn;
-
-    setIsProcessingPayment(true);
-    setIsRedirecting(true);
-    setBookingSubmitError(null);
-
-    // 1. Submit Click Metrics & Lead Stats to backend `/api/bookings/whatsapp-click`
-    try {
-      await fetch('/api/bookings/whatsapp-click', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          tourId: selectedTour.id,
-          startDate: selectedSlot.startDate,
-          participantsCount: finalQty,
-          vendorId: selectedTour.vendorId,
-          booking_reference: bookingRef
-        })
-      });
-      console.log(`Backend Lead Tracking logged successfully for #${bookingRef}`);
-    } catch (e) {
-      console.error('Click tracking API error:', e);
-    }
-
-    // 2. Create the real booking record via the API (server/db.ts — Postgres or SQLite)
-    const bId = 'book-' + Math.floor(Math.random() * 90000 + 10000);
-    const newBooking: Booking = {
-      id: bId,
-      slotId: selectedSlot.id,
-      tourId: selectedTour.id,
-      customerId: 'guest-' + Math.floor(Math.random() * 90000 + 10000),
-      customerName: bookingCustomerName.trim() || currentUser.name,
-      customerPhone: bookingCustomerPhone.trim() ? getFullPhoneNumber() : currentUser.phone,
-      bookingDate: new Date().toISOString().split('T')[0],
-      participantsCount: finalQty,
-      totalAmount: totalCost,
-      status: 'pending', // Stored as Pending status until operator confirms
-      paymentMethod: 'whatsapp',
-      booking_reference: bookingRef,
-      smsNotificationSent: false,
-
-      // Active Lifestyle custom properties
-      isTeamBooking: (selectedTour.category === 'active' || selectedTour.isActiveLife) && bookingRegType === 'team',
-      teamName: bookingRegType === 'team' ? bookingTeamName : undefined,
-      teamMembers: bookingRegType === 'team' ? bookingTeamMembers.filter(m => m.name.trim() !== '') : undefined,
-      usingOwnEquipment: usingOwnEquipment
-    };
-
-    try {
-      // onAddBooking POSTs to /api/bookings and already updates the slot's bookedCount
-      // locally from the server's response, so there's no separate increment call here.
-      await onAddBooking(newBooking);
-    } catch (e: any) {
-      setIsProcessingPayment(false);
-      setIsRedirecting(false);
-      setBookingSubmitError(e?.message || t('tourDetailPage.booking.validation.submitError'));
-      return;
-    }
-
-    if (onShowNotification) {
-      onShowNotification(t('tourDetailPage.booking.notifications.statsRecorded'), 'info');
-    }
-
-    // 3. Exactly 1-second wait before auto-direction: "Müştəri WhatsApp-a yönləndirilməzdən tam bir saniyə öncə arxa planda klik statistikasını tutmalıyq."
-    setTimeout(() => {
-      setIsProcessingPayment(false);
-      setIsRedirecting(false);
-
-      // Raw message formatting
-      let msgText = t('tourDetailPage.booking.waMessage.intro', {
-        tourName: selectedTour.name,
-        date: selectedSlot.startDate,
-        qty: finalQty,
-        bookingRef,
-        customerName: bookingCustomerName.trim() || currentUser.name,
-        customerPhone: bookingCustomerPhone.trim() ? getFullPhoneNumber() : currentUser.phone
-      });
-
-      if (selectedTour.category === 'active' || selectedTour.isActiveLife) {
-        const regTypeText = bookingRegType === 'team'
-          ? t('tourDetailPage.booking.waMessage.teamRegType', { teamName: bookingTeamName || t('tourDetailPage.booking.waMessage.teamNameNotProvided') })
-          : t('tourDetailPage.booking.waMessage.individualRegType');
-        msgText += t('tourDetailPage.booking.waMessage.regTypeLine', { regType: regTypeText });
-
-        if (bookingRegType === 'team') {
-          const filledMembers = bookingTeamMembers.filter(m => m.name.trim());
-          if (filledMembers.length > 0) {
-            msgText += t('tourDetailPage.booking.waMessage.teamMembersHeader');
-            filledMembers.forEach((m, i) => {
-              msgText += `\n  - ${i + 2}. ${m.name} (${m.phone})`;
-            });
-          }
-        }
-
-        if (selectedTour.equipmentIncluded) {
-          msgText += t('tourDetailPage.booking.waMessage.equipmentLine', {
-            equipment: usingOwnEquipment
-              ? t('tourDetailPage.booking.waMessage.ownEquipmentDiscounted')
-              : t('tourDetailPage.booking.waMessage.organizerFreeEquipment')
-          });
-        } else {
-          msgText += t('tourDetailPage.booking.waMessage.equipmentLine', {
-            equipment: rentEquipment
-              ? t('tourDetailPage.booking.waMessage.rentPaid')
-              : t('tourDetailPage.booking.waMessage.ownEquipment')
-          });
-        }
-
-        msgText += t('tourDetailPage.booking.waMessage.safetyLine');
-      }
-
-      // Driver/Guide specific direct whatsapp number, or the organizing vendor's own profile phone
-      const targetWa = (selectedTour.whatsapp_number || vendorFallbackPhone).replace(/\s+/g, '');
-
-      const waUrl = `https://wa.me/${targetWa}?text=${encodeURIComponent(msgText)}`;
-
-      // Safe external routing
-      window.open(waUrl, '_blank');
-
-      // Set success visuals
-      setBookingSuccessData({
-        bookingId: bId,
-        bookingRef: bookingRef,
-        tourName: selectedTour.name,
-        date: selectedSlot.startDate,
-        amount: totalCost,
-        method: 'whatsapp',
-        waNumber: targetWa,
-        waMessage: msgText
-      });
-    }, 1000);
-  };
+  // Mobile fixed price bar: visible while the booking widget itself is off-screen, hidden as
+  // soon as it scrolls into view (same behavior as the approved mockup's bottom bar).
+  const [isMobileBarHidden, setIsMobileBarHidden] = useState<boolean>(false);
+  React.useEffect(() => {
+    const panel = document.getElementById('booking-widget-container');
+    if (!panel || !('IntersectionObserver' in window)) return;
+    const io = new IntersectionObserver(
+      (entries) => entries.forEach(e => setIsMobileBarHidden(e.isIntersecting)),
+      { threshold: 0.25 }
+    );
+    io.observe(panel);
+    return () => io.disconnect();
+  }, [selectedTour.id]);
 
   return (
         <div className="animate-fadeIn bg-white min-h-screen pb-20">
@@ -620,14 +267,32 @@ export function TourDetailPage({
                         </div>
                       </div>
 
-                      {/* Mobile Gallery (Carousel) */}
-                      <div className="md:hidden relative h-[300px] rounded-2xl overflow-hidden shadow-sm block bg-slate-100">
-                         <img src={allMedia[0]} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                         <div className="absolute bottom-3 right-3 pointer-events-auto">
-                           <button onClick={() => setLightboxIndex(0)} className="bg-white/95 text-slate-900 px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm flex items-center gap-1.5 cursor-pointer border border-slate-200">
-                             <Grid2X2 className="w-3.5 h-3.5" /> {t('tourDetailPage.gallery.viewAllImages')}
-                           </button>
-                         </div>
+                      {/* Mobile Gallery — main image + tappable thumbnail strip (approved mockup) */}
+                      <div className="md:hidden space-y-2">
+                        <div className="relative h-[300px] rounded-2xl overflow-hidden shadow-sm block bg-slate-100">
+                          <img src={allMedia[mobileGalleryIndex] || allMedia[0]} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                          <div className="absolute bottom-3 right-3 pointer-events-auto">
+                            <button onClick={() => setLightboxIndex(mobileGalleryIndex)} className="bg-white/95 text-slate-900 px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm flex items-center gap-1.5 cursor-pointer border border-slate-200">
+                              <Grid2X2 className="w-3.5 h-3.5" /> {t('tourDetailPage.gallery.viewAllImages')}
+                            </button>
+                          </div>
+                        </div>
+                        {allMedia.length > 1 && (
+                          <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+                            {allMedia.map((m, idx) => (
+                              <button
+                                key={idx}
+                                type="button"
+                                onClick={() => setMobileGalleryIndex(idx)}
+                                className={`shrink-0 w-16 h-16 rounded-xl overflow-hidden border-2 transition ${
+                                  mobileGalleryIndex === idx ? 'border-primary-500' : 'border-transparent opacity-80'
+                                }`}
+                              >
+                                <img src={m} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+                              </button>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </>
                   );
@@ -672,644 +337,6 @@ export function TourDetailPage({
                     <span className="text-xs text-slate-500 leading-snug">{t('tourDetailPage.quickInfo.selectableAtBooking')}</span>
                   </div>
                 </div>
-
-                {/* ACTIVE Tour Slots List — hidden until "Yerləri yoxla" is clicked in the sidebar */}
-                {showTourSlots && (
-                  <div id="tour-slots-calendar" className="scroll-mt-32 animate-fadeIn">
-                    <h4 className="text-sm font-bold text-slate-800 tracking-wide flex items-center gap-2">
-                      <Calendar className="w-4 h-4 text-slate-500" />
-                      {t('tourDetailPage.slotsCalendar.title')}
-                    </h4>
-                    <p className="text-[11px] text-slate-400 mt-1 mb-2">
-                      {t('tourDetailPage.slotsCalendar.subtitle')}
-                    </p>
-
-                    <div className="space-y-2.5 max-h-48 overflow-y-auto pr-1">
-                      {slots.filter(s => s.tourId === selectedTour.id).map((slot) => {
-                        const remainingSpots = Math.max(0, slot.capacity - slot.bookedCount);
-                        const isFull = remainingSpots <= 0;
-                        return (
-                          <div
-                            key={slot.id}
-                            className={`flex items-center justify-between p-3 rounded-lg border text-xs transition ${
-                              isFull
-                                ? 'bg-slate-50 border-slate-200 opacity-60'
-                                : 'bg-white border-slate-150 shadow-sm hover:border-emerald-300'
-                            }`}
-                          >
-                            <div className="space-y-1">
-                              <span className="font-bold text-slate-700 block">📅 {t('tourDetailPage.slotsCalendar.date', { date: formatDisplayDate(slot.startDate) })}</span>
-                              <span className="text-slate-400 block text-[10px]">
-                                {slot.startDate !== slot.endDate && t('tourDetailPage.slotsCalendar.endDate', { date: formatDisplayDate(slot.endDate) })}
-                              </span>
-                            </div>
-
-                            <div className="text-center">
-                              <span className="text-[10px] text-slate-400 block">{t('tourDetailPage.slotsCalendar.remainingSpots')}</span>
-                              <strong className={`${isFull ? 'text-red-500' : 'text-slate-700'}`}>
-                                {remainingSpots} / {slot.capacity}
-                              </strong>
-                            </div>
-
-                            <div className="flex items-center gap-4">
-                              <span className="text-base font-extrabold text-sky-705">
-                                {t('tourDetailPage.slotsCalendar.pricePerPerson', { price: getConvertedPriceInfo(slot.price, selectedTour.priceCurrency).both })}
-                              </span>
-                              {!isFull ? (
-                                <button
-                                  type="button"
-                                  onClick={() => handleOpenBooking(slot)}
-                                  className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-3 py-1.5 rounded transition"
-                                >
-                                  {t('tourDetailPage.slotsCalendar.reserve')}
-                                </button>
-                              ) : (
-                                <span className="text-[11px] text-red-500 font-bold tracking-wider">{t('tourDetailPage.slotsCalendar.full')}</span>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {/* STEP 2 registration form — rendered right below the tour-slots-calendar
-                    section instead of far down the page, so it opens exactly where the user
-                    just clicked "Rezerv et". */}
-                {isBookingStep && (
-                /* STEP 2: BOOKING FLOW INTELLIGENCE / SIMULATION */
-                <div id="booking-form-section" className="space-y-6">
-                  {bookingSuccessData ? (
-                    // Success View
-                    <div className="text-center py-6 space-y-4">
-                      {bookingSuccessData.method === 'whatsapp' ? (
-                        <>
-                          <div className="w-14 h-14 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto shadow-inner">
-                            <MessageCircle className="w-8 h-8 fill-current" />
-                          </div>
-                          <h3 className="text-lg font-extrabold text-slate-800">{t('tourDetailPage.bookingSuccess.whatsapp.title')}</h3>
-                          <p className="text-xs text-slate-500 max-w-sm mx-auto leading-relaxed">
-                            {t('tourDetailPage.bookingSuccess.whatsapp.descPart1')} <strong>{t('tourDetailPage.bookingSuccess.whatsapp.pendingLabel')}</strong>. {t('tourDetailPage.bookingSuccess.whatsapp.descPart2')}
-                          </p>
-
-                          <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 text-left max-w-sm mx-auto space-y-2 text-xs">
-                            <div className="flex justify-between">
-                              <span className="text-slate-400">{t('tourDetailPage.bookingSuccess.orderId')}</span>
-                              <strong className="font-mono text-slate-705 text-slate-800">#{bookingSuccessData.bookingRef}</strong>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-slate-400">{t('tourDetailPage.bookingSuccess.tourRoute')}</span>
-                              <strong className="text-slate-700 text-right">{bookingSuccessData.tourName}</strong>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-slate-400">{t('tourDetailPage.bookingSuccess.date')}</span>
-                              <strong className="text-slate-700">{bookingSuccessData.date}</strong>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-slate-400">{t('tourDetailPage.bookingSuccess.amountDue')}</span>
-                              <strong className="text-emerald-650 text-sm font-extrabold text-emerald-600">{bookingSuccessData.amount} AZN</strong>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-slate-400">{t('tourDetailPage.bookingSuccess.systemRegType')}</span>
-                              <span className="bg-amber-100 text-amber-800 text-[10px] font-extrabold px-1.5 py-0.5 rounded">{t('tourDetailPage.bookingSuccess.pendingWhatsapp')}</span>
-                            </div>
-                          </div>
-
-                          {/* Action Button: Open WhatsApp pre-drafted message */}
-                          <div className="flex flex-col gap-2 max-w-sm mx-auto pt-2">
-                            <a
-                              href={`https://wa.me/${bookingSuccessData.waNumber}?text=${encodeURIComponent(bookingSuccessData.waMessage)}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="w-full py-3 bg-whatsapp-500 hover:bg-whatsapp-600 hover:scale-[1.02] transform transition-all text-white font-extrabold text-xs rounded-xl shadow-lg shadow-whatsapp-500/20 flex items-center justify-center gap-2 cursor-pointer no-underline"
-                            >
-                              <MessageCircle className="w-4 h-4 fill-current" />
-                              {t('tourDetailPage.bookingSuccess.sendViaWhatsapp')} ↗
-                            </a>
-
-                            {/* Copy to clipboard fallback button */}
-                            <button
-                              type="button"
-                              onClick={() => {
-                                navigator.clipboard.writeText(bookingSuccessData.waMessage);
-                                if (onShowNotification) onShowNotification(t('tourDetailPage.bookingSuccess.copiedNotification'), 'success');
-                              }}
-                              className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-[11px] rounded-lg transition flex items-center justify-center gap-1.5 cursor-pointer border border-slate-200"
-                            >
-                              <Copy className="w-3.5 h-3.5" /> {t('tourDetailPage.bookingSuccess.copyAndGoToWhatsapp')}
-                            </button>
-                          </div>
-
-                          {/* WhatsApp dispatch simulation console */}
-                          <div className="bg-slate-950 p-4 rounded-lg text-left max-w-sm mx-auto border border-emerald-950 font-mono text-[10px] space-y-1 text-slate-450 text-slate-400 shadow-inner">
-                            <div className="text-emerald-400">// WHATSAPP DISPATCH HANDLES READY</div>
-                            <div>{t('tourDetailPage.bookingSuccess.guideNumber')} {bookingSuccessData.waNumber}</div>
-                            <div className="text-amber-400">Status: Awaiting Receipt validation via WhatsApp / SMS</div>
-                            <div className="text-slate-500">// {t('tourDetailPage.bookingSuccess.consoleFooter')}</div>
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto text-xl">
-                            ✓
-                          </div>
-                          <h3 className="text-lg font-bold text-slate-800">{t('tourDetailPage.bookingSuccess.purchase.title')}</h3>
-                          <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                            {t('tourDetailPage.bookingSuccess.purchase.desc')}
-                          </p>
-
-                          <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 text-left max-w-sm mx-auto space-y-2 text-xs">
-                            <div className="flex justify-between">
-                              <span className="text-slate-400">{t('tourDetailPage.bookingSuccess.ticketNumber')}</span>
-                              <strong className="font-mono text-slate-700">#{bookingSuccessData.bookingId}</strong>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-slate-400">{t('tourDetailPage.bookingSuccess.tourName')}</span>
-                              <strong className="text-slate-700 text-right">{bookingSuccessData.tourName}</strong>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-slate-400">{t('tourDetailPage.bookingSuccess.date')}</span>
-                              <strong className="text-slate-700">{bookingSuccessData.date}</strong>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-slate-400">{t('tourDetailPage.bookingSuccess.amountPaid')}</span>
-                              <strong className="text-emerald-600">{bookingSuccessData.amount} AZN</strong>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-slate-400">{t('tourDetailPage.bookingSuccess.paymentMethod')}</span>
-                              <span className="font-mono text-xs text-slate-700 font-bold">{bookingSuccessData.method}</span>
-                            </div>
-                          </div>
-
-                          {/* Live SMS dispatch terminal visual log */}
-                          <div className="bg-slate-950 p-4 rounded text-left max-w-sm mx-auto border border-slate-800 font-mono text-[10px] space-y-1 text-slate-400">
-                            <div className="text-emerald-400">// SMS INTEGRATION TRANSMISSION OK</div>
-                            <div>To: {currentUser.phone}</div>
-                            <div>Sender: GEDƏKGÖRƏK</div>
-                            <div className="text-slate-300">{t('tourDetailPage.bookingSuccess.smsBody', { name: currentUser.name, tourName: bookingSuccessData.tourName, qty: bookingQty, bookingId: bookingSuccessData.bookingId })}</div>
-                          </div>
-                        </>
-                      )}
-
-                      <div className="pt-2">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSelectedTour(null);
-                            setBookingSuccessData(null);
-                          }}
-                          className="bg-slate-800 hover:bg-slate-900 text-white font-bold text-xs px-4 py-2 rounded-lg transition cursor-pointer"
-                        >
-                          {t('tourDetailPage.bookingSuccess.close')}
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    // Payment Checkout inputs
-                    <div className="space-y-4">
-                      <div className="flex justify-between items-center bg-slate-50 p-3 rounded-lg">
-                        <div className="text-xs">
-                          <span className="text-slate-400 block">{t('tourDetailPage.checkout.selectedDate')}</span>
-                          <strong className="text-slate-700">{formatDisplayDate(selectedSlot?.startDate)}</strong>
-                        </div>
-                        <div className="text-xs text-right">
-                          <span className="text-slate-400 block">{t('tourDetailPage.checkout.tourPrice')}</span>
-                          <strong className="text-emerald-600 font-bold">{t('tourDetailPage.checkout.pricePerPerson', { price: getConvertedPriceInfo(selectedSlot?.price || 0, selectedTour.priceCurrency).both })}</strong>
-                        </div>
-                      </div>
-
-                      {/* Participant quantity wrapper */}
-                      {bookingRegType !== 'team' ? (
-                        <div>
-                          <label className="block text-xs font-semibold text-slate-500 mb-1">{t('tourDetailPage.checkout.participantCount')}</label>
-                          <div className="flex items-center gap-3">
-                            <button
-                              type="button"
-                              disabled={bookingQty <= 1}
-                              onClick={() => setBookingQty(prev => prev - 1)}
-                              className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold w-8 h-8 rounded-full flex items-center justify-center transition disabled:opacity-40"
-                            >
-                              -
-                            </button>
-                            <span className="font-bold text-slate-800 text-sm tracking-widest">{bookingQty}</span>
-                            <button
-                              type="button"
-                              disabled={selectedSlot ? bookingQty >= (selectedSlot.capacity - selectedSlot.bookedCount) : true}
-                              onClick={() => setBookingQty(prev => prev + 1)}
-                              className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold w-8 h-8 rounded-full flex items-center justify-center transition disabled:opacity-40"
-                            >
-                              +
-                            </button>
-                            <span className="text-[10px] text-slate-400 italic">
-                              {t('tourDetailPage.checkout.maxSpotsAvailable', { count: selectedSlot ? Math.max(0, selectedSlot.capacity - selectedSlot.bookedCount) : 0 })}
-                            </span>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="bg-amber-50 text-amber-900 text-xs p-3 rounded-xl border border-amber-200 font-bold flex items-center justify-between">
-                          <span>📋 {t('tourDetailPage.checkout.teamContingentLabel')}</span>
-                          <span className="text-xs font-black text-amber-800 bg-white px-2 py-0.5 rounded shadow-sm">{t('tourDetailPage.checkout.teamContingentValue')}</span>
-                        </div>
-                      )}
-
-                      {/* ACTIVE LIFESTYLE PORTAL: REGISTRATION STYLE & EQUIPMENT CHOICES */}
-                      {(selectedTour.category === 'active' || selectedTour.isActiveLife) && (
-                        <div className="bg-amber-50/70 border border-amber-200 rounded-xl p-4.5 space-y-4 shadow-sm animate-fadeIn">
-                          <h4 className="text-xs font-bold text-amber-900 tracking-wider flex items-center gap-1.5 border-b border-amber-200 pb-2">
-                            🏅 {t('tourDetailPage.activeSports.title')}
-                          </h4>
-
-                          {/* Individual vs Team Registration (Volleyball specific or other dynamic games) */}
-                          {selectedTour.allowTeamRegistration && (
-                            <div className="space-y-2">
-                              <label className="block text-[10px] font-bold text-slate-500 tracking-wider">{t('tourDetailPage.activeSports.regTypeLabel')}</label>
-                              <div className="grid grid-cols-2 gap-2.5">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setBookingRegType('individual');
-                                    setBookingQty(1);
-                                  }}
-                                  className={`p-3 rounded-xl border text-left transition-all flex flex-col justify-between cursor-pointer ${
-                                    bookingRegType === 'individual'
-                                      ? 'bg-amber-100 border-amber-400 ring-2 ring-amber-200/50 shadow-xs'
-                                      : 'bg-white border-slate-200 hover:bg-slate-50'
-                                  }`}
-                                >
-                                  <span className="font-extrabold text-xs text-slate-800">👤 {t('tourDetailPage.activeSports.individualOption')}</span>
-                                  <span className="text-[9px] text-slate-400 mt-1 block">{t('tourDetailPage.activeSports.individualOptionDesc')}</span>
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setBookingRegType('team');
-                                    setBookingQty(6);
-                                  }}
-                                  className={`p-3 rounded-xl border text-left transition-all flex flex-col justify-between cursor-pointer ${
-                                    bookingRegType === 'team'
-                                      ? 'bg-amber-100 border-amber-400 ring-2 ring-amber-200/50 shadow-xs'
-                                      : 'bg-white border-slate-200 hover:bg-slate-50'
-                                  }`}
-                                >
-                                  <span className="font-extrabold text-xs text-slate-800">🏐 {t('tourDetailPage.activeSports.teamOption')}</span>
-                                  <span className="text-[9px] text-slate-400 mt-1 block">{t('tourDetailPage.activeSports.teamOptionDesc')}</span>
-                                </button>
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Dynamically expanding team sub-form */}
-                          {bookingRegType === 'team' && (
-                            <div className="bg-white/95 border border-amber-200 p-4 rounded-xl space-y-3.5 shadow-xs animate-fadeIn">
-                              <div>
-                                <label className="block text-[11px] font-bold text-slate-700 mb-1">
-                                  {t('tourDetailPage.activeSports.teamNameLabel')} <span className="text-red-500">*</span>
-                                </label>
-                                <input
-                                  type="text"
-                                  placeholder={t('tourDetailPage.activeSports.teamNamePlaceholder')}
-                                  value={bookingTeamName}
-                                  onChange={(e) => setBookingTeamName(e.target.value)}
-                                  className="w-full px-3 py-1.5 text-xs border border-slate-250 bg-white rounded-lg text-slate-800 focus:ring-1 focus:ring-amber-500 outline-none font-medium"
-                                />
-                              </div>
-
-                              <div className="space-y-2">
-                                <label className="block text-[10px] font-black text-slate-500 tracking-widest border-b border-slate-100 pb-1.5">
-                                  {t('tourDetailPage.activeSports.otherMembersLabel')}
-                                </label>
-                                {bookingTeamMembers.map((member, idx) => (
-                                  <div key={idx} className="grid grid-cols-2 gap-2 pb-2 border-b border-dashed border-slate-100 last:border-0 last:pb-0">
-                                    <div>
-                                      <input
-                                        type="text"
-                                        placeholder={t('tourDetailPage.activeSports.memberNamePlaceholder', { index: idx + 2 })}
-                                        value={member.name}
-                                        onChange={(e) => {
-                                          const next = [...bookingTeamMembers];
-                                          next[idx].name = e.target.value;
-                                          setBookingTeamMembers(next);
-                                        }}
-                                        className="w-full px-2.5 py-1 text-[11px] border border-slate-200 rounded text-slate-800 bg-white placeholder-slate-400"
-                                      />
-                                    </div>
-                                    <div>
-                                      <input
-                                        type="tel"
-                                        placeholder={t('tourDetailPage.activeSports.memberPhonePlaceholder')}
-                                        value={member.phone}
-                                        onChange={(e) => {
-                                          const next = [...bookingTeamMembers];
-                                          next[idx].phone = e.target.value;
-                                          setBookingTeamMembers(next);
-                                        }}
-                                        className="w-full px-2.5 py-1 text-[11px] border border-slate-200 rounded text-slate-800 bg-white placeholder-slate-400"
-                                      />
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Dynamic Equipment Checkbox Options */}
-                          <div className="bg-white/90 p-3.5 rounded-xl border border-amber-100 space-y-3">
-                            <span className="block text-[10px] font-bold text-slate-500">{t('tourDetailPage.equipment.sectionLabel')}</span>
-
-                            {selectedTour.equipmentIncluded ? (
-                              <div className="flex items-start gap-2.5">
-                                <input
-                                  type="checkbox"
-                                  id="usingOwnEquipment"
-                                  checked={usingOwnEquipment}
-                                  onChange={(e) => setUsingOwnEquipment(e.target.checked)}
-                                  className="mt-1 w-4.5 h-4.5 text-emerald-600 border-slate-300 rounded focus:ring-emerald-500 cursor-pointer"
-                                />
-                                <label htmlFor="usingOwnEquipment" className="text-xs text-slate-705 text-slate-700 leading-normal cursor-pointer select-none">
-                                  <strong>💼 {t('tourDetailPage.equipment.ownEquipmentTitle')}</strong> {selectedTour.equipmentRentalPrice ? t('tourDetailPage.equipment.ownEquipmentDiscountDesc', { price: selectedTour.equipmentRentalPrice, currency: selectedTour.priceCurrency || 'AZN' }) : t('tourDetailPage.equipment.ownEquipmentNoDiscountDesc')}
-                                </label>
-                              </div>
-                            ) : (
-                              <div className="flex items-start gap-2.5">
-                                <input
-                                  type="checkbox"
-                                  id="rentEquipment"
-                                  checked={rentEquipment}
-                                  onChange={(e) => setRentEquipment(e.target.checked)}
-                                  className="mt-1 w-4.5 h-4.5 text-emerald-600 border-slate-300 rounded focus:ring-emerald-500 cursor-pointer"
-                                />
-                                <label htmlFor="rentEquipment" className="text-xs text-slate-705 text-slate-700 leading-normal cursor-pointer select-none">
-                                  <strong>🎒 {t('tourDetailPage.equipment.rentTitle')}</strong> {t('tourDetailPage.equipment.rentDesc', { equipment: selectedTour.requiredEquipment || t('tourDetailPage.equipment.defaultEquipment'), price: selectedTour.equipmentRentalPrice || 15, currency: selectedTour.priceCurrency || 'AZN' })}
-                                </label>
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Safety Waiver Section with active checkbox requirement */}
-                          <div className="bg-rose-50 p-3.5 rounded-xl border border-rose-100 flex items-start gap-2.5">
-                            <input
-                              type="checkbox"
-                              id="safetyWaiverInputCheck"
-                              checked={safetyAcknowledged}
-                              onChange={(e) => setSafetyAcknowledged(e.target.checked)}
-                              className="mt-1 w-4.5 h-4.5 text-rose-600 border-rose-300 rounded cursor-pointer shrink-0"
-                            />
-                            <div className="text-xs text-slate-700 leading-normal">
-                              <label htmlFor="safetyWaiverInputCheck" className="font-extrabold block text-rose-900 cursor-pointer select-none mb-0.5">
-                                ⚖️ {t('tourDetailPage.safetyWaiver.title')} <span className="text-red-500 font-extrabold">*</span>
-                              </label>
-                              <span className="text-[10px] leading-relaxed block text-rose-950/85">
-                                {t('tourDetailPage.safetyWaiver.body', { level: (selectedTour.difficulty as string) === 'beginner' || selectedTour.difficulty === 'easy' ? t('tourDetailPage.safetyWaiver.levelBeginner') : selectedTour.difficulty === 'hard' ? t('tourDetailPage.safetyWaiver.levelProfessional') : t('tourDetailPage.safetyWaiver.levelIntermediate') })}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Guest Passenger Details (No Registration required!) */}
-                      <div className="bg-slate-50 border border-slate-150 p-4 rounded-xl space-y-4">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[10px] font-extrabold text-emerald-700 bg-emerald-50 px-2 py-1 rounded border border-emerald-100 tracking-wide">
-                            {t('tourDetailPage.guestForm.noRegistrationBadge')}
-                          </span>
-                          <span className="text-slate-400 font-medium text-[11px]">{t('tourDetailPage.guestForm.ticketPurchase')}</span>
-                        </div>
-
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                          <div>
-                            <label className="block text-xs font-semibold text-slate-600 mb-1">
-                              {t('tourDetailPage.guestForm.fullNameLabel')} <span className="text-red-500">*</span>
-                            </label>
-                            <input
-                              type="text"
-                              required
-                              placeholder={t('tourDetailPage.guestForm.fullNamePlaceholder')}
-                              value={bookingCustomerName}
-                              onChange={(e) => setBookingCustomerName(e.target.value)}
-                              disabled={isPhoneVerified}
-                              className="w-full px-3 py-2 text-xs border border-slate-250 bg-white rounded-lg text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-emerald-500 disabled:bg-slate-100 disabled:text-slate-500"
-                            />
-                          </div>
-
-                          <div>
-                            <label className="block text-xs font-semibold text-slate-600 mb-1">
-                              {t('tourDetailPage.guestForm.phoneLabel')} <span className="text-red-500">*</span>
-                            </label>
-                            <div className="flex gap-1.5">
-                              <select
-                                value={phoneCountryDialCode}
-                                onChange={(e) => setPhoneCountryDialCode(e.target.value)}
-                                disabled={isPhoneVerified}
-                                className="w-[6.5rem] shrink-0 px-1.5 py-2 text-xs border border-slate-250 bg-white rounded-lg text-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-500 disabled:bg-slate-100 disabled:text-slate-500"
-                              >
-                                {DIAL_CODES.map((c) => (
-                                  <option key={c.iso2} value={c.dialCode}>
-                                    {isoToFlagEmoji(c.iso2)} {c.dialCode}
-                                  </option>
-                                ))}
-                              </select>
-                              <input
-                                type="tel"
-                                required
-                                placeholder={t('tourDetailPage.guestForm.phonePlaceholder')}
-                                value={bookingCustomerPhone}
-                                onChange={(e) => setBookingCustomerPhone(e.target.value)}
-                                disabled={isPhoneVerified}
-                                className="flex-1 min-w-0 px-3 py-2 text-xs border border-slate-250 bg-white rounded-lg text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-emerald-500 disabled:bg-slate-100 disabled:text-slate-500"
-                              />
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* WhatsApp Number Verification Box — just a live "does this number have
-                            WhatsApp" check, no code is sent or entered. */}
-                        <div className="border-t border-slate-200/60 pt-3.5 mt-2 space-y-3">
-                          {!isPhoneVerified ? (
-                            <div className="space-y-2.5">
-                              {captchaQuestion && (
-                                <div className="flex items-center gap-2.5">
-                                  <label className="text-[11px] text-slate-500 leading-normal shrink-0">
-                                    {t('tourDetailPage.otp.captchaPrompt', { question: captchaQuestion })}
-                                  </label>
-                                  <input
-                                    type="text"
-                                    inputMode="numeric"
-                                    placeholder="?"
-                                    value={captchaAnswer}
-                                    onChange={(e) => setCaptchaAnswer(e.target.value.replace(/[^0-9-]/g, ''))}
-                                    disabled={isCheckingNumber}
-                                    className="w-16 px-2 py-1.5 text-xs text-center font-bold border border-slate-200 bg-slate-50 rounded-lg text-slate-800 focus:outline-none focus:ring-1 focus:ring-emerald-500 disabled:bg-slate-100"
-                                  />
-                                </div>
-                              )}
-                              <button
-                                type="button"
-                                onClick={handleVerifyPhoneNumber}
-                                disabled={isCheckingNumber}
-                                className="w-full py-2 bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-60 font-extrabold text-[11px] rounded-lg transition-all flex items-center justify-center gap-2 cursor-pointer"
-                              >
-                                {isCheckingNumber ? (
-                                  <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                ) : (
-                                  <MessageCircle className="w-3.5 h-3.5 fill-current text-white" />
-                                )}
-                                {isCheckingNumber ? t('tourDetailPage.otp.sendingButton') : t('tourDetailPage.otp.sendButton')}
-                              </button>
-                              {verifyErrorMessage && (
-                                <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-[11px] font-bold text-red-600 leading-snug">
-                                  ⚠️ {verifyErrorMessage}
-                                </div>
-                              )}
-                              {whatsappSystemOnline === false && (
-                                <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 space-y-2">
-                                  <p className="text-[11px] text-amber-800 font-semibold leading-snug">
-                                    {t('tourDetailPage.otp.systemOfflineNotice')}
-                                  </p>
-                                  <a
-                                    href={`https://wa.me/${String(selectedTour.whatsapp_number || vendorFallbackPhone || '').replace(/\D/g, '')}?text=${encodeURIComponent(t('tourDetailPage.otp.directWhatsappPrefill', { tour: getLocalizedTourName(selectedTour, language), date: formatDisplayDate(selectedSlot?.startDate) }))}`}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="inline-flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-extrabold px-3 py-1.5 rounded-lg transition"
-                                  >
-                                    <MessageCircle className="w-3.5 h-3.5 fill-current" />
-                                    {t('tourDetailPage.otp.directWhatsappButton')}
-                                  </a>
-                                </div>
-                              )}
-                            </div>
-                          ) : (
-                            <div className="bg-emerald-50 border border-emerald-150 rounded-lg p-3 flex items-center justify-between text-xs text-emerald-800">
-                              <div className="flex items-center gap-1.5 font-bold">
-                                <CheckCircle className="w-4 h-4 text-emerald-600" />
-                                <span>{t('tourDetailPage.otp.verifiedLabel', { phone: getFullPhoneNumber() })}</span>
-                              </div>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setIsPhoneVerified(false);
-                                  fetchCaptchaChallenge();
-                                }}
-                                className="text-[10px] text-slate-400 hover:text-red-500 underline cursor-pointer"
-                              >
-                                {t('tourDetailPage.otp.changeNumber')}
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Dedicated WhatsApp explanation instead of old cards */}
-                      <div className="bg-emerald-50 border border-emerald-150/60 rounded-xl p-4 space-y-2 text-slate-750">
-                        <div className="flex items-center gap-2 text-emerald-800 font-extrabold text-xs">
-                          <MessageCircle className="w-4 h-4 text-emerald-600 fill-current animate-pulse" />
-                          <span>{t('tourDetailPage.waExplanation.title')}</span>
-                          {whatsappSystemOnline === false ? (
-                            <span className="bg-red-500 text-white text-[8px] font-extrabold px-1.5 py-0.5 rounded tracking-wider">{t('tourDetailPage.waExplanation.inactiveLabel')}</span>
-                          ) : (
-                            <span className="bg-emerald-600 text-white text-[8px] font-extrabold px-1.5 py-0.5 rounded tracking-wider">{t('tourDetailPage.waExplanation.activeLabel')}</span>
-                          )}
-                        </div>
-                        <p className="text-[11px] text-slate-600 leading-relaxed">
-                          {t('tourDetailPage.waExplanation.bodyPart1')} <strong>WhatsApp</strong> {t('tourDetailPage.waExplanation.bodyPart2', { number: selectedTour.whatsapp_number || vendorFallbackPhone })}
-                        </p>
-                      </div>
-
-                      {/* Dynamic Total Cost calculator */}
-                      {(() => {
-                        const priceDetails = getActiveCalculatedPrice();
-                        const currency = selectedTour.priceCurrency || 'AZN';
-                        const isAzn = currency === 'AZN';
-                        
-                        const singleOriginal = getConvertedPriceInfo(priceDetails.perPerson, currency).original;
-                        const totalOriginal = getConvertedPriceInfo(priceDetails.total, currency).original;
-                        const totalAzn = getConvertedPriceInfo(priceDetails.total, currency).azn;
-                        
-                        return (
-                          <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex items-center justify-between">
-                            <div>
-                              <span className="text-xs text-slate-400 block font-medium tracking-tight">{t('tourDetailPage.totalCost.label')}</span>
-                              <span className="text-slate-500 text-[10px] font-mono block">
-                                {t('tourDetailPage.totalCost.breakdown', { qty: priceDetails.qty, price: singleOriginal })}
-                              </span>
-                              {priceDetails.desc && (
-                                <span className="text-[10px] text-amber-600 block mt-0.5 font-bold">
-                                  💡 {priceDetails.desc}
-                                </span>
-                              )}
-                            </div>
-                            <div className="flex flex-col items-end">
-                              <span className="text-xl font-extrabold text-emerald-600 font-mono">
-                                {totalOriginal}
-                              </span>
-                              {!isAzn && (
-                                <span className="text-[10px] text-slate-400 font-bold font-mono">
-                                  (~ {totalAzn} ₼)
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })()}
-
-                      {bookingSubmitError && (
-                        <div className="bg-red-50 border border-red-200 text-red-700 text-xs font-semibold rounded-lg px-3 py-2 flex items-center gap-2">
-                          ⚠️ {bookingSubmitError}
-                        </div>
-                      )}
-
-                      {/* Checkout Action Buttons */}
-                      <div className="flex gap-3 justify-end items-center pt-4 border-t border-slate-100">
-                        {!isPhoneVerified && (
-                          <span className="text-[10px] text-red-500 font-bold bg-red-50 px-2 py-1 rounded">
-                            ⚠️ {t('tourDetailPage.checkoutActions.verifyPhoneWarning')}
-                          </span>
-                        )}
-
-                        {((selectedTour.category === 'active' || selectedTour.isActiveLife) && !safetyAcknowledged) && (
-                          <span className="text-[10px] text-red-500 font-bold bg-rose-50 px-2 py-1 rounded">
-                            ⚠️ {t('tourDetailPage.checkoutActions.acceptWaiverWarning')}
-                          </span>
-                        )}
-
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIsBookingStep(false);
-                            setBookingSuccessData(null);
-                          }}
-                          className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 font-medium text-xs rounded-lg transition"
-                        >
-                          {t('tourDetailPage.checkoutActions.back')}
-                        </button>
-
-                        <button
-                          type="button"
-                          disabled={isProcessingPayment || !isPhoneVerified || (((selectedTour.category === 'active' || selectedTour.isActiveLife)) && !safetyAcknowledged)}
-                          onClick={handleProceedBookingSimulate}
-                          className="px-5 py-2.5 bg-whatsapp-500 hover:bg-whatsapp-600 text-white font-extrabold text-xs rounded-lg shadow-md transition flex items-center gap-2 disabled:opacity-40 hover:scale-[1.02] cursor-pointer"
-                        >
-                          {isProcessingPayment ? (
-                            <>
-                              <svg className="animate-spin h-3.5 w-3.5 text-white" fill="none" viewBox="0 0 24 24">
-                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                              </svg>
-                              <span>{t('tourDetailPage.checkoutActions.recordingInProgress')}</span>
-                            </>
-                          ) : (
-                            <>
-                              <MessageCircle className="w-4 h-4 text-white fill-current animate-pulse" />
-                              <span>{t('tourDetailPage.checkoutActions.bookViaWhatsapp')}</span>
-                            </>
-                          )}
-                        </button>
-                      </div>
-
-                    </div>
-                  )}
-                </div>
-                )}
 
                 {/* Qiymətə daxildir / daxil deyil (Modern Grid) — turun dəyərini istifadəçi ilk açılışda görsün deyə ən yuxarıda */}
                 <div className="space-y-4 py-4">
@@ -1728,13 +755,19 @@ export function TourDetailPage({
                     </div>
                   )}
 
-                  {/* Gündəlik Səyahət Proqramı (Itinerary Map) */}
+                  {/* Gündəlik Səyahət Proqramı (Itinerary Map) — collapsible per the approved mockup */}
                   {selectedTour.isInternational && selectedTour.itinerary && selectedTour.itinerary.length > 0 && (
                     <div className="space-y-4">
-                      <h4 className="text-xs font-black text-slate-500 tracking-widest border-b pb-1.5 flex items-center gap-1.5">
-                        ⏳ {t('tourDetailPage.itineraryDetail.title')}
-                      </h4>
+                      <button
+                        type="button"
+                        onClick={() => setIsItineraryExpanded(prev => !prev)}
+                        className="w-full text-xs font-black text-slate-500 tracking-widest border-b pb-1.5 flex items-center justify-between gap-1.5 cursor-pointer"
+                      >
+                        <span className="flex items-center gap-1.5">⏳ {t('tourDetailPage.itineraryDetail.title')}</span>
+                        <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${isItineraryExpanded ? '' : '-rotate-90'}`} />
+                      </button>
 
+                      {isItineraryExpanded && (
                       <div className="space-y-5">
                         {selectedTour.itinerary.map((day, di) => (
                           <div key={di} className="relative pl-6 border-l-2 border-amber-500/40 space-y-2">
@@ -1767,6 +800,7 @@ export function TourDetailPage({
                           </div>
                         ))}
                       </div>
+                      )}
                     </div>
                   )}
 
@@ -1842,9 +876,13 @@ export function TourDetailPage({
                         {showParticipantsDropdown && (() => {
                           const maxParticipants = selectedSlot ? Math.max(1, selectedSlot.capacity - selectedSlot.bookedCount) : 20;
                           return (
-                            <>
-                            <div className="fixed inset-0 z-10" onClick={() => setShowParticipantsDropdown(false)} />
-                            <div className="absolute left-0 right-0 top-full z-20 bg-white border border-slate-200 rounded-xl shadow-lg p-4 mt-1">
+                            <MaybeBodyPortal>
+                            <div className="fixed inset-0 z-10 max-sm:z-[140] max-sm:bg-black/40 max-sm:animate-sheet-backdrop-in" onClick={() => setShowParticipantsDropdown(false)} />
+                            {/* sm+: anchored dropdown; mobile: bottom sheet (approved mockup) */}
+                            <div className="absolute left-0 right-0 top-full z-20 bg-white border border-slate-200 rounded-xl shadow-lg p-4 mt-1 max-sm:fixed max-sm:inset-x-0 max-sm:top-auto max-sm:bottom-0 max-sm:mt-0 max-sm:z-[150] max-sm:rounded-b-none max-sm:rounded-t-2xl max-sm:border-0 max-sm:shadow-2xl max-sm:animate-sheet-slide-up max-sm:pb-[calc(16px+env(safe-area-inset-bottom))]">
+                              <div className="sm:hidden flex justify-center pb-2 -mt-1">
+                                <div className="w-10 h-1.5 rounded-full bg-slate-300" />
+                              </div>
                               <div className="flex items-center justify-between">
                                 <span className="text-sm font-bold text-slate-700">{t('tourDetailPage.participantsDropdown.adults')}</span>
                                 <div className="flex items-center gap-3">
@@ -1880,7 +918,7 @@ export function TourDetailPage({
                                 {t('tourDetailPage.participantsDropdown.confirm')}
                               </button>
                             </div>
-                            </>
+                            </MaybeBodyPortal>
                           );
                         })()}
                       </div>
@@ -1900,9 +938,13 @@ export function TourDetailPage({
                         </button>
 
                         {showDateDropdown && (
-                          <>
-                          <div className="fixed inset-0 z-10" onClick={() => setShowDateDropdown(false)} />
-                          <div className="absolute left-0 right-0 top-full z-20 bg-white border border-slate-200 rounded-xl shadow-lg p-2 mt-1 max-h-64 overflow-y-auto">
+                          <MaybeBodyPortal>
+                          <div className="fixed inset-0 z-10 max-sm:z-[140] max-sm:bg-black/40 max-sm:animate-sheet-backdrop-in" onClick={() => setShowDateDropdown(false)} />
+                          {/* sm+: anchored dropdown; mobile: bottom sheet (approved mockup) */}
+                          <div className="absolute left-0 right-0 top-full z-20 bg-white border border-slate-200 rounded-xl shadow-lg p-2 mt-1 max-h-64 overflow-y-auto max-sm:fixed max-sm:inset-x-0 max-sm:top-auto max-sm:bottom-0 max-sm:mt-0 max-sm:z-[150] max-sm:max-h-[60vh] max-sm:rounded-b-none max-sm:rounded-t-2xl max-sm:border-0 max-sm:shadow-2xl max-sm:animate-sheet-slide-up max-sm:p-4 max-sm:pb-[calc(16px+env(safe-area-inset-bottom))]">
+                            <div className="sm:hidden flex justify-center pb-2">
+                              <div className="w-10 h-1.5 rounded-full bg-slate-300" />
+                            </div>
                             {slots.filter(s => s.tourId === selectedTour.id).length === 0 ? (
                               <p className="text-xs text-slate-400 font-medium p-3 text-center">{t('tourDetailPage.dateDropdown.noActiveDate')}</p>
                             ) : (
@@ -1944,25 +986,22 @@ export function TourDetailPage({
                                 })
                             )}
                           </div>
-                          </>
+                          </MaybeBodyPortal>
                         )}
                       </div>
                     </div>
                   </div>
 
-                  {/* Primary CTA Action — just reveals the tour-slots-calendar section (moved up next to the
-                      Quick Info Grid). Once that section is open there's nothing left for this button to do,
-                      so it's hidden entirely instead of switching label/behavior. */}
-                  {!showTourSlots && (
-                    <button
-                      type="button"
-                      disabled={slots.filter(s => s.tourId === selectedTour.id).length === 0}
-                      onClick={() => setShowTourSlots(true)}
-                      className="w-full bg-primary-500 hover:bg-primary-600 text-white text-base md:text-lg font-black py-3.5 rounded-full shadow-md transition-all active:scale-95 cursor-pointer block text-center disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
-                      {t('tourDetailPage.sidebar.checkAvailability')}
-                    </button>
-                  )}
+                  {/* Primary CTA — opens the booking-inquiry sheet (auto-selecting the earliest
+                      available date when none is picked yet). */}
+                  <button
+                    type="button"
+                    disabled={!selectedSlot && !earliestAvailableSlot}
+                    onClick={() => handleOpenInquiry()}
+                    className="w-full bg-primary-500 hover:bg-primary-600 text-white text-base md:text-lg font-black py-3.5 rounded-full shadow-md transition-all active:scale-95 cursor-pointer block text-center disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    {t('tourDetailPage.sidebar.checkAvailability')}
+                  </button>
 
                   {/* Guarantees */}
                   <div className="space-y-3 pt-2">
@@ -2010,8 +1049,7 @@ export function TourDetailPage({
                         onClick={() => {
                           window.scrollTo({ top: 0, behavior: 'smooth' });
                           setSelectedTour(tour);
-                          setIsBookingStep(false);
-                          setBookingSuccessData(null);
+                          setShowInquiry(false);
                           setSelectedSlot(null);
                         }}
                       >
@@ -2063,6 +1101,60 @@ export function TourDetailPage({
             </div>
 
         </div>
+
+        {/* Mobile fixed price bar (approved mockup) — sits above the bottom nav on phones,
+            hides itself while the booking widget is on screen. lg+ has the sticky sidebar. */}
+        {(() => {
+          const tourSlots = slots.filter(s => s.tourId === selectedTour.id);
+          if (!tourSlots.length) return null;
+          const basePrice = selectedTour.price ?? tourSlots[0].price;
+          const hasDiscount = !!selectedTour.discountPrice && selectedTour.discountPrice > 0 && selectedTour.discountPrice < basePrice;
+          const shownPrice = hasDiscount ? selectedTour.discountPrice! : basePrice;
+          return (
+            <div
+              className={`lg:hidden fixed left-0 right-0 bottom-16 sm:bottom-0 z-[90] bg-white border-t border-slate-200 shadow-[0_-4px_16px_rgba(0,0,0,0.08)] px-4 py-2.5 transition-all duration-300 ${
+                isMobileBarHidden ? 'translate-y-[130%] opacity-0 pointer-events-none' : 'translate-y-0 opacity-100'
+              }`}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex flex-col leading-tight">
+                  {hasDiscount && (
+                    <span className="line-through text-slate-400 text-[12px]">
+                      {getConvertedPriceInfo(basePrice, selectedTour.priceCurrency).both}
+                    </span>
+                  )}
+                  <div className="flex items-baseline gap-1">
+                    <span className={`font-extrabold text-lg ${hasDiscount ? 'text-label-critical' : 'text-label-primary'}`}>
+                      {getConvertedPriceInfo(shownPrice, selectedTour.priceCurrency).both}
+                    </span>
+                    <span className="text-[12px] text-slate-500 font-medium">/ {t('tourDetailPage.pricingHeader.perPerson')}</span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const panel = document.getElementById('booking-widget-container');
+                    if (panel) panel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  }}
+                  className="bg-primary-500 hover:bg-primary-600 text-white font-black text-sm px-5 py-2.5 rounded-full shadow-md active:scale-95 transition cursor-pointer"
+                >
+                  {t('tourDetailPage.sidebar.checkAvailability')}
+                </button>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Booking-inquiry sheet/modal */}
+        <TourInquirySheet
+          tour={selectedTour}
+          slot={selectedSlot || earliestAvailableSlot}
+          qty={bookingQty}
+          open={showInquiry}
+          onClose={() => setShowInquiry(false)}
+          formatDisplayDate={formatDisplayDate}
+          onShowNotification={onShowNotification}
+        />
       </div>
   );
 }

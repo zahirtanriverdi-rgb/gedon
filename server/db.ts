@@ -265,6 +265,53 @@ export async function initializeDatabase() {
     );
   `);
 
+  // Rezervasiya sorğuları — müştəri tur səhifəsindəki "Yerləri yoxla" axını ilə ad/telefon və
+  // tur-spesifik sual cavablarını göndərir; vendor Telegram/panel bildirişi alıb WhatsApp-dan
+  // özü cavab yazır (köhnə birbaşa wa.me yönləndirməsini əvəz edir). tour_name snapshot-dur ki,
+  // tur sonradan adı dəyişsə/silinsə belə sorğu oxunaqlı qalsın. `answers` JSON massividir:
+  // [{question, answer}] — suallar tur üzrə dəyişə bildiyi üçün sərbəst formadadır.
+  await dbClient.execute(`
+    CREATE TABLE IF NOT EXISTS inquiries (
+      id VARCHAR(255) PRIMARY KEY,
+      tour_id VARCHAR(255) NOT NULL,
+      tour_name VARCHAR(255),
+      vendor_id VARCHAR(255) NOT NULL,
+      slot_id VARCHAR(255),
+      tour_date VARCHAR(255),
+      customer_name VARCHAR(255) NOT NULL,
+      customer_phone VARCHAR(255) NOT NULL,
+      participants_count INTEGER DEFAULT 1,
+      answers TEXT,
+      status VARCHAR(50) DEFAULT 'new',
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (vendor_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+  `);
+  await dbClient.execute(
+    `CREATE INDEX IF NOT EXISTS idx_inquiries_vendor ON inquiries(vendor_id)`
+  );
+
+  // Panel bildirişləri (vendor + admin). recipient_id konkret istifadəçiyə ünvanlanır;
+  // recipient_role='admin' + recipient_id NULL isə bütün adminlərə görünən ümumi bildirişdir
+  // (admin sayı az olduğu üçün oxundu statusu da ortaqdır). `data` JSON-dur — bildirişin
+  // aid olduğu obyektə keçid üçün (məs. {inquiryId, tourId}).
+  await dbClient.execute(`
+    CREATE TABLE IF NOT EXISTS notifications (
+      id VARCHAR(255) PRIMARY KEY,
+      recipient_id VARCHAR(255),
+      recipient_role VARCHAR(50) NOT NULL,
+      type VARCHAR(50) NOT NULL,
+      title VARCHAR(255) NOT NULL,
+      body TEXT,
+      data TEXT,
+      is_read BOOLEAN DEFAULT false,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+  await dbClient.execute(
+    `CREATE INDEX IF NOT EXISTS idx_notifications_recipient ON notifications(recipient_id, is_read)`
+  );
+
   // Vendor transport tracking — which vehicle (bus, offroad, etc.) a vendor sent to which tour
   // departure, and at what cost. Admin-gated per vendor (users.extra_data.busTrackingEnabled).
   // The list itself is shared/visible across all vendors (so operators can see what transport

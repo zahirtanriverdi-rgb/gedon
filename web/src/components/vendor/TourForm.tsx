@@ -1,6 +1,7 @@
 'use client';
 import React, { useState, useEffect, useMemo } from 'react';
-import { Tour, TourSlot, User, Guide } from '../../types';
+import { Tour, TourSlot, User, Guide, InquiryQuestion } from '../../types';
+import { InquiryQuestionsEditor } from './InquiryQuestionsEditor';
 import { parseGpsFile } from '../../utils/gpxParser';
 import { Plus, X, Check } from 'lucide-react';
 import { DynamicStringListInput } from './DynamicStringListInput';
@@ -57,6 +58,8 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
   const [tourDurationHours, setTourDurationHours] = useState<number | ''>(8);
   const [tourDepartureDateTime, setTourDepartureDateTime] = useState<string>('');
   const [tourReturnDateTime, setTourReturnDateTime] = useState<string>('');
+  // Bu tura xas əlavə sorğu sualları (ad/telefon + 2 standart sual həmişə soruşulur)
+  const [tourInquiryQuestions, setTourInquiryQuestions] = useState<InquiryQuestion[]>([]);
   const [dateTimeError, setDateTimeError] = useState<string | null>(null);
   const [tourBringItems, setTourBringItems] = useState<string[]>([]);
   const [tourNotAllowedItems, setTourNotAllowedItems] = useState<string[]>([]);
@@ -264,6 +267,7 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
     setTourScheduleFrequency(tour.scheduleFrequency || 'one-time');
     setTourCancellationHours(tour.cancellationHours !== undefined ? tour.cancellationHours : 48);
     setTourGuideIds(tour.guideIds || []);
+    setTourInquiryQuestions(Array.isArray(tour.inquiryQuestions) ? tour.inquiryQuestions : []);
 
     const tourSlots = slots.filter(s => s.tourId === tour.id);
     setSelectedDates(tourSlots.map(s => new Date(s.startDate)));
@@ -351,6 +355,12 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
       scheduleFrequency: tourCategory === 'active' ? tourScheduleFrequency : undefined,
       guideIds: tourGuideIds.length > 0 ? tourGuideIds : undefined,
       cancellationHours: tourCancellationHours,
+      inquiryQuestions: (() => {
+        const cleaned = tourInquiryQuestions
+          .map(q => ({ ...q, question: q.question.trim(), options: q.options.map(o => o.trim()).filter(Boolean) }))
+          .filter(q => q.question && q.options.length >= 2);
+        return cleaned.length > 0 ? cleaned : undefined;
+      })(),
     };
 
     setIsSavingForm(true);
@@ -1028,6 +1038,8 @@ const handleMediaFilesChange = async (e: React.ChangeEvent<HTMLInputElement>) =>
             />
             {fieldErrors.highlights && <p className="text-[10px] font-semibold text-red-600 mt-1">⚠️ {t('vendorTourForms.tourForm.fields.highlights.error')}</p>}
           </div>
+
+          <InquiryQuestionsEditor questions={tourInquiryQuestions} onChange={setTourInquiryQuestions} />
         </div>
         )}
 

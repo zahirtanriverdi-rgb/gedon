@@ -13,6 +13,7 @@ import { emailVerification } from './emailVerification';
 import { vendorCalculator } from './vendorCalculator';
 import { vendorBusTracking } from './vendorBusTracking';
 import { adminVendorTools } from './adminVendorTools';
+import { inquiriesPanel } from './inquiriesPanel';
 
 // Each namespace module exports { az: {...}, en: {...}, ru: {...} } with a single unique
 // top-level key (its namespace) so merging never collides across files.
@@ -32,6 +33,7 @@ const namespaces = [
   vendorCalculator,
   vendorBusTracking,
   adminVendorTools,
+  inquiriesPanel,
 ];
 
 function merge(dicts: Array<{ az: Record<string, any>; en: Record<string, any>; ru: Record<string, any> }>) {

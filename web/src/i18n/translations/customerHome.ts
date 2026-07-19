@@ -132,7 +132,7 @@ export const customerHome = {
         priceLabel: 'QİYMƏT',
         perPerson: '/ nəfər',
         whatsappTitle: 'Bələdçinin nömrəsinə WhatsApp ilə birbaşa keçid et',
-        whatsappReserve: 'WhatsApp Rezerv',
+        whatsappReserve: 'Sorğu göndər',
       },
       wishlistView: {
         title: 'İstəklərim',
@@ -365,7 +365,7 @@ export const customerHome = {
         priceLabel: 'PRICE',
         perPerson: '/ person',
         whatsappTitle: 'Go directly to the guide\'s WhatsApp number',
-        whatsappReserve: 'WhatsApp Reserve',
+        whatsappReserve: 'Send inquiry',
       },
       wishlistView: {
         title: 'My Wishlist',
@@ -598,7 +598,7 @@ export const customerHome = {
         priceLabel: 'ЦЕНА',
         perPerson: '/ чел.',
         whatsappTitle: 'Перейти напрямую в WhatsApp гида',
-        whatsappReserve: 'Бронь через WhatsApp',
+        whatsappReserve: 'Отправить запрос',
       },
       wishlistView: {
         title: 'Избранное',

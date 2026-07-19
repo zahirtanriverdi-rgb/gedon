@@ -7,6 +7,9 @@ import { useLanguage } from '../i18n/LanguageContext';
 import DashboardSidebarLayout, { DashboardNavItem } from './layout/DashboardSidebarLayout';
 import AdminCampSites from './admin/AdminCampSites';
 import AdminVendorCalculator from './admin/AdminVendorCalculator';
+import AdminInquiriesTab from './admin/AdminInquiriesTab';
+import AdminVendorTelegram from './admin/AdminVendorTelegram';
+import { useNotificationsBadge } from './shared/InquiriesPanel';
 import StatCard from './layout/StatCard';
 import LanguageSwitcher from './LanguageSwitcher';
 import EmailVerificationCard from './EmailVerificationCard';
@@ -34,7 +37,8 @@ import {
   Settings,
   Tent,
   Power,
-  Mail
+  Mail,
+  Bell
 } from 'lucide-react';
 
 function isTourInternational(t: Tour): boolean {
@@ -147,7 +151,7 @@ export default function AdminPortal({
   onLogout
 }: AdminPortalProps) {
   const { t } = useLanguage();
-  const [activeSection, setActiveSection] = useState<'dashboard' | 'tours' | 'vendors' | 'campSites' | 'settings'>('dashboard');
+  const [activeSection, setActiveSection] = useState<'dashboard' | 'tours' | 'vendors' | 'campSites' | 'settings' | 'inquiries'>('dashboard');
 
   // Price calculator cost elements (destinations + rates) — editable draft, synced from
   // platformConfig whenever it changes elsewhere, saved explicitly via the button below.
@@ -575,8 +579,12 @@ export default function AdminPortal({
     }
   };
 
+  // Sorğu bildirişləri — sidebar-dakı "Bildirişlər" tabının oxunmamış sayğacı
+  const { unreadCount, markAllRead } = useNotificationsBadge(authToken);
+
   const navItems: DashboardNavItem[] = [
     { id: 'dashboard', label: t('adminPortal.sidebar.dashboard'), icon: LayoutDashboard },
+    { id: 'inquiries', label: t('inquiriesPanel.tabLabel'), icon: Bell, badgeCount: unreadCount },
     { id: 'tours', label: t('adminPortal.sidebar.tours'), icon: Compass },
     { id: 'vendors', label: t('adminPortal.sidebar.vendors'), icon: Building2 },
     { id: 'campSites', label: t('adminPortal.sidebar.campSites'), icon: Tent },
@@ -590,7 +598,10 @@ export default function AdminPortal({
       subtitle={t('adminPortal.sidebar.subtitle')}
       navItems={navItems}
       activeId={activeSection}
-      onSelect={(id) => setActiveSection(id as typeof activeSection)}
+      onSelect={(id) => {
+        setActiveSection(id as typeof activeSection);
+        if (id === 'inquiries') markAllRead();
+      }}
       title={activeNavItem?.label ?? ''}
       rightSlot={
         <>
@@ -604,6 +615,11 @@ export default function AdminPortal({
         </>
       }
     >
+      {/* Bildirişlər — bütün rezervasiya sorğuları + admin Telegram parametrləri */}
+      {activeSection === 'inquiries' && (
+        <AdminInquiriesTab authToken={authToken} onShowNotification={onShowNotification} />
+      )}
+
       {activeSection === 'dashboard' && (
       <>
       {/* Metrics board */}
@@ -1246,6 +1262,13 @@ export default function AdminPortal({
               })}
             </div>
           </div>
+
+          {/* Section: Vendor Telegram chat ID-ləri — sorğu bildirişlərinin ünvanları */}
+          <AdminVendorTelegram
+            vendors={users}
+            onUpdateUser={onUpdateUser}
+            onShowNotification={onShowNotification}
+          />
 
           {/* Section: Guide Calculator & Bus Tracking — per-vendor toggles + rate config */}
           <AdminVendorCalculator

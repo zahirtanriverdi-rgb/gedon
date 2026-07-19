@@ -15,6 +15,7 @@ import { BusTrackingTab } from './vendor/BusTrackingTab';
 import DashboardSidebarLayout, { DashboardNavItem } from './layout/DashboardSidebarLayout';
 import StatCard from './layout/StatCard';
 import LanguageSwitcher from './LanguageSwitcher';
+import { InquiriesPanel, WaTemplatesEditor, useNotificationsBadge } from './shared/InquiriesPanel';
 import {
   Users,
   DollarSign,
@@ -27,7 +28,8 @@ import {
   CalendarPlus,
   User as UserIcon,
   Calculator,
-  Truck
+  Truck,
+  Bell
 } from 'lucide-react';
 
 // Shown in place of a tour create/edit form once the vendor's subscription has expired
@@ -92,7 +94,11 @@ export default function VendorPortal({
   onLogout
 }: VendorPortalProps) {
   const { t } = useLanguage();
-  const [activeSubTab, setActiveSubTab] = useState<'my-tours' | 'add-tour' | 'add-intl-tour' | 'add-slot' | 'profile' | 'crm' | 'calculator' | 'buses'>('my-tours');
+  const [activeSubTab, setActiveSubTab] = useState<'my-tours' | 'add-tour' | 'add-intl-tour' | 'add-slot' | 'profile' | 'crm' | 'calculator' | 'buses' | 'inquiries'>('my-tours');
+
+  // Sorğu bildirişləri — sidebar-dakı "Bildirişlər" tabının oxunmamış sayğacı. Tab açılanda
+  // hamısı oxundu sayılır (siyahının özü sorğu statuslarını ayrıca idarə edir).
+  const { unreadCount, markAllRead } = useNotificationsBadge(operatorToken);
   const [tourSearchTerm, setTourSearchTerm] = useState('');
   const [selectedTicketBooking, setSelectedTicketBooking] = useState<Booking | null>(null);
 
@@ -192,6 +198,7 @@ export default function VendorPortal({
   // sharing the same activeSubTab value, so the active pill needs its own derived id.
   const navItems: DashboardNavItem[] = [
     { id: 'my-tours', label: t('vendorMisc.vendorPortal.tabMyTours'), icon: LayoutList },
+    { id: 'inquiries', label: t('inquiriesPanel.tabLabel'), icon: Bell, badgeCount: unreadCount },
     { id: 'crm', label: t('vendorMisc.vendorPortal.tabCrm'), icon: BarChart3 },
     { id: 'add-tour', label: t('vendorMisc.vendorPortal.tabAddTour'), icon: PlusCircle },
     { id: 'add-active-tour', label: t('vendorMisc.vendorPortal.tabAddActiveTour'), icon: Activity },
@@ -213,6 +220,7 @@ export default function VendorPortal({
       setNewTourCategory('active');
     } else {
       setActiveSubTab(id as typeof activeSubTab);
+      if (id === 'inquiries') markAllRead();
     }
   };
   const activeNavItem = navItems.find((item) => item.id === activeNavId);
@@ -302,6 +310,45 @@ export default function VendorPortal({
           }}
           onToggleFeatured={onToggleFeatured}
         />
+      )}
+
+      {/* Subtab Content: Bildirişlər — rezervasiya sorğuları + Hazır mesajlar + Telegram info */}
+      {activeSubTab === 'inquiries' && (
+        <div className="space-y-5">
+          <InquiriesPanel
+            token={operatorToken}
+            waTemplates={currentUser.waTemplates || []}
+            onShowNotification={onShowNotification}
+          />
+
+          <WaTemplatesEditor
+            templates={currentUser.waTemplates || []}
+            onShowNotification={onShowNotification}
+            onSave={async (templates) => {
+              const res = await fetch(`/api/users/${currentUser.id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${operatorToken}` },
+                body: JSON.stringify({ waTemplates: templates }),
+              });
+              const data = await res.json().catch(() => ({}));
+              if (!res.ok) throw new Error(data?.error || t('inquiriesPanel.templates.saveError'));
+              if (onUserUpdated && data.user) onUserUpdated(data.user);
+            }}
+          />
+
+          {/* Telegram məlumat qutusu — chat ID-ləri admin bağlayır, vendor yalnız görür */}
+          <div className="bg-sky-50 border border-sky-200 rounded-2xl p-5 space-y-2">
+            <h3 className="font-bold text-sky-900 text-sm">✈️ {t('inquiriesPanel.telegram.vendorInfoTitle')}</h3>
+            <p className="text-xs text-sky-800 leading-relaxed">
+              {t('inquiriesPanel.telegram.vendorInfoBody', { bot: '@AzTour_booking_bot' })}
+            </p>
+            <p className="text-xs font-bold text-sky-900">
+              {(currentUser.telegramChatIds || []).length
+                ? t('inquiriesPanel.telegram.vendorLinkedChats', { ids: (currentUser.telegramChatIds || []).join(', ') })
+                : t('inquiriesPanel.telegram.vendorNoChats')}
+            </p>
+          </div>
+        </div>
       )}
 
       {/* Subtab Content: CRM & Tour Manifest */}

@@ -30,6 +30,7 @@ bütün UI artıq `web/`-dədir; brauzer `/api/*` sorğularını Next rewrite il
 | `storage.ts` | Media yükləmələri — S3-uyğun bucket və ya dev-də `public/uploads/` diski |
 | `translate.ts` | Gemini AI ilə tur/vendor mətnlərini AZ→EN/RU avtomatik tərcümə edir |
 | `whatsapp.ts` | Baileys ilə server-side WhatsApp sessiyası (QR skan, nömrənin WhatsApp-da olub-olmadığını yoxlama) |
+| `telegram.ts` | Telegram bot inteqrasiyası — rezervasiya sorğularını vendor/admin chat-lərinə göndərir (inline "WhatsApp-dan cavabla" düymələri ilə), /start-a chat ID qaytaran long-polling köməkçisi. Token: `TELEGRAM_BOT_TOKEN` |
 | `slugify.ts` | Tur adlarından unikal URL slug yaradır (`slugifyBase`) |
 | `seedCredentials.ts` | Demo/seed hesabları üçün ilkin parollar |
 | `campSites*.ts` və s. | Kamp yerləri validasiyası/DB köməkçiləri |
@@ -69,8 +70,10 @@ Köhnə `src/`-in Next-ə uyğunlaşdırılmış tam nüsxəsi — qovluq strukt
 | Qovluq | İş |
 |---|---|
 | `components/` | `AdminPortal`, `VendorPortal`, `FAQPage`, `PriceCalculator`, `SearchDropdown` və s. üst səviyyə komponentlər |
-| `components/customer/` | `ToursHomeView`, `TourDetailPage`, `CompareView`, `WishlistView`, `CampSitesPage`, `UrgentDealsBell` və s. |
-| `components/vendor/` | `TourForm`, `InternationalTourForm`, `CrmTab`, `MyToursTab`, `ProfileTab`, `QrScannerModal` və s. |
+| `components/customer/` | `ToursHomeView`, `TourDetailPage`, `TourInquirySheet` (rezervasiya sorğu sheet/modalı), `CompareView`, `WishlistView`, `CampSitesPage`, `UrgentDealsBell` və s. |
+| `components/vendor/` | `TourForm`, `InternationalTourForm`, `InquiryQuestionsEditor` (tur üzrə əlavə sorğu sualları), `CrmTab`, `MyToursTab`, `ProfileTab`, `QrScannerModal` və s. |
+| `components/shared/InquiriesPanel.tsx` | Vendor/admin "Bildirişlər" tabının ortaq hissələri: sorğu siyahısı, "Hazır mesajlar" (WhatsApp şablonları) editoru, oxunmamış-badge hook-u |
+| `components/admin/AdminInquiriesTab.tsx`, `AdminVendorTelegram.tsx` | Admin bildirişlər bölməsi (admin chat ID-ləri + şablonlar) və vendor başına Telegram chat ID bağlama |
 | `components/tours/` | `TourStatsRow`, `RouteSparkline`, `ShareMenuButton`, `CompareSwapModal` və s. |
 | `components/site/` | `SiteHeader`, `SiteFooter` (SEO daxili linkləmə), `MobileBottomNav` |
 | `components/layout/`, `components/shared/`, `components/admin/` | Sidebar layout, StatCard, WhatsAppVerifyField, admin alətləri |

@@ -40,7 +40,14 @@ import {
   isGroupCalculatorEnabled,
   listContributors,
   setSetting,
+  getSetting,
 } from "./server/campSites.ts";
+import {
+  isTelegramEnabled,
+  escapeHtml,
+  broadcastTelegram,
+  startTelegramPolling,
+} from "./server/telegram.ts";
 import { parseBboxParam, getPoisForBbox } from "./server/overpass.ts";
 import { resolveGoogleMapsLink } from "./server/geo.ts";
 import multer from "multer";
@@ -176,6 +183,8 @@ function rowToUser(row: any) {
     calculatorEnabled: !!extra.calculatorEnabled,
     busTrackingEnabled: !!extra.busTrackingEnabled,
     calculatorConfig: extra.calculatorConfig || undefined,
+    telegramChatIds: Array.isArray(extra.telegramChatIds) ? extra.telegramChatIds : [],
+    waTemplates: Array.isArray(extra.waTemplates) ? extra.waTemplates : [],
   };
 }
 
@@ -438,6 +447,17 @@ app.put("/api/users/:id", authenticateUser, async (req: any, res) => {
     // own numbers same as admin can. Whether the calculator/bus-tracking tab exists at all stays
     // an admin-only call below — a vendor can't turn the feature on for themselves.
     if ((isAdmin || isSelf) && body.calculatorConfig !== undefined) extra.calculatorConfig = body.calculatorConfig;
+    // WhatsApp "Hazır mesajlar" şablonları — vendor özününkünü, admin istənilən vendorunkunu idarə edir.
+    if ((isAdmin || isSelf) && body.waTemplates !== undefined) {
+      if (!Array.isArray(body.waTemplates)) return res.status(400).json({ error: "waTemplates massiv olmalıdır." });
+      extra.waTemplates = body.waTemplates
+        .filter((t: any) => t && typeof t.text === 'string')
+        .map((t: any) => ({
+          id: String(t.id || `tpl-${randomUUID()}`),
+          name: String(t.name || '').slice(0, 100),
+          text: String(t.text).slice(0, 2000),
+        }));
+    }
 
     let username = existingRow.username;
     let passwordHash = existingRow.password_hash;
@@ -450,6 +470,12 @@ app.put("/api/users/:id", authenticateUser, async (req: any, res) => {
       if (body.isManuallyDeactivated !== undefined) isManuallyDeactivated = !!body.isManuallyDeactivated;
       if (body.calculatorEnabled !== undefined) extra.calculatorEnabled = !!body.calculatorEnabled;
       if (body.busTrackingEnabled !== undefined) extra.busTrackingEnabled = !!body.busTrackingEnabled;
+      // Telegram chat ID-ləri yalnız admin təyin edir (vendor redaktə bölməsindən) —
+      // bir vendora bir neçə chat bağlana bilər.
+      if (body.telegramChatIds !== undefined) {
+        if (!Array.isArray(body.telegramChatIds)) return res.status(400).json({ error: "telegramChatIds massiv olmalıdır." });
+        extra.telegramChatIds = body.telegramChatIds.map((c: any) => String(c).trim()).filter(Boolean);
+      }
     }
 
     // Changing the email — whether the owner edits their own profile or an admin edits it for
@@ -2033,6 +2059,333 @@ app.delete("/api/bookings/:id", authenticateUser, async (req: any, res) => {
   }
 });
 
+// ===================== SORĞULAR + BİLDİRİŞLƏR + TELEGRAM =====================
+// Müştəri tur səhifəsindən "Yerləri yoxla" → sorğu formu (ad, WhatsApp nömrəsi, tur sualları)
+// göndərir. Sorğu DB-yə yazılır, vendor + admin üçün panel bildirişi yaranır və Telegram
+// chat-lərinə (vendorun users.extra_data.telegramChatIds, adminin settings-dəki chat ID-ləri)
+// inline "WhatsApp-dan cavabla" düymələri ilə mesaj gedir. Düymə wa.me linkidir — mətni
+// vendorun/adminin "Hazır mesajlar" şablonlarından {ad}/{tur}/{tarix}/{say} doldurulmaqla gəlir.
+
+function rowToInquiry(row: any) {
+  let answers: Array<{ question: string; answer: string }> = [];
+  try { answers = row.answers ? JSON.parse(row.answers) : []; } catch { answers = []; }
+  return {
+    id: row.id,
+    tourId: row.tour_id,
+    tourName: row.tour_name || undefined,
+    vendorId: row.vendor_id,
+    slotId: row.slot_id || undefined,
+    tourDate: row.tour_date || undefined,
+    customerName: row.customer_name,
+    customerPhone: row.customer_phone,
+    participantsCount: Number(row.participants_count) || 1,
+    answers,
+    status: row.status || 'new',
+    createdAt: row.created_at,
+  };
+}
+
+async function getAdminChatIds(): Promise<string[]> {
+  try {
+    const parsed = JSON.parse(await getSetting('telegram_admin_chat_ids', '[]'));
+    return Array.isArray(parsed) ? parsed.map(String) : [];
+  } catch { return []; }
+}
+
+interface WaTemplate { id: string; name: string; text: string }
+
+async function getAdminWaTemplates(): Promise<WaTemplate[]> {
+  try {
+    const parsed = JSON.parse(await getSetting('telegram_admin_wa_templates', '[]'));
+    return Array.isArray(parsed) ? parsed : [];
+  } catch { return []; }
+}
+
+// {ad} {tur} {tarix} {say} placeholder-lərini real dəyərlərlə əvəz edir
+function fillWaTemplate(text: string, vars: Record<string, string>): string {
+  return String(text || '').replace(/\{(ad|tur|tarix|say)\}/g, (_, key) => vars[key] ?? '');
+}
+
+// Telegram inline düymələri: hər şablon üçün bir "WhatsApp-dan cavabla" düyməsi.
+// Şablon yoxdursa standart salamlaşma mətni ilə tək düymə qayıdır.
+function buildWaReplyButtons(
+  templates: WaTemplate[],
+  customerPhone: string,
+  vars: Record<string, string>
+): { text: string; url: string }[] {
+  const phoneDigits = String(customerPhone).replace(/\D/g, '');
+  if (!phoneDigits) return [];
+  const makeUrl = (msg: string) => `https://wa.me/${phoneDigits}?text=${encodeURIComponent(msg)}`;
+  const valid = (templates || []).filter(t => t && typeof t.text === 'string' && t.text.trim());
+  if (!valid.length) {
+    const fallback = `Salam ${vars.ad}! "${vars.tur}" turu ilə bağlı sorğunuzu aldıq.`;
+    return [{ text: '📲 WhatsApp-dan cavabla', url: makeUrl(fallback) }];
+  }
+  // Telegram klaviaturasını yığcam saxlamaq üçün ilk 4 şablon
+  return valid.slice(0, 4).map(t => ({
+    text: `📲 ${t.name || 'WhatsApp-dan cavabla'}`,
+    url: makeUrl(fillWaTemplate(t.text, vars)),
+  }));
+}
+
+// Sadə in-memory rate limit — public endpoint spam-dan qorunur (IP başına 10 dəq / 5 sorğu)
+const inquiryRateMap = new Map<string, { count: number; resetAt: number }>();
+function consumeInquiryRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const entry = inquiryRateMap.get(ip);
+  if (!entry || now > entry.resetAt) {
+    inquiryRateMap.set(ip, { count: 1, resetAt: now + 10 * 60 * 1000 });
+    return true;
+  }
+  if (entry.count >= 5) return false;
+  entry.count++;
+  return true;
+}
+
+// POST /api/inquiries — public: müştəri sorğu göndərir
+app.post("/api/inquiries", async (req, res) => {
+  try {
+    const ip = String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown').split(',')[0].trim();
+    if (!consumeInquiryRateLimit(ip)) {
+      return res.status(429).json({ error: "Çox sayda sorğu göndərildi. Zəhmət olmasa bir az sonra yenidən cəhd edin." });
+    }
+
+    const body = req.body || {};
+    const { tourId, slotId, tourDate, customerName, customerPhone, participantsCount } = body;
+    if (!tourId || !customerName || !String(customerName).trim() || !customerPhone) {
+      return res.status(400).json({ error: "Ad, soyad və WhatsApp nömrəsi mütləqdir." });
+    }
+    const phoneDigits = String(customerPhone).replace(/\D/g, '');
+    if (phoneDigits.length < 9) {
+      return res.status(400).json({ error: "WhatsApp nömrəsi düzgün formatda deyil." });
+    }
+    const answers: Array<{ question: string; answer: string }> = Array.isArray(body.answers)
+      ? body.answers
+          .filter((a: any) => a && typeof a.question === 'string' && typeof a.answer === 'string')
+          .map((a: any) => ({ question: a.question.slice(0, 300), answer: a.answer.slice(0, 500) }))
+      : [];
+
+    const tourRows = await dbClient.query('SELECT id, name, vendor_id FROM tours WHERE id = ?', [tourId]);
+    if (!tourRows.length) return res.status(404).json({ error: "Tur tapılmadı." });
+    const tour = tourRows[0];
+
+    const id = `inq-${randomUUID()}`;
+    const name = String(customerName).trim().slice(0, 200);
+    const phone = String(customerPhone).trim().slice(0, 50);
+    const count = Math.max(1, Math.min(99, Number(participantsCount) || 1));
+    const date = tourDate ? String(tourDate).slice(0, 100) : null;
+
+    await dbClient.execute(
+      `INSERT INTO inquiries (id, tour_id, tour_name, vendor_id, slot_id, tour_date, customer_name, customer_phone, participants_count, answers, status)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'new')`,
+      [id, tour.id, tour.name, tour.vendor_id, slotId || null, date, name, phone, count, JSON.stringify(answers)]
+    );
+
+    // Panel bildirişləri — vendor üçün ünvanlı, adminlər üçün ümumi
+    const notifTitle = `Yeni sorğu: ${tour.name}`;
+    const notifBody = `${name} • ${phone} • ${count} nəfər${date ? ' • ' + date : ''}`;
+    const notifData = JSON.stringify({ inquiryId: id, tourId: tour.id });
+    await dbClient.execute(
+      `INSERT INTO notifications (id, recipient_id, recipient_role, type, title, body, data) VALUES (?, ?, 'vendor', 'inquiry', ?, ?, ?)`,
+      [`ntf-${randomUUID()}`, tour.vendor_id, notifTitle, notifBody, notifData]
+    );
+    await dbClient.execute(
+      `INSERT INTO notifications (id, recipient_id, recipient_role, type, title, body, data) VALUES (?, NULL, 'admin', 'inquiry', ?, ?, ?)`,
+      [`ntf-${randomUUID()}`, notifTitle, notifBody, notifData]
+    );
+
+    // Cavabı gecikdirməmək üçün Telegram göndərişi arxa planda gedir
+    res.status(201).json({ inquiry: rowToInquiry((await dbClient.query('SELECT * FROM inquiries WHERE id = ?', [id]))[0]) });
+
+    (async () => {
+      try {
+        const vendorRows = await dbClient.query('SELECT name, company_name, extra_data FROM users WHERE id = ?', [tour.vendor_id]);
+        let vendorExtra: Record<string, any> = {};
+        try { vendorExtra = vendorRows[0]?.extra_data ? JSON.parse(vendorRows[0].extra_data) : {}; } catch { vendorExtra = {}; }
+        const vendorChatIds: string[] = Array.isArray(vendorExtra.telegramChatIds) ? vendorExtra.telegramChatIds.map(String) : [];
+        const vendorTemplates: WaTemplate[] = Array.isArray(vendorExtra.waTemplates) ? vendorExtra.waTemplates : [];
+
+        const vars = { ad: name, tur: tour.name, tarix: date || '', say: String(count) };
+        const answerLines = answers.length
+          ? '\n<b>Cavablar:</b>\n' + answers.map(a => `• ${escapeHtml(a.question)}: <b>${escapeHtml(a.answer)}</b>`).join('\n')
+          : '';
+        const text =
+          `🔔 <b>Yeni rezervasiya sorğusu</b>\n\n` +
+          `🏔 <b>Tur:</b> ${escapeHtml(tour.name)}\n` +
+          (date ? `📅 <b>Tarix:</b> ${escapeHtml(date)}\n` : '') +
+          `👥 <b>İştirakçı:</b> ${count} nəfər\n` +
+          `👤 <b>Ad, soyad:</b> ${escapeHtml(name)}\n` +
+          `📞 <b>Əlaqə (WhatsApp):</b> ${escapeHtml(phone)}` +
+          answerLines;
+
+        if (vendorChatIds.length) {
+          await broadcastTelegram(vendorChatIds, text, buildWaReplyButtons(vendorTemplates, phone, vars));
+        }
+        const adminChatIds = await getAdminChatIds();
+        if (adminChatIds.length) {
+          const adminTemplates = await getAdminWaTemplates();
+          await broadcastTelegram(adminChatIds, text, buildWaReplyButtons(adminTemplates, phone, vars));
+        }
+      } catch (err) {
+        console.error("[POST /api/inquiries] Telegram göndərişi alınmadı:", err);
+      }
+    })();
+  } catch (error: any) {
+    console.error("[POST /api/inquiries] error:", error);
+    res.status(500).json({ error: "Sorğu göndərilə bilmədi: " + error.message });
+  }
+});
+
+// GET /api/inquiries — vendor öz sorğularını, admin hamısını görür
+app.get("/api/inquiries", authenticateUser, async (req: any, res) => {
+  try {
+    const conditions: string[] = [];
+    const params: any[] = [];
+    if (req.operator.role === 'vendor') {
+      conditions.push('vendor_id = ?');
+      params.push(req.operator.id);
+    } else if (req.operator.role !== 'admin') {
+      return res.status(403).json({ error: "Bu əməliyyat üçün icazəniz yoxdur." });
+    } else if (req.query.vendorId) {
+      conditions.push('vendor_id = ?');
+      params.push(String(req.query.vendorId));
+    }
+    if (req.query.status) { conditions.push('status = ?'); params.push(String(req.query.status)); }
+    const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+    const rows = await dbClient.query(`SELECT * FROM inquiries ${whereClause} ORDER BY created_at DESC LIMIT 200`, params);
+    res.json({ inquiries: rows.map(rowToInquiry) });
+  } catch (error: any) {
+    console.error("[GET /api/inquiries] error:", error);
+    res.status(500).json({ error: "Sorğuları gətirmək mümkün olmadı: " + error.message });
+  }
+});
+
+// PUT /api/inquiries/:id — status dəyişikliyi (yeni → oxunub → cavablanıb)
+app.put("/api/inquiries/:id", authenticateUser, async (req: any, res) => {
+  try {
+    const rows = await dbClient.query('SELECT * FROM inquiries WHERE id = ?', [req.params.id]);
+    if (!rows.length) return res.status(404).json({ error: "Sorğu tapılmadı." });
+    if (req.operator.role !== 'admin' && rows[0].vendor_id !== req.operator.id) {
+      return res.status(403).json({ error: "Bu sorğu sizin hesabınıza aid deyil." });
+    }
+    const status = String(req.body?.status || '');
+    if (!['new', 'read', 'replied'].includes(status)) {
+      return res.status(400).json({ error: "Status yalnız new/read/replied ola bilər." });
+    }
+    await dbClient.execute('UPDATE inquiries SET status = ? WHERE id = ?', [status, req.params.id]);
+    const updated = await dbClient.query('SELECT * FROM inquiries WHERE id = ?', [req.params.id]);
+    res.json({ inquiry: rowToInquiry(updated[0]) });
+  } catch (error: any) {
+    console.error("[PUT /api/inquiries/:id] error:", error);
+    res.status(500).json({ error: "Sorğu yenilənə bilmədi: " + error.message });
+  }
+});
+
+// GET /api/notifications — istifadəçinin panel bildirişləri (+oxunmamış sayı)
+app.get("/api/notifications", authenticateUser, async (req: any, res) => {
+  try {
+    const isAdmin = req.operator.role === 'admin';
+    const whereClause = isAdmin
+      ? `WHERE recipient_role = 'admin' AND (recipient_id IS NULL OR recipient_id = ?)`
+      : `WHERE recipient_id = ?`;
+    const rows = await dbClient.query(
+      `SELECT * FROM notifications ${whereClause} ORDER BY created_at DESC LIMIT 100`,
+      [req.operator.id]
+    );
+    const notifications = rows.map((row: any) => {
+      let data: any = undefined;
+      try { data = row.data ? JSON.parse(row.data) : undefined; } catch { data = undefined; }
+      return {
+        id: row.id,
+        type: row.type,
+        title: row.title,
+        body: row.body || '',
+        data,
+        isRead: !!row.is_read,
+        createdAt: row.created_at,
+      };
+    });
+    res.json({ notifications, unreadCount: notifications.filter(n => !n.isRead).length });
+  } catch (error: any) {
+    console.error("[GET /api/notifications] error:", error);
+    res.status(500).json({ error: "Bildirişləri gətirmək mümkün olmadı: " + error.message });
+  }
+});
+
+// PUT /api/notifications/read — {ids: [...]} və ya {all: true} oxundu işarələnir (yalnız özününkülər)
+app.put("/api/notifications/read", authenticateUser, async (req: any, res) => {
+  try {
+    const isAdmin = req.operator.role === 'admin';
+    const scopeClause = isAdmin
+      ? `recipient_role = 'admin' AND (recipient_id IS NULL OR recipient_id = ?)`
+      : `recipient_id = ?`;
+    if (req.body?.all) {
+      await dbClient.execute(`UPDATE notifications SET is_read = ? WHERE ${scopeClause}`, [1, req.operator.id]);
+    } else {
+      const ids: string[] = Array.isArray(req.body?.ids) ? req.body.ids.map(String) : [];
+      if (!ids.length) return res.status(400).json({ error: "ids massivi və ya all: true göndərin." });
+      for (const nid of ids) {
+        await dbClient.execute(`UPDATE notifications SET is_read = ? WHERE id = ? AND ${scopeClause}`, [1, nid, req.operator.id]);
+      }
+    }
+    res.json({ success: true });
+  } catch (error: any) {
+    console.error("[PUT /api/notifications/read] error:", error);
+    res.status(500).json({ error: "Bildirişlər yenilənə bilmədi: " + error.message });
+  }
+});
+
+// GET/PUT /api/admin/telegram-settings — adminin öz chat ID-ləri və hazır mesaj şablonları.
+// Bot tokeni .env-də qalır (TELEGRAM_BOT_TOKEN) — buradan idarə olunmur.
+app.get("/api/admin/telegram-settings", authenticateUser, async (req: any, res) => {
+  if (req.operator.role !== 'admin') {
+    return res.status(403).json({ error: "Bu əməliyyat yalnız adminlər üçündür." });
+  }
+  try {
+    res.json({
+      botEnabled: isTelegramEnabled(),
+      adminChatIds: await getAdminChatIds(),
+      adminTemplates: await getAdminWaTemplates(),
+    });
+  } catch (error: any) {
+    console.error("[GET /api/admin/telegram-settings] error:", error);
+    res.status(500).json({ error: "Telegram parametrləri yüklənə bilmədi." });
+  }
+});
+
+app.put("/api/admin/telegram-settings", authenticateUser, async (req: any, res) => {
+  if (req.operator.role !== 'admin') {
+    return res.status(403).json({ error: "Bu əməliyyat yalnız adminlər üçündür." });
+  }
+  try {
+    const body = req.body || {};
+    if (body.adminChatIds !== undefined) {
+      if (!Array.isArray(body.adminChatIds)) return res.status(400).json({ error: "adminChatIds massiv olmalıdır." });
+      const ids = body.adminChatIds.map((c: any) => String(c).trim()).filter(Boolean);
+      await setSetting('telegram_admin_chat_ids', JSON.stringify(ids));
+    }
+    if (body.adminTemplates !== undefined) {
+      if (!Array.isArray(body.adminTemplates)) return res.status(400).json({ error: "adminTemplates massiv olmalıdır." });
+      const templates = body.adminTemplates
+        .filter((t: any) => t && typeof t.text === 'string')
+        .map((t: any) => ({
+          id: String(t.id || `tpl-${randomUUID()}`),
+          name: String(t.name || '').slice(0, 100),
+          text: String(t.text).slice(0, 2000),
+        }));
+      await setSetting('telegram_admin_wa_templates', JSON.stringify(templates));
+    }
+    res.json({
+      botEnabled: isTelegramEnabled(),
+      adminChatIds: await getAdminChatIds(),
+      adminTemplates: await getAdminWaTemplates(),
+    });
+  } catch (error: any) {
+    console.error("[PUT /api/admin/telegram-settings] error:", error);
+    res.status(500).json({ error: "Telegram parametrləri saxlanıla bilmədi." });
+  }
+});
+
 // Vendor transport tracking — CRUD for "which vehicle we sent to which tour departure, and at
 // what cost". Admin-gated per vendor via users.extra_data.busTrackingEnabled (see
 // PUT /api/users/:id). The list is shared: every vendor can read every record (so operators can
@@ -3123,7 +3476,21 @@ async function startServer() {
   // WhatsApp session boots in the background — the marketplace itself must keep working even
   // if no admin has scanned the QR yet (or the connection later drops), so failures here are
   // only logged, never thrown.
-  startWhatsApp().catch((err) => console.error("[WhatsApp] Başlanğıc qoşulma xətası:", err));
+  // WHATSAPP_DISABLED=1 — ikinci bir dev/test prosesi eyni Baileys sessiya fayllarını açanda
+  // əsas serverin bağlantısını 440 stream-konflikti ilə saldığı üçün test prosesləri bunu qoyur.
+  if (process.env.WHATSAPP_DISABLED === "1") {
+    console.log("[WhatsApp] WHATSAPP_DISABLED=1 — sessiya bu prosesdə başladılmır.");
+  } else {
+    startWhatsApp().catch((err) => console.error("[WhatsApp] Başlanğıc qoşulma xətası:", err));
+  }
+
+  // Telegram bot — token yoxdursa no-op. Long polling yalnız chat ID köməkçisi üçündür
+  // (bota yazan hər kəsə öz chat ID-sini qaytarır); bildiriş göndərmək polling-dən asılı deyil.
+  if (isTelegramEnabled()) {
+    startTelegramPolling();
+  } else {
+    console.log("[Telegram] TELEGRAM_BOT_TOKEN yoxdur — Telegram bildirişləri deaktivdir.");
+  }
 
   // Any /api/* path that didn't match one of the routes above is a genuine 404. Without this
   // a typo'd or removed endpoint would fall through to the catch-all below and return HTML,

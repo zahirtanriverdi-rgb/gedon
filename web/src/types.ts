@@ -32,6 +32,8 @@ export interface User {
   calculatorEnabled?: boolean; // Admin-set per vendor — shows/hides the guide-payment/net-income calculator tab in the vendor panel
   busTrackingEnabled?: boolean; // Admin-set per vendor — shows/hides the "buses sent to tours" tab in the vendor panel
   calculatorConfig?: GuideCalculatorConfig; // Admin-tuned per vendor; falls back to DEFAULT_GUIDE_CALCULATOR_CONFIG when unset
+  telegramChatIds?: string[]; // Admin-set per vendor — Telegram chats that receive this vendor's inquiry notifications (several allowed)
+  waTemplates?: WaTemplate[]; // Vendor/admin-managed "Hazır mesajlar" — prefilled WhatsApp reply texts used by the Telegram reply buttons
 }
 
 // Guide day-rates are tiered by the tour's own `category` (always set, unlike the old
@@ -223,6 +225,54 @@ export interface Tour {
   allowTeamRegistration?: boolean;
   scheduleFrequency?: string; // e.g. 'one-time', 'daily', 'every-sunday', 'every-weekend'
   translations?: Partial<Record<'en' | 'ru', { name: string; description: string | null; includes?: string[]; notIncluded?: string[]; highlights?: string[] }>>; // Machine-translated (Gemini) content, keyed by target language; populated in the background by scheduleTourTranslation. Source-of-truth content is always Azerbaijani.
+  inquiryQuestions?: InquiryQuestion[]; // Vendor-defined extra questions asked in the booking-inquiry sheet, in addition to the two fixed ones
+}
+
+// Vendor-defined extra question shown in the booking-inquiry sheet (radio options; optional
+// "Other (write your own)" free-text choice appended when allowOther is set).
+export interface InquiryQuestion {
+  id: string;
+  question: string;
+  options: string[];
+  allowOther?: boolean;
+}
+
+export type InquiryStatus = 'new' | 'read' | 'replied';
+
+// Customer booking inquiry (replaces the old direct-WhatsApp-redirect booking flow) — created
+// from the tour detail page, lands in the vendor/admin notification panels and their Telegram.
+export interface Inquiry {
+  id: string;
+  tourId: string;
+  tourName?: string;
+  vendorId: string;
+  slotId?: string;
+  tourDate?: string;
+  customerName: string;
+  customerPhone: string;
+  participantsCount: number;
+  answers: Array<{ question: string; answer: string }>;
+  status: InquiryStatus;
+  createdAt: string;
+}
+
+// In-panel notification (vendor/admin) — see GET /api/notifications.
+export interface AppNotification {
+  id: string;
+  type: string;
+  title: string;
+  body: string;
+  data?: { inquiryId?: string; tourId?: string };
+  isRead: boolean;
+  createdAt: string;
+}
+
+// Saved WhatsApp reply template ("Hazır mesajlar") — placeholders {ad} {tur} {tarix} {say}
+// are filled server-side when building the Telegram inline reply button.
+export interface WaTemplate {
+  id: string;
+  name: string;
+  text: string;
 }
 
 export interface TourSlot {
