@@ -1,3 +1,3 @@
-// Ödəniş və real alış təsdiqi sistemi (bax: Review.verifiedAttendee) tam qurulana qədər
-// rəy/reytinq UI-ı saxta rəylərin qarşısını almaq üçün müvəqqəti olaraq söndürülüb.
-export const REVIEWS_ENABLED = false;
+// Rəylər rezervasiya nömrəsi (#TUR-XXXX, biletin üstündə çap olunur) ilə təsdiqlənir —
+// POST /api/reviews yalnız həmin tura aid real sifarişin nömrəsi ilə rəy qəbul edir.
+export const REVIEWS_ENABLED = true;

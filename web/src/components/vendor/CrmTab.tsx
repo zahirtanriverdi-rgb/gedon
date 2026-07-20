@@ -456,6 +456,12 @@ export function CrmTab({ tours, slots, bookings, currentUser, operatorToken, onE
                                   }}
                                   className="font-bold text-slate-800 bg-transparent hover:bg-slate-100 focus:bg-white text-xs p-1 rounded border border-transparent focus:border-slate-300 w-full focus:outline-none transition"
                                 />
+                                {/* Rezervasiya nömrəsi — biletdə çap olunur, müştəri rəy yazanda bununla təsdiqlənir */}
+                                {b.booking_reference && (
+                                  <span className="block text-[10px] font-mono font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 rounded px-1.5 py-0.5 mt-1 w-fit">
+                                    {b.booking_reference}
+                                  </span>
+                                )}
                               </td>
                               <td className="p-1.5 py-3">
                                 <input

@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useEffect, useMemo } from 'react';
-import { Tour, TourSlot, User, Guide, InquiryQuestion } from '../../types';
+import { Tour, TourSlot, User, Guide, InquiryQuestion, DayProgramStep } from '../../types';
 import { InquiryQuestionsEditor } from './InquiryQuestionsEditor';
 import { parseGpsFile } from '../../utils/gpxParser';
 import { Plus, X, Check } from 'lucide-react';
@@ -89,7 +89,10 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
   // Active Lifestyle specifics
   const [tourActivityType, setTourActivityType] = useState<string>('volleyball');
   const [tourActiveDifficulty, setTourActiveDifficulty] = useState<string>('medium');
-  const [tourAgeLimit, setTourAgeLimit] = useState<string>('18-45 yaş');
+  // Ümumi yaş limiti — bütün kateqoriyalar üçün (boş = detal səhifəsində göstərilmir)
+  const [tourAgeLimit, setTourAgeLimit] = useState<string>('');
+  // "Günün proqramı" timeline addımları (vaxt + başlıq + qeyd) — yerli turların detal səhifəsində göstərilir
+  const [tourDayProgram, setTourDayProgram] = useState<DayProgramStep[]>([]);
   const [tourMeetingPoint, setTourMeetingPoint] = useState<string>('');
   const [tourMeetingPointEmbedUrl, setTourMeetingPointEmbedUrl] = useState<string>('');
   const [tourRequiredEquipment, setTourRequiredEquipment] = useState<string>('');
@@ -256,7 +259,8 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
 
     setTourActivityType(tour.activityType || 'volleyball');
     setTourActiveDifficulty(tour.activeDifficulty || 'medium');
-    setTourAgeLimit(tour.ageLimit || '18-45 yaş');
+    setTourAgeLimit(tour.ageLimit || '');
+    setTourDayProgram(Array.isArray(tour.dayProgram) ? tour.dayProgram : []);
     setTourMeetingPoint(tour.meetingPoint || '');
     setTourMeetingPointEmbedUrl(tour.meetingPointEmbedUrl || '');
     setTourRequiredEquipment(tour.requiredEquipment || '');
@@ -344,7 +348,13 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
       isActiveLife: tourCategory === 'active',
       activityType: tourCategory === 'active' ? tourActivityType : undefined,
       activeDifficulty: tourCategory === 'active' ? (tourActiveDifficulty as 'beginner' | 'medium' | 'professional') : undefined,
-      ageLimit: tourCategory === 'active' ? tourAgeLimit : undefined,
+      ageLimit: tourAgeLimit.trim() || undefined,
+      dayProgram: (() => {
+        const cleaned = tourDayProgram
+          .map(s => ({ time: s.time.trim(), title: s.title.trim(), note: s.note?.trim() || undefined }))
+          .filter(s => s.time && s.title);
+        return cleaned.length > 0 ? cleaned : undefined;
+      })(),
       meetingPoint: tourMeetingPoint || undefined,
       meetingPointEmbedUrl: tourMeetingPoint ? tourMeetingPointEmbedUrl : undefined,
       requiredEquipment: tourCategory === 'active' ? tourRequiredEquipment : undefined,
@@ -635,12 +645,19 @@ const handleMediaFilesChange = async (e: React.ChangeEvent<HTMLInputElement>) =>
                   <option value="professional">{t('vendorTourForms.tourForm.activeSection.activeDifficulty.professional')}</option>
                 </select>
               </div>
-              <div>
-                <label className="block text-[11px] font-bold text-amber-700 tracking-wide mb-1">{t('vendorTourForms.tourForm.activeSection.ageLimit.label')}</label>
-                <input type="text" value={tourAgeLimit} onChange={(e) => setTourAgeLimit(e.target.value)} placeholder={t('vendorTourForms.tourForm.activeSection.ageLimit.placeholder')} className="w-full px-3 py-2 bg-white border border-amber-200 rounded-lg text-xs" />
-              </div>
             </div>
           )}
+
+          <div>
+            <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">{t('vendorTourForms.tourForm.fields.ageLimit.label')}</label>
+            <input
+              type="text"
+              value={tourAgeLimit}
+              onChange={(e) => setTourAgeLimit(e.target.value)}
+              placeholder={t('vendorTourForms.tourForm.fields.ageLimit.placeholder')}
+              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+            />
+          </div>
 
           <div>
             <DynamicStringListInput
@@ -744,6 +761,56 @@ const handleMediaFilesChange = async (e: React.ChangeEvent<HTMLInputElement>) =>
           {dateTimeError && (
             <div className="md:col-span-2 text-[11px] font-semibold text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">⚠️ {dateTimeError}</div>
           )}
+
+          {/* Günün proqramı builder — detal səhifəsindəki timeline bu addımlardan qurulur */}
+          <div className="md:col-span-2 bg-slate-50/70 p-4 rounded-xl border border-slate-200 space-y-3">
+            <div>
+              <h4 className="text-xs font-bold text-slate-700 tracking-wider">🗓 {t('vendorTourForms.tourForm.fields.dayProgram.heading')}</h4>
+              <p className="text-[10px] text-slate-400 font-medium mt-0.5">{t('vendorTourForms.tourForm.fields.dayProgram.hint')}</p>
+            </div>
+            {tourDayProgram.map((step, idx) => (
+              <div key={idx} className="flex flex-col sm:flex-row gap-2 bg-white border border-slate-200 rounded-lg p-2.5">
+                <input
+                  type="text"
+                  value={step.time}
+                  onChange={(e) => setTourDayProgram(prev => prev.map((s, i) => i === idx ? { ...s, time: e.target.value } : s))}
+                  placeholder={t('vendorTourForms.tourForm.fields.dayProgram.timePlaceholder')}
+                  className="w-full sm:w-32 shrink-0 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono"
+                />
+                <input
+                  type="text"
+                  value={step.title}
+                  onChange={(e) => setTourDayProgram(prev => prev.map((s, i) => i === idx ? { ...s, title: e.target.value } : s))}
+                  placeholder={t('vendorTourForms.tourForm.fields.dayProgram.titlePlaceholder')}
+                  className="w-full flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+                />
+                <div className="flex gap-2 flex-1">
+                  <input
+                    type="text"
+                    value={step.note || ''}
+                    onChange={(e) => setTourDayProgram(prev => prev.map((s, i) => i === idx ? { ...s, note: e.target.value } : s))}
+                    placeholder={t('vendorTourForms.tourForm.fields.dayProgram.notePlaceholder')}
+                    className="w-full flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setTourDayProgram(prev => prev.filter((_, i) => i !== idx))}
+                    className="shrink-0 w-8 h-8 self-center flex items-center justify-center rounded-lg text-red-500 hover:bg-red-50 transition"
+                    aria-label={t('vendorTourForms.tourForm.fields.dayProgram.removeStep')}
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={() => setTourDayProgram(prev => [...prev, { time: '', title: '', note: '' }])}
+              className="flex items-center gap-1.5 text-xs font-bold text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg px-3 py-2 transition cursor-pointer"
+            >
+              <Plus className="w-3.5 h-3.5" /> {t('vendorTourForms.tourForm.fields.dayProgram.addStep')}
+            </button>
+          </div>
 
           <div>
             <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">

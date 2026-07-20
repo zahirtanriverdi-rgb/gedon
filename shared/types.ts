@@ -146,6 +146,14 @@ export interface ItineraryDay {
   image?: string;
 }
 
+// Yerli (bir günlük) turların saat-saat "Günün proqramı" timeline addımı — beynəlxalq
+// turların gün-gün ItineraryDay-indən fərqli olaraq vaxt intervalı ilə işləyir.
+export interface DayProgramStep {
+  time: string; // "06:30" və ya "07:00–10:00"
+  title: string;
+  note?: string; // məs: "4x4 dağ maşınları ilə"
+}
+
 export interface Tour {
   id: string;
   name: string;
@@ -202,12 +210,13 @@ export interface Tour {
   priceCurrency?: 'AZN' | 'USD' | 'EUR';
   notIncluded?: string[];
   itinerary?: ItineraryDay[];
+  dayProgram?: DayProgramStep[]; // Yerli turların saat-saat günün proqramı (vendor formda qurulur)
 
   // Active Lifestyle and Adventure Specifics
   isActiveLife?: boolean;
   activityType?: 'volleyball' | 'running' | 'skiing' | 'rafting' | 'cycling' | 'other' | string;
   activeDifficulty?: 'beginner' | 'medium' | 'professional' | string;
-  ageLimit?: string;
+  ageLimit?: string; // Bütün kateqoriyalar üçün ümumi yaş limiti (məs: "12+"); detal səhifəsinin stats sırasında görünür
   requiredEquipment?: string;
   equipmentIncluded?: boolean;
   equipmentRentalPrice?: number;

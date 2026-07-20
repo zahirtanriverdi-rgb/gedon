@@ -1925,6 +1925,22 @@ function rowToBooking(row: any) {
   };
 }
 
+// Rezervasiya nömrəsi (#TUR-XXXX) müştəriyə görünən yeganə identifikatordur: biletin üstündə
+// çap olunur, Telegram bildirişində göndərilir və rəy yazarkən təsdiq üçün istənilir — ona görə
+// təsadüfi 4 rəqəm kolliziya verməsin deyə unikallıq yoxlanılır (dolduqca 5-6 rəqəmə keçir).
+async function generateBookingReference(): Promise<string> {
+  for (let digits = 4; digits <= 6; digits++) {
+    const min = Math.pow(10, digits - 1);
+    const span = min * 9;
+    for (let attempt = 0; attempt < 8; attempt++) {
+      const candidate = `#TUR-${Math.floor(min + Math.random() * span)}`;
+      const clash = await dbClient.query('SELECT id FROM bookings WHERE booking_reference = ?', [candidate]);
+      if (!clash.length) return candidate;
+    }
+  }
+  return `#TUR-${Date.now().toString().slice(-7)}`;
+}
+
 function splitBookingBody(body: Record<string, any>) {
   const extra: Record<string, any> = {};
   for (const key of Object.keys(body)) {
@@ -1981,7 +1997,7 @@ app.post("/api/bookings", async (req, res) => {
     if (!slotRows.length) return res.status(404).json({ error: "Bu tur üçün belə bir tarix tapılmadı." });
 
     const id = body.id || `book-${randomUUID()}`;
-    const bookingReference = body.booking_reference || `#TUR-${Math.floor(1000 + Math.random() * 9000)}`;
+    const bookingReference = body.booking_reference || await generateBookingReference();
     const extra = splitBookingBody(body);
 
     await dbClient.execute(
@@ -2224,28 +2240,21 @@ app.post("/api/inquiries", async (req, res) => {
       [id, tour.id, tour.name, tour.vendor_id, slotId || null, date, name, phone, count, JSON.stringify(answers)]
     );
 
-    // Panel bildirişi — yalnız vendor üçün. Admin sorğu bildirişi almır (admin bildirişləri
-    // vendorların tur yaratma/düzəliş hadisələri üçündür) — sorğunun özü onsuz da vendorun
-    // CRM-inə düşür.
-    const notifTitle = `Yeni sorğu: ${tour.name}`;
-    const notifBody = `${name} • ${phone} • ${count} nəfər${date ? ' • ' + date : ''}`;
-    const notifData = JSON.stringify({ inquiryId: id, tourId: tour.id });
-    await dbClient.execute(
-      `INSERT INTO notifications (id, recipient_id, recipient_role, type, title, body, data) VALUES (?, ?, 'vendor', 'inquiry', ?, ?, ?)`,
-      [`ntf-${randomUUID()}`, tour.vendor_id, notifTitle, notifBody, notifData]
-    );
-
     // Rezervasiya sorğusu avtomatik olaraq CRM "bütün sifarişlər" cədvəlinə "gözləmədə" sifariş
     // kimi düşür — vendor artıq ayrı panelə baxmadan onu adi sifariş kimi idarə edir (təsdiq/ödəniş/
     // ləğv, bilet, PDF). Sorğu cavabları extra_data-da saxlanır və operator qeydinə xülasə düşür.
     // Sifariş yalnız etibarlı tarix (slot) olduqda yaradılır; slot NOT NULL olduğu üçün şərtdir.
+    // bookingRef panel bildirişinə, Telegram mesajına və biletə düşür — müştəri rəy yazanda
+    // bu nömrə ilə təsdiqlənir (bax POST /api/reviews).
+    let createdBookingRef: string | null = null;
     try {
       if (slotId) {
         const slotRows = await dbClient.query('SELECT id, price FROM tour_slots WHERE id = ? AND tour_id = ?', [slotId, tour.id]);
         if (slotRows.length) {
           const price = Number(slotRows[0].price) || 0;
           const bookingId = `book-${randomUUID()}`;
-          const bookingRef = `#TUR-${Math.floor(1000 + Math.random() * 9000)}`;
+          const bookingRef = await generateBookingReference();
+          createdBookingRef = bookingRef;
           const noteSummary = answers.map(a => a.answer).filter(Boolean).join(' • ');
           const extra = {
             paymentStatus: 'Ödənilməyib',
@@ -2268,6 +2277,17 @@ app.post("/api/inquiries", async (req, res) => {
       console.error("[POST /api/inquiries] avtomatik sifariş yaradıla bilmədi:", err);
     }
 
+    // Panel bildirişi — yalnız vendor üçün. Admin sorğu bildirişi almır (admin bildirişləri
+    // vendorların tur yaratma/düzəliş hadisələri üçündür) — sorğunun özü onsuz da vendorun
+    // CRM-inə düşür. Rezervasiya nömrəsi bildirişdə görünür.
+    const notifTitle = `Yeni sorğu: ${tour.name}`;
+    const notifBody = `${name} • ${phone} • ${count} nəfər${date ? ' • ' + date : ''}${createdBookingRef ? ' • ' + createdBookingRef : ''}`;
+    const notifData = JSON.stringify({ inquiryId: id, tourId: tour.id });
+    await dbClient.execute(
+      `INSERT INTO notifications (id, recipient_id, recipient_role, type, title, body, data) VALUES (?, ?, 'vendor', 'inquiry', ?, ?, ?)`,
+      [`ntf-${randomUUID()}`, tour.vendor_id, notifTitle, notifBody, notifData]
+    );
+
     // Cavabı gecikdirməmək üçün Telegram göndərişi arxa planda gedir
     res.status(201).json({ inquiry: rowToInquiry((await dbClient.query('SELECT * FROM inquiries WHERE id = ?', [id]))[0]) });
 
@@ -2285,6 +2305,7 @@ app.post("/api/inquiries", async (req, res) => {
           : '';
         const text =
           `🔔 <b>Yeni rezervasiya sorğusu</b>\n\n` +
+          (createdBookingRef ? `🎫 <b>Rezervasiya №:</b> <code>${escapeHtml(createdBookingRef)}</code>\n` : '') +
           `🏔 <b>Tur:</b> ${escapeHtml(tour.name)}\n` +
           (date ? `📅 <b>Tarix:</b> ${escapeHtml(date)}\n` : '') +
           `👥 <b>İştirakçı:</b> ${count} nəfər\n` +
@@ -2918,27 +2939,51 @@ app.get("/api/reviews", async (req, res) => {
   }
 });
 
-// POST /api/reviews — create a review (must reference a real booking for that tour,
-// enforcing the anti-fake-rating rule), then refreshes the tour's rating/reviewsCount
+// POST /api/reviews — create a review. The customer proves attendance with the reservation
+// number (#TUR-XXXX) printed on their ticket / sent by the vendor; legacy clients may still
+// send an internal bookingId. One review per booking, then the tour's aggregates refresh.
 app.post("/api/reviews", async (req, res) => {
   try {
     const body = req.body || {};
-    const { tourId, bookingId, customerName, rating, comment } = body;
-    if (!tourId || !bookingId || !customerName || rating === undefined) {
-      return res.status(400).json({ error: "Zəhmət olmasa bütün məcburi sahələri doldurun (tourId, bookingId, customerName, rating)." });
+    const { tourId, bookingId, bookingReference, customerName, rating, comment } = body;
+    if (!tourId || (!bookingId && !bookingReference) || !customerName || rating === undefined) {
+      return res.status(400).json({ error: "Zəhmət olmasa bütün məcburi sahələri doldurun (tourId, rezervasiya nömrəsi, customerName, rating)." });
+    }
+    const numericRating = Number(rating);
+    if (!(numericRating >= 1 && numericRating <= 5)) {
+      return res.status(400).json({ error: "Qiymətləndirmə 1 ilə 5 arasında olmalıdır." });
     }
 
-    const bookingRows = await dbClient.query('SELECT id FROM bookings WHERE id = ? AND tour_id = ?', [bookingId, tourId]);
-    const verifiedAttendee = bookingRows.length > 0;
-    if (!verifiedAttendee) {
-      return res.status(400).json({ error: "Rəy yalnız həmin turu rezerv etmiş müştərilər üçün mümkündür (bookingId uyğun gəlmədi)." });
+    let bookingRows: any[];
+    if (bookingReference) {
+      // "#TUR-4750", "tur-4750", " #TUR - 4750 " kimi yazılışların hamısı eyni nömrəyə uyğunlaşır
+      const normalizedRef = String(bookingReference).replace(/[\s#]/g, '').toUpperCase();
+      bookingRows = await dbClient.query(
+        `SELECT id FROM bookings WHERE tour_id = ? AND UPPER(REPLACE(REPLACE(booking_reference, '#', ''), ' ', '')) = ?`,
+        [tourId, normalizedRef]
+      );
+      if (!bookingRows.length) {
+        return res.status(400).json({ error: "Bu rezervasiya nömrəsi ilə bu tur üçün sifariş tapılmadı. Nömrəni biletinizdən dəqiq köçürün (məs: #TUR-4750)." });
+      }
+    } else {
+      bookingRows = await dbClient.query('SELECT id FROM bookings WHERE id = ? AND tour_id = ?', [bookingId, tourId]);
+      if (!bookingRows.length) {
+        return res.status(400).json({ error: "Rəy yalnız həmin turu rezerv etmiş müştərilər üçün mümkündür (bookingId uyğun gəlmədi)." });
+      }
+    }
+    const matchedBookingId = bookingRows[0].id;
+
+    // Hər sifarişə (rezervasiya nömrəsinə) yalnız bir rəy
+    const existingReview = await dbClient.query('SELECT id FROM reviews WHERE booking_id = ?', [matchedBookingId]);
+    if (existingReview.length) {
+      return res.status(400).json({ error: "Bu rezervasiya nömrəsi ilə artıq rəy yazılıb." });
     }
 
     const id = body.id || `review-${randomUUID()}`;
     await dbClient.execute(
       `INSERT INTO reviews (id, tour_id, booking_id, customer_id, customer_name, rating, comment, verified_attendee)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [id, tourId, bookingId, body.customerId || null, customerName, Number(rating), comment || null, 1]
+      [id, tourId, matchedBookingId, body.customerId || null, String(customerName).trim().slice(0, 200), numericRating, comment ? String(comment).slice(0, 3000) : null, 1]
     );
 
     // Refresh the tour's aggregate rating / reviewsCount from the reviews table.

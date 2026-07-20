@@ -6,16 +6,22 @@ import { computeFeaturedTourIds } from '../../utils/featuredTours';
 import { useLanguage } from '../../i18n/LanguageContext';
 import { getLocalizedTourName, getLocalizedTourDescription, getLocalizedTourIncludes, getLocalizedTourNotIncluded, getLocalizedTourHighlights, getLocalizedGuideBio, getLocalizedGuideSpecialty } from '../../i18n/tourLocalization';
 import {
+  BadgeCheck,
   Calendar,
   Check,
-  CheckCircle,
   ChevronDown,
+  ChevronRight,
   Clock,
+  Flag,
   Globe,
   Grid2X2,
   Heart,
-  Minus,
+  MapPin,
+  MoveHorizontal,
+  Mountain,
+  Satellite,
   Star,
+  UserRoundCheck,
   Users,
   X
 } from 'lucide-react';
@@ -23,8 +29,8 @@ import { TourWeatherForecast } from '../TourWeatherForecast';
 import { GpsTrackVisualizer } from '../GpsTrackVisualizer';
 import { PackingListSection } from './PackingListSection';
 import { TourReviewsList } from './TourReviewsList';
-import { parseStoredGpxData, getRouteDurationHours } from '../../utils/gpxParser';
-import { TourRouteStatsCard } from '../tours/TourRouteStatsCard';
+import { parseStoredGpxData } from '../../utils/gpxParser';
+import { RouteSparkline } from '../tours/RouteSparkline';
 import { ShareMenuButton } from '../tours/ShareMenuButton';
 import { TourInquirySheet, MaybeBodyPortal } from './TourInquirySheet';
 
@@ -96,10 +102,16 @@ export function TourDetailPage({
   const [bookingQty, setBookingQty] = useState<number>(1);
   const [showParticipantsDropdown, setShowParticipantsDropdown] = useState<boolean>(false);
   const [showDateDropdown, setShowDateDropdown] = useState<boolean>(false);
-  // Mobile gallery: which media the big image shows (thumb strip below swaps it)
-  const [mobileGalleryIndex, setMobileGalleryIndex] = useState<number>(0);
+  // Gallery: which media the big image shows (thumb strip below swaps it) — mokapdakı kimi
+  // bütün breakpointlərdə böyük şəkil + thumbnail lenti işlədilir.
+  const [galleryIndex, setGalleryIndex] = useState<number>(0);
   // Day-program (itinerary) section starts open, collapsible like the approved mockup
   const [isItineraryExpanded, setIsItineraryExpanded] = useState<boolean>(true);
+  // Yerli turların "Günün proqramı" timeline-ı — mokapdakı kimi açıq başlayır
+  const [isDayProgramExpanded, setIsDayProgramExpanded] = useState<boolean>(true);
+  // Toplanış yeri xəritəsi və 3D peyk trayektoriyası yalnız istəklə açılır (mokap: düymələr)
+  const [showMeetingMap, setShowMeetingMap] = useState<boolean>(false);
+  const [showSatellite, setShowSatellite] = useState<boolean>(false);
   const isFeaturedThisMonth = React.useMemo(() => computeFeaturedTourIds(tours, slots).has(selectedTour.id), [tours, slots, selectedTour.id]);
 
   // "You might also like" picks: deterministic order for SSR + first client render (a
@@ -186,51 +198,30 @@ export function TourDetailPage({
         <div className="animate-fadeIn bg-white min-h-screen pb-20">
           <div className="max-w-[var(--global-max-width)] mx-auto px-5 py-8">
 
-            {/* Header Section */}
-            <div className="mb-8 space-y-4">
-              <div className="flex space-x-2 text-xs text-label-tertiary font-medium">
-                <span><strong className="text-label-primary cursor-pointer pointer-events-auto hover:underline" onClick={(e) => { e.stopPropagation(); const org = users.find(u => u.id === selectedTour.vendorId); if (org) { setSelectedOrganizer(org); } }}>{selectedTour.vendorName}</strong> {t('tourDetailPage.header.by')}</span>
+            {/* Header Section — mokap: vendor sətri (avatar + ad + təsdiq nişanı) + başlıq.
+                Save/paylaş düymələri qalereyanın üstündədir. */}
+            <div className="mb-6 space-y-3">
+              <div className="flex items-center gap-2">
+                <span
+                  className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold text-white shrink-0"
+                  style={{ background: 'linear-gradient(135deg,#2E7D46,#1E5C34)' }}
+                >
+                  {selectedTour.vendorName?.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]?.toUpperCase()).join('') || 'GG'}
+                </span>
+                <strong
+                  className="text-label-primary text-[15px] font-bold cursor-pointer hover:underline"
+                  onClick={(e) => { e.stopPropagation(); const org = users.find(u => u.id === selectedTour.vendorId); if (org) { setSelectedOrganizer(org); } }}
+                >
+                  {selectedTour.vendorName}
+                </strong>
+                <BadgeCheck className="w-[18px] h-[18px] text-white fill-emerald-500 shrink-0" aria-label="Təsdiqlənmiş" />
+                {isFeaturedThisMonth && (
+                  <span className="bg-amber-500 text-white border border-amber-600 text-[10px] font-extrabold px-2 py-0.5 rounded shadow-sm shrink-0">🔥 {t('tourDetailPage.header.bestSellerBadge')}</span>
+                )}
               </div>
-              <h1 className="text-3xl sm:text-4xl font-extrabold text-label-primary tracking-tight leading-tight">
+              <h1 className="text-2xl sm:text-4xl font-extrabold text-label-primary tracking-tight leading-tight">
                 {getLocalizedTourName(selectedTour, language)}
               </h1>
-              <div className="flex flex-wrap items-center justify-between gap-4 mt-2">
-                <div className="flex items-center gap-4">
-                  {isFeaturedThisMonth && (
-                    <div className="bg-amber-500 text-white border border-amber-600 text-xs font-extrabold px-2 py-1 rounded shadow-sm shrink-0">🔥 {t('tourDetailPage.header.bestSellerBadge')}</div>
-                  )}
-                  {REVIEWS_ENABLED && selectedTour.rating != null && (
-                    <div className="flex items-center gap-1 font-bold text-label-primary text-sm shrink-0">
-                      <Star className="w-4 h-4 fill-amber-500 text-amber-500" />
-                      {selectedTour.rating.toFixed(1)} <span className="text-label-tertiary font-normal underline decoration-slate-300">({t('tourDetailPage.header.reviewsCount', { count: getReviewsCount(selectedTour.id) })})</span>
-                    </div>
-                  )}
-                  <div className="flex items-center gap-1 font-bold text-label-primary text-sm shrink-0">
-                     • <span className="text-label-secondary font-normal">{selectedTour.region}</span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={() => handleToggleWishlist(selectedTour.id)}
-                    className={`flex items-center gap-2 border rounded-full px-4 py-2 font-extrabold text-sm transition cursor-pointer shadow-sm ${
-                      wishlist.includes(selectedTour.id)
-                        ? 'border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100'
-                        : 'border-slate-200 text-slate-700 hover:bg-slate-50'
-                    }`}
-                  >
-                    <Heart className={`w-4 h-4 ${wishlist.includes(selectedTour.id) ? 'fill-rose-600 text-rose-600' : ''}`} />
-                    {wishlist.includes(selectedTour.id) ? t('tourDetailPage.header.inWishlist') : t('tourDetailPage.header.addToWishlist')}
-                  </button>
-                  <ShareMenuButton
-                    tour={selectedTour}
-                    slots={slots}
-                    onShowNotification={onShowNotification}
-                    showLabel
-                    iconClassName="w-4 h-4"
-                    buttonClassName="flex items-center gap-2 border border-slate-200 rounded-full px-4 py-2 hover:bg-slate-50 text-slate-700 font-extrabold text-sm transition cursor-pointer shadow-sm"
-                  />
-                </div>
-              </div>
             </div>
 
             {/* TWO COLUMN WRAPPER — items-stretch (default) so the right column wrapper is as tall as the
@@ -241,187 +232,183 @@ export function TourDetailPage({
               {/* LEFT COLUMN: Gallery & Info */}
               <div className="w-full lg:w-[65%] shrink-0 space-y-10">
                 
-                {/* Asymmetric Gallery (Bento) */}
+                {/* Qalereya (mokap): böyük əsas şəkil + thumbnail lenti; şəklin üstündə kateqoriya
+                    və region nişanları, save/paylaş düymələri. */}
                 {(() => {
                   const allMedia = [selectedTour.image, ...(selectedTour.images || []), ...(selectedTour.videos || [])].filter(Boolean);
+                  const categoryBadges: Record<string, string> = {
+                    peak: `🏔️ ${t('customerHome.toursHomeView.categories.peak')}`,
+                    camp: `⛺ ${t('customerHome.toursHomeView.categories.camp')}`,
+                    hiking: `🥾 ${t('customerHome.toursHomeView.categories.hiking')}`,
+                    active: `🏃‍♂️ ${t('customerHome.toursHomeView.categories.active')}`,
+                    international: `✈️ ${t('customerHome.toursHomeView.badges.international')}`,
+                  };
                   return (
-                    <>
-                      <div className="hidden md:grid grid-cols-3 grid-rows-2 gap-2 h-[450px] relative rounded-2xl overflow-hidden shrink-0 bg-slate-100">
-                        <div className="col-span-2 row-span-2 cursor-pointer relative overflow-hidden group" onClick={() => setLightboxIndex(0)}>
-                          <img src={allMedia[0]} className="w-full h-full object-cover transition duration-500 group-hover:scale-105" referrerPolicy="no-referrer" />
-                          <div className="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition duration-300 pointer-events-none" />
+                    <div className="space-y-2">
+                      <div className="relative rounded-2xl overflow-hidden bg-slate-100 cursor-pointer group h-[240px] sm:h-[420px]" onClick={() => setLightboxIndex(galleryIndex)}>
+                        <div className="absolute top-4 left-4 bg-black/60 backdrop-blur-sm text-white px-3 py-1.5 rounded-full flex items-center gap-1.5 z-10 shadow-sm">
+                          <span className="text-[12px] font-medium tracking-wide">{categoryBadges[selectedTour.category] || categoryBadges.peak}</span>
                         </div>
-                        <div className="col-span-1 row-span-1 cursor-pointer relative overflow-hidden group" onClick={() => setLightboxIndex(1)}>
-                          <img src={allMedia[1] || allMedia[0]} className="w-full h-full object-cover transition duration-500 group-hover:scale-105" referrerPolicy="no-referrer" />
-                          <div className="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition duration-300 pointer-events-none" />
+                        <div className="absolute bottom-4 right-4 bg-black/60 backdrop-blur-sm text-white px-3 py-1.5 rounded-full flex items-center gap-1.5 z-10 shadow-sm">
+                          <MapPin className="w-3.5 h-3.5" />
+                          <span className="text-[12px] font-medium tracking-wide">{selectedTour.region}</span>
                         </div>
-                        <div className="col-span-1 row-span-1 cursor-pointer relative overflow-hidden group" onClick={() => setLightboxIndex(2)}>
-                          <img src={allMedia[2] || allMedia[0]} className="w-full h-full object-cover transition duration-500 group-hover:scale-105" referrerPolicy="no-referrer" />
-                          <div className="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition duration-300 pointer-events-none" />
-                          
-                          <div className="absolute inset-x-0 bottom-0 top-0 flex items-end justify-end p-4 pointer-events-none">
-                            <button className="bg-white/95 text-slate-900 px-4 py-2 border border-slate-200 rounded-lg shadow-sm text-sm font-extrabold flex items-center gap-2 pointer-events-auto hover:bg-slate-50 transition cursor-pointer">
-                              <Grid2X2 className="w-4 h-4" /> {t('tourDetailPage.gallery.viewAll')}
-                            </button>
-                          </div>
+                        <img src={allMedia[galleryIndex] || allMedia[0]} alt={getLocalizedTourName(selectedTour, language)} className="w-full h-full object-cover block transition duration-500 group-hover:scale-105" referrerPolicy="no-referrer" />
+                        <div className="absolute top-3 right-3 flex gap-2 z-10" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            type="button"
+                            aria-label={wishlist.includes(selectedTour.id) ? t('tourDetailPage.header.inWishlist') : t('tourDetailPage.header.addToWishlist')}
+                            onClick={() => handleToggleWishlist(selectedTour.id)}
+                            className="w-10 h-10 rounded-full bg-white/95 hover:bg-white shadow-sm flex items-center justify-center text-slate-700 transition hover:scale-105 border border-slate-200/60 cursor-pointer"
+                          >
+                            <Heart className={`w-5 h-5 ${wishlist.includes(selectedTour.id) ? 'fill-rose-600 text-rose-600' : ''}`} />
+                          </button>
+                          <ShareMenuButton
+                            tour={selectedTour}
+                            slots={slots}
+                            onShowNotification={onShowNotification}
+                            stopPropagationOnOpen
+                            iconClassName="w-5 h-5"
+                            buttonClassName="w-10 h-10 rounded-full bg-white/95 hover:bg-white shadow-sm flex items-center justify-center text-slate-700 transition hover:scale-105 border border-slate-200/60 cursor-pointer"
+                          />
+                        </div>
+                        <div className="absolute bottom-4 left-4 pointer-events-none z-10">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setLightboxIndex(galleryIndex); }}
+                            className="bg-white/95 text-slate-900 px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm flex items-center gap-1.5 cursor-pointer border border-slate-200 pointer-events-auto"
+                          >
+                            <Grid2X2 className="w-3.5 h-3.5" /> {t('tourDetailPage.gallery.viewAll')}
+                          </button>
                         </div>
                       </div>
-
-                      {/* Mobile Gallery — main image + tappable thumbnail strip (approved mockup) */}
-                      <div className="md:hidden space-y-2">
-                        <div className="relative h-[300px] rounded-2xl overflow-hidden shadow-sm block bg-slate-100">
-                          <img src={allMedia[mobileGalleryIndex] || allMedia[0]} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                          <div className="absolute bottom-3 right-3 pointer-events-auto">
-                            <button onClick={() => setLightboxIndex(mobileGalleryIndex)} className="bg-white/95 text-slate-900 px-3 py-1.5 rounded-lg text-xs font-bold shadow-sm flex items-center gap-1.5 cursor-pointer border border-slate-200">
-                              <Grid2X2 className="w-3.5 h-3.5" /> {t('tourDetailPage.gallery.viewAllImages')}
+                      {allMedia.length > 1 && (
+                        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none" style={{ WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none' }}>
+                          {allMedia.map((m, idx) => (
+                            <button
+                              key={idx}
+                              type="button"
+                              onClick={() => setGalleryIndex(idx)}
+                              className={`shrink-0 rounded-lg overflow-hidden bg-slate-100 cursor-pointer border-2 transition ${
+                                galleryIndex === idx ? 'border-primary-500' : 'border-transparent opacity-80 hover:opacity-100'
+                              }`}
+                              style={{ flex: '0 0 calc((100% - 28px) / 3.5)', height: 66 }}
+                            >
+                              <img src={m} className="w-full h-full object-cover block" alt="" referrerPolicy="no-referrer" />
                             </button>
-                          </div>
+                          ))}
                         </div>
-                        {allMedia.length > 1 && (
-                          <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
-                            {allMedia.map((m, idx) => (
-                              <button
-                                key={idx}
-                                type="button"
-                                onClick={() => setMobileGalleryIndex(idx)}
-                                className={`shrink-0 w-16 h-16 rounded-xl overflow-hidden border-2 transition ${
-                                  mobileGalleryIndex === idx ? 'border-primary-500' : 'border-transparent opacity-80'
-                                }`}
-                              >
-                                <img src={m} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    </>
+                      )}
+                    </div>
                   );
                 })()}
 
-                {/* Quick Info Grid */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-6 py-6 border-b border-slate-200">
-                  <div className="flex flex-col gap-1.5">
-                    <Calendar className="w-6 h-6 text-slate-700 mb-1" />
-                    <span className="text-sm font-extrabold text-slate-900">{(selectedTour.cancellationHours ?? 48) === 0 ? t('tourDetailPage.quickInfo.noCancellation') : t('tourDetailPage.quickInfo.freeCancellation')}</span>
-                    <span className="text-xs text-slate-500 leading-snug">
-                      {(selectedTour.cancellationHours ?? 48) === 0
-                        ? t('tourDetailPage.quickInfo.noCancellationDesc')
-                        : t('tourDetailPage.quickInfo.freeCancellationDesc', { hours: selectedTour.cancellationHours ?? 48 })}
-                    </span>
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    <Clock className="w-6 h-6 text-slate-700 mb-1" />
-                    <span className="text-sm font-extrabold text-slate-900">{selectedTour.durationDays >= 2
-                      ? t('tourDetailPage.quickInfo.durationDays', { days: selectedTour.durationDays })
-                      : t('tourDetailPage.quickInfo.duration', { hours: selectedTour.durationHours ?? (selectedTour.durationDays * 8) })}</span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        document.getElementById('tour-full-description')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                      }}
-                      className="text-xs text-slate-500 leading-snug text-left underline decoration-dotted underline-offset-2 hover:text-slate-700 cursor-pointer"
-                    >
-                      {t('tourDetailPage.quickInfo.checkStartTimes')}
-                    </button>
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    <Globe className="w-6 h-6 text-slate-700 mb-1" />
-                    <span className="text-sm font-extrabold text-slate-900">{t('tourDetailPage.quickInfo.professionalGuide')}</span>
-                    <span className="text-xs text-slate-500 leading-snug">
-                      {selectedTour.languages && selectedTour.languages.length > 0 ? selectedTour.languages.join(', ') : t('tourDetailPage.quickInfo.azerbaijaniLanguage')}
-                    </span>
-                  </div>
-                  <div className="flex flex-col gap-1.5">
-                    <Users className="w-6 h-6 text-slate-700 mb-1" />
-                    <span className="text-sm font-extrabold text-slate-900">{t('tourDetailPage.quickInfo.privateGroupTours')}</span>
-                    <span className="text-xs text-slate-500 leading-snug">{t('tourDetailPage.quickInfo.selectableAtBooking')}</span>
-                  </div>
-                </div>
-
-                {/* Qiymətə daxildir / daxil deyil (Modern Grid) — turun dəyərini istifadəçi ilk açılışda görsün deyə ən yuxarıda */}
-                <div className="space-y-4 py-4">
-                  <h2 className="text-xl font-extrabold text-slate-900">{t('tourDetailPage.priceIncludes.title')}</h2>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {/* Daxildir */}
-                    <div className="bg-emerald-50/40 border border-emerald-100 rounded-2xl p-5 space-y-3.5">
-                      <h3 className="text-xs font-black text-emerald-700 tracking-wider uppercase">{t('tourDetailPage.priceIncludes.includedHeader')}</h3>
-                      <div className="space-y-3">
-                        {(selectedTour.includes && selectedTour.includes.length > 0
-                          ? getLocalizedTourIncludes(selectedTour, language)
-                          : [t('tourDetailPage.priceIncludes.defaultIncluded1'), t('tourDetailPage.priceIncludes.defaultIncluded2')]
-                        ).map((item, idx) => (
-                          <div key={`inc-${idx}`} className="flex items-start gap-3">
-                            <CheckCircle className="w-5 h-5 text-emerald-500 shrink-0" />
-                            <span className="text-slate-700 text-sm font-medium">{item}</span>
+                {/* Stats siyahısı (mokap): çətinlik, GPX məsafə/yüksəklik, müddət, yaş limiti,
+                    bələdçi ("Bax" linki ilə), ödənişsiz ləğv, özəl qrup (slot tutumundan). */}
+                {(() => {
+                  const parsedGpx = parseStoredGpxData(selectedTour.gpxData);
+                  const isSportActive = selectedTour.category === 'active' || selectedTour.isActiveLife;
+                  let difficultyLabel = t(`customerHome.toursHomeView.difficulty.${selectedTour.difficulty}`);
+                  if (isSportActive) {
+                    const activeDiff = selectedTour.activeDifficulty || (selectedTour.difficulty === 'easy' ? 'beginner' : selectedTour.difficulty === 'hard' || selectedTour.difficulty === 'extreme' ? 'professional' : 'medium');
+                    difficultyLabel = t(`customerHome.toursHomeView.activeDifficulty.${activeDiff === 'beginner' || activeDiff === 'easy' ? 'beginner' : activeDiff === 'medium' ? 'medium' : 'professional'}`);
+                  }
+                  const durationLabel = selectedTour.durationDays >= 2
+                    ? t('tourDetailPage.stats.durationDays', { days: selectedTour.durationDays })
+                    : t('tourDetailPage.stats.durationHours', { hours: selectedTour.durationHours ?? (selectedTour.durationDays * 8) });
+                  const organizer = users.find(u => u.id === selectedTour.vendorId);
+                  const hasGuides = !!(organizer && organizer.guides && organizer.guides.length > 0);
+                  const maxCapacity = Math.max(0, ...slots.filter(s => s.tourId === selectedTour.id).map(s => s.capacity));
+                  const iconBox = 'w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center shrink-0';
+                  return (
+                    <div className="flex flex-col gap-3.5 py-4 border-b border-slate-200">
+                      <div className="flex items-center gap-3">
+                        <div className={iconBox}><Mountain className="w-[18px] h-[18px] text-slate-600" /></div>
+                        <div className="text-[14px] text-slate-900">
+                          <span className="font-extrabold">{t('tourDetailPage.stats.difficulty')}</span> <span className="text-slate-600">{difficultyLabel}</span>
+                        </div>
+                      </div>
+                      {parsedGpx && (
+                        <>
+                          <div className="flex items-center gap-3">
+                            <div className={iconBox}><MoveHorizontal className="w-[18px] h-[18px] text-slate-600" /></div>
+                            <div className="text-[14px] text-slate-900">
+                              <span className="font-extrabold">{t('tourDetailPage.stats.distance')}</span> <span className="text-slate-600">{parsedGpx.stats.distanceKm} km</span>
+                            </div>
                           </div>
-                        ))}
-                        {selectedTour.mealType && (
-                          <div className="flex items-start gap-3">
-                            <CheckCircle className="w-5 h-5 text-emerald-500 shrink-0" />
-                            <span className="text-slate-700 text-sm font-medium">{t('tourDetailPage.priceIncludes.mealLabel', { meal: selectedTour.mealType })}</span>
+                          <div className="flex items-center gap-3">
+                            <div className={iconBox}><Flag className="w-[18px] h-[18px] text-slate-600" /></div>
+                            <div className="text-[14px] text-slate-900">
+                              <span className="font-extrabold">{t('tourDetailPage.stats.elevation')}</span> <span className="text-slate-600">{parsedGpx.stats.elevationGainM} m</span>
+                            </div>
                           </div>
-                        )}
-                        {selectedTour.flightIncluded && (
-                          <div className="flex items-start gap-3">
-                            <CheckCircle className="w-5 h-5 text-emerald-500 shrink-0" />
-                            <span className="text-slate-700 text-sm font-medium">{t('tourDetailPage.priceIncludes.flightIncluded')}</span>
+                        </>
+                      )}
+                      <div className="flex items-center gap-3">
+                        <div className={iconBox}><Clock className="w-[18px] h-[18px] text-slate-600" /></div>
+                        <div className="text-[14px] text-slate-900">
+                          <span className="font-extrabold">{t('tourDetailPage.stats.duration')}</span> <span className="text-slate-600">{durationLabel}</span>
+                        </div>
+                      </div>
+                      {selectedTour.ageLimit && (
+                        <div className="flex items-center gap-3">
+                          <div className={iconBox}><UserRoundCheck className="w-[18px] h-[18px] text-slate-600" /></div>
+                          <div className="text-[14px] text-slate-900">
+                            <span className="font-extrabold">{t('tourDetailPage.stats.ageLimit')}</span> <span className="text-slate-600">{selectedTour.ageLimit}</span>
                           </div>
-                        )}
+                        </div>
+                      )}
+                      <div className="flex items-start gap-3">
+                        <div className={iconBox}><Globe className="w-[18px] h-[18px] text-slate-600" /></div>
+                        <div className="flex flex-col gap-0.5 pt-0.5 flex-1">
+                          <span className="flex items-center justify-between gap-2">
+                            <span className="text-[14px] font-extrabold text-slate-900 leading-tight">{t('tourDetailPage.quickInfo.professionalGuide')}</span>
+                            {hasGuides && (
+                              <button
+                                type="button"
+                                onClick={() => document.getElementById('tour-guides-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                                className="text-[14px] font-semibold inline-flex items-center gap-0.5 cursor-pointer text-emerald-700 hover:text-emerald-800"
+                              >
+                                {t('tourDetailPage.stats.view')}<ChevronRight className="w-3.5 h-3.5" />
+                              </button>
+                            )}
+                          </span>
+                          <span className="text-slate-500 leading-snug text-[12.5px]">
+                            {selectedTour.languages && selectedTour.languages.length > 0 ? selectedTour.languages.join(', ') : t('tourDetailPage.quickInfo.azerbaijaniLanguage')}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <div className={iconBox}><Calendar className="w-[18px] h-[18px] text-slate-600" /></div>
+                        <div className="flex flex-col gap-0.5 pt-0.5">
+                          <span className="text-[14px] font-extrabold text-slate-900 leading-tight">{(selectedTour.cancellationHours ?? 48) === 0 ? t('tourDetailPage.quickInfo.noCancellation') : t('tourDetailPage.quickInfo.freeCancellation')}</span>
+                          <span className="text-slate-500 leading-snug text-[12.5px]">
+                            {(selectedTour.cancellationHours ?? 48) === 0
+                              ? t('tourDetailPage.quickInfo.noCancellationDesc')
+                              : t('tourDetailPage.quickInfo.freeCancellationDesc', { hours: selectedTour.cancellationHours ?? 48 })}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <div className={iconBox}><Users className="w-[18px] h-[18px] text-slate-600" /></div>
+                        <div className="flex flex-col gap-0.5 pt-0.5">
+                          <span className="text-[14px] font-extrabold text-slate-900 leading-tight">{t('tourDetailPage.quickInfo.privateGroupTours')}</span>
+                          <span className="text-slate-500 leading-snug text-[12.5px]">
+                            {maxCapacity > 0 ? t('tourDetailPage.stats.maxParticipants', { count: maxCapacity }) : t('tourDetailPage.quickInfo.selectableAtBooking')}
+                          </span>
+                        </div>
                       </div>
                     </div>
+                  );
+                })()}
 
-                    {/* Daxil deyil */}
-                    <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 space-y-3.5">
-                      <h3 className="text-xs font-black text-slate-400 tracking-wider uppercase">{t('tourDetailPage.priceIncludes.notIncludedHeader')}</h3>
-                      <div className="space-y-3">
-                        {(selectedTour.notIncluded && selectedTour.notIncluded.length > 0
-                          ? getLocalizedTourNotIncluded(selectedTour, language)
-                          : [t('tourDetailPage.priceIncludes.defaultNotIncluded1')]
-                        ).map((item, idx) => (
-                          <div key={`exc-${idx}`} className="flex items-start gap-3">
-                            <Minus className="w-5 h-5 text-slate-300 shrink-0" />
-                            <span className="text-slate-500 text-sm font-medium">{item}</span>
-                          </div>
-                        ))}
-                        {!selectedTour.flightIncluded && selectedTour.isInternational && (
-                          <div className="flex items-start gap-3">
-                            <Minus className="w-5 h-5 text-slate-300 shrink-0" />
-                            <span className="text-slate-500 text-sm font-medium">{t('tourDetailPage.priceIncludes.flightsSeparate')}</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Highlights */}
-                <div className="space-y-4 py-4 border-t border-slate-200">
-                  <h2 className="text-xl font-extrabold text-slate-900">{t('tourDetailPage.highlights.title')}</h2>
-                  <div className="flex flex-col gap-4">
-                    {(selectedTour.highlights && selectedTour.highlights.length > 0
-                      ? getLocalizedTourHighlights(selectedTour, language)
-                      : [
-                          t('tourDetailPage.highlights.defaultHighlight1', { region: selectedTour.region }),
-                          t('tourDetailPage.highlights.defaultHighlight2', { difficulty: selectedTour.difficulty }),
-                          ...(selectedTour.isInternational ? [t('tourDetailPage.highlights.defaultHighlight3', { city: selectedTour.destinationCity })] : [])
-                        ]
-                    ).map((highlight, idx) => (
-                      <div key={idx} className="flex items-start gap-4">
-                        <div className="mt-0.5"><Check className="w-5 h-5 text-emerald-600" /></div>
-                        <span className="text-slate-700 leading-relaxed font-medium">{highlight}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Full description */}
-                <div id="tour-full-description" className="space-y-4 py-4 border-t border-slate-200 scroll-mt-24">
+                {/* Tur haqqında (mokap sırası: təsvir ən yuxarıda) */}
+                <div id="tour-full-description" className="space-y-4 py-8 scroll-mt-24">
                   <h2 className="text-xl font-extrabold text-slate-900">{t('tourDetailPage.fullDescription.title')}</h2>
                   {(() => { const localizedDescription = getLocalizedTourDescription(selectedTour, language); return (
                   <div className="relative">
                     <div
                       className={`overflow-hidden transition-all duration-300 ease-in-out ${
-                        isDescExpanded || localizedDescription.length <= 320 ? 'max-h-[1000px]' : 'max-h-[150px]'
+                        isDescExpanded || localizedDescription.length <= 320 ? 'max-h-[2000px]' : 'max-h-[150px]'
                       }`}
                     >
                       <p className="text-slate-700 text-sm leading-relaxed whitespace-pre-line font-medium antialiased">
@@ -451,53 +438,77 @@ export function TourDetailPage({
                   )}
                 </div>
 
-                {/* Meeting Point */}
-                {selectedTour.meetingPoint && (
-                  <div className="space-y-4 py-4 border-t border-slate-200">
-                    <h2 className="text-xl font-extrabold text-slate-900">{t('tourDetailPage.meetingPoint.title')}</h2>
-                    <p className="text-sm font-medium text-slate-700 leading-relaxed">
-                      {selectedTour.meetingPoint}
-                    </p>
-                    {selectedTour.meetingPointEmbedUrl && (
-                      <iframe
-                        src={selectedTour.meetingPointEmbedUrl}
-                        width="100%"
-                        height="400"
-                        style={{ border: 0 }}
-                        loading="lazy"
-                        allowFullScreen
-                        className="rounded-xl h-[250px] sm:h-[400px]"
-                      />
-                    )}
+                {/* Önə çıxanlar — vendor doldurubsa göstərilir */}
+                {selectedTour.highlights && selectedTour.highlights.length > 0 && (
+                  <div className="space-y-4 py-8 border-t border-slate-200">
+                    <h2 className="text-xl font-extrabold text-slate-900">{t('tourDetailPage.highlights.title')}</h2>
+                    <div className="flex flex-col gap-3">
+                      {getLocalizedTourHighlights(selectedTour, language).map((highlight, idx) => (
+                        <div key={idx} className="flex items-start gap-3">
+                          <Check className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+                          <span className="text-slate-700 text-[15px] leading-relaxed font-medium">{highlight}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
 
-                {/* Important Information */}
-                <div className="space-y-4 py-4 border-t border-slate-200">
+                {/* Qiymətə daxildir — mokap: ✓ (daxildir) və ✗ (daxil deyil) birləşmiş tək siyahı */}
+                <div className="space-y-4 py-8 border-t border-slate-200">
+                  <h2 className="text-xl font-extrabold text-slate-900">{t('tourDetailPage.priceIncludes.title')}</h2>
+                  <ul className="space-y-2.5">
+                    {[
+                      ...(selectedTour.includes && selectedTour.includes.length > 0
+                        ? getLocalizedTourIncludes(selectedTour, language)
+                        : [t('tourDetailPage.priceIncludes.defaultIncluded1'), t('tourDetailPage.priceIncludes.defaultIncluded2')]),
+                      ...(selectedTour.mealType ? [t('tourDetailPage.priceIncludes.mealLabel', { meal: selectedTour.mealType })] : []),
+                      ...(selectedTour.flightIncluded ? [t('tourDetailPage.priceIncludes.flightIncluded')] : []),
+                    ].map((item, idx) => (
+                      <li key={`inc-${idx}`} className="flex items-start gap-2.5">
+                        <Check className="w-[18px] h-[18px] text-green-600 shrink-0 mt-0.5" strokeWidth={2.4} />
+                        <span className="text-slate-700 text-[15px]">{item}</span>
+                      </li>
+                    ))}
+                    {[
+                      ...(selectedTour.notIncluded && selectedTour.notIncluded.length > 0
+                        ? getLocalizedTourNotIncluded(selectedTour, language)
+                        : []),
+                      ...(!selectedTour.flightIncluded && selectedTour.isInternational ? [t('tourDetailPage.priceIncludes.flightsSeparate')] : []),
+                    ].map((item, idx) => (
+                      <li key={`exc-${idx}`} className="flex items-start gap-2.5">
+                        <X className="w-[18px] h-[18px] text-red-600 shrink-0 mt-0.5" strokeWidth={2.4} />
+                        <span className="text-slate-700 text-[15px]">{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                {/* Vacib məlumat — yaşıl ✓ / qırmızı ✗ (mokap) */}
+                <div className="space-y-4 py-8 border-t border-slate-200">
                   <h2 className="text-xl font-extrabold text-slate-900">{t('tourDetailPage.importantInfo.title')}</h2>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 mt-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 mt-2">
                     <div>
-                      <h3 className="font-bold text-slate-800 text-sm mb-3">{t('tourDetailPage.importantInfo.bringHeader')}</h3>
-                      <ul className="space-y-2">
+                      <h3 className="font-extrabold text-slate-800 text-sm mb-3">{t('tourDetailPage.importantInfo.bringHeader')}</h3>
+                      <ul className="space-y-2.5">
                         {(selectedTour.importantInfo?.bring && selectedTour.importantInfo.bring.length > 0
                           ? selectedTour.importantInfo.bring
                           : [selectedTour.requiredEquipment || t('tourDetailPage.importantInfo.defaultBring1'), t('tourDetailPage.importantInfo.defaultBring2'), t('tourDetailPage.importantInfo.defaultBring3')]
                         ).map((item, idx) => (
-                          <li key={idx} className="flex items-start gap-3 text-sm text-slate-700 font-medium">
-                            <Check className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" /> {item}
+                          <li key={idx} className="flex items-start gap-2.5 text-[15px] text-slate-700">
+                            <Check className="w-[18px] h-[18px] text-green-600 mt-0.5 shrink-0" strokeWidth={2.4} /> {item}
                           </li>
                         ))}
                       </ul>
                     </div>
                     <div>
-                      <h3 className="font-bold text-slate-800 text-sm mb-3">{t('tourDetailPage.importantInfo.notAllowedHeader')}</h3>
-                      <ul className="space-y-2">
+                      <h3 className="font-extrabold text-slate-800 text-sm mb-3">{t('tourDetailPage.importantInfo.notAllowedHeader')}</h3>
+                      <ul className="space-y-2.5">
                         {(selectedTour.importantInfo?.notAllowed && selectedTour.importantInfo.notAllowed.length > 0
                           ? selectedTour.importantInfo.notAllowed
                           : [t('tourDetailPage.importantInfo.defaultNotAllowed1'), t('tourDetailPage.importantInfo.defaultNotAllowed2')]
                         ).map((item, idx) => (
-                          <li key={idx} className="flex items-start gap-3 text-sm text-slate-700 font-medium">
-                            <X className="w-4 h-4 text-slate-400 mt-0.5 shrink-0" /> {item}
+                          <li key={idx} className="flex items-start gap-2.5 text-[15px] text-slate-700">
+                            <X className="w-[18px] h-[18px] text-red-600 mt-0.5 shrink-0" strokeWidth={2.4} /> {item}
                           </li>
                         ))}
                       </ul>
@@ -505,97 +516,154 @@ export function TourDetailPage({
                   </div>
                 </div>
 
-                {/* Extra dynamic details (Weather, GPT assistant) */}
-                <div className="space-y-6 pt-4 border-t border-slate-200">
-
-              {/* Tabs Info / Scheduling */}
-                <div className="space-y-6">
-                  {/* Dynamic Integrations */}
-
-                  {/* High fidelity Weather Integration */}
-                  {slots.filter(s => s.tourId === selectedTour.id).length > 0 && (
-                    <TourWeatherForecast 
-                      dates={slots.filter(s => s.tourId === selectedTour.id).map(s => s.startDate)} 
-                      region={selectedTour.region} 
-                      variant="detailed" 
-                    />
-                  )}
-
-                  {/* GPX-derived route stats + mini route map, sitting above the full 3D explorer below */}
-                  {(() => {
-                    const parsedGpx = parseStoredGpxData(selectedTour.gpxData);
-                    if (!parsedGpx) return null;
-
-                    const isSportActive = selectedTour.category === 'active' || selectedTour.isActiveLife;
-                    let difficultyBarColorClass = 'bg-sky-500';
-                    let difficultyPercent = 60;
-                    let difficultyLabel = t(`customerHome.toursHomeView.difficulty.${selectedTour.difficulty}`);
-                    if (selectedTour.difficulty === 'easy') { difficultyBarColorClass = 'bg-emerald-500'; difficultyPercent = 30; }
-                    else if (selectedTour.difficulty === 'hard') { difficultyBarColorClass = 'bg-rose-500'; difficultyPercent = 85; }
-                    else if (selectedTour.difficulty === 'extreme') { difficultyBarColorClass = 'bg-red-700'; difficultyPercent = 100; }
-
-                    if (isSportActive) {
-                      const activeDiff = selectedTour.activeDifficulty || (selectedTour.difficulty === 'easy' ? 'beginner' : selectedTour.difficulty === 'hard' || selectedTour.difficulty === 'extreme' ? 'professional' : 'medium');
-                      if (activeDiff === 'beginner' || activeDiff === 'easy') {
-                        difficultyBarColorClass = 'bg-emerald-500'; difficultyPercent = 30;
-                        difficultyLabel = `🟢 ${t('customerHome.toursHomeView.activeDifficulty.beginner')}`;
-                      } else if (activeDiff === 'medium') {
-                        difficultyBarColorClass = 'bg-sky-500'; difficultyPercent = 60;
-                        difficultyLabel = `🟡 ${t('customerHome.toursHomeView.activeDifficulty.medium')}`;
-                      } else {
-                        difficultyBarColorClass = 'bg-rose-500'; difficultyPercent = 85;
-                        difficultyLabel = `🔴 ${t('customerHome.toursHomeView.activeDifficulty.professional')}`;
-                      }
-                    }
-
-                    // Actual on-trail hiking time estimated from the real GPX track, not the
-                    // manually-entered trip-wide duration (which includes transport/rest days).
-                    const durationLabel = `${getRouteDurationHours(parsedGpx)} ${t('miscWidgets.tourRouteStatsCard.hours')}`;
-
-                    return (
-                      <div className="border border-slate-200 rounded-2xl p-4 bg-white shadow-sm">
-                        <TourRouteStatsCard
-                          tour={selectedTour}
-                          parsed={parsedGpx}
-                          durationLabel={durationLabel}
-                          difficultyLabel={difficultyLabel}
-                          difficultyBarColorClass={difficultyBarColorClass}
-                          difficultyPercent={difficultyPercent}
-                          ratingValue={4.9}
-                        />
+                {/* Günün proqramı — vendor formda qurulan saat-saat timeline (mokap), yığıla bilir */}
+                {selectedTour.dayProgram && selectedTour.dayProgram.length > 0 && (
+                  <div className="space-y-4 py-8 border-t border-slate-200">
+                    <button
+                      type="button"
+                      onClick={() => setIsDayProgramExpanded(prev => !prev)}
+                      className="w-full flex items-center justify-between gap-2 cursor-pointer bg-transparent border-0 p-0 text-left"
+                    >
+                      <span className="text-xl font-extrabold text-slate-900">{t('tourDetailPage.dayProgram.title')}</span>
+                      <ChevronDown className={`w-[22px] h-[22px] text-slate-700 transition-transform ${isDayProgramExpanded ? '' : '-rotate-90'}`} />
+                    </button>
+                    {isDayProgramExpanded && (
+                      <div className="mt-1">
+                        {selectedTour.dayProgram.map((step, idx) => (
+                          <div key={idx} className="relative pb-5 last:pb-0">
+                            {idx < selectedTour.dayProgram!.length - 1 && (
+                              <span className="absolute left-4 top-9 bottom-0 w-px bg-slate-200" aria-hidden />
+                            )}
+                            <div className="flex gap-3 items-center">
+                              <span className="w-8 h-8 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center relative z-[1] shrink-0">
+                                <Clock className="w-[15px] h-[15px] text-slate-500" />
+                              </span>
+                              <div className="flex-1 min-w-0">
+                                <div className="text-[13px] text-slate-500 font-mono">{step.time}</div>
+                                <div className="text-[15px] font-bold text-slate-900 leading-tight mt-0.5">{step.title}</div>
+                              </div>
+                            </div>
+                            {step.note && (
+                              <p className="text-[13px] text-slate-500 leading-snug ml-11 mt-0.5">{step.note}</p>
+                            )}
+                          </div>
+                        ))}
                       </div>
-                    );
-                  })()}
+                    )}
+                  </div>
+                )}
 
-                  {/* Stunning Interactive 3D/2D GPX Trail Explorer Map */}
-                  {selectedTour.gpxData && (
-                    <GpsTrackVisualizer gpxDataString={selectedTour.gpxData} />
-                  )}
+                {/* Toplanış yeri — xəritə düymə ilə açılır (mokap: "Xəritədə bax") */}
+                {selectedTour.meetingPoint && (
+                  <div className="space-y-3 py-8 border-t border-slate-200">
+                    <h2 className="text-xl font-extrabold text-slate-900">{t('tourDetailPage.meetingPoint.title')}</h2>
+                    <p className="text-[14px] text-slate-600 leading-relaxed">
+                      {selectedTour.meetingPoint}
+                    </p>
+                    {selectedTour.meetingPointEmbedUrl && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => setShowMeetingMap(prev => !prev)}
+                          className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-[14px] cursor-pointer bg-[#2E4F3E] hover:bg-[#233f30] text-white transition"
+                        >
+                          <MapPin className="w-4 h-4" />
+                          {showMeetingMap ? t('tourDetailPage.meetingPoint.hideMap') : t('tourDetailPage.meetingPoint.viewOnMap')}
+                        </button>
+                        {showMeetingMap && (
+                          <iframe
+                            src={selectedTour.meetingPointEmbedUrl}
+                            width="100%"
+                            height="400"
+                            style={{ border: 0 }}
+                            loading="lazy"
+                            allowFullScreen
+                            className="rounded-xl h-[250px] sm:h-[400px]"
+                          />
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
 
+                {/* Yürüş trayektoriyası — kompakt sparkline + istəklə 3D peyk xəritəsi (mokap) */}
+                {(() => {
+                  const parsedGpx = parseStoredGpxData(selectedTour.gpxData);
+                  if (!parsedGpx || !selectedTour.gpxData) return null;
+                  return (
+                    <div className="space-y-3 py-8 border-t border-slate-200">
+                      <h2 className="text-xl font-extrabold text-slate-900">{t('tourDetailPage.trajectory.title')}</h2>
+                      <p className="text-[13px] text-slate-500 leading-snug -mt-1">{t('tourDetailPage.trajectory.subtitle')}</p>
+                      <div className="rounded-2xl border border-slate-200 bg-slate-50/50 p-4 mt-1">
+                        <div className="flex items-center justify-center gap-5 mb-3 text-[12px] text-slate-500">
+                          <span className="inline-flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-green-600 inline-block" />{t('tourDetailPage.trajectory.start')}
+                          </span>
+                          <span className="inline-flex items-center gap-1.5">
+                            <Flag className="w-[13px] h-[13px] text-red-600" />{t('tourDetailPage.trajectory.end')}
+                          </span>
+                        </div>
+                        <div className="w-full h-40 flex items-center justify-center">
+                          <RouteSparkline points={parsedGpx.points} className="w-full h-full max-w-[340px] text-brand-primary" />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setShowSatellite(prev => !prev)}
+                          className="w-full flex items-center justify-center gap-2 mt-3 py-2.5 rounded-xl font-semibold text-[13px] cursor-pointer bg-[#2E4F3E] hover:bg-[#233f30] text-white transition"
+                        >
+                          <Satellite className="w-4 h-4" />
+                          {showSatellite ? t('tourDetailPage.trajectory.satelliteHide') : t('tourDetailPage.trajectory.satelliteButton')}
+                        </button>
+                        {!showSatellite && (
+                          <div className="rounded-xl p-3 text-[12.5px] leading-snug mt-2.5" style={{ background: '#F0F5F1', color: '#3F5140' }}>
+                            {t('tourDetailPage.trajectory.satelliteHint')}
+                          </div>
+                        )}
+                        {showSatellite && (
+                          <div className="mt-3">
+                            <GpsTrackVisualizer gpxDataString={selectedTour.gpxData} />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Extra dynamic details */}
+                <div className="space-y-0">
+
+                <div className="space-y-0">
+                  {/* Tur bələdçisi — mokap: sətir siyahısı, klik → təşkilatçı profili */}
                   {(() => {
                     const organizer = users.find(u => u.id === selectedTour.vendorId);
                     if (organizer && organizer.guides && organizer.guides.length > 0) {
                       return (
-                        <div className="mt-6 mb-2 border border-slate-200 rounded-2xl p-5 bg-gradient-to-r from-slate-50 to-white shadow-sm">
-                          <h4 className="font-extrabold text-slate-800 mb-4 text-sm flex items-center gap-2">
-                            👥 {t('tourDetailPage.organizerTeam.title')}
-                          </h4>
-                          <div className="flex gap-4 overflow-x-auto pb-4 snap-x snap-mandatory scrollbar-none sm:scrollbar-thin">
-                            {organizer.guides.map((g, i) => (
-                              <div key={i} className="flex flex-col items-start flex-shrink-0 w-[260px] snap-start bg-white p-4 rounded-xl border border-slate-200 shadow-sm transition hover:shadow-md">
-                                <div className="flex items-center gap-4 mb-3 w-full">
-                                  <div className="w-12 h-12 rounded-full overflow-hidden bg-slate-100 border-2 border-emerald-50 flex-shrink-0">
-                                    {g.avatar ? <img src={g.avatar} className="w-full h-full object-cover"/> : <span className="flex items-center justify-center font-bold text-slate-400 w-full h-full text-sm">{g.name.charAt(0)}</span>}
-                                  </div>
-                                  <div className="flex-1 overflow-hidden">
-                                     <span className="text-sm font-bold text-slate-800 block truncate" title={g.name}>{g.name}</span>
-                                     <span className="text-[10px] text-emerald-600 font-bold block line-clamp-2 tracking-wide mt-0.5" title={getLocalizedGuideSpecialty(g, language)}>{getLocalizedGuideSpecialty(g, language) || t('tourDetailPage.organizerTeam.defaultSpecialty')}</span>
-                                  </div>
-                                </div>
-                                <p className="text-xs text-slate-600 font-medium leading-relaxed line-clamp-3" title={getLocalizedGuideBio(g, language)}>{getLocalizedGuideBio(g, language)}</p>
-                              </div>
-                            ))}
-                          </div>
+                        <div id="tour-guides-section" className="space-y-1 py-8 border-t border-slate-200 scroll-mt-20">
+                          <h2 className="text-xl font-extrabold text-slate-900 mb-2">{t('tourDetailPage.guides.title')}</h2>
+                          {organizer.guides.map((g, i) => (
+                            <button
+                              key={i}
+                              type="button"
+                              onClick={() => setSelectedOrganizer(organizer)}
+                              className={`w-full flex items-start gap-3 py-3.5 text-left bg-transparent border-0 group cursor-pointer ${i < organizer.guides!.length - 1 ? 'border-b border-slate-100' : ''}`}
+                            >
+                              <span className="w-11 h-11 rounded-full overflow-hidden bg-slate-100 border-2 border-emerald-50 shrink-0">
+                                {g.avatar
+                                  ? <img src={g.avatar} className="w-full h-full object-cover" alt={g.name} />
+                                  : <span className="flex items-center justify-center font-bold text-slate-400 w-full h-full text-sm">{g.name.charAt(0)}</span>}
+                              </span>
+                              <span className="flex-1 min-w-0 block">
+                                <span className="flex items-center gap-1">
+                                  <span className="text-[14px] font-bold text-slate-900 leading-tight group-hover:text-emerald-700 transition-colors">{g.name}</span>
+                                  <ChevronRight className="w-[15px] h-[15px] text-slate-400 group-hover:text-emerald-600 transition-colors" />
+                                </span>
+                                <span className="text-[12px] font-semibold text-emerald-600 mt-0.5 block">{getLocalizedGuideSpecialty(g, language) || t('tourDetailPage.organizerTeam.defaultSpecialty')}</span>
+                                {getLocalizedGuideBio(g, language) && (
+                                  <span className="text-[13px] text-slate-500 leading-snug mt-1 block">{getLocalizedGuideBio(g, language)}</span>
+                                )}
+                              </span>
+                            </button>
+                          ))}
                         </div>
                       );
                     }
@@ -804,14 +872,24 @@ export function TourDetailPage({
                     </div>
                   )}
 
-                  {/* Historical verified feedbacks inside detailed modals */}
-                  {/* Ödəniş sistemi olmadığı üçün müvəqqəti söndürülüb, bax: REVIEWS_ENABLED */}
+                  {/* Rəylər — rezervasiya nömrəsi ilə təsdiqlənən rəylər (mokap dizaynı) */}
                   {REVIEWS_ENABLED && (
                     <TourReviewsList
-                      tourId={selectedTour.id}
+                      tour={selectedTour}
                       reviews={reviews}
-                      reviewsCount={getReviewsCount(selectedTour.id)}
+                      onShowNotification={onShowNotification}
                     />
+                  )}
+
+                  {/* Hava proqnozu — mokap: canlı nişanlı kompakt kartlar, ən sonda */}
+                  {slots.filter(s => s.tourId === selectedTour.id).length > 0 && (
+                    <div className="py-8 border-t border-slate-200">
+                      <TourWeatherForecast
+                        dates={slots.filter(s => s.tourId === selectedTour.id).map(s => s.startDate)}
+                        region={selectedTour.region}
+                        variant="section"
+                      />
+                    </div>
                   )}
                 </div>
 
@@ -1034,18 +1112,34 @@ export function TourDetailPage({
 
           </div> {/* Closes TWO COLUMN WRAPPER */}
 
-          {/* YOU MIGHT ALSO LIKE SECTION */}
+          {/* Bunlar da maraqlı ola bilər — ana səhifə kart dizaynı (mokap) */}
           <div className="mt-16 pt-16 border-t border-slate-200">
             <h2 className="text-2xl font-extrabold text-label-primary mb-8">{t('tourDetailPage.relatedTours.title')}</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 w-full">
                 {relatedTours
                   .map(tour => {
-                    const priceList = slots.filter(s => s.tourId === tour.id).map(s => s.price);
+                    const tourSlots = slots.filter(s => s.tourId === tour.id);
+                    const priceList = tourSlots.map(s => s.price);
                     const minPrice = priceList.length > 0 ? Math.min(...priceList) : null;
+                    const shownPrice = tour.discountPrice && tour.discountPrice > 0 && tour.discountPrice < (tour.price ?? minPrice ?? 0)
+                      ? tour.discountPrice
+                      : (tour.price ?? minPrice);
+                    const relatedGpx = parseStoredGpxData(tour.gpxData);
+                    const categoryBadge =
+                      tour.category === 'camp' ? `⛺ ${t('customerHome.toursHomeView.categories.camp')}`
+                      : tour.category === 'hiking' ? `🥾 ${t('customerHome.toursHomeView.categories.hiking')}`
+                      : tour.category === 'active' ? `🏃‍♂️ ${t('customerHome.toursHomeView.categories.active')}`
+                      : tour.isInternational ? `✈️ ${t('customerHome.toursHomeView.badges.international')}`
+                      : `🏔️ ${t('customerHome.toursHomeView.categories.peak')}`;
+                    const diffTextColors: Record<string, string> = { easy: '#2E9E5B', medium: '#D6A32A', hard: '#C2703D', extreme: '#dc3545' };
+                    const diffSegColors: Record<string, string> = { easy: '#2E9E5B', medium: '#D6A32A', hard: '#C2703D', extreme: '#dc3545' };
+                    const diffSegments: Record<string, number> = { easy: 2, medium: 3, hard: 4, extreme: 5 };
+                    const segFilled = diffSegments[tour.difficulty] ?? 3;
+                    const segColor = diffSegColors[tour.difficulty] ?? '#D6A32A';
                     return (
                       <div
                         key={tour.id}
-                        className="group flex flex-col bg-white border border-[#E4E6E9] rounded-2xl overflow-hidden hover:shadow-[0_8px_24px_rgba(0,0,0,0.08)] transition-all duration-300 cursor-pointer h-full"
+                        className="bg-[#fcfdfc] rounded-[24px] overflow-hidden shadow-sm hover:shadow-md transition-all flex flex-col group border border-slate-100 cursor-pointer"
                         onClick={() => {
                           window.scrollTo({ top: 0, behavior: 'smooth' });
                           setSelectedTour(tour);
@@ -1053,45 +1147,110 @@ export function TourDetailPage({
                           setSelectedSlot(null);
                         }}
                       >
-                        <div className="relative aspect-[4/3] overflow-hidden">
+                        <div className="relative h-[200px] overflow-hidden bg-slate-100 shrink-0">
                           <img
                             src={tour.image}
                             alt={getLocalizedTourName(tour, language)}
-                            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                            loading="lazy"
+                            className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
                             referrerPolicy="no-referrer"
                           />
-                          <button className="absolute top-3 right-3 bg-white/90 p-2 rounded-full text-slate-700 hover:text-rose-600 transition shadow-sm" onClick={(e) => { e.stopPropagation(); }}>
-                            <Heart className="w-4 h-4" />
-                          </button>
-                        </div>
-                        <div className="p-4 flex flex-col flex-grow">
-                          <div className="flex items-center gap-1.5 text-[14px] text-label-secondary font-normal mb-2">
-                            <span>{tour.category}</span>
-                            <span>•</span>
-                            <span>{tour.region}</span>
+                          <div className="absolute top-4 left-4 bg-black/60 backdrop-blur-sm text-white px-2.5 py-1 rounded-full flex items-center gap-1.5 z-10 shadow-sm">
+                            <span className="text-[11px] font-medium tracking-wide">{categoryBadge}</span>
                           </div>
-                          <h3 className="font-bold text-label-primary text-[16px] mb-3 line-clamp-2 leading-[1.4] group-hover:text-emerald-700 transition">
+                          <div className="absolute top-4 right-4 flex items-center gap-1.5 z-10">
+                            <button
+                              type="button"
+                              onClick={(e) => handleToggleWishlist(tour.id, e)}
+                              className="w-[40px] h-[40px] bg-white/90 hover:bg-white rounded-full flex items-center justify-center transition shadow-sm"
+                              aria-label={t('tourDetailPage.header.addToWishlist')}
+                            >
+                              <Heart className={`w-5 h-5 ${wishlist.includes(tour.id) ? 'fill-rose-600 text-rose-600' : 'text-gray-700'}`} />
+                            </button>
+                            <ShareMenuButton
+                              tour={tour}
+                              slots={slots}
+                              onShowNotification={onShowNotification}
+                              stopPropagationOnOpen
+                              iconClassName="w-5 h-5"
+                              buttonClassName="w-[40px] h-[40px] bg-white/90 hover:bg-white rounded-full flex items-center justify-center text-gray-700 transition shadow-sm"
+                            />
+                          </div>
+                          <div className="absolute bottom-4 right-4 bg-white text-gray-800 text-[11px] font-semibold px-2.5 py-1 rounded-full flex items-center gap-1 z-10 shadow-sm border border-slate-100">
+                            <MapPin className="w-3 h-3 text-[#2E4F3E]" />
+                            <span className="truncate max-w-[120px]">{tour.region.split(',')[0]}</span>
+                          </div>
+                        </div>
+                        <div className="px-5 pt-5 pb-4 flex-1 flex flex-col">
+                          <h3 className="font-bold text-gray-900 text-[15px] leading-snug mb-2 line-clamp-2">
                             {getLocalizedTourName(tour, language)}
                           </h3>
-                          {REVIEWS_ENABLED && (
-                            <div className="flex items-center gap-1 text-xs font-bold text-label-primary mb-4">
-                               <Star className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
-                               4.9 <span className="text-label-tertiary font-normal">({getReviewsCount(tour.id)})</span>
-                            </div>
-                          )}
-
-                          <div className="mt-auto pt-4 border-t border-slate-100 flex items-end justify-between">
-                            <span className="text-xs text-label-tertiary font-medium">{tour.durationDays >= 2
-                              ? t('tourDetailPage.relatedTours.days', { days: tour.durationDays })
-                              : t('tourDetailPage.relatedTours.hours', { hours: tour.durationHours ?? (tour.durationDays * 8) })}</span>
-                            {minPrice ? (
-                              <div className="flex flex-col items-end">
-                                <span className="text-[10px] text-label-tertiary font-medium">{t('tourDetailPage.relatedTours.startingPrices')}</span>
-                                <span className="text-base font-extrabold text-label-primary">{getConvertedPriceInfo(minPrice, tour.priceCurrency).both}</span>
+                          <div className="flex items-center gap-1.5 text-[11px] text-gray-500 font-medium mb-2">
+                            <Clock className="w-3.5 h-3.5" />
+                            <span>
+                              {tour.durationDays >= 2
+                                ? t('tourDetailPage.relatedTours.days', { days: tour.durationDays })
+                                : t('tourDetailPage.relatedTours.hours', { hours: tour.durationHours ?? (tour.durationDays * 8) })}
+                              <span className="mx-1.5">•</span>
+                              {t('customerHome.toursHomeView.activeDates', { count: tourSlots.length })}
+                            </span>
+                          </div>
+                          <div className="mt-auto flex flex-col">
+                            {relatedGpx && (
+                              <div className="flex flex-wrap items-center text-[12px] text-gray-500 mb-4">
+                                <span className="text-gray-400 mr-1">{t('tourDetailPage.stats.distance')}</span> <span className="font-semibold text-gray-700">{relatedGpx.stats.distanceKm} km</span>
+                                <span className="mx-1.5">•</span>
+                                <span className="text-gray-400 mr-1">{t('tourDetailPage.stats.elevation')}</span> <span className="font-semibold text-gray-700">{relatedGpx.stats.elevationGainM} m</span>
                               </div>
-                            ) : (
-                               <span className="text-xs font-bold text-label-tertiary">{t('tourDetailPage.relatedTours.soldOut')}</span>
                             )}
+                            <div className="mb-4">
+                              <div className="flex justify-between items-end mb-1.5">
+                                <span className="text-[11px] font-bold" style={{ color: diffTextColors[tour.difficulty] ?? '#D6A32A' }}>
+                                  {t(`customerHome.toursHomeView.difficulty.${tour.difficulty}`)}
+                                </span>
+                                <div className="flex items-center gap-1">
+                                  {REVIEWS_ENABLED && tour.rating != null && getReviewsCount(tour.id) > 0 ? (
+                                    <>
+                                      <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                                      <span className="text-[11px] font-bold text-gray-800">{tour.rating.toFixed(1)} <span className="font-normal text-gray-500">({getReviewsCount(tour.id)})</span></span>
+                                    </>
+                                  ) : (
+                                    <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 rounded px-1.5 py-0.5">{t('customerHome.toursHomeView.cardMeta.newTag')}</span>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="flex gap-1 h-1.5">
+                                {[1, 2, 3, 4, 5].map(n => (
+                                  <div key={n} className="flex-1 rounded-full" style={{ background: n <= segFilled ? segColor : '#E2E8F0' }} />
+                                ))}
+                              </div>
+                            </div>
+                            <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+                              {shownPrice != null ? (
+                                <div className="flex flex-col">
+                                  <span className="text-[8px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Qiymət</span>
+                                  <div className="flex items-baseline gap-0.5">
+                                    <span className="text-[18px] font-extrabold text-gray-900 leading-none">{getConvertedPriceInfo(shownPrice, tour.priceCurrency).both}</span>
+                                    <span className="text-[9px] font-medium text-gray-500 whitespace-nowrap">/ nəfər</span>
+                                  </div>
+                                </div>
+                              ) : (
+                                <span className="text-xs font-bold text-label-tertiary">{t('tourDetailPage.relatedTours.soldOut')}</span>
+                              )}
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                                  setSelectedTour(tour);
+                                  setShowInquiry(false);
+                                  setSelectedSlot(null);
+                                }}
+                                className="bg-[#2E4F3E] hover:bg-[#233f30] text-white px-4 py-2 rounded-xl text-[11px] font-bold flex items-center gap-1.5 transition-colors shadow-sm cursor-pointer"
+                              >
+                                Daha Ətraflı
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg>
+                              </button>
+                            </div>
                           </div>
                         </div>
                       </div>

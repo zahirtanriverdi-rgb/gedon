@@ -7,7 +7,8 @@ import { useLanguage } from '../i18n/LanguageContext';
 interface TourWeatherForecastProps {
   dates: string[];
   region: string;
-  variant?: 'compact' | 'detailed';
+  // 'section' — detal səhifəsinin mokap dizaynı: h2 başlıq + "Canlı" nişanı + gradient kartlar
+  variant?: 'compact' | 'detailed' | 'section';
 }
 
 export const TourWeatherForecast: React.FC<TourWeatherForecastProps> = ({ dates, region, variant = 'compact' }) => {
@@ -119,6 +120,47 @@ export const TourWeatherForecast: React.FC<TourWeatherForecastProps> = ({ dates,
                   <span className="text-slate-400 font-medium text-[9px] hidden sm:inline">
                     ({conditionLabel})
                   </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  if (variant === 'section') {
+    return (
+      <div className="space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-xl font-extrabold text-slate-900">{t('tourDetailPage.weatherSection.title')}</h2>
+          <span className="inline-flex items-center gap-1.5 text-[11px] font-bold px-2.5 py-1 rounded-full bg-sky-50 text-sky-700 border border-sky-200">
+            <span className="w-[7px] h-[7px] rounded-full bg-sky-500 inline-block animate-pulse" />
+            {t('tourDetailPage.weatherSection.liveBadge')}
+          </span>
+        </div>
+        <p className="text-[13px] text-slate-500 leading-snug -mt-1">{t('tourDetailPage.weatherSection.subtitle')}</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          {dates.map((date) => {
+            const forecast = forecasts[date];
+            if (!forecast) return null;
+            const conditionLabel = t(`miscWidgets.tourWeatherForecast.conditions.${forecast.labelKey}`);
+            return (
+              <div
+                key={date}
+                className="flex items-center justify-between rounded-xl p-3.5 border border-sky-100"
+                style={{ background: 'linear-gradient(135deg,#F0F9FF,#FFFFFF)' }}
+              >
+                <div className="flex items-center gap-3">
+                  <span className="text-[26px] leading-none">{forecast.emoji}</span>
+                  <div>
+                    <div className="text-[13px] font-bold text-slate-800">{formatAzeriDate(date)}</div>
+                    <div className="text-[11px] text-slate-500 font-medium">{conditionLabel}</div>
+                  </div>
+                </div>
+                <div className="flex items-baseline gap-1">
+                  <span className="text-[17px] font-extrabold text-slate-800">{forecast.tempMax}°</span>
+                  <span className="text-[13px] text-slate-400 font-semibold">/ {forecast.tempMin}°</span>
                 </div>
               </div>
             );
