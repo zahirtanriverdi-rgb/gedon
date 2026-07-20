@@ -23,7 +23,11 @@ const NAV_STRINGS = {
  * vendor/admin dashboards, which use their own route groups). Wishlist/compare badges listen
  * to the utils' change events since the toggles now live in sibling components.
  */
-export function MobileBottomNav() {
+export function MobileBottomNav({
+  featureFlags,
+}: {
+  featureFlags?: { campSitesEnabled: boolean; groupCalculatorEnabled: boolean };
+} = {}) {
   const router = useRouter();
   const pathname = usePathname();
   const { language, setLanguage } = useLanguage();
@@ -60,7 +64,8 @@ export function MobileBottomNav() {
   }, [menuOpen]);
 
   // Admin-controlled feature flags (settings table) — shared with the desktop SiteHeader.
-  const { campSitesEnabled, groupCalculatorEnabled } = useSiteFeatureFlags();
+  // SSR-resolved values arrive via props so the burger's calculator entry doesn't flicker.
+  const { campSitesEnabled, groupCalculatorEnabled } = useSiteFeatureFlags(featureFlags);
 
   const go = (href: string) => {
     setMenuOpen(false);

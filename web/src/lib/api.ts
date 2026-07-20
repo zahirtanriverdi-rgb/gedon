@@ -108,6 +108,27 @@ export async function getSlotsForTour(tourId: string): Promise<TourSlot[]> {
   return data?.slots ?? [];
 }
 
+/**
+ * Admin-controlled customer-facing feature flags, resolved SERVER-side so the header/bottom-nav
+ * render with the correct state in the initial HTML. Fetching these on the client instead makes
+ * the calculator/camp icons flash in then out on every load (the client hook defaults to
+ * "visible" and only hides once its fetch resolves). Mirrors the success-path logic of
+ * useSiteFeatureFlags so SSR and hydration agree.
+ */
+export async function getSiteFeatureFlags(): Promise<{
+  campSitesEnabled: boolean;
+  groupCalculatorEnabled: boolean;
+}> {
+  const [camp, calc] = await Promise.all([
+    serverFetchOptional<{ enabled?: boolean }>('/api/camp-sites/config'),
+    serverFetchOptional<{ enabled?: boolean }>('/api/group-calculator/config'),
+  ]);
+  return {
+    campSitesEnabled: !!camp && camp.enabled !== false,
+    groupCalculatorEnabled: !!calc && calc.enabled !== false,
+  };
+}
+
 export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3001';
 
 export type { Tour, TourSlot, Review, User };

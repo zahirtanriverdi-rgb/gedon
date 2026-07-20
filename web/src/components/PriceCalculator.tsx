@@ -129,7 +129,7 @@ export const PriceCalculator: React.FC<PriceCalculatorProps> = ({ onBack, config
 
       <div className="mb-8">
         <h1 className="text-3xl font-extrabold text-label-primary tracking-tight flex items-center gap-3">
-          <span className="text-4xl">🧮</span>
+          <Calculator className="w-8 h-8 text-primary-500" strokeWidth={2.5} />
           {t('miscWidgets.priceCalculator.title')}
         </h1>
         <p className="text-slate-500 mt-2 font-medium">{t('miscWidgets.priceCalculator.subtitle')}</p>

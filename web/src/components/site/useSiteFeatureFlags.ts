@@ -4,13 +4,23 @@ import { useEffect, useState } from 'react';
 
 /**
  * Admin-controlled customer-facing feature flags (settings table, public config endpoints).
- * Defaults mirror the old CustomerPortal behavior: camp sites stay hidden until the config
- * loads (never flashes on installs where it's off), the calculator stays visible until told
- * otherwise (never flashes away in the common case).
+ *
+ * Pass the SSR-resolved values (getSiteFeatureFlags in lib/api) as `initial` so the first
+ * client render already matches reality — otherwise the icons flash in then out on every load
+ * (camp defaults hidden, calculator defaults visible, and only the fetch corrects them). The
+ * effect still re-fetches for freshness; with a correct `initial` it resolves to the same value
+ * and nothing flickers.
  */
-export function useSiteFeatureFlags() {
-  const [campSitesEnabled, setCampSitesEnabled] = useState<boolean>(false);
-  const [groupCalculatorEnabled, setGroupCalculatorEnabled] = useState<boolean>(true);
+export function useSiteFeatureFlags(initial?: {
+  campSitesEnabled?: boolean;
+  groupCalculatorEnabled?: boolean;
+}) {
+  const [campSitesEnabled, setCampSitesEnabled] = useState<boolean>(
+    initial?.campSitesEnabled ?? false,
+  );
+  const [groupCalculatorEnabled, setGroupCalculatorEnabled] = useState<boolean>(
+    initial?.groupCalculatorEnabled ?? true,
+  );
 
   useEffect(() => {
     fetch('/api/camp-sites/config')

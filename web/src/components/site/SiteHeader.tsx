@@ -29,14 +29,21 @@ const NAV_LABELS: Record<'az' | 'en' | 'ru', { wishlist: string; compare: string
 // threshold the old SPA used to decide when the header's inline copy takes over.
 const HEADER_SEARCH_SCROLL_Y = 300;
 
-export function SiteHeader({ tours }: { tours: Tour[] }) {
+export function SiteHeader({
+  tours,
+  featureFlags,
+}: {
+  tours: Tour[];
+  featureFlags?: { campSitesEnabled: boolean; groupCalculatorEnabled: boolean };
+}) {
   const { language, t } = useLanguage();
   const router = useRouter();
   const pathname = usePathname();
   const labels = NAV_LABELS[language] || NAV_LABELS.az;
   // Camp sites / group calculator are admin-toggled features — their nav icons must disappear
   // when the admin turns them off (the mobile bottom nav already does this via the same flags).
-  const { campSitesEnabled, groupCalculatorEnabled } = useSiteFeatureFlags();
+  // featureFlags is the SSR-resolved state, passed so the icons don't flash in/out on load.
+  const { campSitesEnabled, groupCalculatorEnabled } = useSiteFeatureFlags(featureFlags);
   const nav = [
     { href: '/wishlist', label: labels.wishlist, Icon: Heart },
     { href: '/compare', label: labels.compare, Icon: Scale },
