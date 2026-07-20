@@ -286,7 +286,12 @@ export function InternationalTourForm({ currentUser, tour, slots, onAddTour, onE
         tourId = tour.id;
         if (onEditTour) await onEditTour(updatedTour);
         if (onShowNotification) {
-          onShowNotification(t('vendorTourForms.internationalTourForm.notifications.tourUpdatedPendingApproval'), 'info');
+          onShowNotification(
+            currentUser.role === 'admin'
+              ? t('vendorTourForms.internationalTourForm.notifications.tourUpdatedByAdmin')
+              : t('vendorTourForms.internationalTourForm.notifications.tourUpdatedPendingApproval'),
+            'info'
+          );
         }
       } else {
         const newTour: Tour = {

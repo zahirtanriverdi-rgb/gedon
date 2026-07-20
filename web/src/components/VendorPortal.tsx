@@ -1,5 +1,5 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Tour, TourSlot, Booking, User } from '../types';
 import { useLanguage } from '../i18n/LanguageContext';
 import { ProfileTab } from './vendor/ProfileTab';
@@ -96,6 +96,12 @@ export default function VendorPortal({
 }: VendorPortalProps) {
   const { t } = useLanguage();
   const [activeSubTab, setActiveSubTab] = useState<'my-tours' | 'add-tour' | 'add-intl-tour' | 'add-slot' | 'profile' | 'crm' | 'calculator' | 'buses'>('my-tours');
+
+  // Sidebar navigation keeps the old scroll depth otherwise — landing mid-page (or past the
+  // end of a shorter tab) looks like a blank/broken screen.
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [activeSubTab]);
   const [tourSearchTerm, setTourSearchTerm] = useState('');
   const [selectedTicketBooking, setSelectedTicketBooking] = useState<Booking | null>(null);
 

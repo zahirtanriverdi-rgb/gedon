@@ -145,7 +145,10 @@ export function CrmTab({ tours, slots, bookings, currentUser, operatorToken, onE
     .reduce((sum, b) => sum + b.participantsCount, 0);
 
   const targetSlotCapacity = selectedCrmSlot?.capacity || 0;
-  const remainingSeats = Math.max(0, targetSlotCapacity - webBookingsCount - currentTourExternalSales);
+  // The server-maintained bookedCount is the source of truth for occupancy — it also covers
+  // seats that have no booking row in this client's list (e.g. imported/seeded registrations),
+  // which webBookingsCount + currentTourExternalSales alone would miss.
+  const remainingSeats = Math.max(0, targetSlotCapacity - (selectedCrmSlot?.bookedCount ?? (webBookingsCount + currentTourExternalSales)));
 
   return (
         <div className="space-y-6 animate-fadeIn">
@@ -236,7 +239,9 @@ export function CrmTab({ tours, slots, bookings, currentUser, operatorToken, onE
                 </div>
                 <div>
                   <span className="block text-[10px] text-slate-400 font-bold tracking-wider">{t('vendorBookings.crmTab.metrics.externalSales')}</span>
-                  <strong className="text-base text-slate-800 font-mono">{t('vendorBookings.crmTab.metrics.seatsCount', { count: selectedCrmTour?.externalSales || 0 })}</strong>
+                  {/* Computed from the actual manual/kənar bookings — tour.externalSales is never
+                      populated anywhere, so reading it always showed 0. */}
+                  <strong className="text-base text-slate-800 font-mono">{t('vendorBookings.crmTab.metrics.seatsCount', { count: currentTourExternalSales })}</strong>
                 </div>
               </div>
 

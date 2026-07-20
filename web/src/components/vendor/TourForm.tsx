@@ -395,7 +395,14 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
         tourId = tour.id;
         if (onEditTour) await onEditTour(updatedTour);
         if (onShowNotification) {
-          onShowNotification(t('vendorTourForms.tourForm.notifications.tourUpdatedPendingApproval'), 'info');
+          // Admin edits write straight to the live row (no re-approval round) — the
+          // "sent to admin for re-approval" wording is only true for vendors.
+          onShowNotification(
+            currentUser.role === 'admin'
+              ? t('vendorTourForms.tourForm.notifications.tourUpdatedByAdmin')
+              : t('vendorTourForms.tourForm.notifications.tourUpdatedPendingApproval'),
+            'info'
+          );
         }
       } else {
         const newTour: Tour = {

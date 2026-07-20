@@ -152,6 +152,12 @@ export default function AdminPortal({
   const { t } = useLanguage();
   const [activeSection, setActiveSection] = useState<'dashboard' | 'tours' | 'vendors' | 'campSites' | 'settings'>('dashboard');
 
+  // Sidebar navigation keeps the old scroll depth otherwise — landing mid-page (or past the
+  // end of a shorter section) looks like a blank/broken screen.
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [activeSection]);
+
   // Price calculator cost elements (destinations + rates) — editable draft, synced from
   // platformConfig whenever it changes elsewhere, saved explicitly via the button below.
   const [pcConfig, setPcConfig] = useState<PriceCalculatorConfig>(platformConfig.priceCalculatorConfig);
@@ -273,13 +279,50 @@ export default function AdminPortal({
     if (currency === 'EUR' && eurRateDraft === '') setEurRateDraft(String(exchangeRates.EUR));
   };
 
+  // Persists the manually entered USD/EUR rates so they survive reloads and win over the
+  // live CBAR feed for every client (see /api/exchange-rates/cbar override logic).
+  const [savingRates, setSavingRates] = useState(false);
+  const handleSaveRates = async () => {
+    const usd = Number(usdRateDraft);
+    const eur = Number(eurRateDraft);
+    if (!(usd > 0) || !(eur > 0)) {
+      if (onShowNotification) onShowNotification(t('adminPortal.exchangeRates.invalidRates'), 'error');
+      return;
+    }
+    setSavingRates(true);
+    try {
+      const response = await fetch('/api/admin/settings', {
+        method: 'PUT',
+        headers: adminSettingsAuthHeaders,
+        body: JSON.stringify({ usdRate: usd, eurRate: eur }),
+      });
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        throw new Error(errData.error || t('adminPortal.exchangeRates.saveError'));
+      }
+      onUpdateExchangeRates({ USD: usd, EUR: eur });
+      if (onShowNotification) onShowNotification(t('adminPortal.exchangeRates.saveSuccess'), 'success');
+    } catch (err: any) {
+      if (onShowNotification) onShowNotification(err.message || t('adminPortal.exchangeRates.saveError'), 'error');
+    } finally {
+      setSavingRates(false);
+    }
+  };
+
   const fetchCbarRates = async () => {
     setCbarLoading(true);
     try {
-      const response = await fetch('/api/exchange-rates/cbar');
+      const response = await fetch('/api/exchange-rates/cbar?live=1');
       if (response.ok) {
         const data = await response.json();
         if (data.success && data.USD && data.EUR) {
+          // Fetching live rates also clears any pinned manual override — the admin's intent
+          // here is "follow the live CBAR feed again".
+          fetch('/api/admin/settings', {
+            method: 'PUT',
+            headers: adminSettingsAuthHeaders,
+            body: JSON.stringify({ clearRateOverride: true }),
+          }).catch(() => {});
           onUpdateExchangeRates({ USD: data.USD, EUR: data.EUR });
           if (onShowNotification) {
             onShowNotification(t('adminPortal.exchangeRates.cbarFetchSuccess', { usd: data.USD, eur: data.EUR }), 'success');
@@ -849,12 +892,9 @@ export default function AdminPortal({
               <div className="flex flex-wrap gap-3 items-end max-w-xl">
                 <button
                   type="button"
-                  onClick={() => {
-                    if (onShowNotification) {
-                      onShowNotification(t('adminPortal.exchangeRates.saveSuccess'), 'success');
-                    }
-                  }}
-                  className="bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs px-4 py-2 rounded-lg transition-all cursor-pointer"
+                  disabled={savingRates}
+                  onClick={handleSaveRates}
+                  className="bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white font-bold text-xs px-4 py-2 rounded-lg transition-all cursor-pointer"
                 >
                   {t('adminPortal.exchangeRates.saveButton')}
                 </button>

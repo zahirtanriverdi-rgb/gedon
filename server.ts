@@ -733,6 +733,15 @@ const serverBookings: ServerBooking[] = [];
 // Endpoint to fetch CBAR live rates (dynamic or fallback to 22.05.2026)
 app.get("/api/exchange-rates/cbar", async (req, res) => {
   try {
+    // Admin-saved manual rates win over the live feed for every consumer. The admin panel's
+    // "Canlı CBAR Məzənnəsini Gətir" button passes ?live=1 to bypass the override and read
+    // the actual live values into the form.
+    if (req.query.live !== '1') {
+      const override = await getStoredExchangeRateOverride();
+      if (override) {
+        return res.json({ success: true, USD: override.USD, EUR: override.EUR, source: 'manual-override' });
+      }
+    }
     const today = new Date();
     const day = String(today.getDate()).padStart(2, '0');
     const month = String(today.getMonth() + 1).padStart(2, '0');
@@ -978,11 +987,41 @@ app.get("/api/camp-sites/config", async (req, res) => {
   }
 });
 
+// Admin-persisted cost elements for the public "Qrup üçün qiymət hesabla" calculator.
+// Stored as one JSON blob in the settings table; null means "admin never saved — client
+// falls back to its built-in defaults".
+async function getStoredPriceCalculatorConfig(): Promise<Record<string, any> | null> {
+  try {
+    const raw = await getSetting('price_calculator_config', '');
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+// Admin-saved manual USD/EUR rates. When set, they win over the live CBAR feed for every
+// client (customer currency display and vendor AZN-equivalent calculations alike).
+async function getStoredExchangeRateOverride(): Promise<{ USD: number; EUR: number } | null> {
+  try {
+    const raw = await getSetting('exchange_rate_override', '');
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed?.USD > 0 && parsed?.EUR > 0 ? { USD: Number(parsed.USD), EUR: Number(parsed.EUR) } : null;
+  } catch {
+    return null;
+  }
+}
+
 // GET /api/group-calculator/config — public flag for whether the "Qrup hesabla" group price
 // calculator nav button is shown to customers (admin-controlled, mirrors /api/camp-sites/config).
+// Also carries the admin-saved cost elements (config) so the customer calculator uses the same
+// tariffs the admin edits in Ayarlar instead of the client's hardcoded fallback.
 app.get("/api/group-calculator/config", async (req, res) => {
   try {
-    res.json({ enabled: await isGroupCalculatorEnabled() });
+    res.json({
+      enabled: await isGroupCalculatorEnabled(),
+      config: await getStoredPriceCalculatorConfig(),
+    });
   } catch (error: any) {
     console.error("[GET /api/group-calculator/config] error:", error);
     res.status(500).json({ error: "Konfiqurasiya yüklənə bilmədi." });
@@ -1231,6 +1270,8 @@ app.get("/api/admin/settings", authenticateUser, async (req: any, res) => {
       campRewardThreshold: threshold,
       campSitesEnabled: await isCampSitesEnabled(),
       groupCalculatorEnabled: await isGroupCalculatorEnabled(),
+      priceCalculatorConfig: await getStoredPriceCalculatorConfig(),
+      exchangeRateOverride: await getStoredExchangeRateOverride(),
     });
   } catch (error: any) {
     console.error("[GET /api/admin/settings] error:", error);
@@ -1243,9 +1284,12 @@ app.put("/api/admin/settings", authenticateUser, async (req: any, res) => {
     return res.status(403).json({ error: "Bu əməliyyat yalnız adminlər üçündür." });
   }
   const body = req.body || {};
+  // Camp fields are optional as a pair — callers that only save the calculator config or
+  // exchange rates shouldn't be forced to resend (and re-validate) the camp point values.
+  const hasCampFields = body.campPointsPerSite !== undefined || body.campRewardThreshold !== undefined;
   const pointsPerSite = Number(body.campPointsPerSite);
   const threshold = Number(body.campRewardThreshold);
-  if (!Number.isInteger(pointsPerSite) || pointsPerSite <= 0 || !Number.isInteger(threshold) || threshold <= 0) {
+  if (hasCampFields && (!Number.isInteger(pointsPerSite) || pointsPerSite <= 0 || !Number.isInteger(threshold) || threshold <= 0)) {
     return res.status(400).json({ error: "Hər iki qiymət müsbət tam ədəd olmalıdır." });
   }
   if (body.campSitesEnabled !== undefined && typeof body.campSitesEnabled !== 'boolean') {
@@ -1254,20 +1298,43 @@ app.put("/api/admin/settings", authenticateUser, async (req: any, res) => {
   if (body.groupCalculatorEnabled !== undefined && typeof body.groupCalculatorEnabled !== 'boolean') {
     return res.status(400).json({ error: "groupCalculatorEnabled true/false olmalıdır." });
   }
+  if (body.priceCalculatorConfig !== undefined && (typeof body.priceCalculatorConfig !== 'object' || body.priceCalculatorConfig === null || Array.isArray(body.priceCalculatorConfig))) {
+    return res.status(400).json({ error: "priceCalculatorConfig obyekt olmalıdır." });
+  }
+  const hasRateFields = body.usdRate !== undefined || body.eurRate !== undefined;
+  const usdRate = Number(body.usdRate);
+  const eurRate = Number(body.eurRate);
+  if (hasRateFields && (!(usdRate > 0) || !(eurRate > 0))) {
+    return res.status(400).json({ error: "usdRate və eurRate birlikdə göndərilməli və müsbət ədəd olmalıdır." });
+  }
   try {
-    await setSetting('camp_points_per_site', String(pointsPerSite));
-    await setSetting('camp_reward_threshold', String(threshold));
+    if (hasCampFields) {
+      await setSetting('camp_points_per_site', String(pointsPerSite));
+      await setSetting('camp_reward_threshold', String(threshold));
+    }
     if (body.campSitesEnabled !== undefined) {
       await setSetting('camp_sites_enabled', body.campSitesEnabled ? 'true' : 'false');
     }
     if (body.groupCalculatorEnabled !== undefined) {
       await setSetting('group_calculator_enabled', body.groupCalculatorEnabled ? 'true' : 'false');
     }
+    if (body.priceCalculatorConfig !== undefined) {
+      await setSetting('price_calculator_config', JSON.stringify(body.priceCalculatorConfig));
+    }
+    if (hasRateFields) {
+      await setSetting('exchange_rate_override', JSON.stringify({ USD: usdRate, EUR: eurRate }));
+    } else if (body.clearRateOverride === true) {
+      // Admin switched back to the live CBAR feed — drop the pinned manual rates.
+      await setSetting('exchange_rate_override', '');
+    }
+    const campConfig = await getCampPointsConfig();
     res.json({
-      campPointsPerSite: pointsPerSite,
-      campRewardThreshold: threshold,
+      campPointsPerSite: campConfig.pointsPerSite,
+      campRewardThreshold: campConfig.threshold,
       campSitesEnabled: await isCampSitesEnabled(),
       groupCalculatorEnabled: await isGroupCalculatorEnabled(),
+      priceCalculatorConfig: await getStoredPriceCalculatorConfig(),
+      exchangeRateOverride: await getStoredExchangeRateOverride(),
     });
   } catch (error: any) {
     console.error("[PUT /api/admin/settings] error:", error);

@@ -167,6 +167,7 @@ export const vendorTourForms = {
           mediaAddedVideos: '{{count}} video',
           mediaAddedJoiner: ' və ',
           tourUpdatedPendingApproval: 'Tur məlumatları yeniləndi və yenidən təsdiqlənməsi üçün Admin nümayəndəsinə göndərildi! ⏳✨',
+          tourUpdatedByAdmin: 'Tur məlumatları yeniləndi və dərhal saytda tətbiq olundu! ✅',
         },
         buttons: {
           back: '← Geri',
@@ -292,6 +293,7 @@ export const vendorTourForms = {
         },
         notifications: {
           tourUpdatedPendingApproval: 'Tur məlumatları yeniləndi və yenidən təsdiqlənməsi üçün Admin nümayəndəsinə göndərildi! ⏳✨',
+          tourUpdatedByAdmin: 'Tur məlumatları yeniləndi və dərhal saytda tətbiq olundu! ✅',
           tourCreatedPendingApproval: 'Təbrik edirik! Yeni Xarici Tur uğurla yaradıldı və təsdiq gözləmə siyahısına əlavə edildi. ⏳✈️',
         },
         submitErrors: {
@@ -474,6 +476,7 @@ export const vendorTourForms = {
           mediaAddedVideos: '{{count}} video(s)',
           mediaAddedJoiner: ' and ',
           tourUpdatedPendingApproval: 'Tour details updated and sent to the admin for re-approval! ⏳✨',
+          tourUpdatedByAdmin: 'Tour details updated and applied to the live site immediately! ✅',
         },
         buttons: {
           back: '← Back',
@@ -599,6 +602,7 @@ export const vendorTourForms = {
         },
         notifications: {
           tourUpdatedPendingApproval: 'Tour details updated and sent to the admin for re-approval! ⏳✨',
+          tourUpdatedByAdmin: 'Tour details updated and applied to the live site immediately! ✅',
           tourCreatedPendingApproval: 'Congratulations! The new International Tour was created successfully and added to the approval queue. ⏳✈️',
         },
         submitErrors: {
@@ -781,6 +785,7 @@ export const vendorTourForms = {
           mediaAddedVideos: '{{count}} видео',
           mediaAddedJoiner: ' и ',
           tourUpdatedPendingApproval: 'Данные тура обновлены и отправлены администратору на повторное утверждение! ⏳✨',
+          tourUpdatedByAdmin: 'Данные тура обновлены и сразу применены на сайте! ✅',
         },
         buttons: {
           back: '← Назад',
@@ -906,6 +911,7 @@ export const vendorTourForms = {
         },
         notifications: {
           tourUpdatedPendingApproval: 'Данные тура обновлены и отправлены администратору на повторное утверждение! ⏳✨',
+          tourUpdatedByAdmin: 'Данные тура обновлены и сразу применены на сайте! ✅',
           tourCreatedPendingApproval: 'Поздравляем! Новый международный тур успешно создан и добавлен в очередь на утверждение. ⏳✈️',
         },
         submitErrors: {

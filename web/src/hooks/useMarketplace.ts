@@ -164,7 +164,8 @@ export function useMarketplace(authToken: string | null): UseMarketplaceResult {
     return () => clearInterval(timer);
   }, [authToken, reloadBookings]);
 
-  // Live CBAR exchange rates (best-effort).
+  // Live CBAR exchange rates (best-effort). The server swaps in the admin's manually saved
+  // override automatically when one exists.
   useEffect(() => {
     (async () => {
       try {
@@ -175,6 +176,27 @@ export function useMarketplace(authToken: string | null): UseMarketplaceResult {
         }
       } catch {
         /* keep fallback rates */
+      }
+    })();
+  }, []);
+
+  // Admin-persisted price calculator tariffs (settings table). Merged over the client default
+  // so an older stored config that predates a newly added field still gets that field's default.
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch('/api/group-calculator/config');
+        if (res.ok) {
+          const data = await res.json();
+          if (data?.config && typeof data.config === 'object') {
+            setPlatformConfig((prev) => ({
+              ...prev,
+              priceCalculatorConfig: { ...DEFAULT_PRICE_CALCULATOR_CONFIG, ...data.config },
+            }));
+          }
+        }
+      } catch {
+        /* keep defaults */
       }
     })();
   }, []);
@@ -531,9 +553,20 @@ export function useMarketplace(authToken: string | null): UseMarketplaceResult {
     setExchangeRates(newRates);
   };
 
-  const handleUpdatePriceCalculatorConfig = (newConfig: PriceCalculatorConfig) => {
-    setPlatformConfig((prev) => ({ ...prev, priceCalculatorConfig: newConfig }));
-    showNotification(t('app.notifications.calculatorUpdated'), 'success');
+  const handleUpdatePriceCalculatorConfig = async (newConfig: PriceCalculatorConfig) => {
+    try {
+      const response = await fetch('/api/admin/settings', {
+        method: 'PUT',
+        headers: authHeaders(),
+        body: JSON.stringify({ priceCalculatorConfig: newConfig }),
+      });
+      const parsed = await parseApiResponse(response);
+      if (!response.ok) throw new Error(parsed.error || 'Kalkulyator parametrləri saxlanıla bilmədi.');
+      setPlatformConfig((prev) => ({ ...prev, priceCalculatorConfig: newConfig }));
+      showNotification(t('app.notifications.calculatorUpdated'), 'success');
+    } catch (e: any) {
+      showNotification(e.message || t('app.notifications.calculatorUpdateError'), 'error');
+    }
   };
 
   return {
