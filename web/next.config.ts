@@ -1,6 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Dev rejimindəki küncdəki "N" göstəricisini gizlət
+  devIndicators: false,
+
   async rewrites() {
     // Express API server-inizin ünvanı (dev-də localhost:3000, prod-da Render və s.)
     const API_ORIGIN = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
