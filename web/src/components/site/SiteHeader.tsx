@@ -165,6 +165,12 @@ export function SiteHeader({
                   setQuery(val);
                   submitSearch(val);
                 }}
+                onSelectTour={(tour) => {
+                  // Header search — a tour pick jumps straight to that tour's page.
+                  if (query.trim()) setRecentSearches(addRecentSearch(query));
+                  setIsSearchFocused(false);
+                  router.push(`/tours/${tour.slug || tour.id}`);
+                }}
                 appLanguage={language}
               />
             )}

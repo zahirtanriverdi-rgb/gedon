@@ -11,6 +11,9 @@ interface SearchDropdownProps {
   tours: Tour[];
   recentSearches: string[];
   onSelect: (value: string) => void;
+  // When a *tour* suggestion (not a region) is picked, open that tour's page directly instead of
+  // just filling the search box. Falls back to onSelect(title) when not provided.
+  onSelectTour?: (tour: Tour) => void;
   appLanguage?: Language;
 }
 
@@ -41,6 +44,7 @@ export const SearchDropdown: React.FC<SearchDropdownProps> = ({
   tours,
   recentSearches,
   onSelect,
+  onSelectTour,
   appLanguage = 'az'
 }) => {
   // Without strictNullChecks, a destructuring default widens the param type to `string`, so
@@ -162,7 +166,18 @@ export const SearchDropdown: React.FC<SearchDropdownProps> = ({
           {suggestions.map((sugg, idx) => (
             <button
               key={idx}
-              onClick={() => onSelect(sugg.title)}
+              onClick={() => {
+                // A tour suggestion opens that exact tour's page (the "did you mean … this tour?"
+                // pick); a region suggestion still just applies it as a search/filter term.
+                if (sugg.type === 'tour' && sugg.id && onSelectTour) {
+                  const tour = approvedTours.find(t => t.id === sugg.id);
+                  if (tour) {
+                    onSelectTour(tour);
+                    return;
+                  }
+                }
+                onSelect(sugg.title);
+              }}
               className="flex items-center gap-3.5 w-full text-left px-5 py-2.5 hover:bg-slate-50 transition-colors"
             >
               {sugg.type === 'region' ? (
