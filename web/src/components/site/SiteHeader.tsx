@@ -7,6 +7,7 @@ import { Heart, Scale, Calculator, Tent } from 'lucide-react';
 import type { Tour } from '@/types';
 import { useLanguage } from '@/i18n/LanguageContext';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
+import CurrencySwitcher from '@/components/CurrencySwitcher';
 import { UrgentDealsBell } from '@/components/customer/UrgentDealsBell';
 import { SearchDropdown } from '@/components/SearchDropdown';
 import { getRecentSearches, addRecentSearch } from '@/utils/recentSearches';
@@ -122,7 +123,14 @@ export function SiteHeader({
     // page's own search bar takes over the viewport top (its sticky top-0 pins flush there,
     // exactly like the old SPA). Making this sticky on mobile would cover that search bar.
     <header
-      className="relative sm:sticky top-0 z-40 border-b border-[var(--border-primary)] bg-white/90 backdrop-blur"
+      className={`relative sm:sticky top-0 z-40 border-b transition-colors ${
+        // On the home page at the very top, the hero's green gradient extends up behind the
+        // header — so keep it transparent/borderless there to blend in. Once scrolled (or on
+        // any other page) it becomes the solid white bar with a divider.
+        pathname === '/' && !isScrolled
+          ? 'border-transparent bg-transparent'
+          : 'border-[var(--border-primary)] bg-white/90 backdrop-blur'
+      }`}
       style={{ height: 'var(--header-height)' }}
     >
       <div className="mx-auto flex h-full max-w-[var(--global-max-width)] items-center justify-center sm:justify-between gap-4 px-4 sm:px-6">
@@ -207,6 +215,7 @@ export function SiteHeader({
               them with direct "Bilet al" links. */}
           <UrgentDealsBell />
           <LanguageSwitcher />
+          <CurrencySwitcher />
         </nav>
       </div>
     </header>
