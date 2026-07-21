@@ -5,14 +5,16 @@
 /* Exact design-token spec (single source of truth). Component classes below reference
    these directly, e.g. h-[var(--header-height)], rounded-[var(--card-radius)]. */
 :root {
-  --label-primary: #111E12;
-  --label-secondary: #627265;
+  /* Neutrals / labels / surfaces follow the GYG cool navy-gray palette (keep-our-green
+     rollout, 2026-07-22). Green stays the brand primary; everything else is GYG. */
+  --label-primary: #1a2b49;
+  --label-secondary: #63687a;
   --label-tertiary: #858995;
   --interactive-primary: #1E3F20;
-  --label-critical: #ec003f;
+  --label-critical: #c72a3d;
   --surface-critical-weak: #ffe8ed;
   --border-primary: #dcdfe4;
-  --background-secondary: #cbe4e3;
+  --background-secondary: #ebeef1;
   --global-max-width: 1440px;
   --header-height: 80px;
   --card-radius: 12px;
@@ -26,10 +28,10 @@
   --color-accent: #C28E46;
   --color-bg-light: #FBFBFA;
   --color-bg-page: #FFFFFF;
-  --color-cta: #166EF3;
-  --color-cta-hover: #24BAEC;
-  --color-text-main: #111E12;
-  --color-text-muted: #627265;
+  --color-cta: #0071eb;
+  --color-cta-hover: #005dc4;
+  --color-text-main: #1a2b49;
+  --color-text-muted: #63687a;
 }
 
 @theme {
@@ -53,14 +55,14 @@
      Generates text, bg, border utilities, e.g. text-label-primary, bg-surface-critical-weak.
      Values are aliases of the plain :root tokens below — kept in @theme too so Tailwind
      generates utility classes from them. */
-  --color-label-primary: #111E12;
-  --color-label-secondary: #627265;
+  --color-label-primary: #1a2b49;
+  --color-label-secondary: #63687a;
   --color-label-tertiary: #858995;
   --color-interactive-primary: #1E3F20;
-  --color-label-critical: #ec003f;
+  --color-label-critical: #c72a3d;
   --color-surface-critical-weak: #ffe8ed;
   --color-border-primary: #dcdfe4;
-  --color-background-secondary: #cbe4e3;
+  --color-background-secondary: #ebeef1;
 
   /* ---- Brand palette (single source of truth) ---- */
 
@@ -78,17 +80,17 @@
   --color-primary-900: #0c1b0c;
   --color-primary-950: #061006;
 
-  /* Capri Blue — deep blue accent (indigo/blue utility classes), anchored on brand CTA #166EF3. */
-  --color-cta-blue-50: #eef4fe;
-  --color-cta-blue-100: #dbe9fd;
-  --color-cta-blue-200: #b7d3fb;
-  --color-cta-blue-300: #8ab8f8;
-  --color-cta-blue-400: #4f95f5;
-  --color-cta-blue-500: #166EF3;
-  --color-cta-blue-600: #0f5cd1;
-  --color-cta-blue-700: #0d4aa8;
-  --color-cta-blue-800: #0c3d87;
-  --color-cta-blue-900: #0b3269;
+  /* GYG blue — interactive/CTA blue (indigo/blue utility classes), anchored on GYG interactive-primary #0071eb. */
+  --color-cta-blue-50: #e7f1fe;
+  --color-cta-blue-100: #cfe4fd;
+  --color-cta-blue-200: #9ecafb;
+  --color-cta-blue-300: #6aaef8;
+  --color-cta-blue-400: #3591f4;
+  --color-cta-blue-500: #0071eb;
+  --color-cta-blue-600: #005dc4;
+  --color-cta-blue-700: #00499b;
+  --color-cta-blue-800: #073d7d;
+  --color-cta-blue-900: #0b3266;
   --color-cta-blue-950: #071d3f;
 
   /* Blue Isle — lighter cyan-blue accent (sky/cyan utility classes), anchored on brand CTA-hover #24BAEC. */
@@ -122,33 +124,34 @@
   --color-accent-orange-900: #593a1d;
   --color-accent-orange-950: #3b2612;
 
-  /* Secondary: pink-red — CTAs, discount/HOT badges, warnings (use sparingly) */
-  --color-accent-pink-50: #ffeaf0;
-  --color-accent-pink-100: #ffd7e1;
-  --color-accent-pink-200: #ffb4c8;
-  --color-accent-pink-300: #ff799d;
-  --color-accent-pink-400: #ff3369;
-  --color-accent-pink-500: #ec003f;
-  --color-accent-pink-600: #b1002f;
-  --color-accent-pink-700: #830023;
-  --color-accent-pink-800: #66001b;
-  --color-accent-pink-900: #540016;
-  --color-accent-pink-950: #1f0008;
+  /* Critical red — discount/HOT badges, warnings, errors (GYG critical, anchored #c72a3d) */
+  --color-accent-pink-50: #ffe8ed;
+  --color-accent-pink-100: #fcd4dc;
+  --color-accent-pink-200: #f5aab8;
+  --color-accent-pink-300: #ec7d90;
+  --color-accent-pink-400: #dc4f66;
+  --color-accent-pink-500: #c72a3d;
+  --color-accent-pink-600: #951d2b;
+  --color-accent-pink-700: #7a1723;
+  --color-accent-pink-800: #5f121c;
+  --color-accent-pink-900: #4d0f17;
+  --color-accent-pink-950: #2a070c;
 
   /* Tertiary: ink/surface neutrals — text/contrast (dark) and card/page backgrounds (light).
-     Forest-green-tinted (not navy) to match the brand text tokens: 50 ≈ bg-light (#FBFBFA),
-     500 = text-muted (#627265) exact, 900 = text-main (#111E12) exact. */
-  --color-ink-50: #fafbfa;
-  --color-ink-100: #f1f3f1;
-  --color-ink-200: #e1e6e1;
-  --color-ink-300: #c7d0c7;
-  --color-ink-400: #96a497;
-  --color-ink-500: #627265;
-  --color-ink-600: #55635a;
-  --color-ink-700: #3e483f;
-  --color-ink-800: #2b332c;
-  --color-ink-900: #111E12;
-  --color-ink-950: #0a0f0a;
+     GYG cool navy-gray ramp: 100 = surface-secondary (#ebeef1), 200 = border (#dcdfe4),
+     500 = label-tertiary (#858995) exact, 600 = label-secondary (#63687a) exact,
+     900 = label-primary (#1a2b49) exact. */
+  --color-ink-50: #f6f7f9;
+  --color-ink-100: #ebeef1;
+  --color-ink-200: #dcdfe4;
+  --color-ink-300: #bfc7cf;
+  --color-ink-400: #a0a8b6;
+  --color-ink-500: #858995;
+  --color-ink-600: #63687a;
+  --color-ink-700: #494d58;
+  --color-ink-800: #31343d;
+  --color-ink-900: #1a2b49;
+  --color-ink-950: #10182b;
 
   /* ---- Remap the generic Tailwind palettes used across the app to the brand tokens ----
      This lets existing utility classes (bg-emerald-600, text-slate-700, etc.) render
