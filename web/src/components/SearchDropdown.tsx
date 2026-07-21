@@ -150,6 +150,9 @@ export const SearchDropdown: React.FC<SearchDropdownProps> = ({
           {recentSearches.map((search, idx) => (
             <button
               key={idx}
+              // preventDefault on mousedown so the tap doesn't blur the input first — the click
+              // must reach onClick before any focus-driven close (same pattern as the clear button).
+              onMouseDown={(e) => e.preventDefault()}
               onClick={() => onSelect(search)}
               className="flex items-center gap-3.5 w-full text-left px-5 py-2.5 hover:bg-slate-50 transition-colors"
             >
@@ -166,6 +169,9 @@ export const SearchDropdown: React.FC<SearchDropdownProps> = ({
           {suggestions.map((sugg, idx) => (
             <button
               key={idx}
+              // preventDefault on mousedown so the tap doesn't blur the input first — the click
+              // must reach onClick before any focus-driven close (same pattern as the clear button).
+              onMouseDown={(e) => e.preventDefault()}
               onClick={() => {
                 // A tour suggestion opens that exact tour's page (the "did you mean … this tour?"
                 // pick); a region suggestion still just applies it as a search/filter term.
