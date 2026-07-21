@@ -306,6 +306,23 @@
 }
 
 @layer utilities {
+  /* Hero arxa fon gradienti — GYG imageless-hero-gradient strukturu, amma brend yaşılı ilə.
+     Başlıq + axtarış blokunun arxasında yuxarıdan aşağı sönən yumşaq işıqlanma. */
+  .hero-gradient {
+    position: absolute;
+    inset-inline: 0;
+    top: 0;
+    height: 420px;
+    z-index: 0;
+    pointer-events: none;
+    background: linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--color-primary) 14%, transparent) 0%,
+      color-mix(in srgb, var(--color-primary) 5%, transparent) 45%,
+      transparent 100%
+    );
+  }
+
   @keyframes spin-slow {
     from {
       transform: rotate(0deg);

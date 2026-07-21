@@ -128,7 +128,8 @@ export function ToursHomeView({
     `px-4 py-2 rounded-full text-xs font-bold border transition-all cursor-pointer ${active ? 'bg-emerald-50 text-brand-primary border-brand-primary' : 'bg-white text-brand-text-main border-slate-200 hover:border-slate-300 hover:bg-slate-50'}`;
 
   return (
-    <div className="space-y-4 -mx-5 px-4 sm:px-5 md:px-8 lg:px-12 xl:px-14 min-[1440px]:px-[72px]">
+    <div className="relative space-y-4 -mx-5 px-4 sm:px-5 md:px-8 lg:px-12 xl:px-14 min-[1440px]:px-[72px]">
+      <div className="hero-gradient" aria-hidden="true" />
       <div className="max-sm:contents flex flex-col items-center justify-center pt-[20px] pb-[28px] sm:pt-[38px] sm:pb-[50px] min-h-[220px] sm:min-h-[294px] mb-3 relative z-30 w-full">
        <h2 className="max-sm:pt-[20px] text-2xl sm:text-3xl md:text-4xl leading-tight md:leading-[1.22] font-extrabold text-brand-text-main mb-4 sm:mb-6 tracking-tight text-center" suppressHydrationWarning>
   {t('discoverTours')}
