@@ -825,7 +825,10 @@ export function ToursHomeView({
                                   <span className="text-[11px] font-medium text-gray-500">({getReviewsCount(tour.id)})</span>
                                 </>
                               ) : (
-                                <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 rounded px-1.5 py-0.5">{tt('customerHome.toursHomeView.cardMeta.newTag')}</span>
+                                <>
+                                  <Star className="w-3.5 h-3.5 fill-[#1a2b49] text-[#1a2b49]" />
+                                  <span className="text-[13px] font-bold text-[#1a2b49]">{tt('customerHome.toursHomeView.cardMeta.newTag')}</span>
+                                </>
                               )}
                             </div>
                             
@@ -1143,7 +1146,10 @@ export function ToursHomeView({
                               <span className="text-[11px] font-bold text-gray-800">{getAverageRating(tour.id)} <span className="font-normal text-gray-500">({tt('customerHome.toursHomeView.cardMeta.reviews', { count: getReviewsCount(tour.id) })})</span></span>
                             </>
                           ) : (
-                            <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 rounded px-1.5 py-0.5">{tt('customerHome.toursHomeView.cardMeta.newTag')}</span>
+                            <>
+                              <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                              <span className="text-[11px] font-bold text-gray-800">{tt('customerHome.toursHomeView.cardMeta.newTag')}</span>
+                            </>
                           )}
                         </div>
                       </div>
