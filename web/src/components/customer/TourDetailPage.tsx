@@ -1267,6 +1267,40 @@ export function TourDetailPage({
                   </div>
                 </div>
 
+                {/* Always-visible remaining-seats indicator for the selected date (or the
+                    earliest upcoming date with free seats when none is picked). Reads live
+                    capacity − bookedCount, so it reflects vendor/admin edits on every render. */}
+                {(() => {
+                  const todayStr = new Date().toISOString().slice(0, 10);
+                  const displaySlot = selectedSlot
+                    ?? [...slots.filter(s => s.tourId === selectedTour.id && s.startDate >= todayStr && s.capacity - s.bookedCount > 0)]
+                         .sort((a, b) => a.startDate.localeCompare(b.startDate))[0]
+                    ?? null;
+                  if (!displaySlot) return null;
+                  const remaining = Math.max(0, displaySlot.capacity - displaySlot.bookedCount);
+                  if (remaining <= 0) {
+                    return (
+                      <div className="flex items-center gap-2 text-xs font-bold text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                        <Users className="w-4 h-4 shrink-0" />
+                        {t('tourDetailPage.sidebar.seatsSoldOut')}
+                      </div>
+                    );
+                  }
+                  const urgent = remaining <= 5;
+                  // When the user has picked a date the copy says "this date"; otherwise it
+                  // points at the nearest upcoming date (with its date spelled out) so it's
+                  // never ambiguous which date the seat count refers to.
+                  const message = selectedSlot
+                    ? t(urgent ? 'tourDetailPage.sidebar.seatsRemainingUrgent' : 'tourDetailPage.sidebar.seatsRemaining', { count: remaining })
+                    : t(urgent ? 'tourDetailPage.sidebar.seatsNearestDateUrgent' : 'tourDetailPage.sidebar.seatsNearestDate', { count: remaining, date: formatDisplayDate(displaySlot.startDate) });
+                  return (
+                    <div className={`flex items-center gap-2 text-xs font-bold rounded-lg px-3 py-2 border ${urgent ? 'text-red-600 bg-red-50 border-red-200' : 'text-emerald-700 bg-emerald-50 border-emerald-200'}`}>
+                      <Users className="w-4 h-4 shrink-0" />
+                      {message}
+                    </div>
+                  );
+                })()}
+
                 {/* Primary CTA */}
                 <button
                   type="button"
