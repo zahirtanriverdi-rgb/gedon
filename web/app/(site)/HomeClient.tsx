@@ -31,6 +31,7 @@ const MONTH_KEYS = [
 const TRANSLATIONS = {
   az: {
     searchPlaceholder: "Məkanları və ya fəaliyyətləri kəşf et...",
+    searchPlaceholderShort: "Tur, məkan axtar...",
     searchButton: "Axtar",
     discoverTours: "Xəyalınızdakı Turları Kəşf Edin",
     upcomingTours: "Yaxınlaşan Turlar",
@@ -55,6 +56,7 @@ const TRANSLATIONS = {
   },
   en: {
     searchPlaceholder: "Explore destinations and experiences...",
+    searchPlaceholderShort: "Search tours, places...",
     searchButton: "Search",
     discoverTours: "Discover Your Dream Tours",
     upcomingTours: "Upcoming Tours",
@@ -79,6 +81,7 @@ const TRANSLATIONS = {
   },
   ru: {
     searchPlaceholder: "Откройте для себя места и впечатления...",
+    searchPlaceholderShort: "Поиск туров, мест...",
     searchButton: "Поиск",
     discoverTours: "Откройте для себя туры вашей мечты",
     upcomingTours: "Ближайшие туры",

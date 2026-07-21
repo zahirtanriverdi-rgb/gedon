@@ -210,12 +210,14 @@ export function ToursHomeView({
                 BOTH edges. */}
             <div className="sticky top-0 sm:static z-30 sm:w-full -mx-4 px-4 sm:mx-0 sm:px-0 md:mx-0 md:px-0 lg:mx-0 lg:px-0 xl:mx-0 xl:px-0 min-[1440px]:mx-0 min-[1440px]:px-0 bg-white/95 sm:bg-transparent backdrop-blur-sm sm:backdrop-blur-none">
             <div className="w-full max-w-[706px] mx-auto mt-2 sm:mt-8 pb-3 sm:pb-4 flex items-center justify-center relative">
-              <div ref={searchContainerRef} className="relative w-full h-12 sm:h-14 bg-white shadow-sm sm:shadow-md rounded-full p-1 border border-slate-200 flex items-center">
-                <div className="pl-4 pr-2 flex items-center flex-1 min-w-0">
-                   <Search className="text-brand-text-muted w-5 h-5 sm:w-[22px] sm:h-[22px] mr-2 sm:mr-3 flex-shrink-0" />
+              <div ref={searchContainerRef} className="relative w-full h-12 sm:h-14 bg-white shadow-sm sm:shadow-md rounded-full px-5 border border-slate-200 flex items-center">
+                <div className="flex items-center flex-1 min-w-0">
+                   <Search className="text-brand-text-muted w-5 h-5 sm:w-[22px] sm:h-[22px] mr-3 flex-shrink-0" />
                    {/* Two inputs sharing the same state: only one is ever visible/focusable
                        at a given breakpoint (display:none removes the other from layout and
-                       tab order), so this avoids a JS matchMedia check and any hydration mismatch. */}
+                       tab order), so this avoids a JS matchMedia check and any hydration mismatch.
+                       Both use a 16px font (text-base): iOS Safari auto-zooms the page on focus
+                       for any input under 16px, so the smaller text-sm here was the mobile-zoom bug. */}
                    <input
                      type="text"
                      placeholder={t('searchPlaceholderShort')}
@@ -226,9 +228,15 @@ export function ToursHomeView({
                        if (e.key === 'Enter') {
                          recordSearch(currentSearchQuery);
                          setIsSearchFocused(false);
+                         e.currentTarget.blur();
+                         const toursSection = document.getElementById('tours-list');
+                         if (toursSection) {
+                           const y = toursSection.getBoundingClientRect().top + window.pageYOffset - 100;
+                           window.scrollTo({ top: y, behavior: 'smooth' });
+                         }
                        }
                      }}
-                     className="sm:hidden w-full min-w-0 py-2.5 bg-transparent text-brand-text-main text-sm leading-[1.38] focus:outline-none font-normal placeholder-brand-text-muted truncate"
+                     className="sm:hidden w-full min-w-0 py-2.5 bg-transparent text-brand-text-main text-base leading-[1.38] focus:outline-none font-normal placeholder-brand-text-muted truncate"
                    />
                    <input
                      type="text"
@@ -240,26 +248,31 @@ export function ToursHomeView({
                        if (e.key === 'Enter') {
                          recordSearch(currentSearchQuery);
                          setIsSearchFocused(false);
+                         const toursSection = document.getElementById('tours-list');
+                         if (toursSection) {
+                           const y = toursSection.getBoundingClientRect().top + window.pageYOffset - 100;
+                           window.scrollTo({ top: y, behavior: 'smooth' });
+                         }
                        }
                      }}
                      className="hidden sm:block w-full min-w-0 py-2.5 bg-transparent text-brand-text-main text-base leading-[1.38] focus:outline-none font-normal placeholder-brand-text-muted truncate"
                    />
                 </div>
-                <button
-                  onClick={() => {
-                    recordSearch(currentSearchQuery);
-                    setIsSearchFocused(false);
-                    const toursSection = document.getElementById('tours-list');
-                    if(toursSection) {
-                      const yOffset = -100;
-                      const y = toursSection.getBoundingClientRect().top + window.pageYOffset + yOffset;
-                      window.scrollTo({top: y, behavior: 'smooth'});
-                    }
-                  }}
-                  className="bg-brand-primary hover:bg-brand-primary-hover text-white font-bold py-2.5 px-4 sm:px-6 rounded-full transition-colors flex-shrink-0 text-xs shadow-md cursor-pointer"
-                >
-                  {t('searchButton')}
-                </button>
+
+                {/* Clear (×) — appears once there's any text so the query can be wiped in one tap.
+                    onMouseDown preventDefault keeps the input focused (so the suggestions stay
+                    open and the user can retype immediately) instead of the button stealing focus. */}
+                {currentSearchQuery && (
+                  <button
+                    type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => handleSearchChange('')}
+                    aria-label={tt('customerHome.toursHomeView.filters.resetAll')}
+                    className="flex-shrink-0 ml-1 w-8 h-8 flex items-center justify-center rounded-full text-brand-text-muted hover:bg-slate-100 hover:text-brand-text-main transition-colors cursor-pointer"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
 
                 {/* Suggestions Dropdown */}
                 {isSearchFocused && (
@@ -286,7 +299,7 @@ export function ToursHomeView({
                   type="button"
                   onClick={() => setIsFiltersExpanded(true)}
                   aria-label={tt('customerHome.toursHomeView.filters.showAdvanced')}
-                  className="w-12 h-12 sm:w-14 sm:h-14 bg-white shadow-sm sm:shadow-md rounded-full border border-slate-200 flex items-center justify-center text-brand-text-main hover:border-slate-300 hover:bg-slate-50 transition-colors cursor-pointer"
+                  className="w-12 h-12 sm:w-14 sm:h-14 bg-brand-primary hover:bg-brand-primary-hover shadow-md rounded-full flex items-center justify-center text-white transition-colors cursor-pointer"
                 >
                   <SlidersHorizontal className="w-[18px] h-[18px] sm:w-5 sm:h-5" />
                 </button>
@@ -305,7 +318,7 @@ export function ToursHomeView({
                     }}
                     aria-label={tt('customerHome.toursHomeView.filters.resetAll')}
                     title={tt('customerHome.toursHomeView.filters.resetAll')}
-                    className="absolute -top-0.5 -right-0.5 z-10 w-5 h-5 bg-brand-primary hover:bg-brand-primary-hover text-white rounded-full ring-2 ring-white shadow-sm flex items-center justify-center transition-colors cursor-pointer before:absolute before:-inset-2 before:content-[''] before:rounded-full"
+                    className="absolute -top-0.5 -right-0.5 z-10 w-5 h-5 bg-rose-500 hover:bg-rose-600 text-white rounded-full ring-2 ring-white shadow-sm flex items-center justify-center transition-colors cursor-pointer before:absolute before:-inset-2 before:content-[''] before:rounded-full"
                   >
                     <X className="w-3 h-3" strokeWidth={3} />
                   </button>
