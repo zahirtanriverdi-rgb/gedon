@@ -464,7 +464,7 @@ export function ToursHomeView({
       {uniqueUpcomingTours.length > 0 && (
         <div className="mb-3 mt-0 w-full animate-fadeIn relative">
           <div className="flex items-center justify-between mb-2 px-1">
-            <h3 className="text-[24px] font-medium text-brand-text-main tracking-tight">{t('upcomingTours')}</h3>
+            <h3 className="text-[24px] font-bold text-brand-text-main tracking-tight">{t('upcomingTours')}</h3>
           </div>
           <div className="relative group">
             {uniqueUpcomingTours.length > 3 && upcomingScrollLeft > 5 && (
@@ -541,7 +541,7 @@ export function ToursHomeView({
 
       <div id="tours-list" className="space-y-16 mt-10">
         <div className="flex items-center justify-between mb-2 px-1">
-          <h3 className="text-[24px] font-medium text-brand-text-main tracking-tight" suppressHydrationWarning>{tt('customerHome.toursHomeView.allToursSectionTitle')}</h3>
+          <h3 className="text-[24px] font-bold text-brand-text-main tracking-tight" suppressHydrationWarning>{tt('customerHome.toursHomeView.allToursSectionTitle')}</h3>
         </div>
         {selectedCategory === 'hiking' && (
           <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-3 mb-1 -mx-1 px-1">
