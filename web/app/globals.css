@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:ital,wght@0,100..700;1,100..700&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&family=Outfit:wght@100..900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&family=JetBrains+Mono:ital,wght@0,100..800;1,100..800&family=Outfit:wght@100..900&display=swap');
 @import "tailwindcss";
 @import "maplibre-gl/dist/maplibre-gl.css";
 
@@ -33,7 +33,7 @@
 }
 
 @theme {
-  --font-sans: "IBM Plex Sans", "Helvetica", "Arial", sans-serif;
+  --font-sans: "Plus Jakarta Sans", "Helvetica", "Arial", sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 
   /* Tailwind utilities for the new brand palette — "brand-" prefixed so they
