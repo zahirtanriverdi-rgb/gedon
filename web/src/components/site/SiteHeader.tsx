@@ -10,6 +10,8 @@ import LanguageSwitcher from '@/components/LanguageSwitcher';
 import { UrgentDealsBell } from '@/components/customer/UrgentDealsBell';
 import { SearchDropdown } from '@/components/SearchDropdown';
 import { getRecentSearches, addRecentSearch } from '@/utils/recentSearches';
+import { getWishlist, WISHLIST_CHANGED_EVENT } from '@/utils/wishlist';
+import { getCompareList, COMPARE_CHANGED_EVENT } from '@/utils/compare';
 import { useGlobalSearch } from './GlobalSearchContext';
 import { useSiteFeatureFlags } from './useSiteFeatureFlags';
 
@@ -44,11 +46,34 @@ export function SiteHeader({
   // when the admin turns them off (the mobile bottom nav already does this via the same flags).
   // featureFlags is the SSR-resolved state, passed so the icons don't flash in/out on load.
   const { campSitesEnabled, groupCalculatorEnabled } = useSiteFeatureFlags(featureFlags);
+
+  // Wishlist/compare counts — both stores live in localStorage and fire a change event whenever
+  // the customer toggles a tour from a card, so the header icons must listen and re-render. Init
+  // to 0 to match SSR (localStorage isn't available server-side), then hydrate in the effect.
+  // Also listen to the native `storage` event so a change made in another tab reflects here too.
+  const [wishlistCount, setWishlistCount] = useState(0);
+  const [compareCount, setCompareCount] = useState(0);
+  React.useEffect(() => {
+    const sync = () => {
+      setWishlistCount(getWishlist().length);
+      setCompareCount(getCompareList().length);
+    };
+    sync();
+    window.addEventListener(WISHLIST_CHANGED_EVENT, sync);
+    window.addEventListener(COMPARE_CHANGED_EVENT, sync);
+    window.addEventListener('storage', sync);
+    return () => {
+      window.removeEventListener(WISHLIST_CHANGED_EVENT, sync);
+      window.removeEventListener(COMPARE_CHANGED_EVENT, sync);
+      window.removeEventListener('storage', sync);
+    };
+  }, []);
+
   const nav = [
-    { href: '/wishlist', label: labels.wishlist, Icon: Heart },
-    { href: '/compare', label: labels.compare, Icon: Scale },
-    ...(campSitesEnabled ? [{ href: '/camp-sites', label: labels.camp, Icon: Tent }] : []),
-    ...(groupCalculatorEnabled ? [{ href: '/calculator', label: labels.calc, Icon: Calculator }] : []),
+    { href: '/wishlist', label: labels.wishlist, Icon: Heart, count: wishlistCount, badgeClass: 'bg-rose-600', activeFill: true },
+    { href: '/compare', label: labels.compare, Icon: Scale, count: compareCount, badgeClass: 'bg-brand-cta', activeFill: false },
+    ...(campSitesEnabled ? [{ href: '/camp-sites', label: labels.camp, Icon: Tent, count: 0, badgeClass: '', activeFill: false }] : []),
+    ...(groupCalculatorEnabled ? [{ href: '/calculator', label: labels.calc, Icon: Calculator, count: 0, badgeClass: '', activeFill: false }] : []),
   ];
 
   // Inline search bar state — desktop (sm+) only, revealed once scrolled past the home page's
@@ -100,7 +125,7 @@ export function SiteHeader({
       className="relative sm:sticky top-0 z-40 border-b border-[var(--border-primary)] bg-white/90 backdrop-blur"
       style={{ height: 'var(--header-height)' }}
     >
-      <div className="mx-auto flex h-full max-w-[var(--global-max-width)] items-center justify-between gap-4 px-4 sm:px-6">
+      <div className="mx-auto flex h-full max-w-[var(--global-max-width)] items-center justify-center sm:justify-between gap-4 px-4 sm:px-6">
         <Link href="/" className="text-xl font-black tracking-tight text-[var(--color-primary)]">
           GedəkGörək
         </Link>
@@ -150,17 +175,27 @@ export function SiteHeader({
             (wishlist/compare/camp/bell as tabs, calculator + language in its burger menu). */}
         <nav className="hidden sm:flex items-center gap-1 sm:gap-3">
           {/* Icon-only by request — each label survives as tooltip (title) + aria-label. */}
-          {nav.map(({ href, label, Icon }) => (
-            <Link
-              key={href}
-              href={href}
-              className="flex items-center rounded-full p-2.5 text-[var(--color-text-muted)] transition-colors hover:bg-[var(--background-secondary)] hover:text-[var(--color-primary)]"
-              title={label}
-              aria-label={label}
-            >
-              <Icon className="h-5 w-5" />
-            </Link>
-          ))}
+          {nav.map(({ href, label, Icon, count, badgeClass, activeFill }) => {
+            const active = count > 0;
+            return (
+              <Link
+                key={href}
+                href={href}
+                className={`relative flex items-center rounded-full p-2.5 transition-colors hover:bg-[var(--background-secondary)] hover:text-[var(--color-primary)] ${
+                  active ? 'text-[var(--color-primary)]' : 'text-[var(--color-text-muted)]'
+                }`}
+                title={active ? `${label} (${count})` : label}
+                aria-label={active ? `${label} (${count})` : label}
+              >
+                <Icon className="h-5 w-5" fill={active && activeFill ? 'currentColor' : 'none'} />
+                {active && (
+                  <span className={`absolute -top-0.5 -right-0.5 min-w-[17px] h-[17px] px-1 ${badgeClass} text-white text-[10px] font-bold rounded-full flex items-center justify-center`}>
+                    {count}
+                  </span>
+                )}
+              </Link>
+            );
+          })}
           {/* "Təcili fürsətlər" — rings + shows an amber badge whenever any approved tour
               has an upcoming departure with fewer than 5 seats left; opens a popup listing
               them with direct "Bilet al" links. */}

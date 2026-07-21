@@ -693,6 +693,8 @@ export function HomeClient({ tours, slots, reviews, users, bookings }: HomeClien
                 reviews={reviews}
                 users={users}
                 wishlist={wishlist}
+                compareList={compareList}
+                handleToggleCompare={handleToggleCompare}
                 currentUser={guestUser}
                 onAddBooking={handleAddBooking}
                 onShowNotification={showNotification}

@@ -1,24 +1,9 @@
 /**
  * Central API access for the Next app.
- *
- * Two callers, two paths:
- *  - Server Components (SSR) call `serverFetch` — it hits the Express API DIRECTLY via
- *    API_BASE_URL and never goes through the browser. `cache: 'no-store'` keeps tour prices /
- *    availability fresh on every request (the approved dynamic-SSR strategy).
- *  - Client Components keep using RELATIVE `/api/*` urls (via `clientFetch` or plain fetch),
- *    which Next's rewrite (next.config.ts) proxies to the same Express origin. This is exactly
- *    how the old Vite SPA talked to the backend, so ported components need no per-call changes.
  */
-
 const SERVER_API_BASE =
   process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000';
 
-/**
- * The API always responds with JSON, but a request that slips past Express (413, proxy 500,
- * etc.) comes back as an HTML error page — response.json() would then throw a cryptic
- * "Unexpected token '<'". Parsing text first lets us surface a message that points at the
- * real problem. (Ported from the inline parseApiResponse in the old App.tsx.)
- */
 async function parseApiResponse<T>(response: Response): Promise<T> {
   const text = await response.text();
   try {
@@ -31,11 +16,9 @@ async function parseApiResponse<T>(response: Response): Promise<T> {
 }
 
 export interface ServerFetchOptions extends RequestInit {
-  /** Bearer token to forward (rarely needed for public SSR pages). */
   token?: string;
 }
 
-/** Server-side fetch against the Express API. Returns parsed JSON of type T. */
 export async function serverFetch<T>(path: string, opts: ServerFetchOptions = {}): Promise<T> {
   const { token, headers, ...rest } = opts;
   const url = path.startsWith('http') ? path : `${SERVER_API_BASE}${path}`;
@@ -54,11 +37,6 @@ export async function serverFetch<T>(path: string, opts: ServerFetchOptions = {}
   return parseApiResponse<T>(response);
 }
 
-/**
- * Server-side fetch that tolerates a not-found / error by returning `null` instead of throwing.
- * Handy for optional SSR data (slots, reviews) that shouldn't 500 the whole page if the API
- * hiccups.
- */
 export async function serverFetchOptional<T>(
   path: string,
   opts: ServerFetchOptions = {},
@@ -73,6 +51,10 @@ export async function serverFetchOptional<T>(
 /** Client-side fetch — relative url, proxied by the Next rewrite to the Express origin. */
 export async function clientFetch<T>(path: string, opts: RequestInit = {}): Promise<T> {
   const response = await fetch(path, opts);
+  if (response.status === 401) {
+    window.dispatchEvent(new CustomEvent('auth:unauthorized'));
+    throw new Error('Sessiyanızın vaxtı bitib. Yenidən daxil olun.');
+  }
   return parseApiResponse<T>(response);
 }
 
@@ -108,13 +90,6 @@ export async function getSlotsForTour(tourId: string): Promise<TourSlot[]> {
   return data?.slots ?? [];
 }
 
-/**
- * Admin-controlled customer-facing feature flags, resolved SERVER-side so the header/bottom-nav
- * render with the correct state in the initial HTML. Fetching these on the client instead makes
- * the calculator/camp icons flash in then out on every load (the client hook defaults to
- * "visible" and only hides once its fetch resolves). Mirrors the success-path logic of
- * useSiteFeatureFlags so SSR and hydration agree.
- */
 export async function getSiteFeatureFlags(): Promise<{
   campSitesEnabled: boolean;
   groupCalculatorEnabled: boolean;
@@ -129,6 +104,11 @@ export async function getSiteFeatureFlags(): Promise<{
   };
 }
 
-export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3001';
+// YENİ ƏLAVƏ OLUNAN: Real vendor məlumatlarını çəkmək üçün funksiya
+export async function getVendorById(vendorId: string): Promise<User | null> {
+  const data = await serverFetchOptional<{ user: User }>(`/api/vendors/${encodeURIComponent(vendorId)}`);
+  return data?.user ?? null;
+}
 
+export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3001';
 export type { Tour, TourSlot, Review, User };

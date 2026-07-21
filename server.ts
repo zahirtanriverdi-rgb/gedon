@@ -53,23 +53,22 @@ import { parseBboxParam, getPoisForBbox } from "./server/overpass.ts";
 import { resolveGoogleMapsLink } from "./server/geo.ts";
 import multer from "multer";
 import { storeMediaFile, isAllowedMediaType, isS3Enabled } from "./server/storage.ts";
+import QRCode from "qrcode";
 
 const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+
 // ===================== BASE URL & STATIC FILES =====================
 const publicDir = path.join(process.cwd(), "public");
-
-// Bütün upload qovluqlarını static edirik
 app.use("/tour-images", express.static(path.join(publicDir, "tour-images")));
 app.use("/uploads", express.static(path.join(publicDir, "uploads")));
 app.use("/public", express.static(publicDir));
 
-// Əsas URL funksiyası (localhost və Render üçün)
 const getBaseUrl = () => {
   if (process.env.NODE_ENV === "production") {
-    return process.env.VITE_API_BASE_URL || 
-           process.env.RENDER_EXTERNAL_URL || 
-           "https://gedekgorek.onrender.com";   // ← buranı öz Render linkinə dəyiş
+    return process.env.VITE_API_BASE_URL ||
+      process.env.RENDER_EXTERNAL_URL ||
+      "https://gedekgorek.onrender.com";
   }
   return `http://localhost:${process.env.PORT || 3000}`;
 };
@@ -78,7 +77,6 @@ console.log(`[Static] Serving files from: ${publicDir}`);
 console.log(`[Base URL] Current base: ${getBaseUrl()}`);
 console.log(`[Storage] Media uploads → ${isS3Enabled() ? "S3-compatible bucket" : "local disk (public/uploads) — S3 env not configured"}`);
 
-// Lazy initialize GoogleGenAI client
 let aiClient: GoogleGenAI | null = null;
 function getGeminiClient(): GoogleGenAI {
   if (!aiClient) {
@@ -98,14 +96,8 @@ function getGeminiClient(): GoogleGenAI {
   return aiClient;
 }
 
-// Body parser (raised limit: tour/vendor forms can include base64-encoded images/GPX data
-// well beyond Express's 100kb default, which otherwise fails with a hard-to-diagnose
-// "request entity too large" 413 whose HTML error page breaks response.json() on the client)
 app.use(express.json({ limit: '50mb' }));
 
-// Malformed JSON bodies would otherwise fall through to Express's default HTML error page
-// (a full stack trace, including server file paths) instead of the JSON error shape every
-// other endpoint returns — breaking response.json() on the client and leaking server internals.
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
   if (err instanceof SyntaxError && 'body' in err) {
     return res.status(400).json({ error: "Göndərilən məlumat düzgün formatda deyil (JSON parse xətası)." });
@@ -113,20 +105,11 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
   next(err);
 });
 
-// JWT/bcrypt Authentication System
-//
-// JWT_SECRET must come from the environment in any real deployment. If it's missing we
-// generate a random one at boot instead of falling back to a fixed string — a hardcoded
-// fallback would let anyone who reads this source forge valid tokens for any user/role.
-// The tradeoff: without JWT_SECRET set, all sessions are invalidated on server restart.
 if (!process.env.JWT_SECRET) {
-  console.warn("[SECURITY] JWT_SECRET is not set — generating a random one for this process only. Set JWT_SECRET in your environment for stable sessions across restarts.");
+  console.warn("[SECURITY] JWT_SECRET is not set — generating a random one for this process only.");
 }
 const JWT_SECRET = process.env.JWT_SECRET || randomUUID() + randomUUID();
 
-// Verifies the `Authorization: Bearer <token>` header issued by /api/auth/operator/login or
-// /api/auth/admin/login. Attaches the decoded { id, email, role } to req.operator for route
-// handlers that need to know which user is calling and enforce per-resource ownership.
 function authenticateUser(req: any, res: any, next: any) {
   const authHeader = req.headers.authorization as string | undefined;
   const token = authHeader && authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
@@ -141,10 +124,6 @@ function authenticateUser(req: any, res: any, next: any) {
   }
 }
 
-// Non-throwing variant for GET endpoints that are public by default (customer marketplace
-// browsing needs no login) but scope their response when a valid vendor/admin token IS
-// present. Returns the decoded { id, email, role } payload, or null if there's no token
-// or it doesn't verify — callers treat null the same as "anonymous/public request".
 function getOptionalUser(req: any): { id: string; email: string; role: string } | null {
   const authHeader = req.headers.authorization as string | undefined;
   const token = authHeader && authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
@@ -156,10 +135,6 @@ function getOptionalUser(req: any): { id: string; email: string; role: string } 
   }
 }
 
-// Converts a raw `users` row into the shape the frontend's User type expects. `extra_data`
-// carries `guides` (vendor team members) and `aboutTranslations` (hand-written EN/RU of the
-// `about` bio) but is structured so future optional profile fields can be added without
-// another schema migration.
 function rowToUser(row: any) {
   let extra: Record<string, any> = {};
   try { extra = row.extra_data ? JSON.parse(row.extra_data) : {}; } catch { extra = {}; }
@@ -189,8 +164,6 @@ function rowToUser(row: any) {
   };
 }
 
-// Shared by both login routes below: verifies the bcrypt hash and, on success, signs the same
-// shape of JWT (id/email/role, 24h expiry) both admin and vendor sessions use.
 function verifyPasswordAndIssueToken(user: any, password: string): { token: string } | null {
   if (!user || !bcrypt.compareSync(password, user.password_hash)) return null;
   const token = jwt.sign({ id: user.id, email: user.email, role: user.role }, JWT_SECRET, { expiresIn: "24h" });
@@ -198,12 +171,9 @@ function verifyPasswordAndIssueToken(user: any, password: string): { token: stri
 }
 
 // ===================== MEDIA UPLOAD =====================
-// Vendor formları (TourForm/InternationalTourForm/ProfileTab) şəkil/videonu artıq base64
-// kimi DB-yə YAZMIR — bura yükləyir, cavabdakı URL-i saxlayır. Fayllar S3-uyğun storage-a
-// (və ya S3 konfiqurasiya olunmayıbsa dev-də public/uploads/ diskinə) gedir — bax server/storage.ts.
 const mediaUpload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 100 * 1024 * 1024, files: 10 }, // video üçün 100MB tavan; şəkil limiti aşağıda ayrıca
+  limits: { fileSize: 100 * 1024 * 1024, files: 10 },
   fileFilter: (_req, file, cb) => {
     if (isAllowedMediaType(file.mimetype)) cb(null, true);
     else cb(new Error(`Dəstəklənməyən fayl tipi: ${file.mimetype}`));
@@ -211,7 +181,6 @@ const mediaUpload = multer({
 });
 
 const MAX_IMAGE_BYTES = 15 * 1024 * 1024;
-
 app.post("/api/upload", authenticateUser, (req: any, res) => {
   mediaUpload.array("files", 10)(req, res, async (err: any) => {
     if (err) {
@@ -230,8 +199,6 @@ app.post("/api/upload", authenticateUser, (req: any, res) => {
     }
     try {
       const stored = await Promise.all(files.map(f => storeMediaFile(f.buffer, f.mimetype)));
-      // `urls` köhnə TourForm müqaviləsi ilə uyğunluq üçün qalır; `images`/`videos` mimetype-a
-      // görə serverdə ayrılır ki, client fayl uzantısını təxmin etməli olmasın.
       return res.json({
         success: true,
         urls: stored.map(s => s.url),
@@ -245,14 +212,12 @@ app.post("/api/upload", authenticateUser, (req: any, res) => {
   });
 });
 
-// ADMIN LOGIN (JWT Sign & Return) — checks the real `users` table (Postgres/SQLite via
-// server/db.ts).
+// ADMIN LOGIN
 app.post("/api/auth/admin/login", async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) {
     return res.status(400).json({ error: "Zəhmət olmasa e-poçt və şifrəni daxil edin." });
   }
-
   try {
     const rows = await dbClient.query(
       `SELECT * FROM users WHERE email = ? AND role = 'admin'`,
@@ -263,7 +228,6 @@ app.post("/api/auth/admin/login", async (req, res) => {
     if (!auth) {
       return res.status(401).json({ error: "E-poçt və ya şifrə yanlışdır!" });
     }
-
     return res.json({
       success: true,
       token: auth.token,
@@ -275,15 +239,12 @@ app.post("/api/auth/admin/login", async (req, res) => {
   }
 });
 
-// OPERATOR LOGIN (JWT Sign & Return) — checks the real `users` table (Postgres/SQLite via
-// server/db.ts), not a mock in-memory list, so actual seeded/registered vendor accounts work.
-// `identifier` accepts either the vendor's email or username.
+// OPERATOR LOGIN
 app.post("/api/auth/operator/login", async (req, res) => {
   const { identifier, password } = req.body;
   if (!identifier || !password) {
     return res.status(400).json({ error: "Zəhmət olmasa istifadəçi adı/e-poçt və şifrəni daxil edin." });
   }
-
   try {
     const rows = await dbClient.query(
       `SELECT * FROM users WHERE (email = ? OR username = ?) AND role = 'vendor' AND deleted_at IS NULL`,
@@ -294,7 +255,6 @@ app.post("/api/auth/operator/login", async (req, res) => {
     if (!auth) {
       return res.status(401).json({ error: "İstifadəçi adı/e-poçt və ya şifrə yanlışdır!" });
     }
-
     return res.json({
       success: true,
       token: auth.token,
@@ -306,16 +266,11 @@ app.post("/api/auth/operator/login", async (req, res) => {
   }
 });
 
-// POST /api/admin/vendors — admin creates a new Tour Operator (vendor) account. Only the
-// company name, login (username or email), and an initial password are required; the vendor
-// fills in the rest of their own profile (phone, about, guides, etc.) after their first login.
-// The password is bcrypt-hashed before it ever reaches the database — the plaintext value is
-// never stored or logged, and the response never echoes the hash back.
+// POST /api/admin/vendors
 app.post("/api/admin/vendors", authenticateUser, async (req: any, res) => {
   if (req.operator.role !== 'admin') {
     return res.status(403).json({ error: "Yalnız adminlər yeni operator hesabı yarada bilər." });
   }
-
   try {
     const { companyName, login, password } = req.body || {};
     if (!companyName || !login || !password) {
@@ -324,15 +279,10 @@ app.post("/api/admin/vendors", authenticateUser, async (req: any, res) => {
     if (String(password).length < 6) {
       return res.status(400).json({ error: "Parol ən azı 6 simvol olmalıdır." });
     }
-
     const trimmedLogin = String(login).trim();
-    // The login doubles as either an email or a username. `email` is NOT NULL/UNIQUE in the
-    // schema, so if the admin typed a plain username we derive a private placeholder email —
-    // it's never shown to anyone and login still works via the username itself.
     const isEmailLogin = trimmedLogin.includes('@');
     const email = isEmailLogin ? trimmedLogin : `${trimmedLogin.toLowerCase().replace(/[^a-z0-9._-]/g, '')}@vendor.gedekgorek.local`;
     const username = isEmailLogin ? null : trimmedLogin;
-
     const existing = await dbClient.query(
       `SELECT id FROM users WHERE email = ? OR (username IS NOT NULL AND username = ?)`,
       [email, trimmedLogin]
@@ -340,16 +290,13 @@ app.post("/api/admin/vendors", authenticateUser, async (req: any, res) => {
     if (existing.length > 0) {
       return res.status(409).json({ error: "Bu login artıq istifadə olunur. Zəhmət olmasa başqa login seçin." });
     }
-
     const passwordHash = await bcrypt.hash(String(password), 10);
     const id = `user-${randomUUID()}`;
-
     await dbClient.execute(
       `INSERT INTO users (id, name, email, username, password_hash, role, phone, company_name, balance, created_at)
        VALUES (?, ?, ?, ?, ?, 'vendor', '', ?, 0, CURRENT_TIMESTAMP)`,
       [id, companyName, email, username, passwordHash, companyName]
     );
-
     const rows = await dbClient.query('SELECT * FROM users WHERE id = ?', [id]);
     return res.status(201).json({ success: true, user: rowToUser(rows[0]) });
   } catch (error: any) {
@@ -358,31 +305,21 @@ app.post("/api/admin/vendors", authenticateUser, async (req: any, res) => {
   }
 });
 
-// DELETE /api/admin/vendors/:id — soft-deletes (archives) a vendor account. Requires the
-// admin to confirm with their OWN password (checked twice client-side as a "type it again"
-// confirmation, then sent once here and verified server-side against the admin's real hash —
-// this isn't the vendor's password, since an admin has no legitimate way to know that).
-// This is a soft delete: the user row is only stamped with deleted_at, never removed, so all
-// of the vendor's tours/slots/bookings stay intact for records. The vendor can no longer log
-// in (see /api/auth/operator/login's deleted_at IS NULL check) and disappears from the
-// customer-facing marketplace (see GET /api/tours), but nothing about their history is lost.
+// DELETE /api/admin/vendors/:id
 app.delete("/api/admin/vendors/:id", authenticateUser, async (req: any, res) => {
   if (req.operator.role !== 'admin') {
     return res.status(403).json({ error: "Yalnız adminlər operator hesabını silə bilər." });
   }
-
   try {
     const { adminPassword } = req.body || {};
     if (!adminPassword) {
       return res.status(400).json({ error: "Təsdiq üçün öz parolunuzu daxil edin." });
     }
-
     const adminRows = await dbClient.query('SELECT * FROM users WHERE id = ?', [req.operator.id]);
     const adminRow = adminRows[0];
     if (!adminRow || !bcrypt.compareSync(String(adminPassword), adminRow.password_hash)) {
       return res.status(401).json({ error: "Daxil etdiyiniz parol yanlışdır." });
     }
-
     const vendorRows = await dbClient.query('SELECT * FROM users WHERE id = ?', [req.params.id]);
     const vendorRow = vendorRows[0];
     if (!vendorRow || vendorRow.role !== 'vendor') {
@@ -391,7 +328,6 @@ app.delete("/api/admin/vendors/:id", authenticateUser, async (req: any, res) => 
     if (vendorRow.deleted_at) {
       return res.status(409).json({ error: "Bu operator artıq arxivləşdirilib." });
     }
-
     await dbClient.execute('UPDATE users SET deleted_at = CURRENT_TIMESTAMP WHERE id = ?', [req.params.id]);
     return res.json({ success: true });
   } catch (error: any) {
@@ -400,10 +336,7 @@ app.delete("/api/admin/vendors/:id", authenticateUser, async (req: any, res) => 
   }
 });
 
-// GET /api/users — admin-only. Without this, the AdminPortal's "Tərəfdaşlar" list had no way
-// to ever learn about vendors archived/reactivated from another session — it just kept
-// replaying whatever was last cached in localStorage (or the bundled seed data), so an
-// archived vendor kept showing up as fully active and editable.
+// GET /api/users
 app.get("/api/users", authenticateUser, async (req: any, res) => {
   if (req.operator.role !== 'admin') {
     return res.status(403).json({ error: "Yalnız adminlər istifadəçi siyahısını görə bilər." });
@@ -417,11 +350,21 @@ app.get("/api/users", authenticateUser, async (req: any, res) => {
   }
 });
 
-// PUT /api/users/:id — update a user's profile. An admin can update any user, including
-// login credentials (username/password) and subscription; a vendor/customer can only update
-// their own profile fields (name, email, phone, companyName, avatar, about, guides) — never
-// their own username or password through this route (password changes must go through
-// /api/auth/change-password, which verifies the current password first).
+// GET /api/vendors/:id (Public endpoint - müştəri səhifəsi üçün vendor məlumatları)
+app.get("/api/vendors/:id", async (req, res) => {
+  try {
+    const rows = await dbClient.query('SELECT * FROM users WHERE id = ? AND role = \'vendor\'', [req.params.id]);
+    if (!rows.length) {
+      return res.status(404).json({ error: "Vendor tapılmadı." });
+    }
+    res.json({ user: rowToUser(rows[0]) });
+  } catch (error: any) {
+    console.error("[GET /api/vendors/:id] error:", error);
+    res.status(500).json({ error: "Vendor məlumatlarını gətirmək mümkün olmadı: " + error.message });
+  }
+});
+
+// PUT /api/users/:id
 app.put("/api/users/:id", authenticateUser, async (req: any, res) => {
   try {
     const rows = await dbClient.query('SELECT * FROM users WHERE id = ?', [req.params.id]);
@@ -432,7 +375,6 @@ app.put("/api/users/:id", authenticateUser, async (req: any, res) => {
     if (!isAdmin && !isSelf) {
       return res.status(403).json({ error: "Bu istifadəçini yeniləmək icazəniz yoxdur." });
     }
-
     const body = req.body || {};
     const name = body.name !== undefined ? body.name : existingRow.name;
     const email = body.email !== undefined ? body.email : existingRow.email;
@@ -440,15 +382,10 @@ app.put("/api/users/:id", authenticateUser, async (req: any, res) => {
     const companyName = body.companyName !== undefined ? body.companyName : existingRow.company_name;
     const avatar = body.avatar !== undefined ? body.avatar : existingRow.avatar;
     const about = body.about !== undefined ? body.about : existingRow.about;
-
     let extra: Record<string, any> = {};
     try { extra = existingRow.extra_data ? JSON.parse(existingRow.extra_data) : {}; } catch { extra = {}; }
     if (body.guides !== undefined) extra.guides = body.guides;
-    // Rate values (day rates, offroad/food unit prices) are self-service: a vendor tunes their
-    // own numbers same as admin can. Whether the calculator/bus-tracking tab exists at all stays
-    // an admin-only call below — a vendor can't turn the feature on for themselves.
     if ((isAdmin || isSelf) && body.calculatorConfig !== undefined) extra.calculatorConfig = body.calculatorConfig;
-    // WhatsApp "Hazır mesajlar" şablonları — vendor özününkünü, admin istənilən vendorunkunu idarə edir.
     if ((isAdmin || isSelf) && body.waTemplates !== undefined) {
       if (!Array.isArray(body.waTemplates)) return res.status(400).json({ error: "waTemplates massiv olmalıdır." });
       extra.waTemplates = body.waTemplates
@@ -459,7 +396,6 @@ app.put("/api/users/:id", authenticateUser, async (req: any, res) => {
           text: String(t.text).slice(0, 2000),
         }));
     }
-
     let username = existingRow.username;
     let passwordHash = existingRow.password_hash;
     let subscriptionValidUntil = existingRow.subscription_valid_until;
@@ -471,26 +407,17 @@ app.put("/api/users/:id", authenticateUser, async (req: any, res) => {
       if (body.isManuallyDeactivated !== undefined) isManuallyDeactivated = !!body.isManuallyDeactivated;
       if (body.calculatorEnabled !== undefined) extra.calculatorEnabled = !!body.calculatorEnabled;
       if (body.busTrackingEnabled !== undefined) extra.busTrackingEnabled = !!body.busTrackingEnabled;
-      // Telegram chat ID-ləri yalnız admin təyin edir (vendor redaktə bölməsindən) —
-      // bir vendora bir neçə chat bağlana bilər.
       if (body.telegramChatIds !== undefined) {
         if (!Array.isArray(body.telegramChatIds)) return res.status(400).json({ error: "telegramChatIds massiv olmalıdır." });
         extra.telegramChatIds = body.telegramChatIds.map((c: any) => String(c).trim()).filter(Boolean);
       }
     }
-
-    // Changing the email — whether the owner edits their own profile or an admin edits it for
-    // them — always throws away any prior verification. Otherwise an admin (or an attacker who
-    // compromised the profile form) could repoint a vendor's account at an inbox they don't
-    // control while keeping the "verified, safe for password-reset" status of the OLD address.
     const emailChanged = email !== existingRow.email;
     const emailVerifiedAt = emailChanged ? null : existingRow.email_verified_at;
-
     await dbClient.execute(
       `UPDATE users SET name = ?, email = ?, username = ?, password_hash = ?, phone = ?, company_name = ?, avatar = ?, about = ?, subscription_valid_until = ?, extra_data = ?, is_manually_deactivated = ?, email_verified_at = ? WHERE id = ?`,
       [name, email, username, passwordHash, phone, companyName, avatar, about, subscriptionValidUntil, JSON.stringify(extra), isManuallyDeactivated ? 1 : 0, emailVerifiedAt, req.params.id]
     );
-
     const updatedRows = await dbClient.query('SELECT * FROM users WHERE id = ?', [req.params.id]);
     if (body.about !== undefined || body.guides !== undefined) {
       scheduleUserTranslation(req.params.id, about, extra.guides);
@@ -502,8 +429,7 @@ app.put("/api/users/:id", authenticateUser, async (req: any, res) => {
   }
 });
 
-// POST /api/auth/change-password — the logged-in user changes their own password. Requires
-// the current password to verify identity before writing a new bcrypt hash.
+// POST /api/auth/change-password
 app.post("/api/auth/change-password", authenticateUser, async (req: any, res) => {
   try {
     const { currentPassword, newPassword } = req.body || {};
@@ -513,14 +439,12 @@ app.post("/api/auth/change-password", authenticateUser, async (req: any, res) =>
     if (String(newPassword).length < 6) {
       return res.status(400).json({ error: "Yeni şifrə ən azı 6 simvol olmalıdır." });
     }
-
     const rows = await dbClient.query('SELECT * FROM users WHERE id = ?', [req.operator.id]);
     if (!rows.length) return res.status(404).json({ error: "İstifadəçi tapılmadı." });
     const user = rows[0];
     if (!bcrypt.compareSync(currentPassword, user.password_hash)) {
       return res.status(401).json({ error: "Cari şifrə yanlışdır." });
     }
-
     const newHash = await bcrypt.hash(newPassword, 10);
     await dbClient.execute('UPDATE users SET password_hash = ? WHERE id = ?', [newHash, req.operator.id]);
     res.json({ success: true });
@@ -530,28 +454,19 @@ app.post("/api/auth/change-password", authenticateUser, async (req: any, res) =>
   }
 });
 
-// POST /api/auth/send-email-verification — the logged-in admin/vendor asks to prove they
-// control their OWN account's current email (not a draft value from an unsaved profile-form
-// edit) before it's trusted as a password-reset destination. A fresh code always overwrites any
-// unused previous one, so only the most recently sent code is ever valid.
+// POST /api/auth/send-email-verification
 app.post("/api/auth/send-email-verification", authenticateUser, async (req: any, res) => {
   try {
     const rows = await dbClient.query('SELECT * FROM users WHERE id = ?', [req.operator.id]);
     if (!rows.length) return res.status(404).json({ error: "İstifadəçi tapılmadı." });
     const user = rows[0];
-
-    // 6-digit numeric code — short-lived (10 min) and single-use, so a 6-digit search space
-    // isn't the weak point a reset token would be; hashed the same way reset_token is, so the
-    // plaintext code only ever exists in the email itself, never at rest in the DB.
     const code = String(Math.floor(100000 + Math.random() * 900000));
     const codeHash = createHash("sha256").update(code).digest("hex");
     const expires = new Date(Date.now() + 10 * 60 * 1000);
-
     await dbClient.execute(
       `UPDATE users SET email_verification_code = ?, email_verification_expires = ? WHERE id = ?`,
       [codeHash, expires.toISOString(), user.id]
     );
-
     await sendEmail({
       to: user.email,
       subject: "E-poçt təsdiqləmə kodu - GedəkGörək",
@@ -565,30 +480,23 @@ app.post("/api/auth/send-email-verification", authenticateUser, async (req: any,
         </div>
       `
     });
-
     res.json({ success: true });
   } catch (error: any) {
     console.error("[POST /api/auth/send-email-verification] error:", error);
-    // Unlike forgot-password, there's no user-enumeration concern here — the caller is already
-    // authenticated as this exact account — so the real error (e.g. "email sending disabled")
-    // is safe and useful to surface.
     res.status(500).json({ error: error.message || "Təsdiqləmə kodu göndərilə bilmədi." });
   }
 });
 
-// POST /api/auth/verify-email — consumes a code minted by /api/auth/send-email-verification
-// above and marks the CALLER's own account email as verified.
+// POST /api/auth/verify-email
 app.post("/api/auth/verify-email", authenticateUser, async (req: any, res) => {
   const code = String((req.body || {}).code || "").trim();
   if (!code) {
     return res.status(400).json({ error: "Təsdiqləmə kodunu daxil edin." });
   }
-
   try {
     const rows = await dbClient.query('SELECT * FROM users WHERE id = ?', [req.operator.id]);
     if (!rows.length) return res.status(404).json({ error: "İstifadəçi tapılmadı." });
     const user = rows[0];
-
     const codeHash = createHash("sha256").update(code).digest("hex");
     if (
       !user.email_verification_code ||
@@ -598,12 +506,10 @@ app.post("/api/auth/verify-email", authenticateUser, async (req: any, res) => {
     ) {
       return res.status(400).json({ error: "Kod yanlışdır və ya vaxtı bitib. Yenidən kod göndərin." });
     }
-
     await dbClient.execute(
       `UPDATE users SET email_verified_at = CURRENT_TIMESTAMP, email_verification_code = NULL, email_verification_expires = NULL WHERE id = ?`,
       [user.id]
     );
-
     const updatedRows = await dbClient.query('SELECT * FROM users WHERE id = ?', [user.id]);
     res.json({ success: true, user: rowToUser(updatedRows[0]) });
   } catch (error: any) {
@@ -612,13 +518,7 @@ app.post("/api/auth/verify-email", authenticateUser, async (req: any, res) => {
   }
 });
 
-// POST /api/auth/forgot-password — logged-out admin/vendor requests a reset link by email
-// (or, for vendors, by username — same field the login screen accepts). Always responds with
-// the same generic success message whether or not the account exists, so this endpoint can't
-// be used to enumerate registered emails/usernames.
-// The raw token is only ever emailed to the user — the DB stores just its SHA-256 hash (see
-// server/db.ts's reset_token migration), so a database leak alone can't be replayed as a
-// working reset link.
+// POST /api/auth/forgot-password
 app.post("/api/auth/forgot-password", async (req, res) => {
   const identifier = String((req.body || {}).identifier || "").trim();
   const genericResponse = {
@@ -628,30 +528,22 @@ app.post("/api/auth/forgot-password", async (req, res) => {
   if (!identifier) {
     return res.status(400).json({ error: "E-poçt və ya istifadəçi adını daxil edin." });
   }
-
   try {
     const rows = await dbClient.query(
       `SELECT * FROM users WHERE (email = ? OR username = ?) AND role IN ('admin', 'vendor') AND deleted_at IS NULL`,
       [identifier, identifier]
     );
     const user = rows[0];
-    // Same generic response whether the account doesn't exist OR its email was never verified
-    // (see POST /api/auth/send-email-verification) — an unverified address might not belong to
-    // the account holder at all (e.g. an admin fat-fingered a vendor's email), so a reset link
-    // must never be mailed there.
     if (!user || !user.email_verified_at) {
       return res.json(genericResponse);
     }
-
     const rawToken = randomBytes(32).toString("hex");
     const tokenHash = createHash("sha256").update(rawToken).digest("hex");
-    const expires = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes
-
+    const expires = new Date(Date.now() + 30 * 60 * 1000);
     await dbClient.execute(
       `UPDATE users SET reset_token = ?, reset_token_expires = ? WHERE id = ?`,
       [tokenHash, expires.toISOString(), user.id]
     );
-
     const resetLink = `${getBaseUrl()}/reset-password?token=${rawToken}`;
     try {
       await sendEmail({
@@ -670,11 +562,8 @@ app.post("/api/auth/forgot-password", async (req, res) => {
         `
       });
     } catch (emailError: any) {
-      // Sending can fail (misconfigured provider, etc.) but the response must stay generic —
-      // otherwise a failed send for a valid account would reveal that the account exists.
       console.error("[POST /api/auth/forgot-password] email send error:", emailError.message);
     }
-
     return res.json(genericResponse);
   } catch (error: any) {
     console.error("[POST /api/auth/forgot-password] error:", error);
@@ -682,11 +571,7 @@ app.post("/api/auth/forgot-password", async (req, res) => {
   }
 });
 
-// POST /api/auth/reset-password — consumes a token minted by /api/auth/forgot-password above.
-// Looks the token up by its SHA-256 hash (never stored/compared in plaintext) and checks
-// expiry in JS rather than in SQL, since the two DB backends (Postgres/SQLite) don't share a
-// single portable "compare TIMESTAMP to now" expression through this project's `?`-placeholder
-// query layer.
+// POST /api/auth/reset-password
 app.post("/api/auth/reset-password", async (req, res) => {
   const { token, password } = req.body || {};
   if (!token || !password) {
@@ -695,7 +580,6 @@ app.post("/api/auth/reset-password", async (req, res) => {
   if (String(password).length < 6) {
     return res.status(400).json({ error: "Yeni şifrə ən azı 6 simvol olmalıdır." });
   }
-
   try {
     const tokenHash = createHash("sha256").update(String(token)).digest("hex");
     const rows = await dbClient.query(`SELECT * FROM users WHERE reset_token = ?`, [tokenHash]);
@@ -703,7 +587,6 @@ app.post("/api/auth/reset-password", async (req, res) => {
     if (!user || !user.reset_token_expires || new Date(user.reset_token_expires).getTime() < Date.now()) {
       return res.status(400).json({ error: "Link etibarsızdır və ya vaxtı bitib. Yenidən şifrə bərpası tələb edin." });
     }
-
     const newHash = await bcrypt.hash(String(password), 10);
     await dbClient.execute(
       `UPDATE users SET password_hash = ?, reset_token = NULL, reset_token_expires = NULL WHERE id = ?`,
@@ -716,7 +599,7 @@ app.post("/api/auth/reset-password", async (req, res) => {
   }
 });
 
-// In-memory "Bookings" table to act as our backend DB tracking WhatsApp click-through leads
+// In-memory "Bookings" table
 interface ServerBooking {
   id: string;
   tourId: string;
@@ -727,15 +610,11 @@ interface ServerBooking {
   status: 'Redirected_to_WhatsApp';
   clickedAt: string;
 }
-
 const serverBookings: ServerBooking[] = [];
 
-// Endpoint to fetch CBAR live rates (dynamic or fallback to 22.05.2026)
+// Endpoint to fetch CBAR live rates
 app.get("/api/exchange-rates/cbar", async (req, res) => {
   try {
-    // Admin-saved manual rates win over the live feed for every consumer. The admin panel's
-    // "Canlı CBAR Məzənnəsini Gətir" button passes ?live=1 to bypass the override and read
-    // the actual live values into the form.
     if (req.query.live !== '1') {
       const override = await getStoredExchangeRateOverride();
       if (override) {
@@ -747,33 +626,25 @@ app.get("/api/exchange-rates/cbar", async (req, res) => {
     const month = String(today.getMonth() + 1).padStart(2, '0');
     const year = today.getFullYear();
     const dateStr = `${day}.${month}.${year}`;
-
     let url = `https://cbar.az/currencies/${dateStr}.xml`;
     console.log(`[CBAR] Fetching live rates from: ${url}`);
-
     let response = await globalThis.fetch(url);
     if (!response.ok) {
-      console.log(`[CBAR] Fetch failed for dynamic date ${dateStr} (status ${response.status}). Falling back to static target 22.05.2026.xml`);
+      console.log(`[CBAR] Fetch failed for dynamic date ${dateStr}. Falling back to static target.`);
       url = "https://cbar.az/currencies/22.05.2026.xml";
       response = await globalThis.fetch(url);
     }
-
     if (!response.ok) {
       throw new Error(`CBAR returned status ${response.status}`);
     }
-
     const xmlText = await response.text();
-
     const usdMatch = xmlText.match(/<Valute Code="USD">[\s\S]*?<Value>([\d.]+)<\/Value>/);
     const eurMatch = xmlText.match(/<Valute Code="EUR">[\s\S]*?<Value>([\d.]+)<\/Value>/);
-
     if (!usdMatch || !eurMatch) {
       throw new Error("Could not parse USD/EUR values from CBAR XML response.");
     }
-
     const usd = parseFloat(usdMatch[1]);
     const eur = parseFloat(eurMatch[1]);
-
     console.log(`[CBAR] Successfully parsed rates: USD = ${usd} AZN, EUR = ${eur} AZN`);
     return res.json({ success: true, USD: usd, EUR: eur, date: dateStr, source: url });
   } catch (error: any) {
@@ -797,21 +668,18 @@ app.get("/api/exchange-rates/cbar", async (req, res) => {
         }
       }
     } catch {
-      // Backup-date fallback also failed — fall through to the generic 500 below.
+      // Backup-date fallback also failed
     }
-
     return res.status(500).json({ error: "CBAR məzənnələrini gətirmək mümkün olmadı: " + error.message });
   }
 });
 
-// Endpoint to track WhatsApp redirect analytics (Lead Tracking)
+// Endpoint to track WhatsApp redirect analytics
 app.post("/api/bookings/whatsapp-click", (req, res) => {
   const { tourId, startDate, participantsCount, vendorId, booking_reference } = req.body;
-
   if (!tourId || !startDate || !participantsCount || !vendorId || !booking_reference) {
-    return res.status(400).json({ error: "Zəhmət olmasa bütün məlumatları qeyd edin (tourId, startDate, participantsCount, vendorId, booking_reference)" });
+    return res.status(400).json({ error: "Zəhmət olmasa bütün məlumatları qeyd edin." });
   }
-
   const newLead: ServerBooking = {
     id: `lead-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
     tourId,
@@ -822,21 +690,17 @@ app.post("/api/bookings/whatsapp-click", (req, res) => {
     status: "Redirected_to_WhatsApp",
     clickedAt: new Date().toISOString()
   };
-
   serverBookings.push(newLead);
   console.log(`[Lead Tracked] Booking Ref: ${booking_reference} | Tour: ${tourId} -> Redirected to WhatsApp.`);
-
   return res.json({
     success: true,
-    message: "Klik statistikası uğurla qeydə alındı (Redirected_to_WhatsApp)",
+    message: "Klik statistikası uğurla qeydə alındı",
     lead: newLead,
     totalLeadsForVendor: serverBookings.filter(b => b.vendorId === vendorId).length
   });
 });
 
-// Endpoint to expose all tracked WhatsApp leads for admin/vendor analytic panels. Leads carry
-// the same customer-identifying data as bookings, so this requires a session — a vendor only
-// sees leads for their own tours, an admin sees everything.
+// GET /api/bookings/whatsapp-leads
 app.get("/api/bookings/whatsapp-leads", authenticateUser, (req: any, res) => {
   const leads = req.operator.role === 'vendor'
     ? serverBookings.filter((b) => b.vendorId === req.operator.id)
@@ -847,15 +711,7 @@ app.get("/api/bookings/whatsapp-leads", authenticateUser, (req: any, res) => {
   });
 });
 
-// ============================================================================
-// WhatsApp verification — checks whether a phone number actually has an active
-// WhatsApp account through a Baileys-driven WhatsApp Web session (see
-// server/whatsapp.ts). No code is sent/entered: a positive check is itself the
-// verification. The session is connected/disconnected from the admin panel by
-// scanning a QR code.
-// ============================================================================
-
-// GET/POST connection management — admin-only, mirrors the /api/admin/vendors role check.
+// WhatsApp verification endpoints
 app.get("/api/whatsapp/status", authenticateUser, (req: any, res) => {
   if (req.operator.role !== "admin") {
     return res.status(403).json({ error: "Yalnız adminlər WhatsApp bağlantısını idarə edə bilər." });
@@ -889,24 +745,14 @@ app.post("/api/whatsapp/logout", authenticateUser, async (req: any, res) => {
   }
 });
 
-// GET /api/whatsapp/public-status — public, lets the booking form show whether number
-// verification is currently possible (badge + fallback link) without leaking the QR code
-// or the linked number (those stay behind the admin-only /api/whatsapp/status above).
 app.get("/api/whatsapp/public-status", (req, res) => {
   return res.json(getPublicWhatsAppStatus());
 });
 
-// GET /api/whatsapp/captcha — public, issues a one-time math challenge that must accompany
-// the verify-number call below. Keeps a scripted loop from cheaply hammering the connected
-// number just by varying phone numbers (on top of the rate limits already in place).
 app.get("/api/whatsapp/captcha", (req, res) => {
   return res.json(generateCaptchaChallenge());
 });
 
-// POST /api/whatsapp/verify-number — public (guest booking flow, same as whatsapp-click
-// above). Requires a valid captcha answer, is rate-limited per phone + globally, and simply
-// reports whether the number has an active WhatsApp account — that check result IS the
-// verification, no code is sent or entered.
 app.post("/api/whatsapp/verify-number", async (req, res) => {
   const { phone, captchaId, captchaAnswer } = req.body || {};
   if (!phone || typeof phone !== "string" || phone.replace(/\D/g, "").length < 7) {
@@ -918,24 +764,22 @@ app.post("/api/whatsapp/verify-number", async (req, res) => {
   const captchaResult = verifyCaptchaChallenge(String(captchaId), Number(captchaAnswer));
   if (captchaResult === "expired") {
     return res.status(400).json({
-      error: "Təhlükəsizlik sualının vaxtı bitib. Yeni sual göndərildi — zəhmət olmasa onu cavablandırın.",
+      error: "Təhlükəsizlik sualının vaxtı bitib.",
       captchaFailed: true,
       captchaExpired: true
     });
   }
   if (captchaResult === "wrong") {
-    return res.status(400).json({ error: "Təhlükəsizlik sualının cavabı yanlışdır. Zəhmət olmasa yenidən cəhd edin.", captchaFailed: true });
+    return res.status(400).json({ error: "Təhlükəsizlik sualının cavabı yanlışdır.", captchaFailed: true });
   }
-
   const rate = checkAndConsumeRateLimit(phone);
   if (!rate.allowed) {
     return res.status(429).json({
-      error: "Çox sayda cəhd edildi. Zəhmət olmasa bir az sonra yenidən cəhd edin.",
+      error: "Çox sayda cəhd edildi.",
       reason: rate.reason,
       retryAfterSec: rate.retryAfterSec
     });
   }
-
   try {
     const hasWhatsapp = await isRegisteredOnWhatsApp(phone);
     if (!hasWhatsapp) {
@@ -944,24 +788,16 @@ app.post("/api/whatsapp/verify-number", async (req, res) => {
     return res.json({ success: true, hasWhatsapp: true });
   } catch (error: any) {
     if (error.message === "WHATSAPP_NOT_CONNECTED") {
-      return res.status(503).json({ error: "WhatsApp doğrulama sistemi hazırda əlçatan deyil. Zəhmət olmasa bir az sonra yenidən cəhd edin." });
+      return res.status(503).json({ error: "WhatsApp doğrulama sistemi hazırda əlçatan deyil." });
     }
     console.error("[POST /api/whatsapp/verify-number] error:", error);
     return res.status(500).json({ error: "Nömrə yoxlanıla bilmədi." });
   }
 });
 
-// ============================================================================
-// Camp Sites — community-submitted camp spots (public page + admin moderation)
-// and the contributor points/reward system keyed by normalized phone number.
-// ============================================================================
-
-// GET /api/camp-sites — public list of approved camp sites. Submitter is credited by first
-// name + surname initial only; the phone number never leaves the server on this endpoint.
+// Camp Sites endpoints
 app.get("/api/camp-sites", async (req, res) => {
   try {
-    // Feature switched off by admin → the public API acts as if no camp sites exist, which
-    // also blanks the camp layer on tour maps without any client-side changes.
     if (!(await isCampSitesEnabled())) {
       return res.json({ campSites: [] });
     }
@@ -975,8 +811,6 @@ app.get("/api/camp-sites", async (req, res) => {
   }
 });
 
-// GET /api/camp-sites/config — public points configuration (shown on the camp sites page:
-// "hər təsdiqlənən yer X xal, Y xala pulsuz tur").
 app.get("/api/camp-sites/config", async (req, res) => {
   try {
     const config = await getCampPointsConfig();
@@ -987,9 +821,6 @@ app.get("/api/camp-sites/config", async (req, res) => {
   }
 });
 
-// Admin-persisted cost elements for the public "Qrup üçün qiymət hesabla" calculator.
-// Stored as one JSON blob in the settings table; null means "admin never saved — client
-// falls back to its built-in defaults".
 async function getStoredPriceCalculatorConfig(): Promise<Record<string, any> | null> {
   try {
     const raw = await getSetting('price_calculator_config', '');
@@ -999,8 +830,6 @@ async function getStoredPriceCalculatorConfig(): Promise<Record<string, any> | n
   }
 }
 
-// Admin-saved manual USD/EUR rates. When set, they win over the live CBAR feed for every
-// client (customer currency display and vendor AZN-equivalent calculations alike).
 async function getStoredExchangeRateOverride(): Promise<{ USD: number; EUR: number } | null> {
   try {
     const raw = await getSetting('exchange_rate_override', '');
@@ -1012,10 +841,6 @@ async function getStoredExchangeRateOverride(): Promise<{ USD: number; EUR: numb
   }
 }
 
-// GET /api/group-calculator/config — public flag for whether the "Qrup hesabla" group price
-// calculator nav button is shown to customers (admin-controlled, mirrors /api/camp-sites/config).
-// Also carries the admin-saved cost elements (config) so the customer calculator uses the same
-// tariffs the admin edits in Ayarlar instead of the client's hardcoded fallback.
 app.get("/api/group-calculator/config", async (req, res) => {
   try {
     res.json({
@@ -1028,9 +853,6 @@ app.get("/api/group-calculator/config", async (req, res) => {
   }
 });
 
-// GET /api/camp-sites/points?phone=... — public contributor points lookup. Uses its own
-// (cheap, DB-only) rate limiter, not the WhatsApp one. Unknown phones get zeros rather than
-// 404 so the endpoint can't be used to enumerate which numbers have submitted sites.
 app.get("/api/camp-sites/points", async (req, res) => {
   const normalized = normalizeAzPhone(String(req.query.phone || ""));
   if (!normalized) {
@@ -1039,7 +861,7 @@ app.get("/api/camp-sites/points", async (req, res) => {
   const rate = checkAndConsumeLookupRateLimit(normalized);
   if (!rate.allowed) {
     return res.status(429).json({
-      error: "Çox sayda cəhd edildi. Zəhmət olmasa bir az sonra yenidən cəhd edin.",
+      error: "Çox sayda cəhd edildi.",
       retryAfterSec: rate.retryAfterSec,
     });
   }
@@ -1051,10 +873,6 @@ app.get("/api/camp-sites/points", async (req, res) => {
   }
 });
 
-// POST /api/camp-sites — public submission (any visitor may propose a camp site). Same
-// abuse-protection flow as /api/whatsapp/verify-number: captcha (issued by GET
-// /api/whatsapp/captcha) + per-phone rate limiting, then validation and a nearby-duplicate
-// check before the row lands in the admin review queue as 'pending_approval'.
 app.post("/api/camp-sites", async (req, res) => {
   if (!(await isCampSitesEnabled())) {
     return res.status(403).json({ error: "Kamp yerləri bölməsi hazırda aktiv deyil." });
@@ -1066,29 +884,26 @@ app.post("/api/camp-sites", async (req, res) => {
   const captchaResult = verifyCaptchaChallenge(String(body.captchaId), Number(body.captchaAnswer));
   if (captchaResult === "expired") {
     return res.status(400).json({
-      error: "Təhlükəsizlik sualının vaxtı bitib. Yeni sual göndərildi — zəhmət olmasa onu cavablandırın.",
+      error: "Təhlükəsizlik sualının vaxtı bitib.",
       captchaFailed: true,
       captchaExpired: true,
     });
   }
   if (captchaResult === "wrong") {
-    return res.status(400).json({ error: "Təhlükəsizlik sualının cavabı yanlışdır. Zəhmət olmasa yenidən cəhd edin.", captchaFailed: true });
+    return res.status(400).json({ error: "Təhlükəsizlik sualının cavabı yanlışdır.", captchaFailed: true });
   }
-
   const submission = validateCampSiteSubmission(body);
   if ("error" in submission) {
     return res.status(400).json({ error: submission.error });
   }
-
   const rate = checkAndConsumeRateLimit(submission.submitterPhoneNormalized);
   if (!rate.allowed) {
     return res.status(429).json({
-      error: "Çox sayda cəhd edildi. Zəhmət olmasa bir az sonra yenidən cəhd edin.",
+      error: "Çox sayda cəhd edildi.",
       reason: rate.reason,
       retryAfterSec: rate.retryAfterSec,
     });
   }
-
   try {
     if (await findNearbyDuplicate(submission)) {
       return res.status(409).json({ error: "Bu nömrə ilə yaxınlıqda artıq bir kamp yeri təqdim edilib." });
@@ -1101,7 +916,6 @@ app.post("/api/camp-sites", async (req, res) => {
   }
 });
 
-// GET /api/admin/camp-sites?status=... — full rows (incl. submitter phone) for moderation.
 app.get("/api/admin/camp-sites", authenticateUser, async (req: any, res) => {
   if (req.operator.role !== 'admin') {
     return res.status(403).json({ error: "Bu əməliyyat yalnız adminlər üçündür." });
@@ -1118,9 +932,6 @@ app.get("/api/admin/camp-sites", authenticateUser, async (req: any, res) => {
   }
 });
 
-// POST /api/admin/camp-sites — admin creates a camp site directly: lands as 'approved'
-// immediately (no moderation queue), is excluded from contributor points (no phone), and may
-// carry the is_verified "checked by our team" badge from the start.
 app.post("/api/admin/camp-sites", authenticateUser, async (req: any, res) => {
   if (req.operator.role !== 'admin') {
     return res.status(403).json({ error: "Bu əməliyyat yalnız adminlər üçündür." });
@@ -1139,10 +950,6 @@ app.post("/api/admin/camp-sites", authenticateUser, async (req: any, res) => {
   }
 });
 
-// PUT /api/admin/camp-sites/:id — approve/reject, mirroring the tour moderation flow.
-// Approval stamps points_awarded with the CURRENT camp_points_per_site setting (a snapshot:
-// later setting changes never rewrite already-earned points) — but only when transitioning
-// from a non-approved status, so re-sending 'approved' can't double-award.
 app.put("/api/admin/camp-sites/:id", authenticateUser, async (req: any, res) => {
   if (req.operator.role !== 'admin') {
     return res.status(403).json({ error: "Bu əməliyyat yalnız adminlər üçündür." });
@@ -1151,12 +958,8 @@ app.put("/api/admin/camp-sites/:id", authenticateUser, async (req: any, res) => 
     const rows = await dbClient.query(`SELECT * FROM camp_sites WHERE id = ?`, [req.params.id]);
     if (!rows.length) return res.status(404).json({ error: "Kamp yeri tapılmadı." });
     const existing = rows[0];
-
     const body = req.body || {};
     const status = body.status;
-
-    // Badge/flag updates (is_verified "checked by our team", is_paid) can come alone or
-    // alongside a status change — they never touch the points logic.
     const hasFlagUpdate = body.isVerified !== undefined || body.isPaid !== undefined;
     if (hasFlagUpdate) {
       if (body.isVerified !== undefined) {
@@ -1166,11 +969,9 @@ app.put("/api/admin/camp-sites/:id", authenticateUser, async (req: any, res) => 
         await dbClient.execute(`UPDATE camp_sites SET is_paid = ? WHERE id = ?`, [toDbBool(body.isPaid), req.params.id]);
       }
     }
-
     if (status === 'approved') {
       if (existing.status !== 'approved') {
         const { pointsPerSite } = await getCampPointsConfig();
-        // Admin-created rows (no phone) never earn points even if re-approved after a reject.
         const points = existing.submitter_phone_normalized ? pointsPerSite : 0;
         await dbClient.execute(
           `UPDATE camp_sites SET status = 'approved', points_awarded = ?, approved_at = CURRENT_TIMESTAMP, rejection_reason = NULL WHERE id = ?`,
@@ -1191,7 +992,6 @@ app.put("/api/admin/camp-sites/:id", authenticateUser, async (req: any, res) => 
     } else if (!hasFlagUpdate) {
       return res.status(400).json({ error: "Yenilənəcək sahə göndərilməyib." });
     }
-
     const updated = await dbClient.query(`SELECT * FROM camp_sites WHERE id = ?`, [req.params.id]);
     res.json({ campSite: rowToAdminCampSite(updated[0]) });
   } catch (error: any) {
@@ -1200,8 +1000,6 @@ app.put("/api/admin/camp-sites/:id", authenticateUser, async (req: any, res) => 
   }
 });
 
-// DELETE /api/admin/camp-sites/:id — spam cleanup. Note: deleting an APPROVED site also
-// removes its points from the submitter (points are computed from approved rows).
 app.delete("/api/admin/camp-sites/:id", authenticateUser, async (req: any, res) => {
   if (req.operator.role !== 'admin') {
     return res.status(403).json({ error: "Bu əməliyyat yalnız adminlər üçündür." });
@@ -1217,7 +1015,6 @@ app.delete("/api/admin/camp-sites/:id", authenticateUser, async (req: any, res) 
   }
 });
 
-// GET /api/admin/camp-contributors — points leaderboard with reward earned/redeemed counts.
 app.get("/api/admin/camp-contributors", authenticateUser, async (req: any, res) => {
   if (req.operator.role !== 'admin') {
     return res.status(403).json({ error: "Bu əməliyyat yalnız adminlər üçündür." });
@@ -1230,8 +1027,6 @@ app.get("/api/admin/camp-contributors", authenticateUser, async (req: any, res) 
   }
 });
 
-// POST /api/admin/camp-rewards/redeem — records that an admin handed out one earned free-tour
-// reward (the tour itself is arranged offline by contacting the contributor).
 app.post("/api/admin/camp-rewards/redeem", authenticateUser, async (req: any, res) => {
   if (req.operator.role !== 'admin') {
     return res.status(403).json({ error: "Bu əməliyyat yalnız adminlər üçündür." });
@@ -1257,8 +1052,6 @@ app.post("/api/admin/camp-rewards/redeem", authenticateUser, async (req: any, re
   }
 });
 
-// GET/PUT /api/admin/settings — the server-persisted camp points configuration (unlike the
-// client-side localStorage platformConfig, these values are read by the server at approval).
 app.get("/api/admin/settings", authenticateUser, async (req: any, res) => {
   if (req.operator.role !== 'admin') {
     return res.status(403).json({ error: "Bu əməliyyat yalnız adminlər üçündür." });
@@ -1284,8 +1077,6 @@ app.put("/api/admin/settings", authenticateUser, async (req: any, res) => {
     return res.status(403).json({ error: "Bu əməliyyat yalnız adminlər üçündür." });
   }
   const body = req.body || {};
-  // Camp fields are optional as a pair — callers that only save the calculator config or
-  // exchange rates shouldn't be forced to resend (and re-validate) the camp point values.
   const hasCampFields = body.campPointsPerSite !== undefined || body.campRewardThreshold !== undefined;
   const pointsPerSite = Number(body.campPointsPerSite);
   const threshold = Number(body.campRewardThreshold);
@@ -1324,7 +1115,6 @@ app.put("/api/admin/settings", authenticateUser, async (req: any, res) => {
     if (hasRateFields) {
       await setSetting('exchange_rate_override', JSON.stringify({ USD: usdRate, EUR: eurRate }));
     } else if (body.clearRateOverride === true) {
-      // Admin switched back to the live CBAR feed — drop the pinned manual rates.
       await setSetting('exchange_rate_override', '');
     }
     const campConfig = await getCampPointsConfig();
@@ -1342,10 +1132,6 @@ app.put("/api/admin/settings", authenticateUser, async (req: any, res) => {
   }
 });
 
-// GET/PUT /api/admin/email-settings — lets an admin switch outbound email (used today only by
-// the forgot-password flow) between Resend and their own domain's SMTP, or turn it off, without
-// touching .env or restarting the server. GET never returns secret values themselves (API key /
-// SMTP password) — only whether one is currently set — since this response reaches the browser.
 app.get("/api/admin/email-settings", authenticateUser, async (req: any, res) => {
   if (req.operator.role !== 'admin') {
     return res.status(403).json({ error: "Bu əməliyyat yalnız adminlər üçündür." });
@@ -1367,9 +1153,6 @@ app.put("/api/admin/email-settings", authenticateUser, async (req: any, res) => 
     return res.status(400).json({ error: "activeProvider 'none', 'resend' və ya 'smtp' olmalıdır." });
   }
   try {
-    // Secret fields (resendApiKey/smtpPassword) are only overwritten when the admin actually
-    // typed a new value — an empty string means "leave the currently-saved secret unchanged",
-    // since GET never echoes it back for the form to keep pre-filled.
     await updateEmailConfig({
       activeProvider: body.activeProvider,
       resendApiKey: typeof body.resendApiKey === 'string' ? body.resendApiKey.trim() : undefined,
@@ -1390,10 +1173,6 @@ app.put("/api/admin/email-settings", authenticateUser, async (req: any, res) => 
   }
 });
 
-// POST /api/admin/email-settings/test — sends a real test email to the logged-in admin's own
-// address using whatever provider is currently active, so they can confirm it works before
-// relying on it for the forgot-password flow. Unlike forgot-password, errors ARE surfaced here
-// verbatim — there's no user-enumeration concern since the admin is testing their own config.
 app.post("/api/admin/email-settings/test", authenticateUser, async (req: any, res) => {
   if (req.operator.role !== 'admin') {
     return res.status(403).json({ error: "Bu əməliyyat yalnız adminlər üçündür." });
@@ -1402,12 +1181,7 @@ app.post("/api/admin/email-settings/test", authenticateUser, async (req: any, re
     await sendEmail({
       to: req.operator.email,
       subject: "Test Email - GedəkGörək",
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; color: #1e293b;">
-          <h2 style="color: #047857;">Test uğurludur ✅</h2>
-          <p>Bu, GedəkGörək admin panelindən göndərilən test emailidir. Email tənzimləmələriniz düzgün işləyir.</p>
-        </div>
-      `
+      html: `<div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; color: #1e293b;"> <h2 style="color: #047857;">Test uğurludur ✅</h2> <p>Bu, GedəkGörək admin panelindən göndərilən test emailidir.</p> </div>`
     });
     res.json({ success: true });
   } catch (error: any) {
@@ -1416,10 +1190,6 @@ app.post("/api/admin/email-settings/test", authenticateUser, async (req: any, re
   }
 });
 
-// GET /api/geo/gmaps?url=... — turns a pasted Google Maps link into {lat, lon} for the
-// camp-site forms. Full links are parsed without any network call; Google short links
-// (maps.app.goo.gl…) are resolved by following their redirect, behind a host allowlist
-// and a small global budget (see server/geo.ts).
 app.get("/api/geo/gmaps", async (req, res) => {
   const result = await resolveGoogleMapsLink(req.query.url);
   if (!result.ok) {
@@ -1428,14 +1198,10 @@ app.get("/api/geo/gmaps", async (req, res) => {
   res.json(result.coords);
 });
 
-// GET /api/osm/pois?bbox=minLat,minLon,maxLat,maxLon — cached Overpass (OpenStreetMap) proxy
-// feeding the GPX map's POI layer (peaks, springs, waterfalls, shelters, camp sites…).
-// Proxied server-side so the browser never talks to community Overpass mirrors directly and
-// repeated views of the same route hit our 24h cache instead of Overpass.
 app.get("/api/osm/pois", async (req, res) => {
   const bbox = parseBboxParam(req.query.bbox);
   if (!bbox) {
-    return res.status(400).json({ error: "bbox parametri 'minLat,minLon,maxLat,maxLon' formatında və maksimum 1°×1° olmalıdır." });
+    return res.status(400).json({ error: "bbox parametri 'minLat,minLon,maxLat,maxLon' formatında olmalıdır." });
   }
   try {
     res.json({ pois: await getPoisForBbox(bbox) });
@@ -1444,25 +1210,13 @@ app.get("/api/osm/pois", async (req, res) => {
     res.status(502).json({ error: "OpenStreetMap məlumatları hazırda əlçatan deyil." });
   }
 });
-
 // ============================================================================
 // Marketplace Core Data API — Tours / Slots / Bookings / Reviews
-// Backed by dbClient (server/db.ts), which talks to PostgreSQL when
-// DATABASE_URL is configured and falls back to local SQLite otherwise.
-// All queries below use "?" placeholders bound through dbClient's params
-// array, which dbClient translates into safely parameterized queries for
-// both drivers — no request value is ever concatenated into SQL text.
 // ============================================================================
-
-// Fields that live as real columns on the `tours` table. Everything else on
-// the request body (itinerary, roomTypes, includes, etc.) is preserved as-is
-// inside the `extra_data` JSON column so the full Tour shape round-trips.
 const TOUR_CORE_FIELDS = [
   'id', 'vendorId', 'vendorName', 'name', 'slug', 'category', 'difficulty', 'region',
   'durationDays', 'description', 'image', 'isActive', 'isApproved', 'status',
-  'priceCurrency', 'rating', 'reviewsCount', 'createdAt',
-  // pendingData lives in its own `pending_data` column, never inside extra_data.
-  'pendingData'
+  'priceCurrency', 'rating', 'reviewsCount', 'createdAt', 'pendingData'
 ];
 
 function rowToTour(row: any) {
@@ -1503,19 +1257,13 @@ function splitTourBody(body: Record<string, any>) {
   return extra;
 }
 
-// GET /api/tours — list tours, optionally filtered by vendorId / category / isApproved / isActive
-// GET /api/tours — public by default (the customer marketplace needs to browse everyone's
-// tours), but a valid vendor token scopes the result to that vendor's own tours only —
-// the vendorId query param is ignored in that case so a vendor can't request another
-// vendor's data just by passing a different id. An admin token sees everything, same as
-// an anonymous/public request.
+// GET /api/tours
 app.get("/api/tours", async (req, res) => {
   try {
     const user = getOptionalUser(req);
     const { category, isApproved, isActive } = req.query;
     const conditions: string[] = [];
     const params: any[] = [];
-
     if (user && user.role === 'vendor') {
       conditions.push('vendor_id = ?');
       params.push(user.id);
@@ -1525,18 +1273,8 @@ app.get("/api/tours", async (req, res) => {
         params.push(String(req.query.vendorId));
       }
     } else {
-      // Anonymous/customer requests only ever see tours with status = 'approved'. The moment
-      // a vendor edits a live tour (status flips to 'pending_approval', see PUT handler below)
-      // or an admin rejects one, it disappears from the marketplace immediately — no exceptions,
-      // and no "keep showing the stale approved version while a proposal is under review".
       conditions.push("status = 'approved'");
-      // Deactivated tours (vendor danger-zone toggle / admin edit) are hidden server-side too —
-      // the client-side `isActive !== false` filters only cover the list surfaces, not the
-      // detail page, wishlist or compare, so without this the toggle "didn't work" there.
       conditions.push("(is_active IS NULL OR is_active != false)");
-      // A vendor keeps showing up for 3 days past subscriptionValidUntil (grace period —
-      // matches the copy in AdminPortal's subscription section); only once that grace
-      // period has fully elapsed do their tours disappear from the public marketplace.
       const subscriptionGraceCutoff = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
       conditions.push(
         "vendor_id NOT IN (SELECT id FROM users WHERE deleted_at IS NOT NULL OR is_manually_deactivated = true OR (subscription_valid_until IS NOT NULL AND subscription_valid_until < ?))"
@@ -1550,7 +1288,6 @@ app.get("/api/tours", async (req, res) => {
     if (category) { conditions.push('category = ?'); params.push(String(category)); }
     if (isApproved !== undefined) { conditions.push('is_approved = ?'); params.push(isApproved === 'true' ? 1 : 0); }
     if (isActive !== undefined) { conditions.push('is_active = ?'); params.push(isActive === 'true' ? 1 : 0); }
-
     const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
     const rows = await dbClient.query(`SELECT * FROM tours ${whereClause} ORDER BY created_at DESC`, params);
     res.json({ tours: rows.map(rowToTour) });
@@ -1560,53 +1297,18 @@ app.get("/api/tours", async (req, res) => {
   }
 });
 
-// SEO: robots.txt + a DB-generated sitemap.xml (not a static file — regenerated from the
-// live `tours` table on every request so newly-approved tours show up immediately).
-const SITE_URL = "https://gedekgorek.com";
-
-app.get("/robots.txt", (req, res) => {
-  res.type("text/plain").send(`User-agent: *\nAllow: /\nSitemap: ${SITE_URL}/sitemap.xml\n`);
-});
-
-app.get("/sitemap.xml", async (req, res) => {
-  try {
-    // Same "publicly visible" semantics as the anonymous branch of GET /api/tours, simplified
-    // (skips the vendor-subscription-grace-period join — sitemap freshness isn't as critical
-    // as the live listing, and a slightly stale sitemap entry is harmless).
-    const rows = await dbClient.query(
-      `SELECT slug FROM tours WHERE status = 'approved' AND slug IS NOT NULL AND slug != '' AND (is_active IS NULL OR is_active != false)`
-    );
-    const staticPaths = ["", "/faq", "/calculator", "/camp-sites", "/camp-sites/add"];
-    const urls = [
-      ...staticPaths.map((p) => `<url><loc>${SITE_URL}${p}</loc></url>`),
-      ...rows.map((r: any) => `<url><loc>${SITE_URL}/tours/${r.slug}</loc></url>`),
-    ];
-    res.type("application/xml").send(
-      `<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${urls.join("")}</urlset>`
-    );
-  } catch (error: any) {
-    console.error("[GET /sitemap.xml] error:", error);
-    res.status(500).type("application/xml").send(`<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"></urlset>`);
-  }
-});
-
-// GET /api/tours/:id — single tour. Same visibility rule as the list endpoint: a vendor may
-// fetch their own tour in any status, an admin may fetch anything, but an anonymous/customer
-// request (or a vendor token for someone else's tour) 404s unless the tour is 'approved' —
-// pending/rejected tours don't leak through direct-by-id lookups either.
+// GET /api/tours/:id
 app.get("/api/tours/:id", async (req, res) => {
   try {
     const rows = await dbClient.query('SELECT * FROM tours WHERE id = ? OR slug = ?', [req.params.id, req.params.id]);
     if (!rows.length) return res.status(404).json({ error: "Tur tapılmadı." });
     const tour = rowToTour(rows[0]);
-
     const user = getOptionalUser(req);
     const isOwnerVendor = !!user && user.role === 'vendor' && user.id === tour.vendorId;
     const isAdmin = !!user && user.role === 'admin';
     if (!isAdmin && !isOwnerVendor && (tour.status !== 'approved' || tour.isActive === false)) {
       return res.status(404).json({ error: "Tur tapılmadı." });
     }
-
     res.json({ tour });
   } catch (error: any) {
     console.error("[GET /api/tours/:id] error:", error);
@@ -1614,10 +1316,7 @@ app.get("/api/tours/:id", async (req, res) => {
   }
 });
 
-// POST /api/tours — create a tour
-// POST /api/tours — vendors may only create tours under their own vendorId (the JWT's
-// subject, not whatever the client sends); admins may create/assign on any vendor's behalf.
-// New vendor-created tours are always forced unapproved — only an admin can approve.
+// POST /api/tours
 app.post("/api/tours", authenticateUser, async (req: any, res) => {
   try {
     const body = req.body || {};
@@ -1633,12 +1332,10 @@ app.post("/api/tours", authenticateUser, async (req: any, res) => {
     if (body.price !== undefined && !(Number(body.price) >= 0)) {
       return res.status(400).json({ error: "Qiymət mənfi ola bilməz." });
     }
-
     const id = body.id || `tour-${randomUUID()}`;
     const slug = await generateUniqueSlug(name, dbClient);
     const extra = splitTourBody(body);
     const status: 'approved' | 'pending_approval' = isAdmin && body.status === 'approved' ? 'approved' : 'pending_approval';
-
     await dbClient.execute(
       `INSERT INTO tours (id, vendor_id, vendor_name, name, slug, category, difficulty, region, duration_days, description, image, is_active, is_approved, status, pending_data, price_currency, rating, reviews_count, extra_data)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -1655,17 +1352,13 @@ app.post("/api/tours", authenticateUser, async (req: any, res) => {
         JSON.stringify(extra)
       ]
     );
-
     const rows = await dbClient.query('SELECT * FROM tours WHERE id = ?', [id]);
     scheduleTourTranslation(id, { name, description: description || null, includes: body.includes, notIncluded: body.notIncluded, highlights: body.highlights });
-
-    // Vendor yeni tur əlavə etdi → adminlərə bildiriş (admin özü yaradanda yox)
     if (!isAdmin) {
       const vendorRows = await dbClient.query('SELECT name, company_name FROM users WHERE id = ?', [vendorId]);
       const vendorName = vendorRows[0]?.company_name || vendorRows[0]?.name || body.vendorName || 'Vendor';
       notifyAdminsTourEvent('tour_created', { id, name }, vendorName);
     }
-
     res.status(201).json({ tour: rowToTour(rows[0]) });
   } catch (error: any) {
     console.error("[POST /api/tours] error:", error);
@@ -1673,7 +1366,67 @@ app.post("/api/tours", authenticateUser, async (req: any, res) => {
   }
 });
 
-// Writes a fully-merged Tour object onto the live row's core columns + extra_data.
+// PUT /api/tours/:id
+app.put("/api/tours/:id", authenticateUser, async (req: any, res) => {
+  try {
+    const existingRows = await dbClient.query('SELECT * FROM tours WHERE id = ?', [req.params.id]);
+    if (!existingRows.length) return res.status(404).json({ error: "Tur tapılmadı." });
+    const existing = rowToTour(existingRows[0]);
+    const isAdmin = req.operator.role === 'admin';
+    if (!isAdmin && existing.vendorId !== req.operator.id) {
+      return res.status(403).json({ error: "Bu tur sizin hesabınıza aid deyil." });
+    }
+    const body = req.body || {};
+    if (body.durationDays !== undefined && !(Number(body.durationDays) > 0)) {
+      return res.status(400).json({ error: "Müddət (gün) müsbət ədəd olmalıdır." });
+    }
+    if (body.price !== undefined && !(Number(body.price) >= 0)) {
+      return res.status(400).json({ error: "Qiymət mənfi ola bilməz." });
+    }
+    if (isAdmin) {
+      if (body.status === 'approved') {
+        const source = { ...(existing.pendingData || {}), ...body };
+        delete source.status;
+        const merged = { ...existing, ...source, id: req.params.id };
+        delete merged.rejectionReason;
+        await writeLiveTourRow(req.params.id, merged, 'approved', null);
+      } else if (body.status === 'rejected') {
+        const reason = typeof body.rejectionReason === 'string' ? body.rejectionReason.trim() : '';
+        if (!reason) {
+          return res.status(400).json({ error: "Rədd etmək üçün səbəb qeyd edilməlidir." });
+        }
+        const merged = { ...existing, ...body, id: req.params.id, rejectionReason: reason };
+        delete merged.status;
+        await writeLiveTourRow(req.params.id, merged, 'rejected', null);
+      } else {
+        const merged = { ...existing, ...body, id: req.params.id };
+        await writeLiveTourRow(req.params.id, merged, (body.status || existing.status), null);
+      }
+    } else if (existing.status === 'approved') {
+      const proposal = { ...body, id: req.params.id, vendorId: existing.vendorId };
+      delete proposal.status;
+      delete proposal.isApproved;
+      await dbClient.execute(
+        `UPDATE tours SET status = 'pending_approval', pending_data = ? WHERE id = ?`,
+        [JSON.stringify(proposal), req.params.id]
+      );
+      notifyAdminsTourEvent('tour_edited', { id: req.params.id, name: existing.name }, existing.vendorName || 'Vendor');
+    } else {
+      const merged = { ...existing, ...body, id: req.params.id, vendorId: existing.vendorId };
+      delete merged.status;
+      delete merged.isApproved;
+      delete merged.rejectionReason;
+      await writeLiveTourRow(req.params.id, merged, 'pending_approval', null);
+      notifyAdminsTourEvent('tour_edited', { id: req.params.id, name: merged.name || existing.name }, existing.vendorName || 'Vendor');
+    }
+    const rows = await dbClient.query('SELECT * FROM tours WHERE id = ?', [req.params.id]);
+    res.json({ tour: rowToTour(rows[0]) });
+  } catch (error: any) {
+    console.error("[PUT /api/tours/:id] error:", error);
+    res.status(500).json({ error: "Tur yenilənə bilmədi: " + error.message });
+  }
+});
+
 async function writeLiveTourRow(id: string, merged: Record<string, any>, status: 'approved' | 'pending_approval' | 'rejected', pendingData: Record<string, any> | null) {
   const extra = splitTourBody(merged);
   await dbClient.execute(
@@ -1692,142 +1445,7 @@ async function writeLiveTourRow(id: string, merged: Record<string, any>, status:
   scheduleTourTranslation(id, { name: merged.name, description: merged.description || null, includes: merged.includes, notIncluded: merged.notIncluded, highlights: merged.highlights });
 }
 
-// PUT /api/tours/:id — update a tour. Admins edit the live row directly and control approval
-// status. Vendors editing a tour that's still under review (pending_approval/rejected, i.e.
-// never reached customers) also edit the live row directly. But a vendor editing a tour that
-// is currently `approved` (already public) never touches the live columns — the proposed
-// changes are stashed in `pending_data` and status flips to `pending_approval`, which per the
-// GET /api/tours filter means the tour vanishes from the customer marketplace immediately and
-// stays hidden until an admin reviews and either approves (merges the proposal) or rejects it.
-app.put("/api/tours/:id", authenticateUser, async (req: any, res) => {
-  try {
-    const existingRows = await dbClient.query('SELECT * FROM tours WHERE id = ?', [req.params.id]);
-    if (!existingRows.length) return res.status(404).json({ error: "Tur tapılmadı." });
-
-    const existing = rowToTour(existingRows[0]);
-    const isAdmin = req.operator.role === 'admin';
-    if (!isAdmin && existing.vendorId !== req.operator.id) {
-      return res.status(403).json({ error: "Bu tur sizin hesabınıza aid deyil." });
-    }
-
-    const body = req.body || {};
-
-    if (body.durationDays !== undefined && !(Number(body.durationDays) > 0)) {
-      return res.status(400).json({ error: "Müddət (gün) müsbət ədəd olmalıdır." });
-    }
-    if (body.price !== undefined && !(Number(body.price) >= 0)) {
-      return res.status(400).json({ error: "Qiymət mənfi ola bilməz." });
-    }
-
-    if (isAdmin) {
-      if (body.status === 'approved') {
-        // Merge the pending proposal (if any) plus any last-minute admin edits onto the live row.
-        const source = { ...(existing.pendingData || {}), ...body };
-        delete source.status;
-        const merged = { ...existing, ...source, id: req.params.id };
-        delete merged.rejectionReason; // clear any stale reason from a past reject/resubmit cycle
-        await writeLiveTourRow(req.params.id, merged, 'approved', null);
-      } else if (body.status === 'rejected') {
-        // Reject always lands on 'rejected' — it never silently reverts to 'approved'. Applies
-        // uniformly whether this is a brand-new tour or an edit proposal on a previously-live
-        // tour; either way the pending proposal is discarded and the tour stays hidden from
-        // customers (GET /api/tours only returns status = 'approved') until the vendor edits it
-        // again (which resubmits it as 'pending_approval') and an admin approves it.
-        const reason = typeof body.rejectionReason === 'string' ? body.rejectionReason.trim() : '';
-        if (!reason) {
-          return res.status(400).json({ error: "Rədd etmək üçün səbəb qeyd edilməlidir." });
-        }
-        const merged = { ...existing, ...body, id: req.params.id, rejectionReason: reason };
-        delete merged.status;
-        await writeLiveTourRow(req.params.id, merged, 'rejected', null);
-      } else {
-        // Plain admin edit/save with no status transition — updates the live row directly.
-        // Clears any stale pending_data: once an admin hand-edits and saves, their write
-        // supersedes whatever a vendor had proposed, so there's nothing left to merge later.
-        const merged = { ...existing, ...body, id: req.params.id };
-        await writeLiveTourRow(req.params.id, merged, (body.status || existing.status), null);
-      }
-    } else if (existing.status === 'approved') {
-      // Vendor editing a currently-live tour: stash the proposal, leave the live row untouched.
-      const proposal = { ...body, id: req.params.id, vendorId: existing.vendorId };
-      delete proposal.status;
-      delete proposal.isApproved;
-      await dbClient.execute(
-        `UPDATE tours SET status = 'pending_approval', pending_data = ? WHERE id = ?`,
-        [JSON.stringify(proposal), req.params.id]
-      );
-      notifyAdminsTourEvent('tour_edited', { id: req.params.id, name: existing.name }, existing.vendorName || 'Vendor');
-    } else {
-      // Vendor editing a tour that's still under review (or was rejected) — no live/public
-      // version exists yet, so apply the edit directly and (re)submit for approval.
-      const merged = { ...existing, ...body, id: req.params.id, vendorId: existing.vendorId };
-      delete merged.status;
-      delete merged.isApproved;
-      delete merged.rejectionReason; // resubmitting clears the old reason — it no longer applies
-      await writeLiveTourRow(req.params.id, merged, 'pending_approval', null);
-      notifyAdminsTourEvent('tour_edited', { id: req.params.id, name: merged.name || existing.name }, existing.vendorName || 'Vendor');
-    }
-
-    const rows = await dbClient.query('SELECT * FROM tours WHERE id = ?', [req.params.id]);
-    res.json({ tour: rowToTour(rows[0]) });
-  } catch (error: any) {
-    console.error("[PUT /api/tours/:id] error:", error);
-    res.status(500).json({ error: "Tur yenilənə bilmədi: " + error.message });
-  }
-});
-
-// PUT /api/tours/:id/featured — dedicated toggle for the "Ayın Ən Çox Satılanı" manual
-// override. Deliberately bypasses the whole approve/pending-approval dance above: flipping
-// this flag must never resubmit the tour for review or hide it from customers, so it writes
-// straight to `extra_data` on the live row instead of going through writeLiveTourRow/PUT
-// /api/tours/:id's pending_data logic. Only one tour per vendor may be manually featured at a
-// time — turning it on for a tour automatically turns it off on any other tour of the same
-// vendor that currently has it (the previous pick just silently drops out).
-app.put("/api/tours/:id/featured", authenticateUser, async (req: any, res) => {
-  try {
-    const rows = await dbClient.query('SELECT * FROM tours WHERE id = ?', [req.params.id]);
-    if (!rows.length) return res.status(404).json({ error: "Tur tapılmadı." });
-    const existingRow = rows[0];
-    const isAdmin = req.operator.role === 'admin';
-    if (!isAdmin && existingRow.vendor_id !== req.operator.id) {
-      return res.status(403).json({ error: "Bu tur sizin hesabınıza aid deyil." });
-    }
-
-    const isManuallyFeatured = !!(req.body || {}).isManuallyFeatured;
-    let extra: Record<string, any> = {};
-    try { extra = existingRow.extra_data ? JSON.parse(existingRow.extra_data) : {}; } catch { extra = {}; }
-
-    if (isManuallyFeatured) {
-      const siblingRows = await dbClient.query(
-        `SELECT id, extra_data FROM tours WHERE vendor_id = ? AND id != ?`,
-        [existingRow.vendor_id, req.params.id]
-      );
-      for (const sib of siblingRows) {
-        let sibExtra: Record<string, any> = {};
-        try { sibExtra = sib.extra_data ? JSON.parse(sib.extra_data) : {}; } catch { sibExtra = {}; }
-        if (sibExtra.isManuallyFeatured) {
-          delete sibExtra.isManuallyFeatured;
-          delete sibExtra.manuallyFeaturedAt;
-          await dbClient.execute(`UPDATE tours SET extra_data = ? WHERE id = ?`, [JSON.stringify(sibExtra), sib.id]);
-        }
-      }
-      extra.isManuallyFeatured = true;
-      extra.manuallyFeaturedAt = new Date().toISOString();
-    } else {
-      delete extra.isManuallyFeatured;
-      delete extra.manuallyFeaturedAt;
-    }
-
-    await dbClient.execute(`UPDATE tours SET extra_data = ? WHERE id = ?`, [JSON.stringify(extra), req.params.id]);
-    const updatedRows = await dbClient.query('SELECT * FROM tours WHERE id = ?', [req.params.id]);
-    return res.json({ tour: rowToTour(updatedRows[0]) });
-  } catch (error: any) {
-    console.error("[PUT /api/tours/:id/featured] error:", error);
-    return res.status(500).json({ error: "Seçim yenilənə bilmədi: " + error.message });
-  }
-});
-
-// DELETE /api/tours/:id — vendors may only delete their own tours; admins may delete any.
+// DELETE /api/tours/:id
 app.delete("/api/tours/:id", authenticateUser, async (req: any, res) => {
   try {
     const existingRows = await dbClient.query('SELECT vendor_id FROM tours WHERE id = ?', [req.params.id]);
@@ -1835,7 +1453,6 @@ app.delete("/api/tours/:id", authenticateUser, async (req: any, res) => {
     if (req.operator.role !== 'admin' && existingRows[0].vendor_id !== req.operator.id) {
       return res.status(403).json({ error: "Bu tur sizin hesabınıza aid deyil." });
     }
-
     await dbClient.execute('DELETE FROM tours WHERE id = ?', [req.params.id]);
     res.json({ success: true });
   } catch (error: any) {
@@ -1844,6 +1461,7 @@ app.delete("/api/tours/:id", authenticateUser, async (req: any, res) => {
   }
 });
 
+// Slots
 function rowToSlot(row: any) {
   return {
     id: row.id,
@@ -1856,14 +1474,12 @@ function rowToSlot(row: any) {
   };
 }
 
-// GET /api/slots — list all slots, optionally filtered by tourId (flat list across every tour)
 app.get("/api/slots", async (req, res) => {
   try {
     const { tourId } = req.query;
     const conditions: string[] = [];
     const params: any[] = [];
     if (tourId) { conditions.push('tour_id = ?'); params.push(String(tourId)); }
-
     const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
     const rows = await dbClient.query(`SELECT * FROM tour_slots ${whereClause} ORDER BY start_date ASC`, params);
     res.json({ slots: rows.map(rowToSlot) });
@@ -1873,7 +1489,6 @@ app.get("/api/slots", async (req, res) => {
   }
 });
 
-// GET /api/tours/:tourId/slots — list slots for a tour
 app.get("/api/tours/:tourId/slots", async (req, res) => {
   try {
     const rows = await dbClient.query('SELECT * FROM tour_slots WHERE tour_id = ? ORDER BY start_date ASC', [req.params.tourId]);
@@ -1884,7 +1499,6 @@ app.get("/api/tours/:tourId/slots", async (req, res) => {
   }
 });
 
-// POST /api/tours/:tourId/slots — create a slot for a tour
 app.post("/api/tours/:tourId/slots", authenticateUser, async (req: any, res) => {
   try {
     const tourRows = await dbClient.query('SELECT id, vendor_id FROM tours WHERE id = ?', [req.params.tourId]);
@@ -1892,7 +1506,6 @@ app.post("/api/tours/:tourId/slots", authenticateUser, async (req: any, res) => 
     if (req.operator.role !== 'admin' && tourRows[0].vendor_id !== req.operator.id) {
       return res.status(403).json({ error: "Bu tur sizin hesabınıza aid deyil." });
     }
-
     const { startDate, endDate, price, capacity } = req.body || {};
     if (!startDate || price === undefined || capacity === undefined) {
       return res.status(400).json({ error: "Zəhmət olmasa bütün məcburi sahələri doldurun (startDate, price, capacity)." });
@@ -1903,13 +1516,11 @@ app.post("/api/tours/:tourId/slots", authenticateUser, async (req: any, res) => 
     if (!(Number(capacity) > 0)) {
       return res.status(400).json({ error: "Tutum müsbət ədəd olmalıdır." });
     }
-
     const id = req.body.id || `slot-${randomUUID()}`;
     await dbClient.execute(
       `INSERT INTO tour_slots (id, tour_id, start_date, end_date, price, capacity, booked_count) VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [id, req.params.tourId, startDate, endDate || null, Number(price), Number(capacity), Number(req.body.bookedCount) || 0]
     );
-
     const rows = await dbClient.query('SELECT * FROM tour_slots WHERE id = ?', [id]);
     res.status(201).json({ slot: rowToSlot(rows[0]) });
   } catch (error: any) {
@@ -1918,12 +1529,10 @@ app.post("/api/tours/:tourId/slots", authenticateUser, async (req: any, res) => 
   }
 });
 
-// PUT /api/slots/:id — update a slot (partial update)
 app.put("/api/slots/:id", authenticateUser, async (req: any, res) => {
   try {
     const existingRows = await dbClient.query('SELECT * FROM tour_slots WHERE id = ?', [req.params.id]);
     if (!existingRows.length) return res.status(404).json({ error: "Tarix tapılmadı." });
-
     const existing = rowToSlot(existingRows[0]);
     if (req.operator.role !== 'admin') {
       const tourRows = await dbClient.query('SELECT vendor_id FROM tours WHERE id = ?', [existing.tourId]);
@@ -1932,12 +1541,10 @@ app.put("/api/slots/:id", authenticateUser, async (req: any, res) => {
       }
     }
     const merged = { ...existing, ...(req.body || {}) };
-
     await dbClient.execute(
       `UPDATE tour_slots SET start_date = ?, end_date = ?, price = ?, capacity = ?, booked_count = ? WHERE id = ?`,
       [merged.startDate, merged.endDate || null, Number(merged.price), Number(merged.capacity), Number(merged.bookedCount) || 0, req.params.id]
     );
-
     const rows = await dbClient.query('SELECT * FROM tour_slots WHERE id = ?', [req.params.id]);
     res.json({ slot: rowToSlot(rows[0]) });
   } catch (error: any) {
@@ -1946,7 +1553,6 @@ app.put("/api/slots/:id", authenticateUser, async (req: any, res) => {
   }
 });
 
-// DELETE /api/slots/:id
 app.delete("/api/slots/:id", authenticateUser, async (req: any, res) => {
   try {
     const existingRows = await dbClient.query('SELECT id, tour_id FROM tour_slots WHERE id = ?', [req.params.id]);
@@ -1957,7 +1563,6 @@ app.delete("/api/slots/:id", authenticateUser, async (req: any, res) => {
         return res.status(403).json({ error: "Bu tarix sizin hesabınıza aid deyil." });
       }
     }
-
     await dbClient.execute('DELETE FROM tour_slots WHERE id = ?', [req.params.id]);
     res.json({ success: true });
   } catch (error: any) {
@@ -1966,6 +1571,7 @@ app.delete("/api/slots/:id", authenticateUser, async (req: any, res) => {
   }
 });
 
+// Bookings
 const BOOKING_CORE_FIELDS = [
   'id', 'tourId', 'slotId', 'vendorId', 'customerId', 'customerName', 'customerPhone',
   'bookingDate', 'participantsCount', 'totalAmount', 'status', 'paymentMethod', 'booking_reference'
@@ -1992,9 +1598,6 @@ function rowToBooking(row: any) {
   };
 }
 
-// Rezervasiya nömrəsi (#TUR-XXXX) müştəriyə görünən yeganə identifikatordur: biletin üstündə
-// çap olunur, Telegram bildirişində göndərilir və rəy yazarkən təsdiq üçün istənilir — ona görə
-// təsadüfi 4 rəqəm kolliziya verməsin deyə unikallıq yoxlanılır (dolduqca 5-6 rəqəmə keçir).
 async function generateBookingReference(): Promise<string> {
   for (let digits = 4; digits <= 6; digits++) {
     const min = Math.pow(10, digits - 1);
@@ -2016,17 +1619,12 @@ function splitBookingBody(body: Record<string, any>) {
   return extra;
 }
 
-// GET /api/bookings — list bookings, optionally filtered by vendorId / tourId / customerId / status.
-// Bookings carry customer names and phone numbers, so this requires a valid admin/vendor
-// session — a vendor token restricts the result to that vendor's own bookings (ignoring any
-// client-supplied vendorId), an admin token can see everything.
 app.get("/api/bookings", authenticateUser, async (req: any, res) => {
   try {
     const user = req.operator;
     const { tourId, customerId, status } = req.query;
     const conditions: string[] = [];
     const params: any[] = [];
-
     if (user.role === 'vendor') {
       conditions.push('vendor_id = ?');
       params.push(user.id);
@@ -2037,7 +1635,6 @@ app.get("/api/bookings", authenticateUser, async (req: any, res) => {
     if (tourId) { conditions.push('tour_id = ?'); params.push(String(tourId)); }
     if (customerId) { conditions.push('customer_id = ?'); params.push(String(customerId)); }
     if (status) { conditions.push('status = ?'); params.push(String(status)); }
-
     const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
     const rows = await dbClient.query(`SELECT * FROM bookings ${whereClause} ORDER BY created_at DESC`, params);
     res.json({ bookings: rows.map(rowToBooking) });
@@ -2047,8 +1644,6 @@ app.get("/api/bookings", authenticateUser, async (req: any, res) => {
   }
 });
 
-// POST /api/bookings — create a booking (vendorId is derived from the tour, and the
-// matching slot's booked_count is incremented so capacity stays consistent)
 app.post("/api/bookings", async (req, res) => {
   try {
     const body = req.body || {};
@@ -2056,17 +1651,13 @@ app.post("/api/bookings", async (req, res) => {
     if (!tourId || !slotId || !customerName || !customerPhone || !participantsCount || totalAmount === undefined) {
       return res.status(400).json({ error: "Zəhmət olmasa bütün məcburi sahələri doldurun (tourId, slotId, customerName, customerPhone, participantsCount, totalAmount)." });
     }
-
     const tourRows = await dbClient.query('SELECT vendor_id FROM tours WHERE id = ?', [tourId]);
     if (!tourRows.length) return res.status(404).json({ error: "Tur tapılmadı." });
-
     const slotRows = await dbClient.query('SELECT id FROM tour_slots WHERE id = ? AND tour_id = ?', [slotId, tourId]);
     if (!slotRows.length) return res.status(404).json({ error: "Bu tur üçün belə bir tarix tapılmadı." });
-
     const id = body.id || `book-${randomUUID()}`;
     const bookingReference = body.booking_reference || await generateBookingReference();
     const extra = splitBookingBody(body);
-
     await dbClient.execute(
       `INSERT INTO bookings (id, tour_id, slot_id, vendor_id, customer_id, customer_name, customer_phone, booking_reference, participants_count, total_amount, status, payment_method, extra_data)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -2076,12 +1667,10 @@ app.post("/api/bookings", async (req, res) => {
         body.status || 'pending', body.paymentMethod || 'whatsapp', JSON.stringify(extra)
       ]
     );
-
     await dbClient.execute(
       'UPDATE tour_slots SET booked_count = booked_count + ? WHERE id = ?',
       [Number(participantsCount), slotId]
     );
-
     const rows = await dbClient.query('SELECT * FROM bookings WHERE id = ?', [id]);
     res.status(201).json({ booking: rowToBooking(rows[0]) });
   } catch (error: any) {
@@ -2090,19 +1679,16 @@ app.post("/api/bookings", async (req, res) => {
   }
 });
 
-// PUT /api/bookings/:id — update a booking (e.g. status changes, operator notes)
 app.put("/api/bookings/:id", authenticateUser, async (req: any, res) => {
   try {
     const existingRows = await dbClient.query('SELECT * FROM bookings WHERE id = ?', [req.params.id]);
     if (!existingRows.length) return res.status(404).json({ error: "Rezervasiya tapılmadı." });
-
     const existing = rowToBooking(existingRows[0]);
     if (req.operator.role !== 'admin' && existing.vendorId !== req.operator.id) {
       return res.status(403).json({ error: "Bu rezervasiya sizin hesabınıza aid deyil." });
     }
     const merged = { ...existing, ...(req.body || {}), id: req.params.id };
     const extra = splitBookingBody(merged);
-
     await dbClient.execute(
       `UPDATE bookings SET customer_id = ?, customer_name = ?, customer_phone = ?, participants_count = ?, total_amount = ?, status = ?, payment_method = ?, extra_data = ? WHERE id = ?`,
       [
@@ -2111,15 +1697,12 @@ app.put("/api/bookings/:id", authenticateUser, async (req: any, res) => {
         merged.status, merged.paymentMethod || 'whatsapp', JSON.stringify(extra), req.params.id
       ]
     );
-
-    // Keep slot capacity consistent: cancelling frees up the seats, reinstating retakes them.
     const wasCancelled = existing.status === 'cancelled';
     const isCancelled = merged.status === 'cancelled';
     if (wasCancelled !== isCancelled) {
       const delta = isCancelled ? -Number(merged.participantsCount) : Number(merged.participantsCount);
       await dbClient.execute('UPDATE tour_slots SET booked_count = booked_count + ? WHERE id = ?', [delta, merged.slotId]);
     }
-
     const rows = await dbClient.query('SELECT * FROM bookings WHERE id = ?', [req.params.id]);
     res.json({ booking: rowToBooking(rows[0]) });
   } catch (error: any) {
@@ -2128,23 +1711,17 @@ app.put("/api/bookings/:id", authenticateUser, async (req: any, res) => {
   }
 });
 
-// DELETE /api/bookings/:id — vendors may only delete their own bookings; admins may delete any.
 app.delete("/api/bookings/:id", authenticateUser, async (req: any, res) => {
   try {
     const existingRows = await dbClient.query('SELECT * FROM bookings WHERE id = ?', [req.params.id]);
     if (!existingRows.length) return res.status(404).json({ error: "Rezervasiya tapılmadı." });
-
     const existing = rowToBooking(existingRows[0]);
     if (req.operator.role !== 'admin' && existing.vendorId !== req.operator.id) {
       return res.status(403).json({ error: "Bu rezervasiya sizin hesabınıza aid deyil." });
     }
-
-    // Cancelled bookings already freed their seats via PUT; only give seats back here
-    // if the booking being deleted was still occupying capacity.
     if (existing.status !== 'cancelled') {
       await dbClient.execute('UPDATE tour_slots SET booked_count = booked_count - ? WHERE id = ?', [Number(existing.participantsCount), existing.slotId]);
     }
-
     await dbClient.execute('DELETE FROM bookings WHERE id = ?', [req.params.id]);
     res.json({ success: true });
   } catch (error: any) {
@@ -2152,1071 +1729,12 @@ app.delete("/api/bookings/:id", authenticateUser, async (req: any, res) => {
     res.status(500).json({ error: "Rezervasiya silinə bilmədi: " + error.message });
   }
 });
+// ============================================================================
+// QR KODLU BİLET GENERASİYASI (PREMİUM "GedəkGörək" DİZAYNI)
+// ============================================================================
+// qrcode kitabxanası artıq faylın yuxarısında import olunub (HİSSƏ 1)
+// TICKET_COLORS və sanitizeForFallback da yuxarıda təyin olunub
 
-// ===================== SORĞULAR + BİLDİRİŞLƏR + TELEGRAM =====================
-// Müştəri tur səhifəsindən "Yerləri yoxla" → sorğu formu (ad, WhatsApp nömrəsi, tur sualları)
-// göndərir. Sorğu DB-yə yazılır, vendor + admin üçün panel bildirişi yaranır və Telegram
-// chat-lərinə (vendorun users.extra_data.telegramChatIds, adminin settings-dəki chat ID-ləri)
-// inline "WhatsApp-dan cavabla" düymələri ilə mesaj gedir. Düymə wa.me linkidir — mətni
-// vendorun/adminin "Hazır mesajlar" şablonlarından {ad}/{tur}/{tarix}/{say} doldurulmaqla gəlir.
-
-function rowToInquiry(row: any) {
-  let answers: Array<{ question: string; answer: string }> = [];
-  try { answers = row.answers ? JSON.parse(row.answers) : []; } catch { answers = []; }
-  return {
-    id: row.id,
-    tourId: row.tour_id,
-    tourName: row.tour_name || undefined,
-    vendorId: row.vendor_id,
-    slotId: row.slot_id || undefined,
-    tourDate: row.tour_date || undefined,
-    customerName: row.customer_name,
-    customerPhone: row.customer_phone,
-    participantsCount: Number(row.participants_count) || 1,
-    answers,
-    status: row.status || 'new',
-    createdAt: row.created_at,
-  };
-}
-
-async function getAdminChatIds(): Promise<string[]> {
-  try {
-    const parsed = JSON.parse(await getSetting('telegram_admin_chat_ids', '[]'));
-    return Array.isArray(parsed) ? parsed.map(String) : [];
-  } catch { return []; }
-}
-
-interface WaTemplate { id: string; name: string; text: string }
-
-async function getAdminWaTemplates(): Promise<WaTemplate[]> {
-  try {
-    const parsed = JSON.parse(await getSetting('telegram_admin_wa_templates', '[]'));
-    return Array.isArray(parsed) ? parsed : [];
-  } catch { return []; }
-}
-
-// Admin bildirişləri yalnız vendor hadisələri üçündür: yeni tur / mövcud tura düzəliş
-// (hər ikisi təsdiq gözləyir). Panel bildirişi + admin chat-lərinə Telegram.
-async function notifyAdminsTourEvent(
-  kind: 'tour_created' | 'tour_edited',
-  tour: { id: string; name: string },
-  vendorName: string
-): Promise<void> {
-  try {
-    const title = kind === 'tour_created' ? `Yeni tur: ${tour.name}` : `Tur düzəlişi: ${tour.name}`;
-    const body = `${vendorName} • təsdiq gözləyir`;
-    await dbClient.execute(
-      `INSERT INTO notifications (id, recipient_id, recipient_role, type, title, body, data) VALUES (?, NULL, 'admin', ?, ?, ?, ?)`,
-      [`ntf-${randomUUID()}`, kind, title, body, JSON.stringify({ tourId: tour.id })]
-    );
-    const adminChatIds = await getAdminChatIds();
-    if (adminChatIds.length) {
-      const emoji = kind === 'tour_created' ? '🆕' : '✏️';
-      const label = kind === 'tour_created' ? 'Yeni tur əlavə olundu' : 'Tura düzəliş göndərildi';
-      await broadcastTelegram(
-        adminChatIds,
-        `${emoji} <b>${label}</b>\n\n` +
-          `🏔 <b>Tur:</b> ${escapeHtml(tour.name)}\n` +
-          `🏢 <b>Vendor:</b> ${escapeHtml(vendorName)}\n` +
-          `⏳ Admin təsdiqi gözləyir — admin paneldən yoxlayın.`
-      );
-    }
-  } catch (err) {
-    // Bildiriş çatmasa da turun özü yaradılıb/yenilənib — əsas əməliyyatı pozmuruq.
-    console.error(`[notifyAdminsTourEvent] ${kind} bildirişi alınmadı:`, err);
-  }
-}
-
-// {ad} {tur} {tarix} {say} placeholder-lərini real dəyərlərlə əvəz edir
-function fillWaTemplate(text: string, vars: Record<string, string>): string {
-  return String(text || '').replace(/\{(ad|tur|tarix|say)\}/g, (_, key) => vars[key] ?? '');
-}
-
-// Telegram inline düymələri: hər şablon üçün bir "WhatsApp-dan cavabla" düyməsi.
-// Şablon yoxdursa standart salamlaşma mətni ilə tək düymə qayıdır.
-function buildWaReplyButtons(
-  templates: WaTemplate[],
-  customerPhone: string,
-  vars: Record<string, string>
-): { text: string; url: string }[] {
-  const phoneDigits = String(customerPhone).replace(/\D/g, '');
-  if (!phoneDigits) return [];
-  const makeUrl = (msg: string) => `https://wa.me/${phoneDigits}?text=${encodeURIComponent(msg)}`;
-  const valid = (templates || []).filter(t => t && typeof t.text === 'string' && t.text.trim());
-  if (!valid.length) {
-    const fallback = `Salam ${vars.ad}! "${vars.tur}" turu ilə bağlı sorğunuzu aldıq.`;
-    return [{ text: '📲 WhatsApp-dan cavabla', url: makeUrl(fallback) }];
-  }
-  // Telegram klaviaturasını yığcam saxlamaq üçün ilk 4 şablon
-  return valid.slice(0, 4).map(t => ({
-    text: `📲 ${t.name || 'WhatsApp-dan cavabla'}`,
-    url: makeUrl(fillWaTemplate(t.text, vars)),
-  }));
-}
-
-// Sadə in-memory rate limit — public endpoint spam-dan qorunur (IP başına 10 dəq / 5 sorğu)
-const inquiryRateMap = new Map<string, { count: number; resetAt: number }>();
-function consumeInquiryRateLimit(ip: string): boolean {
-  const now = Date.now();
-  const entry = inquiryRateMap.get(ip);
-  if (!entry || now > entry.resetAt) {
-    inquiryRateMap.set(ip, { count: 1, resetAt: now + 10 * 60 * 1000 });
-    return true;
-  }
-  if (entry.count >= 5) return false;
-  entry.count++;
-  return true;
-}
-
-// POST /api/inquiries — public: müştəri sorğu göndərir
-app.post("/api/inquiries", async (req, res) => {
-  try {
-    const ip = String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || 'unknown').split(',')[0].trim();
-    if (!consumeInquiryRateLimit(ip)) {
-      return res.status(429).json({ error: "Çox sayda sorğu göndərildi. Zəhmət olmasa bir az sonra yenidən cəhd edin." });
-    }
-
-    const body = req.body || {};
-    const { tourId, slotId, tourDate, customerName, customerPhone, participantsCount } = body;
-    if (!tourId || !customerName || !String(customerName).trim() || !customerPhone) {
-      return res.status(400).json({ error: "Ad, soyad və WhatsApp nömrəsi mütləqdir." });
-    }
-    const phoneDigits = String(customerPhone).replace(/\D/g, '');
-    if (phoneDigits.length < 9) {
-      return res.status(400).json({ error: "WhatsApp nömrəsi düzgün formatda deyil." });
-    }
-    const answers: Array<{ question: string; answer: string }> = Array.isArray(body.answers)
-      ? body.answers
-          .filter((a: any) => a && typeof a.question === 'string' && typeof a.answer === 'string')
-          .map((a: any) => ({ question: a.question.slice(0, 300), answer: a.answer.slice(0, 500) }))
-      : [];
-
-    const tourRows = await dbClient.query('SELECT id, name, vendor_id FROM tours WHERE id = ?', [tourId]);
-    if (!tourRows.length) return res.status(404).json({ error: "Tur tapılmadı." });
-    const tour = tourRows[0];
-
-    const id = `inq-${randomUUID()}`;
-    const name = String(customerName).trim().slice(0, 200);
-    const phone = String(customerPhone).trim().slice(0, 50);
-    const count = Math.max(1, Math.min(99, Number(participantsCount) || 1));
-    const date = tourDate ? String(tourDate).slice(0, 100) : null;
-
-    await dbClient.execute(
-      `INSERT INTO inquiries (id, tour_id, tour_name, vendor_id, slot_id, tour_date, customer_name, customer_phone, participants_count, answers, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'new')`,
-      [id, tour.id, tour.name, tour.vendor_id, slotId || null, date, name, phone, count, JSON.stringify(answers)]
-    );
-
-    // Rezervasiya sorğusu avtomatik olaraq CRM "bütün sifarişlər" cədvəlinə "gözləmədə" sifariş
-    // kimi düşür — vendor artıq ayrı panelə baxmadan onu adi sifariş kimi idarə edir (təsdiq/ödəniş/
-    // ləğv, bilet, PDF). Sorğu cavabları extra_data-da saxlanır və operator qeydinə xülasə düşür.
-    // Sifariş yalnız etibarlı tarix (slot) olduqda yaradılır; slot NOT NULL olduğu üçün şərtdir.
-    // bookingRef panel bildirişinə, Telegram mesajına və biletə düşür — müştəri rəy yazanda
-    // bu nömrə ilə təsdiqlənir (bax POST /api/reviews).
-    let createdBookingRef: string | null = null;
-    try {
-      if (slotId) {
-        const slotRows = await dbClient.query('SELECT id, price FROM tour_slots WHERE id = ? AND tour_id = ?', [slotId, tour.id]);
-        if (slotRows.length) {
-          const price = Number(slotRows[0].price) || 0;
-          const bookingId = `book-${randomUUID()}`;
-          const bookingRef = await generateBookingReference();
-          createdBookingRef = bookingRef;
-          const noteSummary = answers.map(a => a.answer).filter(Boolean).join(' • ');
-          const extra = {
-            paymentStatus: 'Ödənilməyib',
-            attendanceStatus: 'Gözləmədə',
-            smsNotificationSent: false,
-            source: 'inquiry',
-            inquiryId: id,
-            operatorNote: noteSummary,
-            answers,
-          };
-          await dbClient.execute(
-            `INSERT INTO bookings (id, tour_id, slot_id, vendor_id, customer_id, customer_name, customer_phone, booking_reference, participants_count, total_amount, status, payment_method, extra_data)
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', 'Sorğu', ?)`,
-            [bookingId, tour.id, slotId, tour.vendor_id, null, name, phone, bookingRef, count, price * count, JSON.stringify(extra)]
-          );
-          await dbClient.execute('UPDATE tour_slots SET booked_count = booked_count + ? WHERE id = ?', [count, slotId]);
-        }
-      }
-    } catch (err) {
-      console.error("[POST /api/inquiries] avtomatik sifariş yaradıla bilmədi:", err);
-    }
-
-    // Panel bildirişi — yalnız vendor üçün. Admin sorğu bildirişi almır (admin bildirişləri
-    // vendorların tur yaratma/düzəliş hadisələri üçündür) — sorğunun özü onsuz da vendorun
-    // CRM-inə düşür. Rezervasiya nömrəsi bildirişdə görünür.
-    const notifTitle = `Yeni sorğu: ${tour.name}`;
-    const notifBody = `${name} • ${phone} • ${count} nəfər${date ? ' • ' + date : ''}${createdBookingRef ? ' • ' + createdBookingRef : ''}`;
-    const notifData = JSON.stringify({ inquiryId: id, tourId: tour.id });
-    await dbClient.execute(
-      `INSERT INTO notifications (id, recipient_id, recipient_role, type, title, body, data) VALUES (?, ?, 'vendor', 'inquiry', ?, ?, ?)`,
-      [`ntf-${randomUUID()}`, tour.vendor_id, notifTitle, notifBody, notifData]
-    );
-
-    // Cavabı gecikdirməmək üçün Telegram göndərişi arxa planda gedir
-    res.status(201).json({ inquiry: rowToInquiry((await dbClient.query('SELECT * FROM inquiries WHERE id = ?', [id]))[0]) });
-
-    (async () => {
-      try {
-        const vendorRows = await dbClient.query('SELECT name, company_name, extra_data FROM users WHERE id = ?', [tour.vendor_id]);
-        let vendorExtra: Record<string, any> = {};
-        try { vendorExtra = vendorRows[0]?.extra_data ? JSON.parse(vendorRows[0].extra_data) : {}; } catch { vendorExtra = {}; }
-        const vendorChatIds: string[] = Array.isArray(vendorExtra.telegramChatIds) ? vendorExtra.telegramChatIds.map(String) : [];
-        const vendorTemplates: WaTemplate[] = Array.isArray(vendorExtra.waTemplates) ? vendorExtra.waTemplates : [];
-
-        const vars = { ad: name, tur: tour.name, tarix: date || '', say: String(count) };
-        const answerLines = answers.length
-          ? '\n<b>Cavablar:</b>\n' + answers.map(a => `• ${escapeHtml(a.question)}: <b>${escapeHtml(a.answer)}</b>`).join('\n')
-          : '';
-        const text =
-          `🔔 <b>Yeni rezervasiya sorğusu</b>\n\n` +
-          (createdBookingRef ? `🎫 <b>Rezervasiya №:</b> <code>${escapeHtml(createdBookingRef)}</code>\n` : '') +
-          `🏔 <b>Tur:</b> ${escapeHtml(tour.name)}\n` +
-          (date ? `📅 <b>Tarix:</b> ${escapeHtml(date)}\n` : '') +
-          `👥 <b>İştirakçı:</b> ${count} nəfər\n` +
-          `👤 <b>Ad, soyad:</b> ${escapeHtml(name)}\n` +
-          `📞 <b>Əlaqə (WhatsApp):</b> ${escapeHtml(phone)}` +
-          answerLines;
-
-        if (vendorChatIds.length) {
-          // Son düymə "Oxundu işarələ" — basılanda sorğu CRM-də oxundu olur və panel
-          // bildirişi silinir (bax setTelegramCallbackHandler, startServer).
-          const buttons = [
-            ...buildWaReplyButtons(vendorTemplates, phone, vars),
-            { text: '✅ Oxundu işarələ', callback_data: `inqread:${id}` },
-          ];
-          await broadcastTelegram(vendorChatIds, text, buttons);
-        }
-      } catch (err) {
-        console.error("[POST /api/inquiries] Telegram göndərişi alınmadı:", err);
-      }
-    })();
-  } catch (error: any) {
-    console.error("[POST /api/inquiries] error:", error);
-    res.status(500).json({ error: "Sorğu göndərilə bilmədi: " + error.message });
-  }
-});
-
-// GET /api/inquiries — vendor öz sorğularını, admin hamısını görür
-app.get("/api/inquiries", authenticateUser, async (req: any, res) => {
-  try {
-    const conditions: string[] = [];
-    const params: any[] = [];
-    if (req.operator.role === 'vendor') {
-      conditions.push('vendor_id = ?');
-      params.push(req.operator.id);
-    } else if (req.operator.role !== 'admin') {
-      return res.status(403).json({ error: "Bu əməliyyat üçün icazəniz yoxdur." });
-    } else if (req.query.vendorId) {
-      conditions.push('vendor_id = ?');
-      params.push(String(req.query.vendorId));
-    }
-    if (req.query.status) { conditions.push('status = ?'); params.push(String(req.query.status)); }
-    const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
-    const rows = await dbClient.query(`SELECT * FROM inquiries ${whereClause} ORDER BY created_at DESC LIMIT 200`, params);
-    res.json({ inquiries: rows.map(rowToInquiry) });
-  } catch (error: any) {
-    console.error("[GET /api/inquiries] error:", error);
-    res.status(500).json({ error: "Sorğuları gətirmək mümkün olmadı: " + error.message });
-  }
-});
-
-// PUT /api/inquiries/:id — status dəyişikliyi (yeni → oxunub → cavablanıb)
-app.put("/api/inquiries/:id", authenticateUser, async (req: any, res) => {
-  try {
-    const rows = await dbClient.query('SELECT * FROM inquiries WHERE id = ?', [req.params.id]);
-    if (!rows.length) return res.status(404).json({ error: "Sorğu tapılmadı." });
-    if (req.operator.role !== 'admin' && rows[0].vendor_id !== req.operator.id) {
-      return res.status(403).json({ error: "Bu sorğu sizin hesabınıza aid deyil." });
-    }
-    const status = String(req.body?.status || '');
-    if (!['new', 'read', 'replied'].includes(status)) {
-      return res.status(400).json({ error: "Status yalnız new/read/replied ola bilər." });
-    }
-    await dbClient.execute('UPDATE inquiries SET status = ? WHERE id = ?', [status, req.params.id]);
-    const updated = await dbClient.query('SELECT * FROM inquiries WHERE id = ?', [req.params.id]);
-    res.json({ inquiry: rowToInquiry(updated[0]) });
-  } catch (error: any) {
-    console.error("[PUT /api/inquiries/:id] error:", error);
-    res.status(500).json({ error: "Sorğu yenilənə bilmədi: " + error.message });
-  }
-});
-
-// GET /api/notifications — istifadəçinin panel bildirişləri (+oxunmamış sayı)
-app.get("/api/notifications", authenticateUser, async (req: any, res) => {
-  try {
-    const isAdmin = req.operator.role === 'admin';
-    const whereClause = isAdmin
-      ? `WHERE recipient_role = 'admin' AND (recipient_id IS NULL OR recipient_id = ?)`
-      : `WHERE recipient_id = ?`;
-    const rows = await dbClient.query(
-      `SELECT * FROM notifications ${whereClause} ORDER BY created_at DESC LIMIT 100`,
-      [req.operator.id]
-    );
-    const notifications = rows.map((row: any) => {
-      let data: any = undefined;
-      try { data = row.data ? JSON.parse(row.data) : undefined; } catch { data = undefined; }
-      return {
-        id: row.id,
-        type: row.type,
-        title: row.title,
-        body: row.body || '',
-        data,
-        isRead: !!row.is_read,
-        createdAt: row.created_at,
-      };
-    });
-    res.json({ notifications, unreadCount: notifications.filter(n => !n.isRead).length });
-  } catch (error: any) {
-    console.error("[GET /api/notifications] error:", error);
-    res.status(500).json({ error: "Bildirişləri gətirmək mümkün olmadı: " + error.message });
-  }
-});
-
-// PUT /api/notifications/read — {ids: [...]} və ya {all: true} oxundu işarələnir (yalnız özününkülər)
-app.put("/api/notifications/read", authenticateUser, async (req: any, res) => {
-  try {
-    const isAdmin = req.operator.role === 'admin';
-    const scopeClause = isAdmin
-      ? `recipient_role = 'admin' AND (recipient_id IS NULL OR recipient_id = ?)`
-      : `recipient_id = ?`;
-    if (req.body?.all) {
-      await dbClient.execute(`UPDATE notifications SET is_read = ? WHERE ${scopeClause}`, [1, req.operator.id]);
-    } else {
-      const ids: string[] = Array.isArray(req.body?.ids) ? req.body.ids.map(String) : [];
-      if (!ids.length) return res.status(400).json({ error: "ids massivi və ya all: true göndərin." });
-      for (const nid of ids) {
-        await dbClient.execute(`UPDATE notifications SET is_read = ? WHERE id = ? AND ${scopeClause}`, [1, nid, req.operator.id]);
-      }
-    }
-    res.json({ success: true });
-  } catch (error: any) {
-    console.error("[PUT /api/notifications/read] error:", error);
-    res.status(500).json({ error: "Bildirişlər yenilənə bilmədi: " + error.message });
-  }
-});
-
-// GET/PUT /api/admin/telegram-settings — adminin öz chat ID-ləri və hazır mesaj şablonları.
-// Bot tokeni .env-də qalır (TELEGRAM_BOT_TOKEN) — buradan idarə olunmur.
-app.get("/api/admin/telegram-settings", authenticateUser, async (req: any, res) => {
-  if (req.operator.role !== 'admin') {
-    return res.status(403).json({ error: "Bu əməliyyat yalnız adminlər üçündür." });
-  }
-  try {
-    res.json({
-      botEnabled: isTelegramEnabled(),
-      adminChatIds: await getAdminChatIds(),
-      adminTemplates: await getAdminWaTemplates(),
-    });
-  } catch (error: any) {
-    console.error("[GET /api/admin/telegram-settings] error:", error);
-    res.status(500).json({ error: "Telegram parametrləri yüklənə bilmədi." });
-  }
-});
-
-app.put("/api/admin/telegram-settings", authenticateUser, async (req: any, res) => {
-  if (req.operator.role !== 'admin') {
-    return res.status(403).json({ error: "Bu əməliyyat yalnız adminlər üçündür." });
-  }
-  try {
-    const body = req.body || {};
-    if (body.adminChatIds !== undefined) {
-      if (!Array.isArray(body.adminChatIds)) return res.status(400).json({ error: "adminChatIds massiv olmalıdır." });
-      const ids = body.adminChatIds.map((c: any) => String(c).trim()).filter(Boolean);
-      await setSetting('telegram_admin_chat_ids', JSON.stringify(ids));
-    }
-    if (body.adminTemplates !== undefined) {
-      if (!Array.isArray(body.adminTemplates)) return res.status(400).json({ error: "adminTemplates massiv olmalıdır." });
-      const templates = body.adminTemplates
-        .filter((t: any) => t && typeof t.text === 'string')
-        .map((t: any) => ({
-          id: String(t.id || `tpl-${randomUUID()}`),
-          name: String(t.name || '').slice(0, 100),
-          text: String(t.text).slice(0, 2000),
-        }));
-      await setSetting('telegram_admin_wa_templates', JSON.stringify(templates));
-    }
-    res.json({
-      botEnabled: isTelegramEnabled(),
-      adminChatIds: await getAdminChatIds(),
-      adminTemplates: await getAdminWaTemplates(),
-    });
-  } catch (error: any) {
-    console.error("[PUT /api/admin/telegram-settings] error:", error);
-    res.status(500).json({ error: "Telegram parametrləri saxlanıla bilmədi." });
-  }
-});
-
-// Vendor transport tracking — CRUD for "which vehicle we sent to which tour departure, and at
-// what cost". Admin-gated per vendor via users.extra_data.busTrackingEnabled (see
-// PUT /api/users/:id). The list is shared: every vendor can read every record (so operators can
-// see what's already booked platform-wide), but only the owning vendor may write/edit/delete
-// their own rows — enforced below, not just hidden client-side.
-function rowToVendorBus(row: any) {
-  return {
-    id: row.id,
-    vendorId: row.vendor_id,
-    vendorName: row.vendor_name || undefined,
-    tourId: row.tour_id || undefined,
-    tourName: row.tour_name,
-    contactPhone: row.contact_phone || '',
-    vehicleDescription: row.bus_name || undefined,
-    price: Number(row.price) || 0,
-    travelDate: row.travel_date,
-    createdAt: row.created_at,
-  };
-}
-
-async function isBusTrackingEnabledForVendor(vendorId: string): Promise<boolean> {
-  const rows = await dbClient.query('SELECT extra_data FROM users WHERE id = ?', [vendorId]);
-  if (!rows.length) return false;
-  try {
-    const extra = rows[0].extra_data ? JSON.parse(rows[0].extra_data) : {};
-    return !!extra.busTrackingEnabled;
-  } catch {
-    return false;
-  }
-}
-
-app.get("/api/vendor-buses", authenticateUser, async (req: any, res) => {
-  try {
-    const user = req.operator;
-    const conditions: string[] = [];
-    const params: any[] = [];
-
-    if (user.role === 'vendor') {
-      // Shared list — every vendor sees every vendor's transport records (so operators can see
-      // what's already booked platform-wide). Writes stay owner-scoped in POST/PUT/DELETE below.
-    } else if (user.role === 'admin') {
-      if (req.query.vendorId) { conditions.push('vendor_id = ?'); params.push(String(req.query.vendorId)); }
-    } else {
-      return res.status(403).json({ error: "Bu bölməyə icazəniz yoxdur." });
-    }
-
-    const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
-    const rows = await dbClient.query(`SELECT * FROM vendor_buses ${whereClause} ORDER BY travel_date DESC, created_at DESC`, params);
-    res.json({ buses: rows.map(rowToVendorBus) });
-  } catch (error: any) {
-    console.error("[GET /api/vendor-buses] error:", error);
-    res.status(500).json({ error: "Avtobus qeydləri gətirilə bilmədi: " + error.message });
-  }
-});
-
-app.post("/api/vendor-buses", authenticateUser, async (req: any, res) => {
-  try {
-    if (req.operator.role !== 'vendor') {
-      return res.status(403).json({ error: "Yalnız operatorlar avtobus qeydi əlavə edə bilər." });
-    }
-    if (!(await isBusTrackingEnabledForVendor(req.operator.id))) {
-      return res.status(403).json({ error: "Avtobus izləmə bu hesab üçün aktiv deyil." });
-    }
-
-    const body = req.body || {};
-    const { tourName, contactPhone, price, travelDate } = body;
-    if (!tourName || !contactPhone || price === undefined || !travelDate) {
-      return res.status(400).json({ error: "Zəhmət olmasa bütün məcburi sahələri doldurun (tourName, contactPhone, price, travelDate)." });
-    }
-
-    const vendorRows = await dbClient.query('SELECT name, company_name FROM users WHERE id = ?', [req.operator.id]);
-    const vendorName = vendorRows.length ? (vendorRows[0].company_name || vendorRows[0].name) : undefined;
-
-    const id = `bus-${randomUUID()}`;
-    await dbClient.execute(
-      `INSERT INTO vendor_buses (id, vendor_id, vendor_name, tour_id, tour_name, contact_phone, bus_name, price, travel_date)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [id, req.operator.id, vendorName || null, body.tourId || null, tourName, contactPhone, body.vehicleDescription || null, Number(price), travelDate]
-    );
-
-    const rows = await dbClient.query('SELECT * FROM vendor_buses WHERE id = ?', [id]);
-    res.status(201).json({ bus: rowToVendorBus(rows[0]) });
-  } catch (error: any) {
-    console.error("[POST /api/vendor-buses] error:", error);
-    res.status(500).json({ error: "Avtobus qeydi yaradıla bilmədi: " + error.message });
-  }
-});
-
-app.put("/api/vendor-buses/:id", authenticateUser, async (req: any, res) => {
-  try {
-    const existingRows = await dbClient.query('SELECT * FROM vendor_buses WHERE id = ?', [req.params.id]);
-    if (!existingRows.length) return res.status(404).json({ error: "Avtobus qeydi tapılmadı." });
-    const existing = existingRows[0];
-    if (req.operator.role !== 'vendor' || existing.vendor_id !== req.operator.id) {
-      return res.status(403).json({ error: "Bu qeyd sizin hesabınıza aid deyil." });
-    }
-
-    const body = req.body || {};
-    const tourId = body.tourId !== undefined ? body.tourId : existing.tour_id;
-    const tourName = body.tourName !== undefined ? body.tourName : existing.tour_name;
-    const contactPhone = body.contactPhone !== undefined ? body.contactPhone : existing.contact_phone;
-    const vehicleDescription = body.vehicleDescription !== undefined ? body.vehicleDescription : existing.bus_name;
-    const price = body.price !== undefined ? Number(body.price) : Number(existing.price);
-    const travelDate = body.travelDate !== undefined ? body.travelDate : existing.travel_date;
-
-    if (!contactPhone) {
-      return res.status(400).json({ error: "Əlaqə nömrəsi mütləq daxil edilməlidir." });
-    }
-
-    await dbClient.execute(
-      `UPDATE vendor_buses SET tour_id = ?, tour_name = ?, contact_phone = ?, bus_name = ?, price = ?, travel_date = ? WHERE id = ?`,
-      [tourId || null, tourName, contactPhone, vehicleDescription || null, price, travelDate, req.params.id]
-    );
-
-    const rows = await dbClient.query('SELECT * FROM vendor_buses WHERE id = ?', [req.params.id]);
-    res.json({ bus: rowToVendorBus(rows[0]) });
-  } catch (error: any) {
-    console.error("[PUT /api/vendor-buses/:id] error:", error);
-    res.status(500).json({ error: "Avtobus qeydi yenilənə bilmədi: " + error.message });
-  }
-});
-
-app.delete("/api/vendor-buses/:id", authenticateUser, async (req: any, res) => {
-  try {
-    const existingRows = await dbClient.query('SELECT * FROM vendor_buses WHERE id = ?', [req.params.id]);
-    if (!existingRows.length) return res.status(404).json({ error: "Avtobus qeydi tapılmadı." });
-    const existing = existingRows[0];
-    if (req.operator.role !== 'vendor' || existing.vendor_id !== req.operator.id) {
-      return res.status(403).json({ error: "Bu qeyd sizin hesabınıza aid deyil." });
-    }
-
-    await dbClient.execute('DELETE FROM vendor_buses WHERE id = ?', [req.params.id]);
-    res.json({ success: true });
-  } catch (error: any) {
-    console.error("[DELETE /api/vendor-buses/:id] error:", error);
-    res.status(500).json({ error: "Avtobus qeydi silinə bilmədi: " + error.message });
-  }
-});
-
-// Driver blacklist — CRUD for "which drivers other vendors should avoid". Same shared-read /
-// owner-write model as vendor_buses, gated by the same busTrackingEnabled flag.
-function rowToDriverBlacklistEntry(row: any) {
-  return {
-    id: row.id,
-    vendorId: row.vendor_id,
-    vendorName: row.vendor_name || undefined,
-    driverName: row.driver_name,
-    phoneNumber: row.phone_number,
-    reason: row.reason,
-    createdAt: row.created_at,
-  };
-}
-
-app.get("/api/driver-blacklist", authenticateUser, async (req: any, res) => {
-  try {
-    const user = req.operator;
-    const conditions: string[] = [];
-    const params: any[] = [];
-
-    if (user.role === 'vendor') {
-      // Shared list — every vendor sees every reported driver.
-    } else if (user.role === 'admin') {
-      if (req.query.vendorId) { conditions.push('vendor_id = ?'); params.push(String(req.query.vendorId)); }
-    } else {
-      return res.status(403).json({ error: "Bu bölməyə icazəniz yoxdur." });
-    }
-
-    const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
-    const rows = await dbClient.query(`SELECT * FROM driver_blacklist ${whereClause} ORDER BY created_at DESC`, params);
-    res.json({ entries: rows.map(rowToDriverBlacklistEntry) });
-  } catch (error: any) {
-    console.error("[GET /api/driver-blacklist] error:", error);
-    res.status(500).json({ error: "Qara siyahı gətirilə bilmədi: " + error.message });
-  }
-});
-
-app.post("/api/driver-blacklist", authenticateUser, async (req: any, res) => {
-  try {
-    if (req.operator.role !== 'vendor') {
-      return res.status(403).json({ error: "Yalnız operatorlar qara siyahıya əlavə edə bilər." });
-    }
-    if (!(await isBusTrackingEnabledForVendor(req.operator.id))) {
-      return res.status(403).json({ error: "Nəqliyyat izləmə bu hesab üçün aktiv deyil." });
-    }
-
-    const body = req.body || {};
-    const { driverName, phoneNumber, reason } = body;
-    if (!driverName || !phoneNumber || !reason) {
-      return res.status(400).json({ error: "Zəhmət olmasa bütün məcburi sahələri doldurun (driverName, phoneNumber, reason)." });
-    }
-
-    const vendorRows = await dbClient.query('SELECT name, company_name FROM users WHERE id = ?', [req.operator.id]);
-    const vendorName = vendorRows.length ? (vendorRows[0].company_name || vendorRows[0].name) : undefined;
-
-    const id = `blacklist-${randomUUID()}`;
-    await dbClient.execute(
-      `INSERT INTO driver_blacklist (id, vendor_id, vendor_name, driver_name, phone_number, reason)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [id, req.operator.id, vendorName || null, driverName, phoneNumber, reason]
-    );
-
-    const rows = await dbClient.query('SELECT * FROM driver_blacklist WHERE id = ?', [id]);
-    res.status(201).json({ entry: rowToDriverBlacklistEntry(rows[0]) });
-  } catch (error: any) {
-    console.error("[POST /api/driver-blacklist] error:", error);
-    res.status(500).json({ error: "Qara siyahıya əlavə edilə bilmədi: " + error.message });
-  }
-});
-
-app.put("/api/driver-blacklist/:id", authenticateUser, async (req: any, res) => {
-  try {
-    const existingRows = await dbClient.query('SELECT * FROM driver_blacklist WHERE id = ?', [req.params.id]);
-    if (!existingRows.length) return res.status(404).json({ error: "Qeyd tapılmadı." });
-    const existing = existingRows[0];
-    if (req.operator.role !== 'vendor' || existing.vendor_id !== req.operator.id) {
-      return res.status(403).json({ error: "Bu qeyd sizin hesabınıza aid deyil." });
-    }
-
-    const body = req.body || {};
-    const driverName = body.driverName !== undefined ? body.driverName : existing.driver_name;
-    const phoneNumber = body.phoneNumber !== undefined ? body.phoneNumber : existing.phone_number;
-    const reason = body.reason !== undefined ? body.reason : existing.reason;
-
-    if (!driverName || !phoneNumber || !reason) {
-      return res.status(400).json({ error: "Zəhmət olmasa bütün məcburi sahələri doldurun (driverName, phoneNumber, reason)." });
-    }
-
-    await dbClient.execute(
-      `UPDATE driver_blacklist SET driver_name = ?, phone_number = ?, reason = ? WHERE id = ?`,
-      [driverName, phoneNumber, reason, req.params.id]
-    );
-
-    const rows = await dbClient.query('SELECT * FROM driver_blacklist WHERE id = ?', [req.params.id]);
-    res.json({ entry: rowToDriverBlacklistEntry(rows[0]) });
-  } catch (error: any) {
-    console.error("[PUT /api/driver-blacklist/:id] error:", error);
-    res.status(500).json({ error: "Qeyd yenilənə bilmədi: " + error.message });
-  }
-});
-
-app.delete("/api/driver-blacklist/:id", authenticateUser, async (req: any, res) => {
-  try {
-    const existingRows = await dbClient.query('SELECT * FROM driver_blacklist WHERE id = ?', [req.params.id]);
-    if (!existingRows.length) return res.status(404).json({ error: "Qeyd tapılmadı." });
-    const existing = existingRows[0];
-    if (req.operator.role !== 'vendor' || existing.vendor_id !== req.operator.id) {
-      return res.status(403).json({ error: "Bu qeyd sizin hesabınıza aid deyil." });
-    }
-
-    await dbClient.execute('DELETE FROM driver_blacklist WHERE id = ?', [req.params.id]);
-    res.json({ success: true });
-  } catch (error: any) {
-    console.error("[DELETE /api/driver-blacklist/:id] error:", error);
-    res.status(500).json({ error: "Qeyd silinə bilmədi: " + error.message });
-  }
-});
-
-// Saved guide-payment/net-income calculations — snapshots a vendor keeps from the Kalkulyator
-// tab. Unlike vendor_buses/driver_blacklist, this is private financial data: every read and
-// write below is scoped to the owning vendor, never a shared list.
-function rowToSavedCalculation(row: any) {
-  return {
-    id: row.id,
-    vendorId: row.vendor_id,
-    tourId: row.tour_id || undefined,
-    tourName: row.tour_name,
-    slotId: row.slot_id || undefined,
-    slotDate: row.slot_date || undefined,
-    participants: Number(row.participants) || 0,
-    pricePerPerson: Number(row.price_per_person) || 0,
-    durationDays: Number(row.duration_days) || 0,
-    tier: row.tier,
-    mainGuideTotal: Number(row.main_guide_total) || 0,
-    assistantGuideTotal: Number(row.assistant_guide_total) || 0,
-    guideTotal: Number(row.guide_total) || 0,
-    busPrice: Number(row.bus_price) || 0,
-    nivaTotal: Number(row.niva_total) || 0,
-    uazTotal: Number(row.uaz_total) || 0,
-    gaz66Total: Number(row.gaz66_total) || 0,
-    sandwichTotal: Number(row.sandwich_total) || 0,
-    villageLunchTotal: Number(row.village_lunch_total) || 0,
-    villageTeaTotal: Number(row.village_tea_total) || 0,
-    nationalParkTotal: Number(row.national_park_total) || 0,
-    otherCostsTotal: Number(row.other_costs_total) || 0,
-    collected: Number(row.collected) || 0,
-    netIncome: Number(row.net_income) || 0,
-    createdAt: row.created_at,
-  };
-}
-
-async function isCalculatorEnabledForVendor(vendorId: string): Promise<boolean> {
-  const rows = await dbClient.query('SELECT extra_data FROM users WHERE id = ?', [vendorId]);
-  if (!rows.length) return false;
-  try {
-    const extra = rows[0].extra_data ? JSON.parse(rows[0].extra_data) : {};
-    return !!extra.calculatorEnabled;
-  } catch {
-    return false;
-  }
-}
-
-app.get("/api/guide-calculations", authenticateUser, async (req: any, res) => {
-  try {
-    const user = req.operator;
-    const conditions: string[] = [];
-    const params: any[] = [];
-
-    if (user.role === 'vendor') {
-      conditions.push('vendor_id = ?');
-      params.push(user.id);
-    } else if (user.role === 'admin') {
-      if (req.query.vendorId) { conditions.push('vendor_id = ?'); params.push(String(req.query.vendorId)); }
-    } else {
-      return res.status(403).json({ error: "Bu bölməyə icazəniz yoxdur." });
-    }
-
-    if (req.query.tourId) { conditions.push('tour_id = ?'); params.push(String(req.query.tourId)); }
-
-    const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
-    const rows = await dbClient.query(`SELECT * FROM guide_calculations ${whereClause} ORDER BY created_at DESC`, params);
-    res.json({ calculations: rows.map(rowToSavedCalculation) });
-  } catch (error: any) {
-    console.error("[GET /api/guide-calculations] error:", error);
-    res.status(500).json({ error: "Hesablamalar gətirilə bilmədi: " + error.message });
-  }
-});
-
-app.post("/api/guide-calculations", authenticateUser, async (req: any, res) => {
-  try {
-    if (req.operator.role !== 'vendor') {
-      return res.status(403).json({ error: "Yalnız operatorlar hesablama yadda saxlaya bilər." });
-    }
-    if (!(await isCalculatorEnabledForVendor(req.operator.id))) {
-      return res.status(403).json({ error: "Kalkulyator bu hesab üçün aktiv deyil." });
-    }
-
-    const body = req.body || {};
-    const { tourName, participants, pricePerPerson, durationDays, tier, mainGuideTotal, assistantGuideTotal, guideTotal } = body;
-    if (!tourName || participants === undefined || pricePerPerson === undefined || !durationDays || !tier || guideTotal === undefined) {
-      return res.status(400).json({ error: "Zəhmət olmasa bütün məcburi sahələri doldurun." });
-    }
-
-    const id = `calc-${randomUUID()}`;
-    await dbClient.execute(
-      `INSERT INTO guide_calculations (id, vendor_id, tour_id, tour_name, slot_id, slot_date, participants, price_per_person, duration_days, tier, main_guide_total, assistant_guide_total, guide_total, bus_price, niva_total, uaz_total, gaz66_total, sandwich_total, village_lunch_total, village_tea_total, national_park_total, other_costs_total, collected, net_income)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        id, req.operator.id, body.tourId || null, tourName, body.slotId || null, body.slotDate || null,
-        Number(participants), Number(pricePerPerson), Number(durationDays), tier,
-        Number(mainGuideTotal) || 0, Number(assistantGuideTotal) || 0, Number(guideTotal),
-        Number(body.busPrice) || 0,
-        Number(body.nivaTotal) || 0, Number(body.uazTotal) || 0, Number(body.gaz66Total) || 0,
-        Number(body.sandwichTotal) || 0, Number(body.villageLunchTotal) || 0, Number(body.villageTeaTotal) || 0,
-        Number(body.nationalParkTotal) || 0,
-        Number(body.otherCostsTotal) || 0, Number(body.collected) || 0, Number(body.netIncome) || 0,
-      ]
-    );
-
-    const rows = await dbClient.query('SELECT * FROM guide_calculations WHERE id = ?', [id]);
-    res.status(201).json({ calculation: rowToSavedCalculation(rows[0]) });
-  } catch (error: any) {
-    console.error("[POST /api/guide-calculations] error:", error);
-    res.status(500).json({ error: "Hesablama yadda saxlanıla bilmədi: " + error.message });
-  }
-});
-
-app.delete("/api/guide-calculations/:id", authenticateUser, async (req: any, res) => {
-  try {
-    const existingRows = await dbClient.query('SELECT * FROM guide_calculations WHERE id = ?', [req.params.id]);
-    if (!existingRows.length) return res.status(404).json({ error: "Hesablama tapılmadı." });
-    const existing = existingRows[0];
-    if (req.operator.role !== 'vendor' || existing.vendor_id !== req.operator.id) {
-      return res.status(403).json({ error: "Bu hesablama sizin hesabınıza aid deyil." });
-    }
-
-    await dbClient.execute('DELETE FROM guide_calculations WHERE id = ?', [req.params.id]);
-    res.json({ success: true });
-  } catch (error: any) {
-    console.error("[DELETE /api/guide-calculations/:id] error:", error);
-    res.status(500).json({ error: "Hesablama silinə bilmədi: " + error.message });
-  }
-});
-
-// POST /api/bookings/checkin — operator scans a ticket's QR code/reference to check the
-// customer in. Requires a valid operator JWT (authenticateUser); only succeeds for
-// bookings under tours that belong to the authenticated operator's own vendor account.
-app.post("/api/bookings/checkin", authenticateUser, async (req: any, res) => {
-  try {
-    const { reference } = req.body;
-    if (!reference) {
-      return res.status(400).json({ error: "Skan edilmiş bilet kodu göndərilmədi." });
-    }
-
-    let rows = await dbClient.query('SELECT * FROM bookings WHERE booking_reference = ?', [reference]);
-    if (!rows.length) {
-      // Fallback: some older/manual bookings are referenced by a short code derived from
-      // their id (TUR-XXXXX) rather than the stored booking_reference.
-      const candidates = await dbClient.query('SELECT * FROM bookings WHERE vendor_id = ?', [req.operator.id]);
-      rows = candidates.filter((b: any) => `TUR-${String(b.id).slice(0, 5).toUpperCase()}` === reference);
-    }
-
-    if (!rows.length) {
-      return res.status(404).json({ error: "Sistemdə bu bilet məlumatı tapılmadı!" });
-    }
-
-    const bookingRow = rows[0];
-    if (bookingRow.vendor_id !== req.operator.id) {
-      return res.status(403).json({ error: "Bu bilet sizin hesabınıza aid deyil." });
-    }
-
-    const booking = rowToBooking(bookingRow);
-    if ((booking as any).attendanceStatus === 'İştirakçı gəldi') {
-      return res.json({ alreadyCheckedIn: true, booking });
-    }
-
-    const extra = splitBookingBody({ ...booking, attendanceStatus: 'İştirakçı gəldi' });
-    await dbClient.execute('UPDATE bookings SET extra_data = ? WHERE id = ?', [JSON.stringify(extra), booking.id]);
-
-    const updatedRows = await dbClient.query('SELECT * FROM bookings WHERE id = ?', [booking.id]);
-    res.json({ alreadyCheckedIn: false, booking: rowToBooking(updatedRows[0]) });
-  } catch (error: any) {
-    console.error("[POST /api/bookings/checkin] error:", error);
-    res.status(500).json({ error: "Check-in zamanı xəta baş verdi: " + error.message });
-  }
-});
-
-function rowToReview(row: any) {
-  return {
-    id: row.id,
-    tourId: row.tour_id,
-    bookingId: row.booking_id,
-    customerId: row.customer_id,
-    customerName: row.customer_name,
-    rating: Number(row.rating),
-    comment: row.comment,
-    createdAt: row.created_at,
-    verifiedAttendee: !!row.verified_attendee,
-  };
-}
-
-// GET /api/reviews — list reviews, optionally filtered by tourId
-app.get("/api/reviews", async (req, res) => {
-  try {
-    const { tourId } = req.query;
-    const conditions: string[] = [];
-    const params: any[] = [];
-    if (tourId) { conditions.push('tour_id = ?'); params.push(String(tourId)); }
-
-    const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
-    const rows = await dbClient.query(`SELECT * FROM reviews ${whereClause} ORDER BY created_at DESC`, params);
-    res.json({ reviews: rows.map(rowToReview) });
-  } catch (error: any) {
-    console.error("[GET /api/reviews] error:", error);
-    res.status(500).json({ error: "Rəyləri gətirmək mümkün olmadı: " + error.message });
-  }
-});
-
-// POST /api/reviews — create a review. The customer proves attendance with the reservation
-// number (#TUR-XXXX) printed on their ticket / sent by the vendor; legacy clients may still
-// send an internal bookingId. One review per booking, then the tour's aggregates refresh.
-app.post("/api/reviews", async (req, res) => {
-  try {
-    const body = req.body || {};
-    const { tourId, bookingId, bookingReference, customerName, rating, comment } = body;
-    if (!tourId || (!bookingId && !bookingReference) || !customerName || rating === undefined) {
-      return res.status(400).json({ error: "Zəhmət olmasa bütün məcburi sahələri doldurun (tourId, rezervasiya nömrəsi, customerName, rating)." });
-    }
-    const numericRating = Number(rating);
-    if (!(numericRating >= 1 && numericRating <= 5)) {
-      return res.status(400).json({ error: "Qiymətləndirmə 1 ilə 5 arasında olmalıdır." });
-    }
-
-    let bookingRows: any[];
-    if (bookingReference) {
-      // "#TUR-4750", "tur-4750", " #TUR - 4750 " kimi yazılışların hamısı eyni nömrəyə uyğunlaşır
-      const normalizedRef = String(bookingReference).replace(/[\s#]/g, '').toUpperCase();
-      bookingRows = await dbClient.query(
-        `SELECT id FROM bookings WHERE tour_id = ? AND UPPER(REPLACE(REPLACE(booking_reference, '#', ''), ' ', '')) = ?`,
-        [tourId, normalizedRef]
-      );
-      if (!bookingRows.length) {
-        return res.status(400).json({ error: "Bu rezervasiya nömrəsi ilə bu tur üçün sifariş tapılmadı. Nömrəni biletinizdən dəqiq köçürün (məs: #TUR-4750)." });
-      }
-    } else {
-      bookingRows = await dbClient.query('SELECT id FROM bookings WHERE id = ? AND tour_id = ?', [bookingId, tourId]);
-      if (!bookingRows.length) {
-        return res.status(400).json({ error: "Rəy yalnız həmin turu rezerv etmiş müştərilər üçün mümkündür (bookingId uyğun gəlmədi)." });
-      }
-    }
-    const matchedBookingId = bookingRows[0].id;
-
-    // Hər sifarişə (rezervasiya nömrəsinə) yalnız bir rəy
-    const existingReview = await dbClient.query('SELECT id FROM reviews WHERE booking_id = ?', [matchedBookingId]);
-    if (existingReview.length) {
-      return res.status(400).json({ error: "Bu rezervasiya nömrəsi ilə artıq rəy yazılıb." });
-    }
-
-    const id = body.id || `review-${randomUUID()}`;
-    await dbClient.execute(
-      `INSERT INTO reviews (id, tour_id, booking_id, customer_id, customer_name, rating, comment, verified_attendee)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [id, tourId, matchedBookingId, body.customerId || null, String(customerName).trim().slice(0, 200), numericRating, comment ? String(comment).slice(0, 3000) : null, 1]
-    );
-
-    // Refresh the tour's aggregate rating / reviewsCount from the reviews table.
-    const aggRows = await dbClient.query(
-      'SELECT AVG(rating) as avg_rating, COUNT(*) as review_count FROM reviews WHERE tour_id = ?',
-      [tourId]
-    );
-    const avgRating = Number(aggRows[0]?.avg_rating) || 0;
-    const reviewCount = Number(aggRows[0]?.review_count) || 0;
-    await dbClient.execute('UPDATE tours SET rating = ?, reviews_count = ? WHERE id = ?', [avgRating, reviewCount, tourId]);
-
-    const rows = await dbClient.query('SELECT * FROM reviews WHERE id = ?', [id]);
-    res.status(201).json({ review: rowToReview(rows[0]) });
-  } catch (error: any) {
-    console.error("[POST /api/reviews] error:", error);
-    res.status(500).json({ error: "Rəy yaradıla bilmədi: " + error.message });
-  }
-});
-
-// Endpoint for AI beginner and experienced packing assistant returning strict JSON
-app.post("/api/gemini/packing", async (req, res) => {
-  const { tourDetails } = req.body;
-  if (!tourDetails) {
-    return res.status(400).json({ error: "Tur detalları tələb olunur." });
-  }
-
-  try {
-    const ai = getGeminiClient();
-
-    const systemInstruction = `Sən Azərbaycanda fəaliyyət göstərən turlar üçün peşəkar "Ağıllı Çanta və Yürüş Hazırlığı AI Kökləndiricisi"sən.
-İstifadəçilərin həm yeni başlayan ("basics" siyahısı), həm də təcrübəli yürüşçülər ("pro_gear" siyahısı) olduğunu nəzərə alaraq, xüsusi çanta tövsiyələri hazırlamalısan.
-Tövsiyələri mütləq doğma Azərbaycan dilində, hər bir bənddə aydın, anlaşıqlı və tam faydalı şəkildə formalaşdır.
-
-Siyahı tələbləri:
-1. "basics" siyahısı: İlk dəfə və ya yeni başlayanlar üçün mütləq olan baza elementlər (məsələn: lazım olan su miqdarı, adi rahat sürüşməyən idman ayaqqabısı, günəşdən qorunma, yüngül qidalar). Bunlar hər kəsin evində asanlıqla tapa biləcəyi və ya ucuz şəkildə əldə edə biləcəyi detallar olmalıdır ki, insanların gözü qorxmasın.
-2. "pro_gear" siyahısı: Təcrübəli yürüşçülər üçün nəzərdə tutulmuş texniki, daxili relyef və hava şəraitinə uyğun peşəkar avadanlıqlar (məsələn: dik yoxuş-enişlər üçün teleskopik yürüş çubuqları, diz qoruyucuları, sukeçirməyən Gore-Tex botlar, palçıqlı relyef üçün ayaq qamaşları, gecikmələr üçün alın fənəri, termal alt paltarı və ya membran gödəkçə). Baza elementləri bura qətiyyən daxil etmə!
-
-Mövcud turun adı, regionu, çətinliyi və xüsusiyyətlərini analiz edərək tam nöqtə atışı tövsiyələr siyahısı yarat.`;
-
-    const promptText = `Aşağıdakı tur üçün həm yeni başlayanlar ("basics"), həm də təcrübəli yürüşçülər ("pro_gear") üçün Azərbaycan dilində çanta tövsiyələri hazırlat.
-- Tur adı: ${tourDetails.name}
-- Region: ${tourDetails.region}
-- Çətinlik səviyyəsi: ${tourDetails.difficulty === 'easy' ? 'Asan' : tourDetails.difficulty === 'medium' ? 'Orta' : tourDetails.difficulty === 'hard' ? 'Çətin' : 'Ekstrim'}
-- Kateqoriya: ${tourDetails.category === 'hiking' ? 'Yürüş / Hiking' : tourDetails.category === 'camp' ? 'Kamp' : 'Zirvə'}
-- Müddət: ${tourDetails.durationDays} Gün`;
-
-    const response = await ai.models.generateContent({
-      model: "gemini-3.5-flash",
-      contents: promptText,
-      config: {
-        systemInstruction,
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            packing_advice: {
-              type: Type.OBJECT,
-              properties: {
-                basics: {
-                  type: Type.ARRAY,
-                  items: { type: Type.STRING },
-                  description: "Azərbaycan dilində: Yeni başlayanlar üçün sadə və evdə asan tapılan təməl əşyalar və hazırlıq addımları"
-                },
-                pro_gear: {
-                  type: Type.ARRAY,
-                  items: { type: Type.STRING },
-                  description: "Azərbaycan dilində: Təcrübəli yürüşçülər üçün bu turun çətinliyinə və relyefinə uyğun sırf texniki, peşəkar avadanlıq və geyim təklifləri"
-                }
-              },
-              required: ["basics", "pro_gear"]
-            }
-          },
-          required: ["packing_advice"]
-        }
-      }
-    });
-
-    const parsedData = JSON.parse(response.text || "{}");
-    return res.json(parsedData);
-  } catch (err: any) {
-    console.error("Gemini Packing Advice error:", err);
-    return res.status(500).json({ error: err.message || "Xəta baş verdi" });
-  }
-});
-
-// Setup directory for generated tickets and cache directory for fonts
-const ticketsDir = path.join(process.cwd(), "tickets");
-if (!fs.existsSync(ticketsDir)) {
-  fs.mkdirSync(ticketsDir, { recursive: true });
-}
-
-// Custom force download endpoint for tickets to prevent mobile opening in new tab
-app.get("/tickets/:filename", (req, res, next) => {
-  const filename = req.params.filename;
-  const filepath = path.join(ticketsDir, filename);
-  if (fs.existsSync(filepath)) {
-    // res.download sets the correct Content-Disposition headers for direct device file download
-    res.download(filepath, filename);
-  } else {
-    res.status(404).send("Bilet tapılmadı.");
-  }
-});
-
-app.use("/tickets", express.static(ticketsDir));
-
-const fontsDir = path.join(process.cwd(), "fonts");
-if (!fs.existsSync(fontsDir)) {
-  fs.mkdirSync(fontsDir, { recursive: true });
-}
-
-let robotoRegularBase64: string | null = null;
-let robotoBoldBase64: string | null = null;
-
-// Download Google Fonts helper to safely support Azerbaijani UTF-8 characters natively (Ə, ə, İ, ı, etc.)
-async function ensureFonts() {
-  const regPath = path.join(fontsDir, "Roboto-Regular.ttf");
-  const boldPath = path.join(fontsDir, "Roboto-Bold.ttf");
-
-  const regUrl = "https://raw.githubusercontent.com/google/fonts/main/ofl/roboto/Roboto-Regular.ttf";
-  const boldUrl = "https://raw.githubusercontent.com/google/fonts/main/ofl/roboto/Roboto-Bold.ttf";
-
-  try {
-    if (!fs.existsSync(regPath)) {
-      console.log("[Fonts] Downloading Roboto-Regular.ttf for Azerbaijani UTF-8 PDF formatting...");
-      const res = await globalThis.fetch(regUrl);
-      if (res.ok) {
-        const buf = await res.arrayBuffer();
-        fs.writeFileSync(regPath, Buffer.from(buf));
-      }
-    }
-    if (fs.existsSync(regPath)) {
-      robotoRegularBase64 = fs.readFileSync(regPath).toString("base64");
-    }
-
-    if (!fs.existsSync(boldPath)) {
-      console.log("[Fonts] Downloading Roboto-Bold.ttf for Azerbaijani UTF-8 PDF formatting...");
-      const res = await globalThis.fetch(boldUrl);
-      if (res.ok) {
-        const buf = await res.arrayBuffer();
-        fs.writeFileSync(boldPath, Buffer.from(buf));
-      }
-    }
-    if (fs.existsSync(boldPath)) {
-      robotoBoldBase64 = fs.readFileSync(boldPath).toString("base64");
-    }
-    console.log("[Fonts] Roboto UTF-8 fonts are loaded and cached successfully.");
-  } catch (err) {
-    console.error("[Fonts] Failed to download or cache Roboto fonts. PDF generator will fallback to standard built-in fonts gracefully.", err);
-  }
-}
-
-// Fetch QR Code helper
-async function fetchQrCodeBase64(data: string): Promise<string | null> {
-  try {
-    const url = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(data)}`;
-    const res = await globalThis.fetch(url);
-    if (!res.ok) throw new Error("Failed to fetch QR image");
-    const arrayBuffer = await res.arrayBuffer();
-    return Buffer.from(arrayBuffer).toString("base64");
-  } catch (err) {
-    console.error("[QR Code] Failed to fetch live QR code from qrserver API:", err);
-    return null;
-  }
-}
-
-// Automated Landscape Ticket PDF Generation API (Redesigned as beautiful vertical A4 FlixBus format)
 app.post("/api/bookings/generate-ticket", async (req, res) => {
   const {
     bookingId,
@@ -3228,7 +1746,9 @@ app.post("/api/bookings/generate-ticket", async (req, res) => {
     reference,
     participantsCount,
     amount,
-    status
+    status,
+    meetingPoint,
+    vendorName,
   } = req.body;
 
   if (!bookingId || !customerName || !tourName) {
@@ -3236,274 +1756,285 @@ app.post("/api/bookings/generate-ticket", async (req, res) => {
   }
 
   try {
-    // Generate compact Portrait Mobile-Friendly PDF (Optimized for beautiful layout on phones)
+    // ===== 1. QR KODU SERVER-DƏ YARADIRIQ (xarici API-yə ehtiyac yoxdur) =====
+    const bRef = reference || `TUR-${String(bookingId).slice(0, 5).toUpperCase()}`;
+    const qrData = `GEDƏKGÖRƏK|${bRef}|${customerName}|${tourName}`;
+    let qrBase64: string | null = null;
+    try {
+      qrBase64 = await QRCode.toDataURL(qrData, {
+        errorCorrectionLevel: "H",
+        margin: 1,
+        width: 300,
+        color: {
+          dark: "#047857",
+          light: "#FFFFFF",
+        },
+      });
+      // "data:image/png;base64,..." prefixini çıxarırıq
+      qrBase64 = qrBase64.split(",")[1];
+    } catch (qrErr) {
+      console.error("[QR] Lokal QR yaratmaq alınmadı:", qrErr);
+    }
+
+    // ===== 2. PDF SƏNƏDİNİ YARADIRIQ =====
     const doc = new jsPDF({
       orientation: "portrait",
       unit: "px",
-      format: [360, 660]
+      format: [400, 720],
     });
 
-    const pageHeight = 660;
-    const pageWidth = 360;
+    const W = 400;
+    const H = 720;
 
+    // ===== 3. ŞRİFTLƏRİ YÜKLƏYİRİK =====
     let hasCustomFonts = false;
+    let fontName = "Helvetica";
     if (robotoRegularBase64 && robotoBoldBase64) {
       try {
         doc.addFileToVFS("Roboto-Regular.ttf", robotoRegularBase64);
         doc.addFont("Roboto-Regular.ttf", "Roboto", "normal");
-
         doc.addFileToVFS("Roboto-Bold.ttf", robotoBoldBase64);
         doc.addFont("Roboto-Bold.ttf", "Roboto", "bold");
-
         doc.setFont("Roboto", "normal");
         hasCustomFonts = true;
+        fontName = "Roboto";
       } catch (e) {
-        console.error("Failed to register Roboto fonts in jsPDF:", e);
+        console.error("[Fonts] Roboto yüklənmədi:", e);
       }
     }
+    const displayText = (s: string) => (hasCustomFonts ? s || "" : sanitizeForFallback(s));
 
-    const fontName = hasCustomFonts ? "Roboto" : "Helvetica";
+    // ===== 4. ARXA FON VƏ ÇƏRÇİVƏ =====
+    doc.setFillColor(...TICKET_COLORS.white);
+    doc.rect(0, 0, W, H, "F");
 
-    // Force sanitizing clean Azerbaijani/Turkish UTF-8 accents so that standard Helvetica renders flawlessly on all devices
-    const sanitizeText = (str: string) => {
-      return (str || "")
-        .replace(/Ə/g, "E").replace(/ə/g, "e")
-        .replace(/ı/g, "i").replace(/I/g, "I")
-        .replace(/Ö/g, "O").replace(/ö/g, "o")
-        .replace(/Ü/g, "U").replace(/ü/g, "u")
-        .replace(/Ç/g, "C").replace(/ç/g, "c")
-        .replace(/Ş/g, "S").replace(/ş/g, "s")
-        .replace(/Ğ/g, "G").replace(/ğ/g, "g")
-        .replace(/İ/g, "I");
-    };
+    // Üst yaşıl başlıq zolağı
+    doc.setFillColor(...TICKET_COLORS.primary);
+    doc.rect(0, 0, W, 110, "F");
+    doc.setFillColor(...TICKET_COLORS.secondary);
+    doc.rect(0, 95, W, 15, "F");
 
-    const bRef = reference || `TUR-${bookingId.slice(0, 5).toUpperCase()}`;
-
-    // --- DRAW BACKGROUND & SOLID OUTER GREENISH-TEAL DASHED CONTAINER FRAME ---
-    // Background pure white
-    doc.setFillColor(255, 255, 255);
-    doc.rect(0, 0, pageWidth, pageHeight, "F");
-
-    // Decorative green-emerald dashed rounded outer frame border (matching the green frame in original picture)
-    doc.setDrawColor(34, 197, 94); // emerald/green-500 (#22C55E)
-    doc.setLineWidth(1.2);
-    doc.setLineDashPattern([3, 3], 0);
-    // Draw rounded rect enclosing ticket content
-    doc.roundedRect(12, 12, 336, 636, 10, 10, "D");
-    doc.setLineDashPattern([], 0); // Restore line rendering
-
-    // --- 1. CENTERED BRAND HEADER DIRECTLY LIKE SCREENSHOT ---
-    // Center indicator brand colors above text
-    doc.setFillColor(234, 179, 8); // Golden Amber
-    doc.rect(168, 25, 4, 11, "F");
-    doc.setFillColor(34, 197, 94); // Leaf Emerald
-    doc.rect(174, 25, 4, 11, "F");
-
-    // Center header text
-    doc.setTextColor(3, 105, 161); // Sky-700 (#0369A1)
+    // ===== 5. BAŞLIQ: BREND + "ELEKTRON BİLET" =====
+    doc.setTextColor(...TICKET_COLORS.white);
     doc.setFont(fontName, "bold");
-    doc.setFontSize(13);
-    doc.text(sanitizeText("TURLAR.AZ ELEKTRON BİLET"), 180, 48, { align: "center" });
-
-    // Center pill badge detailing "TƏSDİQLƏNİB - ÖDƏNİLİB" below title
-    doc.setFillColor(240, 253, 244); // Green-50 background tint
-    doc.setDrawColor(34, 197, 94); // Green-500 border
-    doc.setLineWidth(1);
-    doc.roundedRect(115, 56, 130, 15, 7, 7, "FD");
-
-    doc.setTextColor(21, 128, 61); // Green-700 accent
-    doc.setFont(fontName, "bold");
-    doc.setFontSize(7.5);
-    doc.text(sanitizeText("TƏSDİQLƏNİB - ÖDƏNİLİB"), 180, 66, { align: "center" });
-
-    // Soft header separator line below the badge
-    doc.setDrawColor(241, 245, 249); // slate-100
-    doc.setLineWidth(1);
-    doc.line(25, 82, 335, 82);
-
-
-    // --- 2. THE TICKET INFORMATION FIELD GRID LIST (LEFT) & QR CODE BOX (RIGHT) ---
-    const safeTourName = sanitizeText(tourName);
-
-    // Route Details Header Anchor
-    doc.setFont(fontName, "bold");
-    doc.setFontSize(7.5);
-    doc.setTextColor(100, 116, 139); // slate-500
-    doc.text(sanitizeText("TUR MARSRUTU"), 25, 96);
-
-    const routeFullText = `${safeTourName} (${sanitizeText(region || "Azərbaycan")})`;
-    const routeTextLines = doc.splitTextToSize(sanitizeText(routeFullText), 300);
-    doc.setFont(fontName, "bold");
-    doc.setFontSize(9);
-    doc.setTextColor(15, 23, 42); // slate-900
-
-    // Small green leaf circle decoration bullet
-    doc.setFillColor(34, 197, 94); 
-    doc.circle(29, 107, 2.5, "F");
-    doc.text(routeTextLines, 36, 109);
-
-    let cY = 111 + (routeTextLines.length * 11) + 12;
-
-    const drawField = (colNum: 1 | 2, label: string, val: string, isBold: boolean = false, fontSz: number = 8.5, customColor: [number, number, number] | null = null) => {
-      const startX = colNum === 1 ? 25 : 190;
-      
-      // Draw Label
-      doc.setFont(fontName, "bold");
-      doc.setFontSize(7.5);
-      doc.setTextColor(100, 116, 139); // slate-500 label
-      doc.text(sanitizeText(label), startX, cY);
-
-      // Draw Value
-      doc.setFont(fontName, isBold ? "bold" : "normal");
-      doc.setFontSize(fontSz);
-      if (customColor) {
-        doc.setTextColor(customColor[0], customColor[1], customColor[2]);
-      } else {
-        doc.setTextColor(15, 23, 42); // slate-900 value
-      }
-      doc.text(sanitizeText(val), startX, cY + 11);
-    };
-
-    // Row 1
-    drawField(1, "SIFARIS / BILET ID", `#${bRef}`, true, 9);
-    drawField(2, "EKSKURSİYA TARİXİ", date || "N/A", true, 9);
-    cY += 26;
-
-    // Row 2
-    drawField(1, "MÜŞTƏRİ ADI", customerName, true, 8.5);
-    drawField(2, "ƏLAQƏ NÖMRƏSİ", customerPhone || "N/A", true, 8.5);
-    cY += 26;
-
-    // Row 3
-    drawField(1, "İŞTİRAKÇI SAYI", `${participantsCount || 1} nəfər`, true, 8.5);
-    drawField(2, "ÜMUMİ MƏBLƏĞ", `${amount || 0} AZN`, true, 11, [16, 185, 129]); // emerald-500 emphasis
-    cY += 26;
-
-    // Row 4
-    drawField(1, "ÖDƏNİŞ METODU", "WhatsApp / m10", true, 8.5);
-    drawField(2, "STATUS", "TƏSDİQLƏNİB", true, 8.5, [21, 128, 61]); // green-700
-    cY += 28;
-
-    // Thin dash list divider
-    doc.setDrawColor(226, 232, 240); // slate-200
-    doc.setLineWidth(1);
-    doc.setLineDashPattern([2, 3], 0);
-    doc.line(25, cY, 335, cY);
-    doc.setLineDashPattern([], 0); // Restore line rendering
-    cY += 12;
-
-    // Center Scanning Live QR Block Frame
-    const qSz = 90;
-    const qX = (360 - qSz) / 2; // 135
-    const qY = cY;
-    
-    const qrBase64 = await fetchQrCodeBase64(bRef);
-    if (qrBase64) {
-      try {
-        doc.addImage(qrBase64, "PNG", qX, qY, qSz, qSz);
-        doc.setDrawColor(226, 232, 240);
-        doc.setLineWidth(0.8);
-        doc.rect(qX, qY, qSz, qSz, "D");
-      } catch (err) {
-        console.error("Failed to add live QR code image to pdf document:", err);
-      }
-    } else {
-      // Gray placeholder boundary
-      doc.setFillColor(248, 250, 252);
-      doc.rect(qX, qY, qSz, qSz, "F");
-      doc.setDrawColor(226, 232, 240);
-      doc.setLineWidth(0.8);
-      doc.rect(qX, qY, qSz, qSz, "D");
-
-      doc.setTextColor(148, 163, 184);
-      doc.setFont(fontName, "normal");
-      doc.setFontSize(7.5);
-      doc.text(sanitizeText("ONLINE QR SCAN"), qX + (qSz / 2), qY + 42, { align: "center" });
-      doc.text(sanitizeText("Birləşdirilmədi"), qX + (qSz / 2), qY + 54, { align: "center" });
-    }
-
-    // QR validation caption label underneath
-    doc.setFont(fontName, "bold");
-    doc.setFontSize(7.5);
-    doc.setTextColor(148, 163, 184); // slate-400
-    doc.text(sanitizeText("TƏSDİQ QR-KODU"), 180, qY + qSz + 11, { align: "center" });
-
-    cY += qSz + 24;
-
-
-    // --- 3. MÜHÜM TƏHLÜKƏSİZLİK QAYDALARI VƏ TƏLİMATLAR (BOTTOM SAFETY NOTE) ---
-    const boxY = cY;
-    const boxH = 132;
-    // Draw clean solid background wrapper block
-    doc.setFillColor(248, 250, 252); // slate-50
-    doc.rect(25, boxY, 310, boxH, "F");
-    
-    // Solid emerald-500 highlight vertical timeline bar on the left bounds
-    doc.setFillColor(16, 185, 129); // emerald-500
-    doc.rect(25, boxY, 3, boxH, "F");
-
-    // Title of regulations
-    doc.setFont(fontName, "bold");
-    doc.setFontSize(7.8);
-    doc.setTextColor(15, 23, 42); // slate-900
-    doc.text(sanitizeText("MÜHÜM TƏHLÜKƏSİZLİK QAYDALARI VƏ TƏLİMATLAR:"), 36, boxY + 14);
-
-    const rules = [
-      "1. Bələdçinin təhlükəsizlik və yürüş təlimatlarına 100% əməl edilməlidir.",
-      "2. Hava şəraitinə uyğun geyim və sürüşməyən rahat yürüş ayaqqabısı mütləqdir.",
-      "3. Təbiətə hörmətlə yanaşılmalı, heç bir növ zibil heç yerə atılmamalıdır.",
-      "4. Xroniki xəstəlik, astma barədə bələdçiyə öncədən məlumat verilməlidir.",
-      "5. Yürüş boyu alkoqollu içkilərin qəbulu qətiyyən qadağandır."
-    ];
+    doc.setFontSize(22);
+    doc.text(displayText("GedəkGörək"), 24, 42);
 
     doc.setFont(fontName, "normal");
-    doc.setFontSize(7);
-    doc.setTextColor(71, 85, 105); // slate-600 soft
-    
-    let ruleY = boxY + 27;
-    rules.forEach((rule) => {
-      const ruleLines = doc.splitTextToSize(sanitizeText(rule), 285);
-      doc.text(ruleLines, 36, ruleY);
-      ruleY += (ruleLines.length * 9.5) + 2;
-    });
+    doc.setFontSize(10);
+    doc.setTextColor(220, 252, 231);
+    doc.text(displayText("Elektron Bilet • E-Ticket"), 24, 60);
 
-
-    // --- 4. TICKET FOOTER WITH REFINED CRM SIGNATURE LINE ---
-    // Subtle horizontal divider line anchored relative to bottom
-    doc.setDrawColor(241, 245, 249);
-    doc.setLineWidth(1);
-    doc.line(25, pageHeight - 34, 335, pageHeight - 34);
-
-    // Centered fine-print footer signoff matching original picture exactly
+    // Sağ üstdə bilet nömrəsi (qızılı vurğu)
+    doc.setFillColor(...TICKET_COLORS.accent);
+    doc.roundedRect(W - 140, 22, 116, 28, 4, 4, "F");
+    doc.setTextColor(...TICKET_COLORS.white);
     doc.setFont(fontName, "bold");
-    doc.setFontSize(6.5);
-    doc.setTextColor(148, 163, 184); // slate-400
-    doc.text(sanitizeText("XİDMƏTDƏN YARARLANDIĞINIZ ÜÇÜN TƏŞƏKKÜR EDİRİK! • TURLAR.AZ"), pageWidth / 2, pageHeight - 22, { align: "center" });
+    doc.setFontSize(10);
+    doc.text(displayText(`#${bRef}`), W - 82, 40, { align: "center" });
 
-    // Output binary array format for flawless Node file writing
-    const pdfOutputArrayBuffer = doc.output("arraybuffer");
+    // ===== 6. TUR ADI BAŞLIĞI (ağ kart üzərində) =====
+    doc.setFillColor(...TICKET_COLORS.white);
+    doc.roundedRect(20, 85, W - 40, 50, 6, 6, "F");
+    doc.setDrawColor(...TICKET_COLORS.divider);
+    doc.setLineWidth(0.3);
+    doc.roundedRect(20, 85, W - 40, 50, 6, 6, "S");
 
+    doc.setTextColor(...TICKET_COLORS.primary);
+    doc.setFont(fontName, "bold");
+    doc.setFontSize(9);
+    doc.text(displayText("TUR MARŞRUTU"), 32, 100);
+
+    doc.setTextColor(...TICKET_COLORS.dark);
+    doc.setFont(fontName, "bold");
+    doc.setFontSize(14);
+    const tourLines = doc.splitTextToSize(displayText(tourName), W - 80);
+    doc.text(tourLines.slice(0, 2), 32, 116);
+
+    doc.setFont(fontName, "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(...TICKET_COLORS.muted);
+    doc.text(displayText(region ? `📍 ${region}` : "📍 Azərbaycan"), 32, 130);
+
+    // ===== 7. ƏSAS MƏLUMAT KARTLARI (2x2 grid) =====
+    let y = 155;
+    const cardW = (W - 60) / 2;
+    const cardH = 62;
+
+    const drawInfoCard = (x: number, label: string, value: string, valueColor: number[] = TICKET_COLORS.dark, isBold: boolean = true) => {
+      doc.setFillColor(...TICKET_COLORS.bg);
+      doc.roundedRect(x, y, cardW, cardH, 5, 5, "F");
+      doc.setDrawColor(...TICKET_COLORS.divider);
+      doc.setLineWidth(0.5);
+      doc.roundedRect(x, y, cardW, cardH, 5, 5, "S");
+
+      doc.setTextColor(...TICKET_COLORS.muted);
+      doc.setFont(fontName, "normal");
+      doc.setFontSize(8);
+      doc.text(displayText(label), x + 10, y + 16);
+
+      doc.setTextColor(...valueColor);
+      doc.setFont(fontName, isBold ? "bold" : "normal");
+      doc.setFontSize(12);
+      const valLines = doc.splitTextToSize(displayText(value), cardW - 20);
+      doc.text(valLines.slice(0, 2), x + 10, y + 36);
+    };
+
+    // Sətir 1
+    drawInfoCard(20, "📅 SƏFƏR TARİXİ", date || "—", TICKET_COLORS.primary);
+    drawInfoCard(20 + cardW + 20, "👥 İŞTİRAKÇI", `${participantsCount || 1} nəfər`, TICKET_COLORS.dark);
+    y += cardH + 10;
+
+    // Sətir 2
+    drawInfoCard(20, "💰 ÜMUMİ MƏBLƏĞ", `${amount || 0} AZN`, TICKET_COLORS.primary, true);
+    drawInfoCard(20 + cardW + 20, "✅ STATUS", status === "cancelled" ? "LƏĞV EDİLDİ" : "TƏSDİQLƏNİB", [21, 128, 61]);
+    y += cardH + 10;
+
+    // ===== 8. MÜŞTƏRİ MƏLUMATLARI (tam enli zolaq) =====
+    doc.setFillColor(...TICKET_COLORS.white);
+    doc.roundedRect(20, y, W - 40, 52, 5, 5, "F");
+    doc.setDrawColor(...TICKET_COLORS.divider);
+    doc.roundedRect(20, y, W - 40, 52, 5, 5, "S");
+
+    doc.setTextColor(...TICKET_COLORS.muted);
+    doc.setFont(fontName, "normal");
+    doc.setFontSize(8);
+    doc.text(displayText("MÜŞTƏRİ MƏLUMATLARI"), 32, y + 15);
+
+    doc.setTextColor(...TICKET_COLORS.dark);
+    doc.setFont(fontName, "bold");
+    doc.setFontSize(12);
+    doc.text(displayText(customerName), 32, y + 32);
+
+    doc.setFont(fontName, "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(...TICKET_COLORS.muted);
+    doc.text(displayText(customerPhone ? `📞 ${customerPhone}` : ""), 32, y + 45);
+
+    if (vendorName) {
+      doc.setFont(fontName, "italic");
+      doc.setFontSize(8);
+      doc.text(displayText(`🏢 ${vendorName}`), W - 32, y + 45, { align: "right" });
+    }
+    y += 62;
+
+    // ===== 9. GÖRÜŞ YERİ (əgər varsa) =====
+    if (meetingPoint) {
+      doc.setFillColor(254, 249, 195); // yellow-100
+      doc.roundedRect(20, y, W - 40, 30, 4, 4, "F");
+      doc.setDrawColor(...TICKET_COLORS.accent);
+      doc.setLineWidth(0.8);
+      doc.roundedRect(20, y, W - 40, 30, 4, 4, "S");
+
+      doc.setTextColor(146, 64, 14); // yellow-800
+      doc.setFont(fontName, "bold");
+      doc.setFontSize(9);
+      doc.text(displayText(`📍 GÖRÜŞ YERİ: ${meetingPoint}`), 32, y + 19);
+      y += 40;
+    }
+
+    // ===== 10. AYIRICI XƏTT (bəzəkli) =====
+    doc.setDrawColor(...TICKET_COLORS.divider);
+    doc.setLineWidth(0.8);
+    doc.setLineDashPattern([3, 3], 0);
+    doc.line(30, y + 5, W - 30, y + 5);
+    doc.setLineDashPattern([], 0);
+    y += 18;
+
+    // ===== 11. QR KOD BÖLMƏSİ =====
+    const qrSize = 140;
+    const qrX = (W - qrSize) / 2;
+    const qrY = y;
+
+    // QR arxa fon (ağ)
+    doc.setFillColor(...TICKET_COLORS.white);
+    doc.roundedRect(qrX - 10, qrY - 10, qrSize + 20, qrSize + 20, 8, 8, "F");
+    doc.setDrawColor(...TICKET_COLORS.primary);
+    doc.setLineWidth(1.5);
+    doc.roundedRect(qrX - 10, qrY - 10, qrSize + 20, qrSize + 20, 8, 8, "S");
+
+    if (qrBase64) {
+      try {
+        doc.addImage(qrBase64, "PNG", qrX, qrY, qrSize, qrSize);
+      } catch (err) {
+        console.error("[QR] PDF-ə əlavə etmək alınmadı:", err);
+      }
+    } else {
+      // Fallback: boz placeholder
+      doc.setFillColor(241, 245, 249);
+      doc.rect(qrX, qrY, qrSize, qrSize, "F");
+      doc.setTextColor(...TICKET_COLORS.muted);
+      doc.setFont(fontName, "normal");
+      doc.setFontSize(9);
+      doc.text(displayText("QR kod yüklənmədi"), qrX + qrSize / 2, qrY + qrSize / 2, { align: "center" });
+    }
+
+    y = qrY + qrSize + 22;
+
+    doc.setTextColor(...TICKET_COLORS.primary);
+    doc.setFont(fontName, "bold");
+    doc.setFontSize(9);
+    doc.text(displayText("Bileti girişdə bələdçiyə göstərin"), W / 2, y, { align: "center" });
+    y += 14;
+
+    // ===== 12. TƏHLÜKƏSİZLİK QAYDALARI (kompakt) =====
+    doc.setFillColor(...TICKET_COLORS.bg);
+    doc.roundedRect(20, y, W - 40, 80, 5, 5, "F");
+
+    doc.setFillColor(...TICKET_COLORS.primary);
+    doc.rect(20, y, 3, 80, "F");
+
+    doc.setTextColor(...TICKET_COLORS.dark);
+    doc.setFont(fontName, "bold");
+    doc.setFontSize(9);
+    doc.text(displayText("⚠️ VACİB QAYDALAR"), 32, y + 14);
+
+    const rules = [
+      "• Bələdçinin təlimatlarına əməl edin",
+      "• Rahat yürüş ayaqqabısı və su mütləqdir",
+      "• Təbiəti qoruyun, zibil atmayın",
+      "• Xroniki xəstəlik barədə əvvəlcədən xəbərdar edin",
+    ];
+    doc.setFont(fontName, "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(...TICKET_COLORS.muted);
+    let ruleY = y + 26;
+    rules.forEach((r) => {
+      doc.text(displayText(r), 32, ruleY);
+      ruleY += 12;
+    });
+    y += 90;
+
+    // ===== 13. ALT BİLDİRİŞ (footer) =====
+    doc.setDrawColor(...TICKET_COLORS.divider);
+    doc.setLineWidth(0.5);
+    doc.line(30, H - 40, W - 30, H - 40);
+
+    doc.setTextColor(...TICKET_COLORS.muted);
+    doc.setFont(fontName, "normal");
+    doc.setFontSize(7.5);
+    doc.text(displayText("Xidmətdən istifadə etdiyiniz üçün təşəkkürlər!"), W / 2, H - 28, { align: "center" });
+    doc.setFont(fontName, "bold");
+    doc.setTextColor(...TICKET_COLORS.primary);
+    doc.text(displayText("gedekgorek.com"), W / 2, H - 18, { align: "center" });
+
+    // ===== 14. FAYLI YADDAŞA VERİRİK VƏ QAYTARIRIQ =====
+    const pdfBuffer = doc.output("arraybuffer");
     const filename = `ticket_${bookingId}.pdf`;
     const filepath = path.join(ticketsDir, filename);
+    fs.writeFileSync(filepath, Buffer.from(pdfBuffer));
 
-    fs.writeFileSync(filepath, Buffer.from(pdfOutputArrayBuffer));
-
-    const ticketUrl = `/tickets/${filename}`;
-    console.log(`[Ticket Success] Beautiful customized vertical mobile boarding pass stored at: ${ticketUrl}`);
-    return res.json({ success: true, ticketUrl });
-
+    console.log(`[Ticket] ✅ Yeni bilet yaradıldı: ${filename}`);
+    return res.json({ success: true, ticketUrl: `/tickets/${filename}` });
   } catch (error: any) {
-    console.error("PDF generation exception:", error);
-    return res.status(500).json({ error: "PDF bilet yaradılması zamanı xətalar baş verdi: " + error.message });
+    console.error("[Ticket] ❌ PDF yaratmaq alınmadı:", error);
+    return res.status(500).json({ error: "Bilet yaradılarkən xəta: " + error.message });
   }
 });
 
-// Itemized PDF export of a guide-payment/net-income calculation. Generated on demand from
-// whatever the vendor currently has on screen (not a stored record) — this way every last
-// sub-line (bonus splits, per-vehicle/per-item qty x price) shows up in the export even though
-// the saved-history table only keeps the item-level totals, not every intermediate number.
-// Reuses the same jsPDF + Roboto-font setup as the ticket generator above so Azerbaijani
-// characters (Ə, ə, ı, İ, etc.) render natively instead of falling back to transliteration.
+// ============================================================================
+// BƏLƏDÇİ ÖDƏNİŞİ VƏ NET GƏLİR HESABLAMASI PDF-İ
+// ============================================================================
 app.post("/api/guide-calculations/pdf", authenticateUser, async (req: any, res) => {
   try {
     if (req.operator.role !== 'vendor') {
@@ -3512,15 +2043,11 @@ app.post("/api/guide-calculations/pdf", authenticateUser, async (req: any, res) 
     if (!(await isCalculatorEnabledForVendor(req.operator.id))) {
       return res.status(403).json({ error: "Kalkulyator bu hesab üçün aktiv deyil." });
     }
-
     const body = req.body || {};
     const { tourName } = body;
     if (!tourName) return res.status(400).json({ error: "Tur adı tələb olunur." });
-
     const num = (v: any) => Number(v) || 0;
-
     const doc = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
-
     let hasCustomFonts = false;
     if (robotoRegularBase64 && robotoBoldBase64) {
       try {
@@ -3535,7 +2062,6 @@ app.post("/api/guide-calculations/pdf", authenticateUser, async (req: any, res) 
       }
     }
     const fontName = hasCustomFonts ? "Roboto" : "Helvetica";
-
     const toAscii = (str: string) => (str || "")
       .replace(/Ə/g, "E").replace(/ə/g, "e")
       .replace(/ı/g, "i").replace(/İ/g, "I")
@@ -3545,17 +2071,14 @@ app.post("/api/guide-calculations/pdf", authenticateUser, async (req: any, res) 
       .replace(/Ş/g, "S").replace(/ş/g, "s")
       .replace(/Ğ/g, "G").replace(/ğ/g, "g");
     const displayText = (str: string) => hasCustomFonts ? (str || "") : toAscii(str);
-
     const pageWidth = 595;
     const marginX = 40;
     let y = 50;
-
     doc.setFont(fontName, "bold");
     doc.setFontSize(16);
     doc.setTextColor(15, 23, 42);
     doc.text(displayText("BƏLƏDÇİ ÖDƏNİŞİ VƏ NET GƏLİR HESABLAMASI"), pageWidth / 2, y, { align: "center" });
     y += 20;
-
     doc.setFont(fontName, "normal");
     doc.setFontSize(10);
     doc.setTextColor(71, 85, 105);
@@ -3565,7 +2088,6 @@ app.post("/api/guide-calculations/pdf", authenticateUser, async (req: any, res) 
     doc.setTextColor(148, 163, 184);
     doc.text(displayText(new Date().toLocaleDateString('az-AZ')), pageWidth / 2, y, { align: "center" });
     y += 26;
-
     const drawRow = (label: string, value: string, opts: { bold?: boolean; indent?: number; size?: number; color?: [number, number, number] } = {}) => {
       const { bold = false, indent = 0, size = 10, color = [15, 23, 42] } = opts;
       doc.setFont(fontName, bold ? "bold" : "normal");
@@ -3575,7 +2097,6 @@ app.post("/api/guide-calculations/pdf", authenticateUser, async (req: any, res) 
       doc.text(displayText(value), pageWidth - marginX, y, { align: "right" });
       y += size + 7;
     };
-
     const drawSectionTitle = (title: string) => {
       y += 4;
       doc.setDrawColor(203, 213, 225);
@@ -3584,27 +2105,18 @@ app.post("/api/guide-calculations/pdf", authenticateUser, async (req: any, res) 
       y += 18;
       doc.setFont(fontName, "bold");
       doc.setFontSize(11.5);
-      doc.setTextColor(6, 95, 70); // emerald-800
+      doc.setTextColor(6, 95, 70);
       doc.text(displayText(title), marginX, y);
       y += 16;
     };
-
     const tierLabel = body.tier === 'peak' ? 'Zirvə' : body.tier === 'camp' ? 'Kamp' : 'Hiking';
-
     drawSectionTitle("Tur Məlumatları");
     drawRow("İştirakçı sayı", `${num(body.participants)} nəfər`);
     drawRow("Turun qiyməti (nəfər başına)", `${num(body.pricePerPerson).toFixed(2)} AZN`);
     drawRow("Tur müddəti", `${num(body.durationDays) || 1} gün`);
     drawRow("Bələdçi qiymət kateqoriyası", tierLabel);
-
-    // A saved (historical) calculation only carries item-level totals, not every intermediate
-    // number (base pay / second bonus / discretionary bonus share, or each item's qty x unit
-    // price) — those sub-lines only render when the caller actually provides them (the live
-    // in-progress calculator does; a saved-row export doesn't), so a saved export shows one
-    // clean total per line instead of misleading "0.00 AZN" sub-rows.
     const has = (v: any) => v !== undefined && v !== null;
     const qtyDetail = (qty: any, price: any) => has(qty) && has(price) ? ` (${num(qty)} x ${num(price).toFixed(2)} AZN)` : '';
-
     drawSectionTitle("Bələdçilərə Ödəniş");
     const hasMainBreakdown = has(body.mainGuidePayment);
     if (hasMainBreakdown) {
@@ -3621,7 +2133,6 @@ app.post("/api/guide-calculations/pdf", authenticateUser, async (req: any, res) 
     }
     drawRow(body.hasThirdGuide ? "Köməkçi bələdçilərə cəmi" : "Köməkçi bələdçiyə cəmi", `${num(body.assistantGuideTotal).toFixed(2)} AZN`, { indent: hasAssistantBreakdown ? 10 : 0, bold: true });
     drawRow("Bələdçilərə ödəniş cəmi", `${num(body.guideTotal).toFixed(2)} AZN`, { bold: true, color: [6, 95, 70] });
-
     drawSectionTitle("Digər Xərclər");
     if (num(body.busPrice) > 0) drawRow("Nəqliyyat", `${num(body.busPrice).toFixed(2)} AZN`, { indent: 10 });
     if (num(body.nivaTotal) > 0) drawRow(`Niva${qtyDetail(body.nivaQty, body.nivaUnitPrice)}`, `${num(body.nivaTotal).toFixed(2)} AZN`, { indent: 10 });
@@ -3632,14 +2143,11 @@ app.post("/api/guide-calculations/pdf", authenticateUser, async (req: any, res) 
     if (num(body.villageTeaTotal) > 0) drawRow("Kənd evində çay süfrəsi (cəmi)", `${num(body.villageTeaTotal).toFixed(2)} AZN`, { indent: 10 });
     if (num(body.nationalParkTotal) > 0) drawRow(`Milli park girişi${qtyDetail(body.nationalParkQty, body.nationalParkUnitPrice)}`, `${num(body.nationalParkTotal).toFixed(2)} AZN`, { indent: 10 });
     drawRow("Digər xərclər cəmi", `${num(body.otherCostsTotal).toFixed(2)} AZN`, { bold: true });
-
     drawSectionTitle("Yekun");
     drawRow("Yığılan pul", `${num(body.collected).toFixed(2)} AZN`);
     drawRow("Turdan olan net gəlir", `${num(body.netIncome).toFixed(2)} AZN`, { bold: true, size: 13, color: [6, 95, 70] });
-
     const pdfArrayBuffer = doc.output("arraybuffer");
     const safeName = toAscii(tourName).replace(/[^a-zA-Z0-9 ]/g, '').trim().replace(/\s+/g, '_').slice(0, 60) || 'hesablama';
-
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${safeName}.pdf"`);
     res.send(Buffer.from(pdfArrayBuffer));
@@ -3649,6 +2157,9 @@ app.post("/api/guide-calculations/pdf", authenticateUser, async (req: any, res) 
   }
 });
 
+// ============================================================================
+// SERVER STARTUP
+// ============================================================================
 async function startServer() {
   // Initialize Enterprise Database schemas / SQLite fallback
   try {
@@ -3660,23 +2171,15 @@ async function startServer() {
   // Safe load custom UTF-8 Fonts at application startup
   await ensureFonts();
 
-  // WhatsApp session boots in the background — the marketplace itself must keep working even
-  // if no admin has scanned the QR yet (or the connection later drops), so failures here are
-  // only logged, never thrown.
-  // WHATSAPP_DISABLED=1 — ikinci bir dev/test prosesi eyni Baileys sessiya fayllarını açanda
-  // əsas serverin bağlantısını 440 stream-konflikti ilə saldığı üçün test prosesləri bunu qoyur.
+  // WhatsApp session boots in the background
   if (process.env.WHATSAPP_DISABLED === "1") {
     console.log("[WhatsApp] WHATSAPP_DISABLED=1 — sessiya bu prosesdə başladılmır.");
   } else {
     startWhatsApp().catch((err) => console.error("[WhatsApp] Başlanğıc qoşulma xətası:", err));
   }
 
-  // Telegram bot — token yoxdursa no-op. Long polling həm chat ID köməkçisidir (bota yazan
-  // hər kəsə öz chat ID-sini qaytarır), həm də inline düymə callback-lərini emal edir;
-  // bildiriş göndərmək polling-dən asılı deyil.
+  // Telegram bot
   if (isTelegramEnabled()) {
-    // "✅ Oxundu işarələ" düyməsi: sorğu CRM-də oxundu statusuna keçir və aid panel
-    // bildirişi oxunmuş sayılır (zəng siyahısından düşür). İdempotentdir.
     setTelegramCallbackHandler(async (data) => {
       if (!data.startsWith("inqread:")) return;
       const inquiryId = data.slice("inqread:".length);
@@ -3696,16 +2199,12 @@ async function startServer() {
     console.log("[Telegram] TELEGRAM_BOT_TOKEN yoxdur — Telegram bildirişləri deaktivdir.");
   }
 
-  // Any /api/* path that didn't match one of the routes above is a genuine 404. Without this
-  // a typo'd or removed endpoint would fall through to the catch-all below and return HTML,
-  // which breaks response.json() on the client instead of surfacing a clear error.
+  // Any /api/* path that didn't match one of the routes above is a genuine 404
   app.use('/api', (req, res) => {
     res.status(404).json({ error: "Belə bir API endpoint mövcud deyil." });
   });
 
-  // The frontend is the standalone Next.js app in web/ (SSR, own port) — this process is
-  // API + static uploads only, so anything else is a 404. Page-level 404 semantics (unknown
-  // tour slugs etc.) are handled by Next itself via notFound().
+  // The frontend is the standalone Next.js app in web/ (SSR, own port)
   app.use((req, res) => {
     res.status(404).json({ error: "Bu server yalnız API-yə xidmət edir — sayt Next.js (web/) tərəfindədir." });
   });

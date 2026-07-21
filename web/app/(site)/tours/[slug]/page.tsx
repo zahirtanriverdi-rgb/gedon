@@ -1,7 +1,6 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { getTourBySlug, getTours, getSlots, getReviews, SITE_URL } from '@/lib/api';
-import { seedUsers } from '@/data/toursData';
+import { getTourBySlug, getTours, getSlots, getReviews, getVendorById, SITE_URL } from '@/lib/api';
 import { TourDetailClient } from './TourDetailClient';
 
 // Dynamic SSR on every request → always-fresh price/availability, and the tour content is in
@@ -48,15 +47,18 @@ export default async function TourDetailPageRoute({
   params: Promise<Params>;
 }) {
   const { slug } = await params;
-
+  
   // Fetch the tour first (cheap 404 path), then the supporting collections in parallel.
   const tour = await getTourBySlug(slug);
   if (!tour || tour.status !== 'approved') notFound();
-
+  
   const [tours, slots, reviews] = await Promise.all([getTours(), getSlots(), getReviews()]);
+  
+  // YENİ: Real vendor məlumatlarını çəkirik (seedUsers əvəzinə)
+  const vendor = await getVendorById(tour.vendorId);
+  const users = vendor ? [vendor] : [];
 
-  // JSON-LD structured data (ported verbatim from the old TourDetailRoute) — injected into the
-  // server HTML so crawlers get rich-result data without executing JS.
+  // JSON-LD structured data (ported verbatim from the old TourDetailRoute)
   const jsonLd: Record<string, unknown> = {
     '@context': 'https://schema.org',
     '@type': 'TouristTrip',
@@ -89,7 +91,7 @@ export default async function TourDetailPageRoute({
         tours={tours}
         slots={slots}
         reviews={reviews}
-        users={seedUsers}
+        users={users} /* YENİ: Real vendor məlumatı göndərilir */
       />
     </>
   );

@@ -1,32 +1,48 @@
 'use client';
-
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import type { User } from '@/types';
 
 interface AuthState {
   user: User | null;
   token: string | null;
-  // False until the stored session (if any) has been read from localStorage on the client.
-  // Route guards must wait for this before redirecting to login, otherwise a hard refresh
-  // would bounce a still-logged-in operator before their session finished loading.
   ready: boolean;
   login: (user: User, token: string) => void;
   logout: () => void;
-  // Merge server-confirmed profile edits into the live session (and its stored copy) so a
-  // vendor's own profile/rate changes show up without logging out and back in.
   updateUser: (updated: User) => void;
 }
 
 const AuthContext = createContext<AuthState | undefined>(undefined);
-
 type StoredSession = { user: User; token: string };
+
+// JWT-nin payload hissəsini (2-ci blok) base64-dən decode edib vaxtını yoxlayır.
+// Əgər token vaxtı bitibsə və ya formatı pozulubsa true qaytarır.
+function isTokenExpired(token: string): boolean {
+  try {
+    const payloadBase64 = token.split('.')[1];
+    if (!payloadBase64) return true;
+    const decoded = JSON.parse(atob(payloadBase64));
+    if (!decoded.exp) return false; // Əgər exp yoxdursa (nadir hal), müddətsiz sayırıq
+    // exp saniyə ilədir, Date.now() millisaniyə ilədir
+    return decoded.exp * 1000 < Date.now(); 
+  } catch {
+    return true; // Decode xətası versə, token etibarsızdır
+  }
+}
 
 function loadSession(key: string): StoredSession | null {
   try {
     const raw = window.localStorage.getItem(key);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    return parsed && parsed.user && parsed.token ? parsed : null;
+    if (parsed && parsed.user && parsed.token) {
+      // Əgər token vaxtı bitibsə, localStorage-u dərhal təmizləyib null qaytarırıq
+      if (isTokenExpired(parsed.token)) {
+        window.localStorage.removeItem(key);
+        return null;
+      }
+      return parsed;
+    }
+    return null;
   } catch {
     return null;
   }
@@ -36,7 +52,7 @@ function saveSession(key: string, session: StoredSession) {
   try {
     window.localStorage.setItem(key, JSON.stringify(session));
   } catch {
-    // localStorage unavailable (private browsing, quota) — session just won't survive a reload
+    // localStorage unavailable
   }
 }
 
@@ -48,17 +64,6 @@ function clearSession(key: string) {
   }
 }
 
-/**
- * Session for a dashboard route group (vendor or admin). Persisted to localStorage under
- * `storageKey` so a page reload doesn't silently bounce a logged-in operator back to the
- * login screen — the JWT itself is valid for 24h (see server.ts). Each route group mounts
- * its own provider with its own key, so a vendor and an admin session can be live at once
- * without ever leaking each other's token (the old SPA's cross-portal token-bleed bug is
- * structurally impossible here).
- *
- * Hydration note: the initial render (server + first client pass) always starts logged-out;
- * the stored session is restored in an effect, flipping `ready` once done.
- */
 export function AuthProvider({
   storageKey,
   children,
@@ -77,6 +82,27 @@ export function AuthProvider({
       setToken(stored.token);
     }
     setReady(true);
+  }, [storageKey]);
+
+  // api.ts-dən gələn 401 (Unauthorized) hadisəsini dinləyirik.
+  // Əgər arxa planda token vaxtı bitərsə, bu event tetiklenecek.
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      clearSession(storageKey);
+      setUser(null);
+      setToken(null);
+      
+      // İstifadəçini uyğun login səhifəsinə yönləndir (əgər artıq login səhifəsində deyilsə)
+      const path = window.location.pathname;
+      if (path.startsWith('/admin') && !path.includes('/login')) {
+        window.location.href = '/admin/login';
+      } else if (path.startsWith('/vendor') && !path.includes('/login')) {
+        window.location.href = '/vendor/login';
+      }
+    };
+
+    window.addEventListener('auth:unauthorized', handleUnauthorized);
+    return () => window.removeEventListener('auth:unauthorized', handleUnauthorized);
   }, [storageKey]);
 
   return (

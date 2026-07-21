@@ -7,6 +7,8 @@ import { ImageLightbox } from '@/components/customer/ImageLightbox';
 import { useLanguage } from '@/i18n/LanguageContext';
 import { useNotification } from '@/lib/notification';
 import { getWishlist, toggleWishlist } from '@/utils/wishlist';
+import { getCompareList, toggleCompareList, replaceInCompareList } from '@/utils/compare';
+import { CompareSwapModal } from '@/components/tours/CompareSwapModal';
 import { useCurrency, makeConvertedPriceInfo } from '@/lib/currency';
 import { useRouter } from 'next/navigation';
 
@@ -49,6 +51,32 @@ export function TourDetailClient({ tour, tours, slots, reviews, users }: TourDet
     if (e) e.stopPropagation();
     setWishlist(toggleWishlist(tourId));
   };
+
+  // Tour comparison ("Müqayisə") — localStorage-backed, max 3 tours (utils/compare.ts). Mirrors
+  // HomeClient: a full list opens the swap modal instead of silently dropping a tour.
+  const [compareList, setCompareList] = useState<string[]>([]);
+  React.useEffect(() => setCompareList(getCompareList()), []);
+  const [pendingCompareTourId, setPendingCompareTourId] = useState<string | null>(null);
+  const handleToggleCompare = (tourId: string, e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    const result = toggleCompareList(tourId);
+    if (result.status === 'full') {
+      setPendingCompareTourId(tourId);
+      return;
+    }
+    setCompareList(result.list);
+  };
+  const handleCompareSwapSelect = (tourIdToRemove: string) => {
+    if (!pendingCompareTourId) return;
+    setCompareList(replaceInCompareList(tourIdToRemove, pendingCompareTourId));
+    setPendingCompareTourId(null);
+  };
+  const pendingCompareCurrentTours = React.useMemo(() => {
+    if (!pendingCompareTourId) return [];
+    return compareList
+      .map((id) => tours.find((tt) => tt.id === id))
+      .filter((tt): tt is Tour => Boolean(tt));
+  }, [tours, compareList, pendingCompareTourId]);
 
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
@@ -115,6 +143,8 @@ export function TourDetailClient({ tour, tours, slots, reviews, users }: TourDet
         reviews={reviews}
         users={users}
         wishlist={wishlist}
+        compareList={compareList}
+        handleToggleCompare={handleToggleCompare}
         currentUser={guestUser}
         onAddBooking={handleAddBooking}
         onShowNotification={showNotification}
@@ -137,6 +167,13 @@ export function TourDetailClient({ tour, tours, slots, reviews, users }: TourDet
         }}
       />
       <ImageLightbox tour={tour} lightboxIndex={lightboxIndex} onSetLightboxIndex={setLightboxIndex} />
+      {pendingCompareTourId && (
+        <CompareSwapModal
+          currentTours={pendingCompareCurrentTours}
+          onSelectReplace={handleCompareSwapSelect}
+          onCancel={() => setPendingCompareTourId(null)}
+        />
+      )}
     </>
   );
 }
