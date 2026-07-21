@@ -173,6 +173,15 @@ export function ToursHomeView({
   // bottom-sheet's fields differ from their defaults.
   const hasCalendarSelection = !!calendarDateStart || calendarSelectedDates.length > 0;
   const hasActiveFilters = selectedDifficulty !== 'all' || selectedRegion !== 'all' || hasCalendarSelection || maxPrice < maxPriceLimit || sortBy !== 'default';
+  // Shared pill styling for the advanced-filters bottom sheet chips (Sort / Difficulty /
+  // Region). Selected state uses the brand's Deep Pine green — same active-chip treatment as
+  // the hero category pills — NOT a blue accent, keeping the sheet on-palette.
+  const filterChipCls = (active: boolean) =>
+    `px-4 py-2 rounded-full text-xs font-bold border transition-all cursor-pointer ${
+      active
+        ? 'bg-emerald-50 text-brand-primary border-brand-primary'
+        : 'bg-white text-brand-text-main border-slate-200 hover:border-slate-300 hover:bg-slate-50'
+    }`;
   return (
         // -mx-5 cancels the parent <main>'s fixed px-5 so this container can
         // reapply proportional side padding across all breakpoints — scaling
@@ -448,44 +457,59 @@ export function ToursHomeView({
                     </div>
                   </div>
 
-                  {/* Scrollable body — capped at 3 columns: the sheet is max-w-2xl,
-                      so 5 columns left ~100px per control and truncated the Azerbaijani
-                      labels/selects ("Bütün dərəcələr", "Varsayılan Sıralama", …). */}
-                  <div className="flex-1 overflow-y-auto px-6 sm:px-10 py-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                {/* Difficulty Filter */}
+                  {/* Scrollable body — single vertical column of chip-based filter sections,
+                      matching the reference bottom-sheet mock (Sort By / chips / range). */}
+                  <div className="flex-1 overflow-y-auto px-6 sm:px-10 py-6 space-y-6">
+                {/* Difficulty Filter — chip selector */}
                 <div>
-                  <label className="block text-[10px] font-bold text-brand-text-muted mb-1">{tt('customerHome.toursHomeView.filters.difficultyLabel')}</label>
-                  <select
-                    value={selectedDifficulty}
-                    onChange={(e) => setSelectedDifficulty(e.target.value)}
-                    className="w-full px-3 py-2 bg-brand-bg-light border border-slate-200 rounded-lg text-xs font-medium text-brand-text-main focus:outline-none focus:ring-1 focus:ring-brand-cta cursor-pointer"
-                  >
-                    <option value="all">{t('allLevels')}</option>
-                    <option value="easy">{tt('customerHome.toursHomeView.filters.difficultyOptions.easy')}</option>
-                    <option value="medium">{tt('customerHome.toursHomeView.filters.difficultyOptions.medium')}</option>
-                    <option value="hard">{tt('customerHome.toursHomeView.filters.difficultyOptions.hard')}</option>
-                    <option value="extreme">{tt('customerHome.toursHomeView.filters.difficultyOptions.extreme')}</option>
-                  </select>
+                  <label className="block text-[13px] font-extrabold text-brand-text-main mb-3">{tt('customerHome.toursHomeView.filters.difficultyLabel')}</label>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { v: 'all', label: t('allLevels') },
+                      { v: 'easy', label: tt('customerHome.toursHomeView.filters.difficultyOptions.easy') },
+                      { v: 'medium', label: tt('customerHome.toursHomeView.filters.difficultyOptions.medium') },
+                      { v: 'hard', label: tt('customerHome.toursHomeView.filters.difficultyOptions.hard') },
+                      { v: 'extreme', label: tt('customerHome.toursHomeView.filters.difficultyOptions.extreme') },
+                    ].map(opt => (
+                      <button
+                        key={opt.v}
+                        type="button"
+                        onClick={() => setSelectedDifficulty(opt.v)}
+                        className={filterChipCls(selectedDifficulty === opt.v)}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
-                {/* Region Filter */}
+                {/* Region Filter — chip selector */}
                 <div>
-                  <label className="block text-[10px] font-bold text-brand-text-muted mb-1">{tt('customerHome.toursHomeView.filters.regionsLabel')}</label>
-                  <select
-                    value={selectedRegion}
-                    onChange={(e) => setSelectedRegion(e.target.value)}
-                    className="w-full px-3 py-2 bg-brand-bg-light border border-slate-200 rounded-lg text-xs font-medium text-brand-text-main focus:outline-none focus:ring-1 focus:ring-brand-cta cursor-pointer"
-                  >
-                    <option value="all">{t('everywhere')}</option>
+                  <label className="block text-[13px] font-extrabold text-brand-text-main mb-3">{tt('customerHome.toursHomeView.filters.regionsLabel')}</label>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedRegion('all')}
+                      className={filterChipCls(selectedRegion === 'all')}
+                    >
+                      {t('everywhere')}
+                    </button>
                     {uniqueRegions.map(reg => (
-                      <option key={reg} value={reg}>{reg}</option>
+                      <button
+                        key={reg}
+                        type="button"
+                        onClick={() => setSelectedRegion(reg)}
+                        className={filterChipCls(selectedRegion === reg)}
+                      >
+                        {reg}
+                      </button>
                     ))}
-                  </select>
+                  </div>
                 </div>
 
                 {/* Tarix Filtri (Təqvim) */}
                 <div className="relative">
-                  <label className="block text-[10px] font-bold text-brand-text-muted mb-1">{tt('customerHome.toursHomeView.filters.dateLabel')}</label>
+                  <label className="block text-[13px] font-extrabold text-brand-text-main mb-3">{tt('customerHome.toursHomeView.filters.dateLabel')}</label>
                   <button
                     type="button"
                     id="calendar-toggle-btn"
@@ -676,39 +700,49 @@ export function ToursHomeView({
                   )}
                 </div>
 
-                {/* Sıralama Dropdown Menu */}
+                {/* Sort By — chip selector (reference mock: "Sort By" pills) */}
                 <div>
-                  <label className="block text-[10px] font-black text-brand-text-muted tracking-wider mb-1">{tt('customerHome.toursHomeView.filters.sortLabel')}</label>
-                  <select
-                    value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value)}
-                    className="w-full px-3 py-2 bg-brand-bg-light border border-slate-200 rounded-lg text-xs font-bold text-brand-text-main focus:outline-none focus:ring-1 focus:ring-brand-cta cursor-pointer"
-                  >
-                    <option value="default">{tt('customerHome.toursHomeView.filters.sortOptions.default')}</option>
-                    <option value="price-asc">{tt('customerHome.toursHomeView.filters.sortOptions.priceAsc')}</option>
-                    <option value="price-desc">{tt('customerHome.toursHomeView.filters.sortOptions.priceDesc')}</option>
-                    <option value="diff-asc">{tt('customerHome.toursHomeView.filters.sortOptions.diffAsc')}</option>
-                    <option value="diff-desc">{tt('customerHome.toursHomeView.filters.sortOptions.diffDesc')}</option>
-                    <option value="date-asc">{tt('customerHome.toursHomeView.filters.sortOptions.dateAsc')}</option>
-                    <option value="date-desc">{tt('customerHome.toursHomeView.filters.sortOptions.dateDesc')}</option>
-                  </select>
+                  <label className="block text-[13px] font-extrabold text-brand-text-main mb-3">{tt('customerHome.toursHomeView.filters.sortLabel')}</label>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { v: 'default', label: tt('customerHome.toursHomeView.filters.sortOptions.default') },
+                      { v: 'price-asc', label: tt('customerHome.toursHomeView.filters.sortOptions.priceAsc') },
+                      { v: 'price-desc', label: tt('customerHome.toursHomeView.filters.sortOptions.priceDesc') },
+                      { v: 'diff-asc', label: tt('customerHome.toursHomeView.filters.sortOptions.diffAsc') },
+                      { v: 'diff-desc', label: tt('customerHome.toursHomeView.filters.sortOptions.diffDesc') },
+                      { v: 'date-asc', label: tt('customerHome.toursHomeView.filters.sortOptions.dateAsc') },
+                      { v: 'date-desc', label: tt('customerHome.toursHomeView.filters.sortOptions.dateDesc') },
+                    ].map(opt => (
+                      <button
+                        key={opt.v}
+                        type="button"
+                        onClick={() => setSortBy(opt.v)}
+                        className={filterChipCls(sortBy === opt.v)}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
 
-                {/* Max Price Range Slider */}
-                <div className="flex flex-col justify-end">
-                  <div className="flex justify-between text-[10px] font-bold text-brand-text-muted mb-1.5">
-                    <span>{tt('customerHome.toursHomeView.filters.maxPrice')}</span>
-                    <span className="text-brand-cta font-extrabold whitespace-nowrap">{maxPrice} ₼</span>
+                {/* Price Range — single max-price slider styled like the reference range row:
+                    min/max endpoints flanking the track, current value in a green pill. */}
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <label className="text-[13px] font-extrabold text-brand-text-main">{tt('customerHome.toursHomeView.filters.maxPrice')}</label>
+                    <span className="text-xs font-extrabold text-brand-primary bg-emerald-50 border border-emerald-100 rounded-full px-2.5 py-0.5 whitespace-nowrap">{maxPrice} ₼</span>
                   </div>
-                  <div className="py-1">
+                  <div className="flex items-center gap-3">
+                    <span className="text-[11px] font-bold text-brand-text-muted shrink-0">20 ₼</span>
                     <input
                       type="range"
                       min="20"
                       max={maxPriceLimit}
                       value={maxPrice}
                       onChange={(e) => setMaxPrice(Number(e.target.value))}
-                      className="w-full accent-brand-cta cursor-pointer h-1 bg-slate-200 rounded-lg"
+                      className="flex-1 accent-brand-primary cursor-pointer h-1.5 bg-slate-200 rounded-lg"
                     />
+                    <span className="text-[11px] font-bold text-brand-text-muted shrink-0">{maxPriceLimit} ₼</span>
                   </div>
                 </div>
                   </div>
