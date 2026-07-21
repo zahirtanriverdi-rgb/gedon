@@ -1,6 +1,6 @@
 'use client';
 import React from 'react';
-import { Clock, MapPin } from 'lucide-react';
+import { Search, Clock, MapPin } from 'lucide-react';
 import { Tour } from '../types';
 import { normalizeAzText } from '../utils/searchNormalize';
 import { getLocalizedTourName, getLocalizedTourDescription } from '../i18n/tourLocalization';
@@ -14,12 +14,34 @@ interface SearchDropdownProps {
   appLanguage?: Language;
 }
 
-export const SearchDropdown: React.FC<SearchDropdownProps> = ({ 
-  query, 
-  tours, 
-  recentSearches, 
+// Renders a suggestion title the way the reference mock does: the part the user has already
+// typed (the matched span) stays light/muted, the remaining "completion" is bold — so the eye
+// is drawn to what each suggestion *adds* over the current query. Falls back to a plain bold
+// title when the query doesn't match by substring (e.g. it matched via the description).
+const HighlightedTitle: React.FC<{ title: string; query: string }> = ({ title, query }) => {
+  const trimmed = query.trim();
+  if (!trimmed) {
+    return <span className="font-bold text-slate-800">{title}</span>;
+  }
+  const idx = normalizeAzText(title).indexOf(normalizeAzText(trimmed));
+  if (idx === -1) {
+    return <span className="font-bold text-slate-800">{title}</span>;
+  }
+  const end = idx + trimmed.length;
+  return (
+    <>
+      <span className="font-normal text-slate-400">{title.slice(0, end)}</span>
+      <span className="font-bold text-slate-800">{title.slice(end)}</span>
+    </>
+  );
+};
+
+export const SearchDropdown: React.FC<SearchDropdownProps> = ({
+  query,
+  tours,
+  recentSearches,
   onSelect,
-  appLanguage = 'az' 
+  appLanguage = 'az'
 }) => {
   // Without strictNullChecks, a destructuring default widens the param type to `string`, so
   // pin it back to Language for the localization helpers below.
@@ -27,13 +49,13 @@ export const SearchDropdown: React.FC<SearchDropdownProps> = ({
   // Diacritic-folded so "selale" typed on an EN/RU keyboard still matches "şəlalə" — the same
   // normalization the main grid filter uses (utils/searchNormalize).
   const lowerQuery = normalizeAzText(query.trim());
-  
+
   // Determine if we should show recent searches
   const showRecent = !lowerQuery && recentSearches.length > 0;
-  
+
   // Get dynamic suggestions
   const suggestions: Array<{ title: string, subtitle: string, type: 'region' | 'tour', image?: string, id?: string }> = [];
-  
+
   // Belt-and-suspenders alongside the server-side filter (GET /api/tours only returns
   // status = 'approved' to anonymous/customer requests) — a pending or rejected tour must
   // never surface in search suggestions.
@@ -61,7 +83,7 @@ export const SearchDropdown: React.FC<SearchDropdownProps> = ({
       normalizeAzText(getLocalizedTourDescription(t, lang)).includes(lowerQuery)
     );
 
-    matchedTours.slice(0, 4).forEach(tour => {
+    matchedTours.slice(0, 5).forEach(tour => {
        suggestions.push({
          title: getLocalizedTourName(tour, lang),
          subtitle: tour.region,
@@ -86,7 +108,7 @@ export const SearchDropdown: React.FC<SearchDropdownProps> = ({
 
     Array.from(regionStats.entries())
       .sort((a, b) => b[1].totalReviews - a[1].totalReviews)
-      .slice(0, 4)
+      .slice(0, 5)
       .forEach(([region, stat]) => {
         suggestions.push({
           title: region,
@@ -98,68 +120,66 @@ export const SearchDropdown: React.FC<SearchDropdownProps> = ({
 
   if (suggestions.length === 0 && !showRecent) {
     return (
-      <div className="absolute top-full left-0 right-0 mt-3 bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden z-[100] py-4 text-left">
-        <div className="px-4 text-center text-slate-500 py-4 text-sm font-medium">
+      <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden z-[100] py-4 text-left">
+        <div className="px-5 text-center text-slate-400 py-4 text-sm font-medium">
           {appLanguage === 'az' ? 'Nəticə tapılmadı' : appLanguage === 'ru' ? 'Ничего не найдено' : 'No results found'}
         </div>
       </div>
     );
   }
 
+  const sectionLabel = showRecent
+    ? (appLanguage === 'az' ? 'Son Axtarışlar' : appLanguage === 'ru' ? 'Недавние поиски' : 'Recent Searches')
+    : (appLanguage === 'az' ? 'Təkliflər' : appLanguage === 'ru' ? 'Предложения' : 'Suggestions');
+
   return (
-    <div className="absolute top-full left-0 right-0 mt-3 bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden z-[100] py-4 text-left max-h-[70vh] overflow-y-auto">
-      {/* Recent Searches */}
+    // Clean single-list dropdown (reference mock): a search-icon row per suggestion, the typed
+    // span muted and the completion bold. No thumbnails — kept intentionally flat and fast to scan.
+    <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden z-[100] py-2 text-left max-h-[70vh] overflow-y-auto">
+      <h3 className="px-5 pt-2 pb-1 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+        {sectionLabel}
+      </h3>
+
+      {/* Recent Searches — plain query strings, tapped to re-run. */}
       {showRecent && (
-        <div className="px-4 mb-5">
-          <h3 className="text-[14px] font-bold text-slate-500 mb-3">
-            {appLanguage === 'az' ? 'Son Axtarışlar' : appLanguage === 'ru' ? 'Недавние поиски' : 'Recent Searches'}
-          </h3>
-          <div className="flex flex-col gap-1">
-            {recentSearches.map((search, idx) => (
-              <button 
-                key={idx}
-                onClick={() => onSelect(search)}
-                className="flex items-center gap-4 w-full text-left p-2 hover:bg-slate-50 rounded-xl transition-colors"
-              >
-                <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center text-slate-500 shrink-0">
-                  <Clock className="w-5 h-5" />
-                </div>
-                <span className="font-bold text-slate-800 text-[15px]">{search}</span>
-              </button>
-            ))}
-          </div>
+        <div className="flex flex-col">
+          {recentSearches.map((search, idx) => (
+            <button
+              key={idx}
+              onClick={() => onSelect(search)}
+              className="flex items-center gap-3.5 w-full text-left px-5 py-2.5 hover:bg-slate-50 transition-colors"
+            >
+              <Clock className="w-[18px] h-[18px] text-slate-400 shrink-0" />
+              <span className="font-bold text-slate-800 text-[15px] truncate">{search}</span>
+            </button>
+          ))}
         </div>
       )}
 
-      {/* Suggestions */}
-      {suggestions.length > 0 && (
-        <div className="px-4">
-          <h3 className="text-[14px] font-bold text-slate-500 mb-3">
-            {appLanguage === 'az' ? 'Təkliflər' : appLanguage === 'ru' ? 'Предложения' : 'Suggestions'}
-          </h3>
-          <div className="flex flex-col gap-1">
-            {suggestions.map((sugg, idx) => (
-              <button 
-                key={idx}
-                onClick={() => onSelect(sugg.title)}
-                className="flex items-center gap-4 w-full text-left p-2 hover:bg-slate-50 rounded-xl transition-colors"
-              >
-                <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center overflow-hidden shrink-0">
-                  {sugg.type === 'region' ? (
-                    <MapPin className="w-6 h-6 text-slate-400" />
-                  ) : sugg.image ? (
-                    <img src={sugg.image} alt={sugg.title} className="w-full h-full object-cover" />
-                  ) : (
-                    <MapPin className="w-6 h-6 text-slate-400" />
-                  )}
-                </div>
-                <div className="flex flex-col overflow-hidden">
-                  <span className="font-bold text-slate-800 text-[15px] truncate">{sugg.title}</span>
-                  <span className="text-[13px] text-slate-500 font-medium mt-0.5 truncate">{sugg.subtitle}</span>
-                </div>
-              </button>
-            ))}
-          </div>
+      {/* Suggestions — regions + tours. */}
+      {!showRecent && suggestions.length > 0 && (
+        <div className="flex flex-col">
+          {suggestions.map((sugg, idx) => (
+            <button
+              key={idx}
+              onClick={() => onSelect(sugg.title)}
+              className="flex items-center gap-3.5 w-full text-left px-5 py-2.5 hover:bg-slate-50 transition-colors"
+            >
+              {sugg.type === 'region' ? (
+                <MapPin className="w-[18px] h-[18px] text-slate-400 shrink-0" />
+              ) : (
+                <Search className="w-[18px] h-[18px] text-slate-400 shrink-0" />
+              )}
+              <span className="flex-1 min-w-0 flex items-baseline gap-2 overflow-hidden">
+                <span className="text-[15px] truncate">
+                  <HighlightedTitle title={sugg.title} query={query} />
+                </span>
+                <span className="text-[12px] text-slate-400 font-medium truncate shrink-0 ml-auto">
+                  {sugg.subtitle}
+                </span>
+              </span>
+            </button>
+          ))}
         </div>
       )}
     </div>
