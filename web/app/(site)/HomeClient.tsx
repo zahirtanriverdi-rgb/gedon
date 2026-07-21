@@ -179,14 +179,39 @@ export function HomeClient({ tours, slots, reviews, users, bookings }: HomeClien
   React.useEffect(() => setRecentSearches(getRecentSearches()), []);
   const recordSearch = (term: string) => setRecentSearches(addRecentSearch(term));
 
+  // Records the scroll position at the moment the search bar gains focus, so the scroll-to-close
+  // handler below can tell a real user scroll apart from the tiny scroll iOS fires when the
+  // on-screen keyboard opens on focus (which must NOT instantly close the freshly-opened dropdown).
+  const searchFocusScrollY = React.useRef(0);
   React.useEffect(() => {
-    function handleClickOutsideSearch(event: MouseEvent) {
+    if (isSearchFocused) searchFocusScrollY.current = window.scrollY;
+  }, [isSearchFocused]);
+
+  React.useEffect(() => {
+    // touchstart alongside mousedown so a tap outside on mobile closes the dropdown too
+    // (some mobile browsers don't emit a reliable mousedown for taps on non-interactive areas).
+    function handleClickOutsideSearch(event: MouseEvent | TouchEvent) {
       if (searchContainerRef.current && !searchContainerRef.current.contains(event.target as Node)) {
         setIsSearchFocused(false);
       }
     }
+    // Scrolling the page closes the dropdown (native search-bar behaviour): tapped the bar,
+    // typed nothing, scrolled → it must not linger open. Blurs the input too so the keyboard
+    // dismisses and the bar can be cleanly re-opened by a fresh tap.
+    function handleScrollClose() {
+      if (Math.abs(window.scrollY - searchFocusScrollY.current) < 24) return;
+      setIsSearchFocused(false);
+      const active = document.activeElement as HTMLElement | null;
+      if (active && searchContainerRef.current?.contains(active)) active.blur();
+    }
     document.addEventListener('mousedown', handleClickOutsideSearch);
-    return () => document.removeEventListener('mousedown', handleClickOutsideSearch);
+    document.addEventListener('touchstart', handleClickOutsideSearch, { passive: true });
+    window.addEventListener('scroll', handleScrollClose, { passive: true });
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutsideSearch);
+      document.removeEventListener('touchstart', handleClickOutsideSearch);
+      window.removeEventListener('scroll', handleScrollClose);
+    };
   }, []);
 
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
