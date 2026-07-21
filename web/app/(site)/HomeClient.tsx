@@ -112,6 +112,10 @@ interface HomeClientProps {
   reviews: Review[];
   users: User[];
   bookings: Booking[];
+  // Set on the dedicated per-category pages (/category/peak, /category/camp, …). When present it
+  // locks the grid to that category and the category chips navigate between the sibling pages
+  // instead of filtering in place. Undefined on the home page ("Bütün Turlar" = all).
+  initialCategory?: string;
 }
 
 /**
@@ -124,7 +128,7 @@ interface HomeClientProps {
  * param-ları müvafiq filtri tətbiq edir — footer-dəki destinasiya/kateqoriya linkləri həqiqi,
  * paylaşıla bilən URL-lərdir.
  */
-export function HomeClient({ tours, slots, reviews, users, bookings }: HomeClientProps) {
+export function HomeClient({ tours, slots, reviews, users, bookings, initialCategory }: HomeClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { t: tGlobal, language } = useLanguage();
@@ -214,7 +218,7 @@ export function HomeClient({ tours, slots, reviews, users, bookings }: HomeClien
     };
   }, []);
 
-  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [selectedCategory, setSelectedCategory] = useState<string>(initialCategory || 'all');
   const [selectedDifficulty, setSelectedDifficulty] = useState<string>('all');
   const [selectedRegion, setSelectedRegion] = useState<string>('all');
   const [maxPrice, setMaxPrice] = useState<number>(3000);
@@ -249,10 +253,13 @@ export function HomeClient({ tours, slots, reviews, users, bookings }: HomeClien
     const regionParam = searchParams.get('region')?.trim() || 'all';
     const rawCategory = searchParams.get('category')?.trim() || 'all';
     // Naməlum kateqoriya dəyəri (köhnə link, əl ilə yazılmış URL) "boş nəticə" ekranına
-    // yox, adi "hamısı" görünüşünə düşsün.
-    const categoryParam = ['peak', 'camp', 'hiking', 'active', 'international'].includes(rawCategory)
-      ? rawCategory
-      : 'all';
+    // yox, adi "hamısı" görünüşünə düşsün. Dedicated kateqoriya səhifəsində (initialCategory)
+    // URL-də `category` param-ı olmur — orada həmişə səhifənin öz kateqoriyası qalır.
+    const categoryParam = initialCategory
+      ? initialCategory
+      : ['peak', 'camp', 'hiking', 'active', 'international'].includes(rawCategory)
+        ? rawCategory
+        : 'all';
     const qParam = searchParams.get('q')?.trim() || '';
     setLocalSearchQuery(qParam);
     setIsSearchFocused(false);
@@ -650,6 +657,7 @@ export function HomeClient({ tours, slots, reviews, users, bookings }: HomeClien
         appLanguage={appLanguage}
         selectedCategory={selectedCategory}
         setSelectedCategory={setSelectedCategory}
+        onCategoryChange={(cat) => router.push(cat === 'all' ? '/' : `/category/${cat}`)}
         selectedDifficulty={selectedDifficulty}
         setSelectedDifficulty={setSelectedDifficulty}
         selectedRegion={selectedRegion}

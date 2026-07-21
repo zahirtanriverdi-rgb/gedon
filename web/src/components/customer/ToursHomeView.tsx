@@ -48,6 +48,9 @@ interface ToursHomeViewProps {
   appLanguage: 'az' | 'en' | 'ru';
   selectedCategory: string;
   setSelectedCategory: (val: string) => void;
+  // When provided, the category chips navigate to the dedicated per-category pages
+  // (/category/peak, …) instead of only toggling local filter state.
+  onCategoryChange?: (val: string) => void;
   selectedDifficulty: string;
   setSelectedDifficulty: (val: string) => void;
   selectedRegion: string;
@@ -93,7 +96,7 @@ export function ToursHomeView({
   tours, slots, bookings, reviews, currentUser, onAddReview, wishlist, compareList,
   handleToggleCompare, t, currentSearchQuery, handleSearchChange, isSearchFocused,
   setIsSearchFocused, searchContainerRef, recentSearches, recordSearch, appLanguage,
-  selectedCategory, setSelectedCategory, selectedDifficulty, setSelectedDifficulty,
+  selectedCategory, setSelectedCategory, onCategoryChange, selectedDifficulty, setSelectedDifficulty,
   selectedRegion, setSelectedRegion, maxPrice, setMaxPrice, maxPriceLimit,
   isFiltersExpanded, setIsFiltersExpanded, uniqueRegions, showCalendarWidget,
   setShowCalendarWidget, calendarDateStart, calendarDateEnd, calendarMode,
@@ -107,6 +110,11 @@ export function ToursHomeView({
   const { t: tt, language } = useLanguage();
   const featuredTourIds = React.useMemo(() => computeFeaturedTourIds(tours, slots), [tours, slots]);
   const [hikingSubcategory, setHikingSubcategory] = React.useState<HikingSubcategory>('all');
+
+  // A category chip either navigates to that category's dedicated page (home + category pages,
+  // via onCategoryChange) or, as a fallback, just toggles the local filter state.
+  const selectCategory = (cat: string) =>
+    onCategoryChange ? onCategoryChange(cat) : setSelectedCategory(cat);
 
   const visibleTours = React.useMemo(() => {
     if (selectedCategory !== 'hiking' || hikingSubcategory === 'all') return sortedAndFilteredTours;
@@ -234,23 +242,23 @@ export function ToursHomeView({
 
         <div className="w-full max-w-3xl overflow-x-auto [&::-webkit-scrollbar]:hidden max-sm:mb-14" style={{ scrollbarWidth: 'none' }}>
           <div className="flex items-center gap-2 mt-4 sm:mt-6 mb-3 sm:mb-4 px-4 -mx-4 sm:px-0 sm:mx-0 sm:justify-center snap-x snap-mandatory w-max sm:w-full mx-auto">
-            <button onClick={() => setSelectedCategory('all')} className={`shrink-0 snap-start px-3 py-2 sm:px-4 sm:py-2.5 rounded-full text-[11px] sm:text-xs font-bold transition-all border ${selectedCategory === 'all' ? 'bg-emerald-50 text-brand-primary border-brand-primary' : 'bg-white text-brand-text-main border-slate-200 hover:border-slate-300 hover:bg-slate-50'}`}>
+            <button onClick={() => selectCategory('all')} className={`shrink-0 snap-start px-3 py-2 sm:px-4 sm:py-2.5 rounded-full text-[11px] sm:text-xs font-bold transition-all border ${selectedCategory === 'all' ? 'bg-emerald-50 text-brand-primary border-brand-primary' : 'bg-white text-brand-text-main border-slate-200 hover:border-slate-300 hover:bg-slate-50'}`}>
                {tt('customerHome.toursHomeView.categories.all')}
             </button>
-            <button onClick={() => setSelectedCategory('peak')} className={`shrink-0 snap-start px-3 py-2 sm:px-4 sm:py-2.5 rounded-full text-[11px] sm:text-xs font-bold transition-all border flex items-center gap-1.5 ${selectedCategory === 'peak' ? 'bg-emerald-50 text-brand-primary border-brand-primary' : 'bg-white text-brand-text-main border-slate-200 hover:border-slate-300 hover:bg-slate-50'}`}>
+            <button onClick={() => selectCategory('peak')} className={`shrink-0 snap-start px-3 py-2 sm:px-4 sm:py-2.5 rounded-full text-[11px] sm:text-xs font-bold transition-all border flex items-center gap-1.5 ${selectedCategory === 'peak' ? 'bg-emerald-50 text-brand-primary border-brand-primary' : 'bg-white text-brand-text-main border-slate-200 hover:border-slate-300 hover:bg-slate-50'}`}>
               🏔️ {tt('customerHome.toursHomeView.categories.peak')}
             </button>
-            <button onClick={() => setSelectedCategory('camp')} className={`shrink-0 snap-start px-3 py-2 sm:px-4 sm:py-2.5 rounded-full text-[11px] sm:text-xs font-bold transition-all border flex items-center gap-1.5 ${selectedCategory === 'camp' ? 'bg-emerald-50 text-brand-primary border-brand-primary' : 'bg-white text-brand-text-main border-slate-200 hover:border-slate-300 hover:bg-slate-50'}`}>
+            <button onClick={() => selectCategory('camp')} className={`shrink-0 snap-start px-3 py-2 sm:px-4 sm:py-2.5 rounded-full text-[11px] sm:text-xs font-bold transition-all border flex items-center gap-1.5 ${selectedCategory === 'camp' ? 'bg-emerald-50 text-brand-primary border-brand-primary' : 'bg-white text-brand-text-main border-slate-200 hover:border-slate-300 hover:bg-slate-50'}`}>
               ⛺ {tt('customerHome.toursHomeView.categories.camp')}
             </button>
-            <button onClick={() => setSelectedCategory('hiking')} className={`shrink-0 snap-start px-3 py-2 sm:px-4 sm:py-2.5 rounded-full text-[11px] sm:text-xs font-bold transition-all border flex items-center gap-1.5 ${selectedCategory === 'hiking' ? 'bg-emerald-50 text-brand-primary border-brand-primary' : 'bg-white text-brand-text-main border-slate-200 hover:border-slate-300 hover:bg-slate-50'}`}>
+            <button onClick={() => selectCategory('hiking')} className={`shrink-0 snap-start px-3 py-2 sm:px-4 sm:py-2.5 rounded-full text-[11px] sm:text-xs font-bold transition-all border flex items-center gap-1.5 ${selectedCategory === 'hiking' ? 'bg-emerald-50 text-brand-primary border-brand-primary' : 'bg-white text-brand-text-main border-slate-200 hover:border-slate-300 hover:bg-slate-50'}`}>
               🥾 {tt('customerHome.toursHomeView.categories.hiking')}
             </button>
-            <button onClick={() => setSelectedCategory('active')} className={`shrink-0 snap-start px-3 py-2 sm:px-4 sm:py-2.5 rounded-full text-[11px] sm:text-xs font-bold transition-all border relative flex items-center gap-1.5 ${selectedCategory === 'active' ? 'bg-emerald-50 text-brand-primary border-brand-primary' : 'bg-white text-brand-text-main border-slate-200 hover:border-slate-300 hover:bg-slate-50'}`}>
+            <button onClick={() => selectCategory('active')} className={`shrink-0 snap-start px-3 py-2 sm:px-4 sm:py-2.5 rounded-full text-[11px] sm:text-xs font-bold transition-all border relative flex items-center gap-1.5 ${selectedCategory === 'active' ? 'bg-emerald-50 text-brand-primary border-brand-primary' : 'bg-white text-brand-text-main border-slate-200 hover:border-slate-300 hover:bg-slate-50'}`}>
               🏃‍♂️ {tt('customerHome.toursHomeView.categories.active')}
               <span className="absolute top-0.5 right-0.5 w-2 h-2 bg-sky-500 rounded-full ring-2 ring-white" title={tt('customerHome.toursHomeView.categories.newBadge')} />
             </button>
-            <button onClick={() => setSelectedCategory('international')} className={`shrink-0 snap-start px-3 py-2 sm:px-4 sm:py-2.5 rounded-full text-[11px] sm:text-xs font-bold transition-all border relative flex items-center gap-1.5 ${selectedCategory === 'international' ? 'bg-emerald-50 text-brand-primary border-brand-primary' : 'bg-white text-brand-text-main border-slate-200 hover:border-slate-300 hover:bg-slate-50'}`}>
+            <button onClick={() => selectCategory('international')} className={`shrink-0 snap-start px-3 py-2 sm:px-4 sm:py-2.5 rounded-full text-[11px] sm:text-xs font-bold transition-all border relative flex items-center gap-1.5 ${selectedCategory === 'international' ? 'bg-emerald-50 text-brand-primary border-brand-primary' : 'bg-white text-brand-text-main border-slate-200 hover:border-slate-300 hover:bg-slate-50'}`}>
               ✈️ {tt('customerHome.toursHomeView.categories.international')}
               <span className="absolute top-0.5 right-0.5 w-2 h-2 bg-rose-500 rounded-full ring-2 ring-white" title={tt('customerHome.toursHomeView.categories.hotBadge')} />
             </button>
