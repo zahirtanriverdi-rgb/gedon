@@ -1,7 +1,0 @@
-{
-  "/(site)/page": "app/(site)/page.js",
-  "/(site)/tours/[slug]/page": "app/(site)/tours/[slug]/page.js",
-  "/vendor/dashboard/page": "app/vendor/dashboard/page.js",
-  "/admin/login/page": "app/admin/login/page.js",
-  "/admin/dashboard/page": "app/admin/dashboard/page.js"
-}

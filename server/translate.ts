@@ -5,6 +5,7 @@ import type { Guide } from "../shared/types";
 // Gemini-powered translation for tour/vendor content (source: Azerbaijani -> English/Russian).
 // Domain-aware prompting handles tourism vocabulary (zirvə/şəlalə/yürüş etc.) far more
 // reliably than a generic machine-translation model would.
+
 const TARGET_LANGUAGES = ["en", "ru"] as const;
 type TargetLanguage = (typeof TARGET_LANGUAGES)[number];
 
@@ -27,6 +28,7 @@ export type TourTranslationEntry = {
 export type TourTranslations = Partial<Record<TargetLanguage, TourTranslationEntry>>;
 
 let aiClient: GoogleGenAI | null = null;
+
 function getGeminiClient(): GoogleGenAI {
   if (!aiClient) {
     const key = process.env.GEMINI_API_KEY;
@@ -67,11 +69,7 @@ async function generateTranslationJson(
   }
 }
 
-const TOUR_SYSTEM_INSTRUCTION = `Sən Azərbaycan dilindən ingilis və rus dillərinə tərcümə edən peşəkar turizm tərcüməçisisən.
-Mətnləri hərfi yox, təbii və axıcı şəkildə tərcümə et.
-Turizm terminologiyasına diqqət et: "zirvə" = "peak/summit", "şəlalə" = "waterfall", "yürüş" = "hike/trek", "kamp" = "camp" və s.
-Siyahı elementlərini (includes/notIncluded/highlights) eyni sırada və eyni sayda tərcümə et, heç birini buraxma və yenisini əlavə etmə.
-Yalnız istənilən JSON strukturunda cavab ver, əlavə şərh yazma.`;
+const TOUR_SYSTEM_INSTRUCTION = `Sən Azərbaycan dilindən ingilis və rus dillərinə tərcümə edən peşəkar turizm tərcüməçisisən. Mətnləri hərfi yox, təbii və axıcı şəkildə tərcümə et. Turizm terminologiyasına diqqət et: "zirvə" = "peak/summit", "şəlalə" = "waterfall", "yürüş" = "hike/trek", "kamp" = "camp" və s. Siyahı elementlərini (includes/notIncluded/highlights) eyni sırada və eyni sayda tərcümə et, heç birini buraxma və yenisini əlavə etmə. Yalnız istənilən JSON strukturunda cavab ver, əlavə şərh yazma.`;
 
 const TOUR_LIST_SCHEMA = { type: Type.ARRAY, items: { type: Type.STRING } };
 
@@ -106,6 +104,7 @@ const TOUR_RESPONSE_SCHEMA = {
 
 export async function translateTourContent(input: TourContentInput): Promise<TourTranslations> {
   if (!input.name) return {};
+
   try {
     const promptText = [
       `Tur adı: ${input.name}`,
@@ -114,7 +113,9 @@ export async function translateTourContent(input: TourContentInput): Promise<Tou
       `Qiymətə daxil deyil (notIncluded): ${JSON.stringify(input.notIncluded || [])}`,
       `Xüsusiyyətlər (highlights): ${JSON.stringify(input.highlights || [])}`,
     ].join("\n");
+
     const parsed = await generateTranslationJson(TOUR_SYSTEM_INSTRUCTION, promptText, TOUR_RESPONSE_SCHEMA);
+
     const translations: TourTranslations = {};
     for (const lang of TARGET_LANGUAGES) {
       const entry = parsed[lang];
@@ -128,6 +129,7 @@ export async function translateTourContent(input: TourContentInput): Promise<Tou
         };
       }
     }
+
     return translations;
   } catch (error: any) {
     console.error("[translate] Gemini tour translation failed:", error.message);
@@ -142,24 +144,24 @@ export function scheduleTourTranslation(tourId: string, input: TourContentInput)
   translateTourContent(input)
     .then(async (translations) => {
       if (!Object.keys(translations).length) return;
+
       const rows = await dbClient.query("SELECT extra_data FROM tours WHERE id = ?", [tourId]);
       if (!rows.length) return;
+
       let extra: Record<string, any> = {};
       try {
         extra = rows[0].extra_data ? JSON.parse(rows[0].extra_data) : {};
       } catch {
         extra = {};
       }
+
       extra.translations = translations;
       await dbClient.execute("UPDATE tours SET extra_data = ? WHERE id = ?", [JSON.stringify(extra), tourId]);
     })
     .catch((error: any) => console.error(`[translate] scheduleTourTranslation failed for ${tourId}:`, error.message));
 }
 
-const USER_SYSTEM_INSTRUCTION = `Sən Azərbaycan dilindən ingilis və rus dillərinə tərcümə edən peşəkar turizm tərcüməçisisən.
-Vendor (tur operatoru) haqqında qısa məlumatı və komanda üzvlərinin (bələdçilərin) bio/ixtisas mətnlərini
-hərfi yox, təbii və peşəkar şəkildə tərcümə et. Siyahını eyni sırada və eyni sayda saxla.
-Yalnız istənilən JSON strukturunda cavab ver, əlavə şərh yazma.`;
+const USER_SYSTEM_INSTRUCTION = `Sən Azərbaycan dilindən ingilis və rus dillərinə tərcümə edən peşəkar turizm tərcüməçisisən. Vendor (tur operatoru) haqqında qısa məlumatı və komanda üzvlərinin (bələdçilərin) bio/ixtisas mətnlərini hərfi yox, təbii və peşəkar şəkildə tərcümə et. Siyahını eyni sırada və eyni sayda saxla. Yalnız istənilən JSON strukturunda cavab ver, əlavə şərh yazma.`;
 
 const USER_RESPONSE_SCHEMA = {
   type: Type.OBJECT,
@@ -209,6 +211,7 @@ export type UserTranslationResult = {
 export function scheduleUserTranslation(userId: string, about: string | null | undefined, guides: Guide[] | undefined) {
   const hasAbout = !!about;
   const guidesList = guides || [];
+
   if (!hasAbout && guidesList.length === 0) return;
 
   (async () => {
@@ -217,10 +220,12 @@ export function scheduleUserTranslation(userId: string, about: string | null | u
         `Vendor haqqında (about): ${about || "(yoxdur)"}`,
         `Bələdçilər (guides): ${JSON.stringify(guidesList.map((g) => ({ bio: g.bio || "", specialty: g.specialty || "" })))}`,
       ].join("\n");
+
       const parsed = await generateTranslationJson(USER_SYSTEM_INSTRUCTION, promptText, USER_RESPONSE_SCHEMA);
 
       const aboutTranslations: Partial<Record<TargetLanguage, string>> = {};
       const guideTranslationsByLang: Record<TargetLanguage, Array<{ bio?: string; specialty?: string }>> = { en: [], ru: [] };
+
       for (const lang of TARGET_LANGUAGES) {
         const entry = parsed[lang];
         if (hasAbout && entry?.about) aboutTranslations[lang] = entry.about;
@@ -229,6 +234,7 @@ export function scheduleUserTranslation(userId: string, about: string | null | u
 
       const rows = await dbClient.query("SELECT extra_data FROM users WHERE id = ?", [userId]);
       if (!rows.length) return;
+
       let extra: Record<string, any> = {};
       try {
         extra = rows[0].extra_data ? JSON.parse(rows[0].extra_data) : {};
@@ -239,6 +245,7 @@ export function scheduleUserTranslation(userId: string, about: string | null | u
       if (hasAbout && Object.keys(aboutTranslations).length) {
         extra.aboutTranslations = aboutTranslations;
       }
+
       if (guidesList.length) {
         extra.guides = guidesList.map((guide, i) => {
           const translations: Guide["translations"] = {};

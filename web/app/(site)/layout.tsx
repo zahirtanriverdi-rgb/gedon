@@ -4,21 +4,19 @@ import { MobileBottomNav } from '@/components/site/MobileBottomNav';
 import { GlobalSearchProvider } from '@/components/site/GlobalSearchContext';
 import { getTours, getSiteFeatureFlags } from '@/lib/api';
 
-/** Chrome for the public marketing/customer pages (header + SEO footer + mobile bottom nav).
- *  Auth and dashboard route groups deliberately opt out of this layout. Tours are fetched
- *  server-side so the footer's internal links (destinations, popular tours, categories) are
- *  in the initial HTML for crawlers. */
 export default async function SiteLayout({ children }: { children: React.ReactNode }) {
   const [tours, featureFlags] = await Promise.all([getTours(), getSiteFeatureFlags()]);
 
   return (
     <GlobalSearchProvider>
       <div className="flex min-h-screen flex-col bg-[var(--color-bg-page)]">
-        {/* Tours feed the header's inline search suggestions dropdown (desktop, on scroll).
-            featureFlags is resolved here so the calculator/camp nav icons render in their
-            final state in the initial HTML (no flash-in/out on refresh). */}
         <SiteHeader tours={tours} featureFlags={featureFlags} />
-        <main className="flex-1 pb-16 sm:pb-0">{children}</main>
+
+        {/* pb-28 (112px) on mobile: floating nav capsule (64px) + bottom gap (16px) +
+            32px breathing room so the last card / sticky booking bar never hides behind
+            the glass capsule. Desktop (sm+) has no bottom nav, so padding resets to 0. */}
+        <main className="flex-1 pb-28 sm:pb-0">{children}</main>
+
         <SiteFooter tours={tours} />
         <MobileBottomNav featureFlags={featureFlags} />
       </div>

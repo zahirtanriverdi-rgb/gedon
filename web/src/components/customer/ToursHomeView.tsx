@@ -111,6 +111,23 @@ export function ToursHomeView({
   const featuredTourIds = React.useMemo(() => computeFeaturedTourIds(tours, slots), [tours, slots]);
   const [hikingSubcategory, setHikingSubcategory] = React.useState<HikingSubcategory>('all');
 
+  // On mobile the search bar is sticky. It needs an opaque white backdrop once it pins over
+  // scrolling content (for legibility), but at the top of the page that white rectangle covers
+  // the hero gradient and leaves ugly white corners around the rounded pill. A sentinel above
+  // the sticky wrapper lets us keep the backdrop transparent until the bar actually sticks.
+  const stickySentinelRef = React.useRef<HTMLDivElement>(null);
+  const [isSearchStuck, setIsSearchStuck] = React.useState(false);
+  React.useEffect(() => {
+    const sentinel = stickySentinelRef.current;
+    if (!sentinel) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setIsSearchStuck(!entry.isIntersecting),
+      { threshold: 0 }
+    );
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, []);
+
   // A category chip either navigates to that category's dedicated page (home + category pages,
   // via onCategoryChange) or, as a fallback, just toggles the local filter state.
   const selectCategory = (cat: string) =>
@@ -134,7 +151,8 @@ export function ToursHomeView({
        <h2 className="max-sm:pt-[20px] text-2xl sm:text-3xl md:text-4xl leading-tight md:leading-[1.22] font-extrabold text-brand-text-main mb-4 sm:mb-6 tracking-tight text-center" suppressHydrationWarning>
   {t('discoverTours')}
 </h2>
-        <div className="sticky top-0 sm:static z-30 sm:w-full -mx-4 px-4 sm:mx-0 sm:px-0 md:mx-0 md:px-0 lg:mx-0 lg:px-0 xl:mx-0 xl:px-0 min-[1440px]:mx-0 min-[1440px]:px-0 bg-white/95 sm:bg-transparent backdrop-blur-sm sm:backdrop-blur-none">
+        <div ref={stickySentinelRef} aria-hidden="true" className="sm:hidden h-px w-full" />
+        <div className={`sticky top-0 sm:static z-30 sm:w-full -mx-4 px-4 sm:mx-0 sm:px-0 md:mx-0 md:px-0 lg:mx-0 lg:px-0 xl:mx-0 xl:px-0 sm:bg-transparent sm:backdrop-blur-none transition-colors duration-200 ${isSearchStuck ? 'bg-white/95 backdrop-blur-sm' : 'bg-transparent'}`}>
           <div className="w-full max-w-[706px] mx-auto mt-2 sm:mt-8 pb-3 sm:pb-4 flex items-center justify-center relative">
             <div ref={searchContainerRef} className="relative w-full h-12 sm:h-14 bg-white shadow-sm sm:shadow-md rounded-full px-5 border border-slate-200 flex items-center">
               <div className="flex items-center flex-1 min-w-0">

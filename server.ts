@@ -55,6 +55,65 @@ import multer from "multer";
 import { storeMediaFile, isAllowedMediaType, isS3Enabled } from "./server/storage.ts";
 import QRCode from "qrcode";
 
+// ===================== BİLET VƏ ŞRİFTLƏR ÜÇÜN ÇATISHMAYAN DƏYİŞƏNLƏR =====================
+let robotoRegularBase64: string | null = null;
+let robotoBoldBase64: string | null = null;
+const ticketsDir = path.join(process.cwd(), "public", "tickets");
+
+// Azərbaycan hərflərini təhlükəsiz əvəz edən funksiya (əgər xüsusi şrift yüklənməyibsə)
+function sanitizeForFallback(str: string): string {
+  return (str || "")
+    .replace(/Ə/g, "E").replace(/ə/g, "e")
+    .replace(/ı/g, "i").replace(/İ/g, "I")
+    .replace(/Ö/g, "O").replace(/ö/g, "o")
+    .replace(/Ü/g, "U").replace(/ü/g, "u")
+    .replace(/Ç/g, "C").replace(/ç/g, "c")
+    .replace(/Ş/g, "S").replace(/ş/g, "s")
+    .replace(/Ğ/g, "G").replace(/ğ/g, "g");
+}
+
+const TICKET_COLORS = {
+  primary: [4, 120, 87],      // #047857 (emerald-700)
+  secondary: [16, 185, 129],  // #10b981 (emerald-500)
+  accent: [245, 158, 11],     // #f59e0b (amber-500)
+  dark: [15, 23, 42],         // #0f172a (slate-900)
+  muted: [100, 116, 139],     // #64748b (slate-500)
+  white: [255, 255, 255],
+  bg: [248, 250, 252],        // #f8fafc (slate-50)
+  divider: [226, 232, 240],   // #e2e8f0 (slate-200)
+};
+
+// Server başlayarkən şriftləri yaddaşa yükləyən funksiya
+async function ensureFonts() {
+  try {
+    // Qovluq mövcud deyilsə, yarat
+    if (!fs.existsSync(ticketsDir)) {
+      fs.mkdirSync(ticketsDir, { recursive: true });
+    }
+    
+    // Şrift fayllarını yoxla və base64 olaraq oxu (əgər mövcuddursa)
+    const regularPath = path.join(process.cwd(), "public", "fonts", "Roboto-Regular.ttf");
+    const boldPath = path.join(process.cwd(), "public", "fonts", "Roboto-Bold.ttf");
+    
+    if (fs.existsSync(regularPath)) {
+      robotoRegularBase64 = fs.readFileSync(regularPath, "base64");
+      console.log("[Fonts] Roboto-Regular.ttf uğurla yükləndi.");
+    } else {
+      console.warn("[Fonts] Roboto-Regular.ttf tapılmadı, standart şrift (fallback) istifadə olunacaq.");
+    }
+    
+    if (fs.existsSync(boldPath)) {
+      robotoBoldBase64 = fs.readFileSync(boldPath, "base64");
+      console.log("[Fonts] Roboto-Bold.ttf uğurla yükləndi.");
+    } else {
+      console.warn("[Fonts] Roboto-Bold.ttf tapılmadı, standart şrift (fallback) istifadə olunacaq.");
+    }
+  } catch (e) {
+    console.error("[Fonts] Şriftləri yükləmək mümkün olmadı:", e);
+  }
+}
+// ============================================================================================
+
 const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 

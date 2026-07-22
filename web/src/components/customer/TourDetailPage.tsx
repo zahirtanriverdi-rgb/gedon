@@ -107,6 +107,7 @@ export function TourDetailPage({
   const [bookingQty, setBookingQty] = useState<number>(1);
   const [showParticipantsDropdown, setShowParticipantsDropdown] = useState<boolean>(false);
   const [showDateDropdown, setShowDateDropdown] = useState<boolean>(false);
+
   // Gallery: desktop/tablet mozaika (böyük şəkil + 2×2 tor), mobil Airbnb üslublu sürüşən karusel.
   const mobileGalleryRef = React.useRef<HTMLDivElement | null>(null);
   const [mobileGalleryIndex, setMobileGalleryIndex] = useState<number>(0);
@@ -115,6 +116,7 @@ export function TourDetailPage({
     if (!el) return;
     setMobileGalleryIndex(Math.round(el.scrollLeft / el.clientWidth));
   };
+
   const [isItineraryExpanded, setIsItineraryExpanded] = useState<boolean>(true);
   const [isDayProgramExpanded, setIsDayProgramExpanded] = useState<boolean>(true);
   const [showMeetingMap, setShowMeetingMap] = useState<boolean>(false);
@@ -126,7 +128,9 @@ export function TourDetailPage({
     () => tours.filter(t => t.id !== selectedTour.id),
     [tours, selectedTour.id]
   );
+
   const [relatedTours, setRelatedTours] = useState(() => relatedToursBase.slice(0, 4));
+
   React.useEffect(() => {
     setRelatedTours([...relatedToursBase].sort(() => 0.5 - Math.random()).slice(0, 4));
   }, [relatedToursBase]);
@@ -151,6 +155,7 @@ export function TourDetailPage({
   };
 
   const [showInquiry, setShowInquiry] = useState<boolean>(false);
+
   const earliestAvailableSlot = React.useMemo(
     () =>
       slots
@@ -168,7 +173,7 @@ export function TourDetailPage({
   React.useEffect(() => {
     if (!autoOpenBooking) return;
     if (earliestAvailableSlot) handleOpenInquiry(earliestAvailableSlot);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoOpenBooking, selectedTour.id]);
 
   const [isMobileBarHidden, setIsMobileBarHidden] = useState<boolean>(false);
@@ -185,12 +190,9 @@ export function TourDetailPage({
 
   return (
     <div className="animate-fadeIn bg-white min-h-screen pb-20">
-      <div className="max-w-[var(--global-max-width)] mx-auto px-5 py-3 sm:py-8">
-        {/* Header Section — desktopda breadcrumb + başlıq + müddət•gecə/reytinq sətri (GYG üslubu).
-            Mobil-də başlıq şəkillərin altında göstərilir (aşağıdakı qalereya bloku). Mobildə bütün
-            bu blok gizlidir (məzmunu onsuz da sm+ üçündür) — logo↔şəkil arası boşluğu ləğv edir. */}
+     <div className="max-w-[var(--global-max-width)] mx-auto px-6 sm:px-10 lg:px-16 py-3 sm:py-8">
+        {/* Header Section */}
         <div className="hidden sm:block sm:mb-6 space-y-3">
-          {/* Desktop breadcrumb: Ana səhifə > kateqoriya > region */}
           {(() => {
             const catLabelMap: Record<string, string> = {
               peak: t('customerHome.toursHomeView.categories.peak'),
@@ -230,8 +232,6 @@ export function TourDetailPage({
               <span className="bg-amber-500 text-white border border-amber-600 text-[10px] font-extrabold px-2 py-0.5 rounded shadow-sm shrink-0">🔥 {t('tourDetailPage.header.bestSellerBadge')}</span>
             )}
           </div>
-          {/* Başlıq sətri — mobil-də gizli (ad şəkillərin altında göstərilir); sm+ ekranlarda üstdə,
-              lg+ yanında bəyən/paylaş düymələri (qiymət boxunun üstündə). */}
           <div className="hidden sm:flex items-start justify-between gap-4">
             <h1 className="text-2xl sm:text-4xl font-extrabold text-label-primary tracking-tight leading-tight">
               {getLocalizedTourName(selectedTour, language)}
@@ -266,7 +266,6 @@ export function TourDetailPage({
               />
             </div>
           </div>
-          {/* Desktop meta sətri: yalnız çoxgünlük turlarda "gün • gecə" + reytinq. */}
           {(() => {
             const isMultiDay = selectedTour.durationDays >= 2;
             const nights = isMultiDay ? selectedTour.durationDays - 1 : 0;
@@ -278,7 +277,7 @@ export function TourDetailPage({
                 {isMultiDay && (
                   <span className="inline-flex items-center gap-2 text-[16px] font-bold text-slate-900">
                     <Clock className="w-[19px] h-[19px] text-slate-700" />
-                    {t('tourDetailPage.relatedTours.days', { days: selectedTour.durationDays })}{nights > 0 ? ` • ${t('tourDetailPage.header.nights', { count: nights })}` : ''}
+                    {t('tourDetailPage.relatedTours.days', { days: selectedTour.durationDays })}{nights > 0 ? `• ${t('tourDetailPage.header.nights', { count: nights })}` : ''}
                   </span>
                 )}
                 {showRating && (
@@ -298,7 +297,7 @@ export function TourDetailPage({
         </div>
 
         {/* TWO COLUMN WRAPPER */}
-        <div className="flex flex-col lg:flex-row gap-10 relative items-stretch">
+        <div className="flex flex-col lg:flex-row gap-6 sm:gap-8 lg:gap-10 relative items-stretch">
           {/* LEFT COLUMN: Gallery & Info */}
           <div className="w-full lg:w-[65%] shrink-0 space-y-10">
             {/* Qalereya */}
@@ -314,7 +313,6 @@ export function TourDetailPage({
               const tiles = allMedia.slice(1, 5);
               const extraCount = allMedia.length - 5;
               const hasTiles = tiles.length > 0;
-              // Şəkil üstü dairəvi düymələr (bəyən + paylaş) — mobil/planşetdə; lg+ gizli (başlığa köçüb).
               const overlayActions = (
                 <div className="absolute top-3 right-3 flex gap-2 z-10 lg:hidden" onClick={(e) => e.stopPropagation()}>
                   <button
@@ -354,7 +352,6 @@ export function TourDetailPage({
                   <span className="text-[12px] font-medium tracking-wide">{selectedTour.region}</span>
                 </div>
               );
-              // Mobil qalereya (referans): yuxarı-solda geri oxu düyməsi.
               const backButton = (
                 <button
                   type="button"
@@ -367,8 +364,7 @@ export function TourDetailPage({
               );
               return (
                 <>
-                  {/* MOBİL (referans): tam enli karusel; aşağı-solda kateqoriya+location stack,
-                      aşağı-sağda qalereya düyməsi; başlıq isə şəkillərin altında. */}
+                  {/* MOBİL */}
                   <div className="sm:hidden">
                     <div className="relative">
                       <div
@@ -389,7 +385,6 @@ export function TourDetailPage({
                       </div>
                       {backButton}
                       {overlayActions}
-                      {/* Aşağı-sol: kateqoriya (üstdə) + location (altda) stack */}
                       <div className="absolute bottom-4 left-4 flex flex-col items-start gap-2 z-10">
                         <span className="bg-black/60 backdrop-blur-sm text-white px-3 py-1.5 rounded-full shadow-sm text-[12px] font-medium tracking-wide">
                           {categoryBadges[selectedTour.category] || categoryBadges.peak}
@@ -399,7 +394,6 @@ export function TourDetailPage({
                           <span className="text-[12px] font-medium tracking-wide">{selectedTour.region}</span>
                         </span>
                       </div>
-                      {/* Aşağı-sağ: qalereya düyməsi — bütün şəkillərə baxmaq üçün */}
                       <button
                         type="button"
                         onClick={(e) => { e.stopPropagation(); setLightboxIndex(0); }}
@@ -420,7 +414,6 @@ export function TourDetailPage({
                         </div>
                       )}
                     </div>
-                    {/* Vendor sətri — mobildə şəklin altında, başlığın üstündə (referans) */}
                     <div className="mt-4 flex items-center gap-2">
                       <span
                         className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold text-white shrink-0"
@@ -439,13 +432,11 @@ export function TourDetailPage({
                         <span className="bg-amber-500 text-white border border-amber-600 text-[10px] font-extrabold px-2 py-0.5 rounded shadow-sm shrink-0">🔥 {t('tourDetailPage.header.bestSellerBadge')}</span>
                       )}
                     </div>
-                    {/* Turun adı şəkillərin altında (referans) */}
                     <h1 className="mt-2 text-2xl font-extrabold text-label-primary tracking-tight leading-tight">
                       {getLocalizedTourName(selectedTour, language)}
                     </h1>
                   </div>
-
-                  {/* DESKTOP/PLANŞET (GetYourGuide üslubu): solda böyük şəkil + sağda 2×2 tor. */}
+                  {/* DESKTOP/PLANŞET */}
                   <div className="hidden sm:flex flex-row gap-2 h-[440px] rounded-2xl overflow-hidden">
                     <div
                       className={`relative group cursor-pointer overflow-hidden bg-slate-100 ${hasTiles ? 'w-1/2' : 'w-full'}`}
@@ -506,7 +497,6 @@ export function TourDetailPage({
                 : t('tourDetailPage.stats.durationHours', { hours: selectedTour.durationHours ?? (selectedTour.durationDays * 8) });
               const maxCapacity = Math.max(0, ...slots.filter(s => s.tourId === selectedTour.id).map(s => s.capacity));
               const cancellationHours = selectedTour.cancellationHours ?? 48;
-              // Airbnb üslublu chip-lər: çətinlik / məsafə / yüksəklik / müddət / yaş — üfüqi sürüşən pill.
               const statChips: { Icon: React.ComponentType<{ className?: string }>; label: string; value: string }[] = [
                 { Icon: Mountain, label: t('tourDetailPage.stats.difficulty'), value: difficultyLabel },
                 ...(parsedGpx ? [
@@ -516,7 +506,6 @@ export function TourDetailPage({
                 { Icon: Clock, label: t('tourDetailPage.stats.duration'), value: durationLabel },
                 ...(selectedTour.ageLimit ? [{ Icon: UserRoundCheck, label: t('tourDetailPage.stats.ageLimit'), value: String(selectedTour.ageLimit) }] : []),
               ];
-              // İkinci chip sətri: bələdçi / ödənişsiz ləğv / özəl qrup — başlıq qalın, alt sətir boz.
               const featureChips: { Icon: React.ComponentType<{ className?: string }>; title: string; sub: string }[] = [
                 {
                   Icon: Globe,
@@ -539,17 +528,12 @@ export function TourDetailPage({
               const desktopRowClass = 'hidden sm:flex gap-2.5 overflow-x-auto scrollbar-none -mx-1 px-1 pb-0.5';
               const labelCls = 'text-[11px] text-slate-500 font-medium whitespace-normal sm:whitespace-nowrap';
               const valueCls = 'text-[13.5px] text-slate-900 font-bold whitespace-normal sm:whitespace-nowrap';
-              // Vahid mobil tor üçün stat + feature chip-ləri birləşdir (topBold: feature başlıqları qalın).
               const mergedChips = [
                 ...statChips.map((c) => ({ Icon: c.Icon, top: c.label, bottom: c.value, topBold: false })),
                 ...featureChips.map((c) => ({ Icon: c.Icon, top: c.title, bottom: c.sub, topBold: true })),
               ];
               return (
                 <div className="py-5 border-b border-slate-200 sm:space-y-3">
-                  {/* MOBİL: 2 sütunlu simmetrik kart toru. Hər kart ağ fon + incə xətt/kölgə,
-                      yuxarıda rəngli ikon, altında boz başlıq + tünd əsas dəyər. Sayı tək olduqda
-                      son kart (uzun mətnli xüsusiyyət) tam enli fərqli blok kimi oturur.
-                      Padding/gap 4px şəbəkəsinə uyğun: kart daxili p-4, ikon↔mətn gap-2.5. */}
                   <div className="grid grid-cols-2 gap-3 sm:hidden">
                     {mergedChips.map((c, i) => {
                       const fullWidth = mergedChips.length % 2 === 1 && i === mergedChips.length - 1;
@@ -569,7 +553,6 @@ export function TourDetailPage({
                       );
                     })}
                   </div>
-                  {/* DESKTOP: iki üfüqi sürüşən sətir (mokap) */}
                   <div className={desktopRowClass} style={chipRowStyle}>
                     {statChips.map((c, i) => (
                       <div key={i} className={chipClass}>
@@ -681,29 +664,35 @@ export function TourDetailPage({
             {/* Vacib məlumat */}
             <div className="space-y-4 py-8 border-t border-slate-200">
               <h2 className="text-xl font-extrabold text-slate-900">{t('tourDetailPage.importantInfo.title')}</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 mt-2">
-                <div>
-                  <h3 className="font-extrabold text-slate-800 text-sm mb-3">{t('tourDetailPage.importantInfo.bringHeader')}</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mt-2">
+                <div className="bg-emerald-50/50 border border-emerald-100 rounded-xl p-5">
+                  <h3 className="font-extrabold text-emerald-900 text-sm mb-4 flex items-center gap-2">
+                    <Check className="w-5 h-5 text-emerald-600" strokeWidth={2.4} />
+                    {t('tourDetailPage.importantInfo.bringHeader')}
+                  </h3>
                   <ul className="space-y-2.5">
                     {(selectedTour.importantInfo?.bring && selectedTour.importantInfo.bring.length > 0
                       ? selectedTour.importantInfo.bring
                       : [selectedTour.requiredEquipment || t('tourDetailPage.importantInfo.defaultBring1'), t('tourDetailPage.importantInfo.defaultBring2'), t('tourDetailPage.importantInfo.defaultBring3')]
                     ).map((item, idx) => (
-                      <li key={idx} className="flex items-start gap-2.5 text-[15px] text-slate-700">
-                        <Check className="w-[18px] h-[18px] text-green-600 mt-0.5 shrink-0" strokeWidth={2.4} /> {item}
+                      <li key={idx} className="flex items-start gap-2.5 text-[14px] text-slate-700">
+                        <Check className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" strokeWidth={2.4} /> {item}
                       </li>
                     ))}
                   </ul>
                 </div>
-                <div>
-                  <h3 className="font-extrabold text-slate-800 text-sm mb-3">{t('tourDetailPage.importantInfo.notAllowedHeader')}</h3>
+                <div className="bg-red-50 border border-red-200 rounded-xl p-5">
+                  <h3 className="font-extrabold text-red-900 text-sm mb-4 flex items-center gap-2">
+                    <X className="w-5 h-5 text-red-600" strokeWidth={2.4} />
+                    {t('tourDetailPage.importantInfo.notAllowedHeader')}
+                  </h3>
                   <ul className="space-y-2.5">
                     {(selectedTour.importantInfo?.notAllowed && selectedTour.importantInfo.notAllowed.length > 0
                       ? selectedTour.importantInfo.notAllowed
                       : [t('tourDetailPage.importantInfo.defaultNotAllowed1'), t('tourDetailPage.importantInfo.defaultNotAllowed2')]
                     ).map((item, idx) => (
-                      <li key={idx} className="flex items-start gap-2.5 text-[15px] text-slate-700">
-                        <X className="w-[18px] h-[18px] text-red-600 mt-0.5 shrink-0" strokeWidth={2.4} /> {item}
+                      <li key={idx} className="flex items-start gap-2.5 text-[14px] text-slate-700">
+                        <X className="w-4 h-4 text-red-600 mt-0.5 shrink-0" strokeWidth={2.4} /> {item}
                       </li>
                     ))}
                   </ul>
@@ -826,35 +815,20 @@ export function TourDetailPage({
 
             {/* Extra dynamic details */}
             <div className="space-y-0">
-              {/* Tur bələdçisi — YENİ: Yalnız tura təyin olunmuş bələdçiləri göstərir */}
+              {/* Tur bələdçisi */}
               {(() => {
                 const organizer = users.find(u => u.id === selectedTour.vendorId);
-                
-                // DEBUG: Brauzer konsolunda (F12) bu məlumatları yoxlayın
-                console.log("=== BƏLƏDÇİ DEBUG ===");
-                console.log("Organizer (Vendor):", organizer);
-                console.log("Turun guideIds massivi:", selectedTour.guideIds);
-                console.log("Vendorun bütün guides massivi:", organizer?.guides);
-
-                // MƏNTİQ: 
-                // 1. Əgər turda xüsusi guideIds varsa, yalnız həmin ID-lərə uyğun gələnləri göstər.
-                // 2. Əgər guideIds yoxdursa (köhnə turlar üçün fallback), vendorun bütün bələdçilərini göstər.
                 const hasSpecificGuides = selectedTour.guideIds && selectedTour.guideIds.length > 0;
-                
                 const tourGuides = hasSpecificGuides
                   ? (organizer?.guides?.filter(g => selectedTour.guideIds!.includes(g.id || '')) || [])
                   : (organizer?.guides || []);
-
-                console.log("Filtrdən keçən yekun bələdçilər:", tourGuides);
-                console.log("======================");
-
                 if (tourGuides.length > 0) {
                   return (
                     <div id="tour-guides-section" className="space-y-1 py-8 border-t border-slate-200 scroll-mt-20">
                       <h2 className="text-xl font-extrabold text-slate-900 mb-2">{t('tourDetailPage.guides.title')}</h2>
                       {tourGuides.map((g, i) => (
                         <button
-                          key={g.id || i} // g.id daha etibarlıdır
+                          key={g.id || i}
                           type="button"
                           onClick={() => setSelectedOrganizer(organizer!)}
                           className={`w-full flex items-start gap-3 py-3.5 text-left bg-transparent border-0 group cursor-pointer ${i < tourGuides.length - 1 ? 'border-b border-slate-100' : ''}`}
@@ -905,7 +879,6 @@ export function TourDetailPage({
                       {t('tourDetailPage.internationalPlanner.smartGuideBadge')}
                     </span>
                   </div>
-                  {/* PART 1: WEATHER FORECAST SPECIALLY INTEGRATED FOR DESTINATION */}
                   <div className="space-y-2">
                     <h5 className="text-[10px] font-black text-indigo-900 tracking-wider flex items-center gap-1">
                       ☀️ {t('tourDetailPage.internationalPlanner.weatherTitle')}
@@ -932,7 +905,6 @@ export function TourDetailPage({
                       })}
                     </div>
                   </div>
-                  {/* PART 2: THE SPOTS COVERED IN THESE DAYS */}
                   <div className="space-y-2">
                     <h5 className="text-[10px] font-black text-indigo-900 tracking-wider flex items-center gap-1.5">
                       📍 {t('tourDetailPage.internationalPlanner.placesTitle')}
@@ -1010,7 +982,6 @@ export function TourDetailPage({
                       <span className="text-slate-700 block text-[11px] font-medium leading-relaxed">🚍 {selectedTour.transferDetails || t('tourDetailPage.hotelLogistics.defaultTransfer')}</span>
                     </div>
                   </div>
-                  {/* Room options pricing */}
                   {selectedTour.roomTypes && selectedTour.roomTypes.length > 0 && (
                     <div className="bg-white p-3 rounded-lg border border-amber-150 space-y-2 mt-2">
                       <span className="text-[10px] text-amber-900 font-extrabold block tracking-wide">
@@ -1031,7 +1002,7 @@ export function TourDetailPage({
                 </div>
               )}
 
-              {/* Gündəlik Səyahət Proqramı (Itinerary Map) */}
+              {/* Gündəlik Səyahət Proqramı */}
               {selectedTour.isInternational && selectedTour.itinerary && selectedTour.itinerary.length > 0 && (
                 <div className="space-y-4">
                   <button
@@ -1100,7 +1071,7 @@ export function TourDetailPage({
           {/* RIGHT COLUMN: Sticky Booking Widget */}
           <div className="w-full lg:w-[35%] relative" id="booking-widget-container">
             <div className="sticky top-24 bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-slate-200">
-              <div className="p-6 space-y-6">
+              <div className="p-5 sm:p-6 space-y-5 sm:space-y-6">
                 {/* Pricing Header */}
                 <div className="flex flex-col gap-1">
                   {slots.filter(s => s.tourId === selectedTour.id).length > 0 ? (
@@ -1143,13 +1114,15 @@ export function TourDetailPage({
                       <button
                         type="button"
                         onClick={() => setShowParticipantsDropdown(prev => !prev)}
-                        className="w-full flex items-center justify-between bg-white px-4 py-3 border-b border-slate-200 text-left cursor-pointer hover:bg-slate-50 rounded-t-xl"
+                        className="w-full flex items-center justify-between bg-white px-4 py-3.5 border-b border-slate-200 text-left cursor-pointer hover:bg-slate-50 hover:border-emerald-300 transition-colors rounded-t-xl"
                       >
                         <div className="flex items-center gap-3">
-                          <Users className="w-5 h-5 text-emerald-700" />
-                          <span className="text-sm font-extrabold text-slate-800">{t('tourDetailPage.participantsDropdown.adultsCount', { count: bookingQty })}</span>
+                          <div className="w-9 h-9 rounded-full bg-emerald-50 flex items-center justify-center">
+                            <Users className="w-[18px] h-[18px] text-emerald-600" />
+                          </div>
+                          <span className="text-sm font-bold text-slate-800">{t('tourDetailPage.participantsDropdown.adultsCount', { count: bookingQty })}</span>
                         </div>
-                        <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${showParticipantsDropdown ? 'rotate-180' : ''}`} />
+                        <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform ${showParticipantsDropdown ? 'rotate-180' : ''}`} />
                       </button>
                       {showParticipantsDropdown && (() => {
                         const maxParticipants = selectedSlot ? Math.max(1, selectedSlot.capacity - selectedSlot.bookedCount) : 20;
@@ -1205,13 +1178,15 @@ export function TourDetailPage({
                       <button
                         type="button"
                         onClick={() => setShowDateDropdown(prev => !prev)}
-                        className="w-full flex items-center justify-between bg-white px-4 py-3 text-left cursor-pointer hover:bg-slate-50 rounded-b-xl"
+                        className="w-full flex items-center justify-between bg-white px-4 py-3.5 text-left cursor-pointer hover:bg-slate-50 hover:border-emerald-300 transition-colors rounded-b-xl"
                       >
                         <div className="flex items-center gap-3">
-                          <Calendar className="w-5 h-5 text-emerald-700" />
-                          <span className="text-sm font-extrabold text-slate-800">{selectedSlot ? t('tourDetailPage.dateDropdown.selectedDate', { date: formatDisplayDate(selectedSlot.startDate) }) : t('tourDetailPage.dateDropdown.selectDate')}</span>
+                          <div className="w-9 h-9 rounded-full bg-emerald-50 flex items-center justify-center">
+                            <Calendar className="w-[18px] h-[18px] text-emerald-600" />
+                          </div>
+                          <span className="text-sm font-bold text-slate-800">{selectedSlot ? t('tourDetailPage.dateDropdown.selectedDate', { date: formatDisplayDate(selectedSlot.startDate) }) : t('tourDetailPage.dateDropdown.selectDate')}</span>
                         </div>
-                        <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${showDateDropdown ? 'rotate-180' : ''}`} />
+                        <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform ${showDateDropdown ? 'rotate-180' : ''}`} />
                       </button>
                       {showDateDropdown && (
                         <MaybeBodyPortal>
@@ -1267,36 +1242,31 @@ export function TourDetailPage({
                   </div>
                 </div>
 
-                {/* Always-visible remaining-seats indicator for the selected date (or the
-                    earliest upcoming date with free seats when none is picked). Reads live
-                    capacity − bookedCount, so it reflects vendor/admin edits on every render. */}
+                {/* Remaining-seats indicator */}
                 {(() => {
                   const todayStr = new Date().toISOString().slice(0, 10);
                   const displaySlot = selectedSlot
                     ?? [...slots.filter(s => s.tourId === selectedTour.id && s.startDate >= todayStr && s.capacity - s.bookedCount > 0)]
-                         .sort((a, b) => a.startDate.localeCompare(b.startDate))[0]
+                       .sort((a, b) => a.startDate.localeCompare(b.startDate))[0]
                     ?? null;
                   if (!displaySlot) return null;
                   const remaining = Math.max(0, displaySlot.capacity - displaySlot.bookedCount);
                   if (remaining <= 0) {
                     return (
-                      <div className="flex items-center gap-2 text-xs font-bold text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-                        <Users className="w-4 h-4 shrink-0" />
-                        {t('tourDetailPage.sidebar.seatsSoldOut')}
+                      <div className="flex items-center gap-2.5 text-sm font-bold text-red-700 bg-gradient-to-r from-red-50 to-orange-50 border border-red-300 ring-1 ring-red-200 rounded-xl px-4 py-2.5">
+                        <Users className="w-5 h-5 shrink-0 text-red-600" />
+                        <span>{t('tourDetailPage.sidebar.seatsSoldOut')}</span>
                       </div>
                     );
                   }
                   const urgent = remaining <= 5;
-                  // When the user has picked a date the copy says "this date"; otherwise it
-                  // points at the nearest upcoming date (with its date spelled out) so it's
-                  // never ambiguous which date the seat count refers to.
                   const message = selectedSlot
                     ? t(urgent ? 'tourDetailPage.sidebar.seatsRemainingUrgent' : 'tourDetailPage.sidebar.seatsRemaining', { count: remaining })
                     : t(urgent ? 'tourDetailPage.sidebar.seatsNearestDateUrgent' : 'tourDetailPage.sidebar.seatsNearestDate', { count: remaining, date: formatDisplayDate(displaySlot.startDate) });
                   return (
-                    <div className={`flex items-center gap-2 text-xs font-bold rounded-lg px-3 py-2 border ${urgent ? 'text-red-600 bg-red-50 border-red-200' : 'text-emerald-700 bg-emerald-50 border-emerald-200'}`}>
-                      <Users className="w-4 h-4 shrink-0" />
-                      {message}
+                    <div className={`flex items-center gap-2.5 text-sm font-bold rounded-xl px-4 py-2.5 border ${urgent ? 'text-red-700 bg-gradient-to-r from-red-50 to-orange-50 border-red-300 ring-1 ring-red-200' : 'text-emerald-700 bg-emerald-50 border-emerald-200'}`}>
+                      <Users className={`w-5 h-5 shrink-0 ${urgent ? 'text-red-600' : 'text-emerald-600'}`} />
+                      <span>{message}</span>
                     </div>
                   );
                 })()}
@@ -1306,7 +1276,7 @@ export function TourDetailPage({
                   type="button"
                   disabled={!selectedSlot && !earliestAvailableSlot}
                   onClick={() => handleOpenInquiry()}
-                  className="w-full bg-primary-500 hover:bg-primary-600 text-white text-base md:text-lg font-black py-3.5 rounded-full shadow-md transition-all active:scale-95 cursor-pointer block text-center disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-base md:text-lg font-black py-4 rounded-full shadow-lg hover:shadow-xl transition-all active:scale-95 cursor-pointer block text-center disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   {t('tourDetailPage.sidebar.checkAvailability')}
                 </button>
@@ -1410,7 +1380,7 @@ export function TourDetailPage({
                           <span className="truncate max-w-[120px]">{tour.region.split(',')[0]}</span>
                         </div>
                       </div>
-                      <div className="px-5 pt-5 pb-4 flex-1 flex flex-col">
+                      <div className="px-4 sm:px-5 pt-4 sm:pt-5 pb-4 flex-1 flex flex-col">
                         <h3 className="font-bold text-gray-900 text-[15px] leading-snug mb-2 line-clamp-2">
                           {getLocalizedTourName(tour, language)}
                         </h3>
@@ -1454,17 +1424,17 @@ export function TourDetailPage({
                               ))}
                             </div>
                           </div>
-                          <div className="flex items-center justify-between pt-3 border-t border-slate-100">
+                          <div className="flex items-center justify-between pt-3 border-t border-slate-100 gap-3">
                             {shownPrice != null ? (
-                              <div className="flex flex-col">
-                                <span className="text-[8px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Qiymət</span>
-                                <div className="flex items-baseline gap-0.5">
-                                  <span className="text-[18px] font-extrabold text-gray-900 leading-none">{getConvertedPriceInfo(shownPrice, tour.priceCurrency).both}</span>
-                                  <span className="text-[9px] font-medium text-gray-500 whitespace-nowrap">/ nəfər</span>
+                              <div className="flex flex-col min-w-0 flex-1">
+                                <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-0.5">Qiymət</span>
+                                <div className="flex items-baseline gap-0.5 min-w-0">
+                                  <span className="text-[16px] font-extrabold text-gray-900 leading-none truncate">{getConvertedPriceInfo(shownPrice, tour.priceCurrency).both}</span>
+                                  <span className="text-[10px] font-medium text-gray-500 whitespace-nowrap">/ nəfər</span>
                                 </div>
                               </div>
                             ) : (
-                              <span className="text-xs font-bold text-label-tertiary">{t('tourDetailPage.relatedTours.soldOut')}</span>
+                              <span className="text-xs font-bold text-label-tertiary flex-1">{t('tourDetailPage.relatedTours.soldOut')}</span>
                             )}
                             <button
                               onClick={(e) => {
@@ -1474,7 +1444,7 @@ export function TourDetailPage({
                                 setShowInquiry(false);
                                 setSelectedSlot(null);
                               }}
-                              className="bg-[#2E4F3E] hover:bg-[#233f30] text-white px-4 py-2 rounded-xl text-[11px] font-bold flex items-center gap-1.5 transition-colors shadow-sm cursor-pointer"
+                              className="bg-[#2E4F3E] hover:bg-[#233f30] text-white px-3.5 py-2 rounded-xl text-[11px] font-bold flex items-center gap-1.5 transition-colors shadow-sm cursor-pointer shrink-0"
                             >
                               Daha Ətraflı
                               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg>
@@ -1497,11 +1467,11 @@ export function TourDetailPage({
         const hasDiscount = !!selectedTour.discountPrice && selectedTour.discountPrice > 0 && selectedTour.discountPrice < basePrice;
         const shownPrice = hasDiscount ? selectedTour.discountPrice! : basePrice;
         return (
-          <div
-            className={`lg:hidden fixed left-0 right-0 bottom-16 sm:bottom-0 z-[90] bg-white border-t border-slate-200 shadow-[0_-4px_16px_rgba(0,0,0,0.08)] px-4 py-2.5 transition-all duration-300 ${
-              isMobileBarHidden ? 'translate-y-[130%] opacity-0 pointer-events-none' : 'translate-y-0 opacity-100'
-            }`}
-          >
+         <div
+  className={`lg:hidden fixed left-0 right-0 bottom-24 sm:bottom-0 z-[60] bg-white border-t border-slate-200 shadow-[0_-4px_16px_rgba(0,0,0,0.08)] px-4 py-2.5 transition-all duration-300 ${
+    isMobileBarHidden ? 'translate-y-[130%] opacity-0 pointer-events-none' : 'translate-y-0 opacity-100'
+  }`}
+>
             <div className="flex items-center justify-between gap-3">
               <div className="flex flex-col leading-tight">
                 {hasDiscount && (

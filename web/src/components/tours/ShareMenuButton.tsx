@@ -90,7 +90,7 @@ export const ShareMenuButton: React.FC<ShareMenuButtonProps> = ({
           if (stopPropagationOnOpen) e.stopPropagation();
           setOpen((v) => !v);
         }}
-        className={`${buttonClassName} ${open ? 'rounded-b-none' : ''} relative z-[1001]`}
+        className={`${buttonClassName} ${open ? 'rounded-b-none' : ''} relative z-[20]`}
         title={t('customerHome.toursHomeView.shareTitle')}
       >
         <span className={`relative inline-block ${iconClassName}`}>
@@ -117,7 +117,7 @@ export const ShareMenuButton: React.FC<ShareMenuButtonProps> = ({
             width: coords.width,
             maxHeight: panelVisible ? expandedHeight : 0,
           }}
-          className={`fixed z-[1000] bg-white border border-t-0 border-slate-200 shadow-lg rounded-b-2xl overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+          className={`fixed z-[35] bg-white border border-t-0 border-slate-200 shadow-lg rounded-b-2xl overflow-hidden transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${
             panelVisible ? 'opacity-100' : 'opacity-0 pointer-events-none'
           }`}
         >

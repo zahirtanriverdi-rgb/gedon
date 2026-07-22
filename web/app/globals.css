@@ -6,8 +6,9 @@
    these directly, e.g. h-[var(--header-height)], rounded-[var(--card-radius)]. */
 :root {
   /* Green-keep rollout (2026-07-22): TEXT stays our dark forest green; only the
-     non-text surfaces/borders/CTA/red follow the GYG cool palette. */
-  --label-primary: #111E12;
+     non-text surfaces/borders/CTA/red follow the GYG cool palette.
+     Primary text uses the exact brand Deep Pine (#1E3F20) so it reads visibly green. */
+  --label-primary: #1E3F20;
   --label-secondary: #627265;
   --label-tertiary: #858995;
   --interactive-primary: #1E3F20;
@@ -30,7 +31,7 @@
   --color-bg-page: #FFFFFF;
   --color-cta: #0071eb;
   --color-cta-hover: #005dc4;
-  --color-text-main: #111E12;
+  --color-text-main: #1E3F20;
   --color-text-muted: #627265;
 }
 
@@ -55,7 +56,7 @@
      Generates text, bg, border utilities, e.g. text-label-primary, bg-surface-critical-weak.
      Values are aliases of the plain :root tokens below — kept in @theme too so Tailwind
      generates utility classes from them. */
-  --color-label-primary: #111E12;
+  --color-label-primary: #1E3F20;
   --color-label-secondary: #627265;
   --color-label-tertiary: #858995;
   --color-interactive-primary: #1E3F20;
@@ -139,7 +140,7 @@
 
   /* Tertiary: ink/surface neutrals — serves slate/gray utilities (both text and light
      surfaces). Kept forest-green-tinted so all dark text (card titles text-gray-900 etc.)
-     reads as our brand green: 500 = text-muted (#627265) exact, 900 = text-main (#111E12) exact. */
+     reads as our brand green: 500 = text-muted (#627265) exact, 900 = text-main (#1E3F20) brand Deep Pine. */
   --color-ink-50: #fafbfa;
   --color-ink-100: #f1f3f1;
   --color-ink-200: #e1e6e1;
@@ -149,7 +150,7 @@
   --color-ink-600: #55635a;
   --color-ink-700: #3e483f;
   --color-ink-800: #2b332c;
-  --color-ink-900: #111E12;
+  --color-ink-900: #1E3F20;
   --color-ink-950: #0a0f0a;
 
   /* ---- Remap the generic Tailwind palettes used across the app to the brand tokens ----
