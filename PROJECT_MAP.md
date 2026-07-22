@@ -19,7 +19,6 @@ bütün UI artıq `web/`-dədir; brauzer `/api/*` sorğularını Next rewrite il
 | `.env` / `.env.example` | Mühit dəyişənləri (API açarları və s.) |
 | `database.sqlite` | SQLite məlumat bazası (dev) |
 | `download-azerbaijan-dem.cjs` | Azərbaycan üçün relyef (DEM) tile-larını endirən birdəfəlik skript |
-| `README.md` | Layihə haqqında ümumi qeydlər |
 
 ## `server/` — backend məntiqi
 
@@ -33,7 +32,17 @@ bütün UI artıq `web/`-dədir; brauzer `/api/*` sorğularını Next rewrite il
 | `telegram.ts` | Telegram bot inteqrasiyası — rezervasiya sorğularını vendor/admin chat-lərinə göndərir (inline "WhatsApp-dan cavabla" düymələri ilə), /start-a chat ID qaytaran long-polling köməkçisi. Token: `TELEGRAM_BOT_TOKEN` |
 | `slugify.ts` | Tur adlarından unikal URL slug yaradır (`slugifyBase`) |
 | `seedCredentials.ts` | Demo/seed hesabları üçün ilkin parollar |
-| `campSites*.ts` və s. | Kamp yerləri validasiyası/DB köməkçiləri |
+| `campSites.ts` və s. | Kamp yerləri validasiyası/DB köməkçiləri |
+| `geo.ts` | `/api/geo/resolve` — Google Maps linkini koordinata çevirir (tam linklər lokal parse, yalnız həqiqi Google short-link-lər host allowlist ilə fetch olunur — SSRF qorunması) |
+| `overpass.ts` | Overpass/OpenStreetMap proxy-si (`/api/osm/pois`) — POI-ləri server-side cache + mirror fallback ilə çəkir |
+
+## `shared/` — server və `web/` arasında ortaq modullar
+
+| Fayl | İş |
+|---|---|
+| `types.ts` | Həm Express, həm Next tərəfindən idxal olunan ortaq TypeScript tipləri |
+| `utils/googleMapsLink.ts` | Google Maps linkindən koordinat çıxaran saf funksiyalar (`server/geo.ts` bunu istifadə edir) |
+| `data/toursData.ts`, `data/tourTranslations.ts` | Seed turlar və əl ilə yazılmış tərcümələr — hər iki tərəfin eyni mənbədən oxuması üçün |
 
 ## `scripts/` — birdəfəlik/köməkçi skriptlər
 
@@ -57,6 +66,7 @@ bütün UI artıq `web/`-dədir; brauzer `/api/*` sorğularını Next rewrite il
 | `app/(site)/page.tsx` | Ana səhifə (SSR) — tours/slots/reviews çəkib `HomeClient`-ə ötürür |
 | `app/(site)/HomeClient.tsx` | Ana səhifənin tam interaktiv state qatı (axtarış, filtrlər, təqvim, quick-book) — köhnə CustomerPortal-ın portu |
 | `app/(site)/tours/[slug]/` | Tur detalı (SSR + `TourDetailClient`) |
+| `app/(site)/category/[category]/` | Kateqoriya başına səhifə (`/category/peak`, `camp`, `hiking`, `active`, `international`) — eyni HomeClient, bir kateqoriyaya kilidli, crawlable/share URL |
 | `app/(site)/organizer/[id]/` | Operator ictimai profili |
 | `app/(site)/faq`, `compare`, `wishlist`, `calculator`, `camp-sites` | Müvafiq müştəri səhifələri |
 | `app/reset-password/` | Parol sıfırlama səhifəsi |
