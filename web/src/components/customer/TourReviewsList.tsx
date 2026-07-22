@@ -10,7 +10,7 @@ interface TourReviewsListProps {
   onShowNotification?: (message: string, type?: 'success' | 'info' | 'error' | 'warning') => void;
 }
 
-const INITIAL_VISIBLE = 4;
+const INITIAL_VISIBLE = 3;
 const AVATAR_COLORS = ['#A6683C', '#2E7D46', '#3B6EA5', '#8E5AA3', '#C2703D', '#4C7C6E', '#A34C5E'];
 
 const MONTH_KEYS = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
@@ -109,7 +109,7 @@ export function TourReviewsList({ tour, reviews, onShowNotification }: TourRevie
   );
 
   return (
-    <div className="space-y-4 py-8 border-t border-slate-200">
+    <div className="space-y-4 py-8 border-t border-slate-100">
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-xl font-extrabold text-slate-900">{t('tourDetailPage.reviews.title')}</h2>
         <button

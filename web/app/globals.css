@@ -320,7 +320,7 @@
     pointer-events: none;
     background: linear-gradient(
       180deg,
-      color-mix(in srgb, var(--color-primary) 14%, transparent) 0%,
+      color-mix(in srgb, var(--color-primary) 3%, transparent) 0%,
       color-mix(in srgb, var(--color-primary) 6%, transparent) 55%,
       transparent 100%
     );

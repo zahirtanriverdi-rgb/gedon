@@ -9,24 +9,27 @@ import {
   ArrowLeft,
   BadgeCheck,
   Calendar,
+  CarFront,
   Check,
   ChevronDown,
   ChevronRight,
   Clock,
+  Coffee,
   Flag,
+  Gauge,
   Globe,
   Grid2X2,
   Heart,
-  Home,
   Images,
   MapPin,
-  MoveHorizontal,
   Mountain,
+  Route,
   Satellite,
   Scale,
   Star,
   UserRoundCheck,
   Users,
+  Utensils,
   X
 } from 'lucide-react';
 import { TourWeatherForecast } from '../TourWeatherForecast';
@@ -108,7 +111,7 @@ export function TourDetailPage({
   const [showParticipantsDropdown, setShowParticipantsDropdown] = useState<boolean>(false);
   const [showDateDropdown, setShowDateDropdown] = useState<boolean>(false);
 
-  // Gallery: desktop/tablet mozaika (böyük şəkil + 2×2 tor), mobil Airbnb üslublu sürüşən karusel.
+  // Gallery: SAXLANILIR
   const mobileGalleryRef = React.useRef<HTMLDivElement | null>(null);
   const [mobileGalleryIndex, setMobileGalleryIndex] = useState<number>(0);
   const handleMobileGalleryScroll = () => {
@@ -119,6 +122,8 @@ export function TourDetailPage({
 
   const [isItineraryExpanded, setIsItineraryExpanded] = useState<boolean>(true);
   const [isDayProgramExpanded, setIsDayProgramExpanded] = useState<boolean>(true);
+  const [isPriceIncludesExpanded, setIsPriceIncludesExpanded] = useState<boolean>(true);
+  const [isImportantInfoExpanded, setIsImportantInfoExpanded] = useState<boolean>(true);
   const [showMeetingMap, setShowMeetingMap] = useState<boolean>(false);
   const [showSatellite, setShowSatellite] = useState<boolean>(false);
 
@@ -128,9 +133,7 @@ export function TourDetailPage({
     () => tours.filter(t => t.id !== selectedTour.id),
     [tours, selectedTour.id]
   );
-
   const [relatedTours, setRelatedTours] = useState(() => relatedToursBase.slice(0, 4));
-
   React.useEffect(() => {
     setRelatedTours([...relatedToursBase].sort(() => 0.5 - Math.random()).slice(0, 4));
   }, [relatedToursBase]);
@@ -155,7 +158,6 @@ export function TourDetailPage({
   };
 
   const [showInquiry, setShowInquiry] = useState<boolean>(false);
-
   const earliestAvailableSlot = React.useMemo(
     () =>
       slots
@@ -173,7 +175,6 @@ export function TourDetailPage({
   React.useEffect(() => {
     if (!autoOpenBooking) return;
     if (earliestAvailableSlot) handleOpenInquiry(earliestAvailableSlot);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoOpenBooking, selectedTour.id]);
 
   const [isMobileBarHidden, setIsMobileBarHidden] = useState<boolean>(false);
@@ -190,117 +191,12 @@ export function TourDetailPage({
 
   return (
     <div className="animate-fadeIn bg-white min-h-screen pb-20">
-     <div className="max-w-[var(--global-max-width)] mx-auto px-6 sm:px-10 lg:px-16 py-3 sm:py-8">
-        {/* Header Section */}
-        <div className="hidden sm:block sm:mb-6 space-y-3">
-          {(() => {
-            const catLabelMap: Record<string, string> = {
-              peak: t('customerHome.toursHomeView.categories.peak'),
-              camp: t('customerHome.toursHomeView.categories.camp'),
-              hiking: t('customerHome.toursHomeView.categories.hiking'),
-              active: t('customerHome.toursHomeView.categories.active'),
-              international: t('customerHome.toursHomeView.badges.international'),
-            };
-            const categoryLabel = catLabelMap[selectedTour.category] || catLabelMap.peak;
-            return (
-              <nav className="hidden lg:flex items-center gap-1.5 text-[15px] text-slate-500 font-medium" aria-label="breadcrumb">
-                <a href="/" className="flex items-center hover:text-slate-800 transition-colors" aria-label={t('tourDetailPage.header.homeCrumb')}>
-                  <Home className="w-[18px] h-[18px]" />
-                </a>
-                <ChevronRight className="w-4 h-4 text-slate-300 shrink-0" />
-                <a href={`/?category=${selectedTour.category}`} className="hover:text-slate-800 transition-colors">{categoryLabel}</a>
-                <ChevronRight className="w-4 h-4 text-slate-300 shrink-0" />
-                <a href={`/?region=${encodeURIComponent(selectedTour.region)}`} className="text-slate-800 hover:underline">{selectedTour.region}</a>
-              </nav>
-            );
-          })()}
-          <div className="hidden sm:flex items-center gap-2">
-            <span
-              className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold text-white shrink-0"
-              style={{ background: 'linear-gradient(135deg,#2E7D46,#1E5C34)' }}
-            >
-              {selectedTour.vendorName?.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]?.toUpperCase()).join('') || 'GG'}
-            </span>
-            <strong
-              className="text-label-primary text-[15px] font-bold cursor-pointer hover:underline"
-              onClick={(e) => { e.stopPropagation(); const org = users.find(u => u.id === selectedTour.vendorId); if (org) { setSelectedOrganizer(org); } }}
-            >
-              {selectedTour.vendorName}
-            </strong>
-            <BadgeCheck className="w-[18px] h-[18px] text-white fill-emerald-500 shrink-0" aria-label="Təsdiqlənmiş" />
-            {isFeaturedThisMonth && (
-              <span className="bg-amber-500 text-white border border-amber-600 text-[10px] font-extrabold px-2 py-0.5 rounded shadow-sm shrink-0">🔥 {t('tourDetailPage.header.bestSellerBadge')}</span>
-            )}
-          </div>
-          <div className="hidden sm:flex items-start justify-between gap-4">
-            <h1 className="text-2xl sm:text-4xl font-extrabold text-label-primary tracking-tight leading-tight">
-              {getLocalizedTourName(selectedTour, language)}
-            </h1>
-            <div className="hidden lg:flex items-center gap-2.5 shrink-0" onClick={(e) => e.stopPropagation()}>
-              <button
-                type="button"
-                aria-label={wishlist.includes(selectedTour.id) ? t('tourDetailPage.header.inWishlist') : t('tourDetailPage.header.addToWishlist')}
-                onClick={() => handleToggleWishlist(selectedTour.id)}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full bg-white hover:bg-slate-50 text-slate-900 text-sm font-semibold transition border border-slate-200 shadow-sm cursor-pointer whitespace-nowrap"
-              >
-                <Heart className={`w-[18px] h-[18px] ${wishlist.includes(selectedTour.id) ? 'fill-rose-600 text-rose-600' : ''}`} />
-                {wishlist.includes(selectedTour.id) ? t('tourDetailPage.header.inWishlist') : t('tourDetailPage.header.addToWishlist')}
-              </button>
-              <button
-                type="button"
-                aria-label={compareList.includes(selectedTour.id) ? t('customerHome.toursHomeView.compare.remove') : t('customerHome.toursHomeView.compare.add')}
-                onClick={() => handleToggleCompare(selectedTour.id)}
-                className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-semibold transition border shadow-sm cursor-pointer whitespace-nowrap ${compareList.includes(selectedTour.id) ? 'bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100' : 'bg-white hover:bg-slate-50 text-slate-900 border-slate-200'}`}
-              >
-                <Scale className="w-[18px] h-[18px]" />
-                {compareList.includes(selectedTour.id) ? t('customerHome.toursHomeView.compare.remove') : t('customerHome.toursHomeView.compare.add')}
-              </button>
-              <ShareMenuButton
-                tour={selectedTour}
-                slots={slots}
-                onShowNotification={onShowNotification}
-                stopPropagationOnOpen
-                showLabel
-                iconClassName="w-[18px] h-[18px]"
-                buttonClassName="inline-flex items-center gap-2 px-4 py-2.5 rounded-full bg-white hover:bg-slate-50 text-slate-900 text-sm font-semibold transition border border-slate-200 shadow-sm cursor-pointer whitespace-nowrap"
-              />
-            </div>
-          </div>
-          {(() => {
-            const isMultiDay = selectedTour.durationDays >= 2;
-            const nights = isMultiDay ? selectedTour.durationDays - 1 : 0;
-            const reviewCount = getReviewsCount(selectedTour.id);
-            const showRating = REVIEWS_ENABLED && selectedTour.rating != null && reviewCount > 0;
-            if (!isMultiDay && !showRating) return null;
-            return (
-              <div className="hidden lg:flex items-center gap-x-4 gap-y-1 flex-wrap pt-1">
-                {isMultiDay && (
-                  <span className="inline-flex items-center gap-2 text-[16px] font-bold text-slate-900">
-                    <Clock className="w-[19px] h-[19px] text-slate-700" />
-                    {t('tourDetailPage.relatedTours.days', { days: selectedTour.durationDays })}{nights > 0 ? `• ${t('tourDetailPage.header.nights', { count: nights })}` : ''}
-                  </span>
-                )}
-                {showRating && (
-                  <span className="inline-flex items-center gap-1.5">
-                    <span className="flex items-center gap-0.5">
-                      {[0, 1, 2, 3, 4].map(i => (
-                        <Star key={i} className={`w-[18px] h-[18px] ${i < Math.round(selectedTour.rating!) ? 'fill-amber-400 text-amber-400' : 'fill-slate-200 text-slate-200'}`} />
-                      ))}
-                    </span>
-                    <span className="text-[16px] font-bold text-slate-900">{selectedTour.rating!.toFixed(1)}</span>
-                    <span className="text-[15px] text-slate-500">({t('tourDetailPage.header.reviewsCount', { count: reviewCount })})</span>
-                  </span>
-                )}
-              </div>
-            );
-          })()}
-        </div>
-
+      <div className="max-w-[var(--global-max-width)] mx-auto px-4 sm:px-5 pt-2 pb-8">
         {/* TWO COLUMN WRAPPER */}
-        <div className="flex flex-col lg:flex-row gap-6 sm:gap-8 lg:gap-10 relative items-stretch">
-          {/* LEFT COLUMN: Gallery & Info */}
-          <div className="w-full lg:w-[65%] shrink-0 space-y-10">
-            {/* Qalereya */}
+        <div className="flex flex-col lg:flex-row gap-10 relative items-stretch">
+          {/* LEFT COLUMN */}
+          <div className="w-full lg:w-[65%] shrink-0">
+            {/* Gallery - SAXLANILIR */}
             {(() => {
               const allMedia = [selectedTour.image, ...(selectedTour.images || []), ...(selectedTour.videos || [])].filter(Boolean);
               const categoryBadges: Record<string, string> = {
@@ -342,7 +238,7 @@ export function TourDetailPage({
                 </div>
               );
               const categoryBadge = (
-                <div className="absolute top-4 left-4 bg-black/60 backdrop-blur-sm text-white px-3 py-1.5 rounded-full flex items-center gap-1.5 z-10 shadow-sm">
+                <div className="absolute top-4 left-16 bg-black/60 backdrop-blur-sm text-white px-3 py-1.5 rounded-full flex items-center gap-1.5 z-10 shadow-sm">
                   <span className="text-[12px] font-medium tracking-wide">{categoryBadges[selectedTour.category] || categoryBadges.peak}</span>
                 </div>
               );
@@ -414,29 +310,8 @@ export function TourDetailPage({
                         </div>
                       )}
                     </div>
-                    <div className="mt-4 flex items-center gap-2">
-                      <span
-                        className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold text-white shrink-0"
-                        style={{ background: 'linear-gradient(135deg,#2E7D46,#1E5C34)' }}
-                      >
-                        {selectedTour.vendorName?.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]?.toUpperCase()).join('') || 'GG'}
-                      </span>
-                      <strong
-                        className="text-label-primary text-[15px] font-bold cursor-pointer hover:underline"
-                        onClick={(e) => { e.stopPropagation(); const org = users.find(u => u.id === selectedTour.vendorId); if (org) { setSelectedOrganizer(org); } }}
-                      >
-                        {selectedTour.vendorName}
-                      </strong>
-                      <BadgeCheck className="w-[18px] h-[18px] text-white fill-emerald-500 shrink-0" aria-label="Təsdiqlənmiş" />
-                      {isFeaturedThisMonth && (
-                        <span className="bg-amber-500 text-white border border-amber-600 text-[10px] font-extrabold px-2 py-0.5 rounded shadow-sm shrink-0">🔥 {t('tourDetailPage.header.bestSellerBadge')}</span>
-                      )}
-                    </div>
-                    <h1 className="mt-2 text-2xl font-extrabold text-label-primary tracking-tight leading-tight">
-                      {getLocalizedTourName(selectedTour, language)}
-                    </h1>
                   </div>
-                  {/* DESKTOP/PLANŞET */}
+                  {/* DESKTOP */}
                   <div className="hidden sm:flex flex-row gap-2 h-[440px] rounded-2xl overflow-hidden">
                     <div
                       className={`relative group cursor-pointer overflow-hidden bg-slate-100 ${hasTiles ? 'w-1/2' : 'w-full'}`}
@@ -445,17 +320,21 @@ export function TourDetailPage({
                       {categoryBadge}
                       {regionBadge}
                       <img src={allMedia[0]} alt={getLocalizedTourName(selectedTour, language)} className="w-full h-full object-cover block transition duration-500 group-hover:scale-105" referrerPolicy="no-referrer" />
+                      {backButton}
                       {overlayActions}
                     </div>
                     {hasTiles && (
-                      <div className="grid w-1/2 grid-cols-2 auto-rows-fr gap-2">
+                      <div className={`grid w-1/2 gap-2 ${
+                        // Kafel sayına uyğun tor — 1: tam, 2: alt-alta, 3+: 2 sütun; tək qalan kafel tam sütun tutmasın deyə
+                        tiles.length === 1 ? 'grid-cols-1' : tiles.length === 2 ? 'grid-cols-1 grid-rows-2' : 'grid-cols-2 auto-rows-fr'
+                      }`}>
                         {tiles.map((m, i) => {
                           const idx = i + 1;
                           const isLast = i === tiles.length - 1;
                           return (
                             <div
                               key={idx}
-                              className="relative group cursor-pointer overflow-hidden bg-slate-100"
+                              className={`relative group cursor-pointer overflow-hidden bg-slate-100 ${tiles.length === 3 && i === 2 ? 'col-span-2' : ''}`}
                               onClick={() => setLightboxIndex(idx)}
                             >
                               <img src={m} alt="" className="w-full h-full object-cover block transition duration-500 group-hover:scale-105" referrerPolicy="no-referrer" />
@@ -483,7 +362,21 @@ export function TourDetailPage({
               );
             })()}
 
-            {/* Stats siyahısı */}
+            {/* Başlıq + region (mockup: ggMainTitle — sticky header bu id-ni izləyir) */}
+            <div className="mt-3.5">
+              {isFeaturedThisMonth && (
+                <span className="inline-block bg-amber-500 text-white border border-amber-600 text-[10px] font-extrabold px-2 py-0.5 rounded shadow-sm mb-1.5">🔥 {t('tourDetailPage.header.bestSellerBadge')}</span>
+              )}
+              <h1 id="ggMainTitle" className="text-2xl sm:text-4xl font-extrabold text-label-primary tracking-tight leading-tight">
+                {getLocalizedTourName(selectedTour, language)}
+              </h1>
+              <div className="flex items-center gap-[5px] mt-[3px] text-slate-400 text-[13px]">
+                <MapPin className="w-3.5 h-3.5" />
+                <span>{selectedTour.region}</span>
+              </div>
+            </div>
+
+            {/* Stats - HTML ÜSLUBUNDA */}
             {(() => {
               const parsedGpx = parseStoredGpxData(selectedTour.gpxData);
               const isSportActive = selectedTour.category === 'active' || selectedTour.isActiveLife;
@@ -495,92 +388,124 @@ export function TourDetailPage({
               const durationLabel = selectedTour.durationDays >= 2
                 ? t('tourDetailPage.stats.durationDays', { days: selectedTour.durationDays })
                 : t('tourDetailPage.stats.durationHours', { hours: selectedTour.durationHours ?? (selectedTour.durationDays * 8) });
-              const maxCapacity = Math.max(0, ...slots.filter(s => s.tourId === selectedTour.id).map(s => s.capacity));
-              const cancellationHours = selectedTour.cancellationHours ?? 48;
+              // Mockup: 2 sütunlu boz stat çipləri — Çətinlik, Məsafə, Yüksəklik, Müddət, Yaş limiti
+              // Lüğətdəki stat açarları ":" ilə bitir — mockup çiplərində iki nöqtə yoxdur
+              const noColon = (s: string) => s.replace(/:\s*$/, '');
               const statChips: { Icon: React.ComponentType<{ className?: string }>; label: string; value: string }[] = [
-                { Icon: Mountain, label: t('tourDetailPage.stats.difficulty'), value: difficultyLabel },
+                { Icon: Gauge, label: noColon(t('tourDetailPage.stats.difficulty')), value: difficultyLabel },
                 ...(parsedGpx ? [
-                  { Icon: MoveHorizontal, label: t('tourDetailPage.stats.distance'), value: `${parsedGpx.stats.distanceKm} km` },
-                  { Icon: Flag, label: t('tourDetailPage.stats.elevation'), value: `${parsedGpx.stats.elevationGainM} m` },
+                  { Icon: Route, label: noColon(t('tourDetailPage.stats.distance')), value: `${parsedGpx.stats.distanceKm} km` },
+                  { Icon: Mountain, label: noColon(t('tourDetailPage.stats.elevation')), value: `${parsedGpx.stats.elevationGainM} m` },
                 ] : []),
-                { Icon: Clock, label: t('tourDetailPage.stats.duration'), value: durationLabel },
-                ...(selectedTour.ageLimit ? [{ Icon: UserRoundCheck, label: t('tourDetailPage.stats.ageLimit'), value: String(selectedTour.ageLimit) }] : []),
+                { Icon: Clock, label: noColon(t('tourDetailPage.stats.duration')), value: durationLabel },
+                ...(selectedTour.ageLimit ? [{ Icon: UserRoundCheck, label: noColon(t('tourDetailPage.stats.ageLimit')), value: String(selectedTour.ageLimit) }] : []),
               ];
-              const featureChips: { Icon: React.ComponentType<{ className?: string }>; title: string; sub: string }[] = [
-                {
-                  Icon: Globe,
-                  title: t('tourDetailPage.quickInfo.professionalGuide'),
-                  sub: selectedTour.languages && selectedTour.languages.length > 0 ? selectedTour.languages.join(', ') : t('tourDetailPage.quickInfo.azerbaijaniLanguage'),
-                },
-                {
-                  Icon: Calendar,
-                  title: cancellationHours === 0 ? t('tourDetailPage.quickInfo.noCancellation') : t('tourDetailPage.quickInfo.freeCancellation'),
-                  sub: cancellationHours === 0 ? t('tourDetailPage.quickInfo.noCancellationDesc') : t('tourDetailPage.quickInfo.freeCancellationDesc', { hours: cancellationHours }),
-                },
-                {
-                  Icon: Users,
-                  title: t('tourDetailPage.quickInfo.privateGroupTours'),
-                  sub: maxCapacity > 0 ? t('tourDetailPage.stats.maxParticipants', { count: maxCapacity }) : t('tourDetailPage.quickInfo.selectableAtBooking'),
-                },
-              ];
-              const chipRowStyle = { scrollbarWidth: 'none' as const, WebkitOverflowScrolling: 'touch' as const };
-              const chipClass = 'shrink-0 inline-flex items-center gap-2.5 bg-slate-100 rounded-2xl px-4 py-2.5';
-              const desktopRowClass = 'hidden sm:flex gap-2.5 overflow-x-auto scrollbar-none -mx-1 px-1 pb-0.5';
-              const labelCls = 'text-[11px] text-slate-500 font-medium whitespace-normal sm:whitespace-nowrap';
-              const valueCls = 'text-[13.5px] text-slate-900 font-bold whitespace-normal sm:whitespace-nowrap';
-              const mergedChips = [
-                ...statChips.map((c) => ({ Icon: c.Icon, top: c.label, bottom: c.value, topBold: false })),
-                ...featureChips.map((c) => ({ Icon: c.Icon, top: c.title, bottom: c.sub, topBold: true })),
-              ];
+
               return (
-                <div className="py-5 border-b border-slate-200 sm:space-y-3">
-                  <div className="grid grid-cols-2 gap-3 sm:hidden">
-                    {mergedChips.map((c, i) => {
-                      const fullWidth = mergedChips.length % 2 === 1 && i === mergedChips.length - 1;
-                      return (
-                        <div
-                          key={i}
-                          className={`bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex ${fullWidth ? 'col-span-2 flex-row items-center gap-3' : 'flex-col gap-2.5'}`}
-                        >
-                          <span className="w-9 h-9 rounded-full bg-emerald-50 flex items-center justify-center shrink-0">
-                            <c.Icon className="w-[18px] h-[18px] text-emerald-600" />
-                          </span>
-                          <div className="flex flex-col gap-0.5 leading-tight min-w-0">
-                            <span className={c.topBold ? valueCls : labelCls}>{c.top}</span>
-                            <span className={c.topBold ? labelCls : valueCls}>{c.bottom}</span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <div className={desktopRowClass} style={chipRowStyle}>
-                    {statChips.map((c, i) => (
-                      <div key={i} className={chipClass}>
-                        <c.Icon className="w-[18px] h-[18px] text-slate-600 shrink-0" />
-                        <div className="flex flex-col leading-tight min-w-0">
-                          <span className={labelCls}>{c.label}</span>
-                          <span className={valueCls}>{c.value}</span>
-                        </div>
+                <div className="grid grid-cols-2 gap-[7px] border-b border-slate-100 pt-3.5 pb-6">
+                  {statChips.map((c, i) => (
+                    <div key={i} className="flex items-center gap-2 rounded-[11px] px-2.5 py-[9px]" style={{ background: '#F8FAFC' }}>
+                      <div className="w-9 h-9 rounded-[10px] flex items-center justify-center shrink-0" style={{ background: '#F1F3F1' }}>
+                        <c.Icon className="w-[18px] h-[18px] text-slate-700" />
                       </div>
-                    ))}
-                  </div>
-                  <div className={desktopRowClass} style={chipRowStyle}>
-                    {featureChips.map((c, i) => (
-                      <div key={i} className={chipClass}>
-                        <c.Icon className="w-[18px] h-[18px] text-slate-600 shrink-0" />
-                        <div className="flex flex-col leading-tight min-w-0">
-                          <span className={valueCls}>{c.title}</span>
-                          <span className={labelCls}>{c.sub}</span>
-                        </div>
+                      <div className="flex flex-col gap-px min-w-0">
+                        <span className="text-[11px] leading-[1.35]" style={{ color: '#627265' }}>{c.label}</span>
+                        <span className="text-[13.5px] text-slate-900 font-bold leading-tight whitespace-nowrap overflow-hidden text-ellipsis">{c.value}</span>
                       </div>
-                    ))}
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
+
+            {/* Etibar sıraları — təşkilatçı, bələdçi, ödənişsiz ləğv, özəl qrup (mockup) */}
+            {(() => {
+              const organizer = users.find(u => u.id === selectedTour.vendorId);
+              const cancellationHours = selectedTour.cancellationHours ?? 48;
+              const maxCapacity = Math.max(0, ...slots.filter(s => s.tourId === selectedTour.id).map(s => s.capacity));
+              const hasSpecificGuides = selectedTour.guideIds && selectedTour.guideIds.length > 0;
+              const tourGuides = hasSpecificGuides
+                ? (organizer?.guides?.filter(g => selectedTour.guideIds!.includes(g.id || '')) || [])
+                : (organizer?.guides || []);
+              return (
+                <div className="pt-[22px] pb-6">
+                  {/* Təşkilatçı */}
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); if (organizer) setSelectedOrganizer(organizer); }}
+                    className="flex items-start gap-3 py-[5px] w-full text-left bg-transparent border-0 p-0 cursor-pointer group"
+                  >
+                    <span
+                      className="w-9 h-9 rounded-[10px] overflow-hidden flex items-center justify-center shrink-0 text-[12px] font-bold text-white border border-slate-200"
+                      style={{ background: 'linear-gradient(135deg,#2E7D46,#1E5C34)' }}
+                    >
+                      {selectedTour.vendorName?.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]?.toUpperCase()).join('') || 'GG'}
+                    </span>
+                    <span className="flex flex-col gap-0.5 pt-0.5">
+                      <span className="flex items-center gap-1.5 leading-tight">
+                        <span className="text-[14px] font-extrabold text-slate-900 group-hover:underline">{selectedTour.vendorName}</span>
+                        <BadgeCheck className="w-[15px] h-[15px] text-white fill-emerald-500 shrink-0" aria-label="Təsdiqlənmiş" />
+                      </span>
+                      <span className="text-slate-500 leading-snug text-[12.5px]">{t('tourDetailPage.trust.organizerRole')}</span>
+                    </span>
+                  </button>
+                  {/* Peşəkar bələdçi */}
+                  <div className="flex items-start gap-3 py-[5px]">
+                    <span className="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">
+                      <Globe className="w-[18px] h-[18px] text-slate-700" />
+                    </span>
+                    <div className="flex-1 flex flex-col gap-0.5 pt-0.5 min-w-0">
+                      <span className="flex items-center justify-between gap-2 leading-tight">
+                        <span className="text-[14px] font-extrabold text-slate-900">{t('tourDetailPage.quickInfo.professionalGuide')}</span>
+                        {tourGuides.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => document.getElementById('tour-guides-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                            className="text-[14px] font-semibold inline-flex items-center gap-0.5 cursor-pointer bg-transparent border-0 p-0 leading-tight"
+                            style={{ color: '#1E7A3D' }}
+                          >
+                            {t('tourDetailPage.trust.view')}
+                            <ChevronRight className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </span>
+                      <span className="text-slate-500 leading-snug text-[12.5px]">
+                        {selectedTour.languages && selectedTour.languages.length > 0 ? selectedTour.languages.join(', ') : t('tourDetailPage.quickInfo.azerbaijaniLanguage')}
+                      </span>
+                    </div>
+                  </div>
+                  {/* Ödənişsiz ləğv */}
+                  <div className="flex items-start gap-3 py-[5px]">
+                    <span className="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">
+                      <Calendar className="w-[18px] h-[18px] text-slate-700" />
+                    </span>
+                    <div className="flex flex-col gap-0.5 pt-0.5">
+                      <span className="text-[14px] font-extrabold text-slate-900 leading-tight">
+                        {cancellationHours === 0 ? t('tourDetailPage.quickInfo.noCancellation') : t('tourDetailPage.quickInfo.freeCancellation')}
+                      </span>
+                      <span className="text-slate-500 leading-snug text-[12.5px]">
+                        {cancellationHours === 0 ? t('tourDetailPage.quickInfo.noCancellationDesc') : t('tourDetailPage.quickInfo.freeCancellationDesc', { hours: cancellationHours })}
+                      </span>
+                    </div>
+                  </div>
+                  {/* Özəl qrup turları */}
+                  <div className="flex items-start gap-3 py-[5px]">
+                    <span className="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center shrink-0">
+                      <Users className="w-[18px] h-[18px] text-slate-700" />
+                    </span>
+                    <div className="flex flex-col gap-0.5 pt-0.5">
+                      <span className="text-[14px] font-extrabold text-slate-900 leading-tight">{t('tourDetailPage.quickInfo.privateGroupTours')}</span>
+                      <span className="text-slate-500 leading-snug text-[12.5px]">
+                        {maxCapacity > 0 ? t('tourDetailPage.stats.maxParticipants', { count: maxCapacity }) : t('tourDetailPage.quickInfo.selectableAtBooking')}
+                      </span>
+                    </div>
                   </div>
                 </div>
               );
             })()}
 
             {/* Tur haqqında */}
-            <div id="tour-full-description" className="space-y-4 py-8 scroll-mt-24">
+            <div id="tour-full-description" className="space-y-4 py-8 scroll-mt-24 border-t border-slate-100">
               <h2 className="text-xl font-extrabold text-slate-900">{t('tourDetailPage.fullDescription.title')}</h2>
               {(() => { const localizedDescription = getLocalizedTourDescription(selectedTour, language); return (
               <div className="relative">
@@ -602,7 +527,8 @@ export function TourDetailPage({
                 <button
                   type="button"
                   onClick={() => setIsDescExpanded(!isDescExpanded)}
-                  className="group inline-flex items-center gap-1.5 text-sm font-extrabold text-slate-900 hover:text-emerald-700 cursor-pointer transition-colors mt-1"
+                  className="group inline-flex items-center gap-1.5 text-sm font-extrabold cursor-pointer transition-colors mt-1"
+                  style={{ color: '#1E7A3D' }}
                 >
                   <span className="transition-transform duration-300 group-hover:translate-y-0.5">
                     {isDescExpanded ? t('tourDetailPage.fullDescription.readLess') : t('tourDetailPage.fullDescription.readMore')}
@@ -618,7 +544,7 @@ export function TourDetailPage({
 
             {/* Önə çıxanlar */}
             {selectedTour.highlights && selectedTour.highlights.length > 0 && (
-              <div className="space-y-4 py-8 border-t border-slate-200">
+              <div className="space-y-4 py-8 border-t border-slate-100">
                 <h2 className="text-xl font-extrabold text-slate-900">{t('tourDetailPage.highlights.title')}</h2>
                 <div className="flex flex-col gap-3">
                   {getLocalizedTourHighlights(selectedTour, language).map((highlight, idx) => (
@@ -631,78 +557,108 @@ export function TourDetailPage({
               </div>
             )}
 
-            {/* Qiymətə daxildir */}
-            <div className="space-y-4 py-8 border-t border-slate-200">
-              <h2 className="text-xl font-extrabold text-slate-900">{t('tourDetailPage.priceIncludes.title')}</h2>
-              <ul className="space-y-2.5">
-                {[
+            {/* Qiymətə daxildir — mockup: yığıla bilən, 2 sütun (Daxildir / Daxil deyil) */}
+            <div className="py-8 border-t border-slate-100 flex flex-col gap-4">
+              <button
+                type="button"
+                onClick={() => setIsPriceIncludesExpanded(prev => !prev)}
+                className="w-full flex items-center justify-between gap-2 cursor-pointer bg-transparent border-0 p-0 text-left"
+              >
+                <span className="text-xl font-extrabold text-slate-900">{t('tourDetailPage.priceIncludes.title')}</span>
+                <ChevronDown className={`w-[22px] h-[22px] text-slate-700 transition-transform ${isPriceIncludesExpanded ? '' : '-rotate-90'}`} />
+              </button>
+              {isPriceIncludesExpanded && (() => {
+                const includedItems = [
                   ...(selectedTour.includes && selectedTour.includes.length > 0
                     ? getLocalizedTourIncludes(selectedTour, language)
                     : [t('tourDetailPage.priceIncludes.defaultIncluded1'), t('tourDetailPage.priceIncludes.defaultIncluded2')]),
                   ...(selectedTour.mealType ? [t('tourDetailPage.priceIncludes.mealLabel', { meal: selectedTour.mealType })] : []),
                   ...(selectedTour.flightIncluded ? [t('tourDetailPage.priceIncludes.flightIncluded')] : []),
-                ].map((item, idx) => (
-                  <li key={`inc-${idx}`} className="flex items-start gap-2.5">
-                    <Check className="w-[18px] h-[18px] text-green-600 shrink-0 mt-0.5" strokeWidth={2.4} />
-                    <span className="text-slate-700 text-[15px]">{item}</span>
-                  </li>
-                ))}
-                {[
+                ];
+                const notIncludedItems = [
                   ...(selectedTour.notIncluded && selectedTour.notIncluded.length > 0
                     ? getLocalizedTourNotIncluded(selectedTour, language)
                     : []),
                   ...(!selectedTour.flightIncluded && selectedTour.isInternational ? [t('tourDetailPage.priceIncludes.flightsSeparate')] : []),
-                ].map((item, idx) => (
-                  <li key={`exc-${idx}`} className="flex items-start gap-2.5">
-                    <X className="w-[18px] h-[18px] text-red-600 shrink-0 mt-0.5" strokeWidth={2.4} />
-                    <span className="text-slate-700 text-[15px]">{item}</span>
-                  </li>
-                ))}
-              </ul>
+                ];
+                return (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 mt-2 gap-x-6 gap-y-4">
+                    <div>
+                      <h3 className="text-sm font-extrabold text-slate-800 mb-3">{t('tourDetailPage.priceIncludes.includedHeader')}</h3>
+                      <ul className="space-y-2.5">
+                        {includedItems.map((item, idx) => (
+                          <li key={`inc-${idx}`} className="flex items-start gap-2.5">
+                            <Check className="w-[18px] h-[18px] shrink-0 mt-0.5" style={{ color: '#16A34A' }} strokeWidth={2.4} />
+                            <span className="text-slate-700 text-[15px]">{item}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                    {notIncludedItems.length > 0 && (
+                      <div>
+                        <h3 className="text-sm font-extrabold text-slate-800 mb-3">{t('tourDetailPage.priceIncludes.notIncludedHeader')}</h3>
+                        <ul className="space-y-2.5">
+                          {notIncludedItems.map((item, idx) => (
+                            <li key={`exc-${idx}`} className="flex items-start gap-2.5">
+                              <X className="w-[18px] h-[18px] shrink-0 mt-0.5" style={{ color: '#DC2626' }} strokeWidth={2.4} />
+                              <span className="text-slate-700 text-[15px]">{item}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
 
-            {/* Vacib məlumat */}
-            <div className="space-y-4 py-8 border-t border-slate-200">
-              <h2 className="text-xl font-extrabold text-slate-900">{t('tourDetailPage.importantInfo.title')}</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mt-2">
-                <div className="bg-emerald-50/50 border border-emerald-100 rounded-xl p-5">
-                  <h3 className="font-extrabold text-emerald-900 text-sm mb-4 flex items-center gap-2">
-                    <Check className="w-5 h-5 text-emerald-600" strokeWidth={2.4} />
-                    {t('tourDetailPage.importantInfo.bringHeader')}
-                  </h3>
-                  <ul className="space-y-2.5">
-                    {(selectedTour.importantInfo?.bring && selectedTour.importantInfo.bring.length > 0
-                      ? selectedTour.importantInfo.bring
-                      : [selectedTour.requiredEquipment || t('tourDetailPage.importantInfo.defaultBring1'), t('tourDetailPage.importantInfo.defaultBring2'), t('tourDetailPage.importantInfo.defaultBring3')]
-                    ).map((item, idx) => (
-                      <li key={idx} className="flex items-start gap-2.5 text-[14px] text-slate-700">
-                        <Check className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" strokeWidth={2.4} /> {item}
-                      </li>
-                    ))}
-                  </ul>
+            {/* Vacib məlumat — mockup: yığıla bilən, 2 sütun (Özünüzlə gətirin / İcazə verilmir) */}
+            <div className="py-8 border-t border-slate-100 flex flex-col gap-4">
+              <button
+                type="button"
+                onClick={() => setIsImportantInfoExpanded(prev => !prev)}
+                className="w-full flex items-center justify-between gap-2 cursor-pointer bg-transparent border-0 p-0 text-left"
+              >
+                <span className="text-xl font-extrabold text-slate-900">{t('tourDetailPage.importantInfo.title')}</span>
+                <ChevronDown className={`w-[22px] h-[22px] text-slate-700 transition-transform ${isImportantInfoExpanded ? '' : '-rotate-90'}`} />
+              </button>
+              {isImportantInfoExpanded && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 mt-2 gap-x-6 gap-y-4">
+                  <div>
+                    <h3 className="text-sm font-extrabold text-slate-800 mb-3">{t('tourDetailPage.importantInfo.bringHeader')}</h3>
+                    <ul className="space-y-2.5">
+                      {(selectedTour.importantInfo?.bring && selectedTour.importantInfo.bring.length > 0
+                        ? selectedTour.importantInfo.bring
+                        : [selectedTour.requiredEquipment || t('tourDetailPage.importantInfo.defaultBring1'), t('tourDetailPage.importantInfo.defaultBring2'), t('tourDetailPage.importantInfo.defaultBring3')]
+                      ).map((item, idx) => (
+                        <li key={idx} className="flex items-start gap-2.5">
+                          <Check className="w-[18px] h-[18px] shrink-0 mt-0.5" style={{ color: '#16A34A' }} strokeWidth={2.4} />
+                          <span className="text-slate-700 text-[15px]">{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-extrabold text-slate-800 mb-3">{t('tourDetailPage.importantInfo.notAllowedHeader')}</h3>
+                    <ul className="space-y-2.5">
+                      {(selectedTour.importantInfo?.notAllowed && selectedTour.importantInfo.notAllowed.length > 0
+                        ? selectedTour.importantInfo.notAllowed
+                        : [t('tourDetailPage.importantInfo.defaultNotAllowed1'), t('tourDetailPage.importantInfo.defaultNotAllowed2')]
+                      ).map((item, idx) => (
+                        <li key={idx} className="flex items-start gap-2.5">
+                          <X className="w-[18px] h-[18px] shrink-0 mt-0.5" style={{ color: '#DC2626' }} strokeWidth={2.4} />
+                          <span className="text-slate-700 text-[15px]">{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 </div>
-                <div className="bg-red-50 border border-red-200 rounded-xl p-5">
-                  <h3 className="font-extrabold text-red-900 text-sm mb-4 flex items-center gap-2">
-                    <X className="w-5 h-5 text-red-600" strokeWidth={2.4} />
-                    {t('tourDetailPage.importantInfo.notAllowedHeader')}
-                  </h3>
-                  <ul className="space-y-2.5">
-                    {(selectedTour.importantInfo?.notAllowed && selectedTour.importantInfo.notAllowed.length > 0
-                      ? selectedTour.importantInfo.notAllowed
-                      : [t('tourDetailPage.importantInfo.defaultNotAllowed1'), t('tourDetailPage.importantInfo.defaultNotAllowed2')]
-                    ).map((item, idx) => (
-                      <li key={idx} className="flex items-start gap-2.5 text-[14px] text-slate-700">
-                        <X className="w-4 h-4 text-red-600 mt-0.5 shrink-0" strokeWidth={2.4} /> {item}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
+              )}
             </div>
 
-            {/* Günün proqramı */}
+            {/* Günün proqramı — mockup: ikonlu timeline (addıma uyğun ikon, mono saat) */}
             {selectedTour.dayProgram && selectedTour.dayProgram.length > 0 && (
-              <div className="space-y-4 py-8 border-t border-slate-200">
+              <div className="py-8 border-t border-slate-100 flex flex-col gap-4">
                 <button
                   type="button"
                   onClick={() => setIsDayProgramExpanded(prev => !prev)}
@@ -712,26 +668,36 @@ export function TourDetailPage({
                   <ChevronDown className={`w-[22px] h-[22px] text-slate-700 transition-transform ${isDayProgramExpanded ? '' : '-rotate-90'}`} />
                 </button>
                 {isDayProgramExpanded && (
-                  <div className="mt-1">
-                    {selectedTour.dayProgram.map((step, idx) => (
-                      <div key={idx} className="relative pb-5 last:pb-0">
-                        {idx < selectedTour.dayProgram!.length - 1 && (
-                          <span className="absolute left-4 top-9 bottom-0 w-px bg-slate-200" aria-hidden />
-                        )}
-                        <div className="flex gap-3 items-center">
-                          <span className="w-8 h-8 rounded-full bg-slate-100 border border-slate-200 flex items-center justify-center relative z-[1] shrink-0">
-                            <Clock className="w-[15px] h-[15px] text-slate-500" />
-                          </span>
-                          <div className="flex-1 min-w-0">
-                            <div className="text-[13px] text-slate-500 font-mono">{step.time}</div>
-                            <div className="text-[15px] font-bold text-slate-900 leading-tight mt-0.5">{step.title}</div>
+                  <div className="mt-3">
+                    {selectedTour.dayProgram.map((step, idx) => {
+                      // Addımın məzmununa uyğun ikon (mockup-dakı kimi)
+                      const text = `${step.title} ${step.note || ''}`.toLowerCase();
+                      const StepIcon =
+                        /toplan/.test(text) ? Users
+                        : /nahar|yemə|qida|piknik/.test(text) ? Utensils
+                        : /çay|kofe|coffee/.test(text) ? Coffee
+                        : /yürüş|dırman|zirvə|trek|hiking|piyada|qalx/.test(text) ? Mountain
+                        : /→|marşrut|yol|transfer|dönüş|maşın|avtobus|4x4/.test(text) ? CarFront
+                        : Clock;
+                      return (
+                        <div key={idx} className={`relative ${idx < selectedTour.dayProgram!.length - 1 ? 'pb-5' : ''}`}>
+                          <div className="flex gap-3 items-center">
+                            <div className="shrink-0 w-8">
+                              <span className="flex w-8 h-8 rounded-full items-center justify-center relative z-[1]" style={{ background: '#F1F5F9', border: '1px solid #E2E8F0' }}>
+                                <StepIcon className="w-[15px] h-[15px]" style={{ color: '#64748B' }} />
+                              </span>
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="text-[13px] font-mono" style={{ color: '#64748B' }}>{step.time}</div>
+                              <div className="text-[15px] font-bold text-slate-900 leading-tight mt-0.5">{step.title}</div>
+                            </div>
                           </div>
+                          {step.note && (
+                            <p className="text-[13px] text-slate-500 leading-snug ml-11 mt-0.5">{step.note}</p>
+                          )}
                         </div>
-                        {step.note && (
-                          <p className="text-[13px] text-slate-500 leading-snug ml-11 mt-0.5">{step.note}</p>
-                        )}
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -739,7 +705,7 @@ export function TourDetailPage({
 
             {/* Toplanış yeri */}
             {selectedTour.meetingPoint && (
-              <div className="space-y-3 py-8 border-t border-slate-200">
+              <div className="space-y-3 py-8 border-t border-slate-100">
                 <h2 className="text-xl font-extrabold text-slate-900">{t('tourDetailPage.meetingPoint.title')}</h2>
                 <p className="text-[14px] text-slate-600 leading-relaxed">
                   {selectedTour.meetingPoint}
@@ -749,7 +715,7 @@ export function TourDetailPage({
                     <button
                       type="button"
                       onClick={() => setShowMeetingMap(prev => !prev)}
-                      className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-[14px] cursor-pointer bg-[#2E4F3E] hover:bg-[#233f30] text-white transition"
+                      className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-[14px] cursor-pointer bg-primary-500 hover:bg-primary-600 text-white transition"
                     >
                       <MapPin className="w-4 h-4" />
                       {showMeetingMap ? t('tourDetailPage.meetingPoint.hideMap') : t('tourDetailPage.meetingPoint.viewOnMap')}
@@ -775,7 +741,7 @@ export function TourDetailPage({
               const parsedGpx = parseStoredGpxData(selectedTour.gpxData);
               if (!parsedGpx || !selectedTour.gpxData) return null;
               return (
-                <div className="space-y-3 py-8 border-t border-slate-200">
+                <div className="space-y-3 py-8 border-t border-slate-100">
                   <h2 className="text-xl font-extrabold text-slate-900">{t('tourDetailPage.trajectory.title')}</h2>
                   <p className="text-[13px] text-slate-500 leading-snug -mt-1">{t('tourDetailPage.trajectory.subtitle')}</p>
                   <div className="rounded-2xl border border-slate-200 bg-slate-50/50 p-4 mt-1">
@@ -793,7 +759,7 @@ export function TourDetailPage({
                     <button
                       type="button"
                       onClick={() => setShowSatellite(prev => !prev)}
-                      className="w-full flex items-center justify-center gap-2 mt-3 py-2.5 rounded-xl font-semibold text-[13px] cursor-pointer bg-[#2E4F3E] hover:bg-[#233f30] text-white transition"
+                      className="w-full flex items-center justify-center gap-2 mt-3 py-2.5 rounded-xl font-semibold text-[13px] cursor-pointer bg-primary-500 hover:bg-primary-600 text-white transition"
                     >
                       <Satellite className="w-4 h-4" />
                       {showSatellite ? t('tourDetailPage.trajectory.satelliteHide') : t('tourDetailPage.trajectory.satelliteButton')}
@@ -813,7 +779,7 @@ export function TourDetailPage({
               );
             })()}
 
-            {/* Extra dynamic details */}
+            {/* Extra details */}
             <div className="space-y-0">
               {/* Tur bələdçisi */}
               {(() => {
@@ -824,7 +790,7 @@ export function TourDetailPage({
                   : (organizer?.guides || []);
                 if (tourGuides.length > 0) {
                   return (
-                    <div id="tour-guides-section" className="space-y-1 py-8 border-t border-slate-200 scroll-mt-20">
+                    <div id="tour-guides-section" className="space-y-1 py-8 border-t border-slate-100 scroll-mt-20">
                       <h2 className="text-xl font-extrabold text-slate-900 mb-2">{t('tourDetailPage.guides.title')}</h2>
                       {tourGuides.map((g, i) => (
                         <button
@@ -860,7 +826,7 @@ export function TourDetailPage({
                 return null;
               })()}
 
-              {/* Smart Pack Assistant vs. International Travel Agent Integration */}
+              {/* Packing/International sections */}
               {selectedTour.isInternational ? (
                 <div className="bg-gradient-to-br from-indigo-900/10 to-teal-900/5 border border-indigo-200/60 rounded-2xl p-6 space-y-5 shadow-3xs hover:border-indigo-300 transition duration-300">
                   <div className="flex items-start justify-between flex-wrap gap-3 border-b border-indigo-200/40 pb-3">
@@ -950,7 +916,7 @@ export function TourDetailPage({
                 />
               )}
 
-              {/* Mehmanxana və Nəqliyyat Loqistikası */}
+              {/* Hotel logistics */}
               {selectedTour.isInternational && (
                 <div className="bg-gradient-to-r from-amber-500/10 to-teal-800/5 border border-amber-200 p-5 rounded-xl space-y-4">
                   <h4 className="text-xs font-black text-amber-900 tracking-wider flex items-center gap-1.5 border-b pb-1.5 border-amber-200">
@@ -1002,7 +968,7 @@ export function TourDetailPage({
                 </div>
               )}
 
-              {/* Gündəlik Səyahət Proqramı */}
+              {/* Itinerary */}
               {selectedTour.isInternational && selectedTour.itinerary && selectedTour.itinerary.length > 0 && (
                 <div className="space-y-4">
                   <button
@@ -1020,7 +986,7 @@ export function TourDetailPage({
                         <div className="absolute -left-[7px] top-1.5 w-3 h-3 rounded-full bg-amber-500 border-2 border-white ring-2 ring-amber-500/20" />
                         <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2">
                           <span className="text-xs font-black text-amber-900 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-sm">
-                            📅 {t('tourDetailPage.itineraryDetail.dayNumber', { day: day.day })}
+                             {t('tourDetailPage.itineraryDetail.dayNumber', { day: day.day })}
                           </span>
                           <h5 className="text-xs font-extrabold text-ink-900 flex-1 sm:ml-3">
                             {day.title}
@@ -1046,7 +1012,7 @@ export function TourDetailPage({
                 </div>
               )}
 
-              {/* Rəylər */}
+              {/* Reviews */}
               {REVIEWS_ENABLED && (
                 <TourReviewsList
                   tour={selectedTour}
@@ -1055,9 +1021,9 @@ export function TourDetailPage({
                 />
               )}
 
-              {/* Hava proqnozu */}
+              {/* Weather */}
               {slots.filter(s => s.tourId === selectedTour.id).length > 0 && (
-                <div className="py-8 border-t border-slate-200">
+                <div className="py-8 border-t border-slate-100">
                   <TourWeatherForecast
                     dates={slots.filter(s => s.tourId === selectedTour.id).map(s => s.startDate)}
                     region={selectedTour.region}
@@ -1066,13 +1032,41 @@ export function TourDetailPage({
                 </div>
               )}
             </div>
-          </div> {/* Closes Left Column */}
+          </div>
 
-          {/* RIGHT COLUMN: Sticky Booking Widget */}
+          {/* RIGHT COLUMN: Booking Widget - HTML ÜSLUBUNDA */}
           <div className="w-full lg:w-[35%] relative" id="booking-widget-container">
-            <div className="sticky top-24 bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-slate-200">
+            <div className="sticky top-24">
+              {/* İstəklər / Müqayisə / Paylaş — boxdan ayrı, üstündə */}
+              <div className="hidden lg:flex items-center justify-end gap-2 mb-3" onClick={(e) => e.stopPropagation()}>
+                <button
+                  type="button"
+                  aria-label={wishlist.includes(selectedTour.id) ? t('tourDetailPage.header.inWishlist') : t('tourDetailPage.header.addToWishlist')}
+                  onClick={() => handleToggleWishlist(selectedTour.id)}
+                  className="w-10 h-10 rounded-full bg-white hover:bg-slate-50 shadow-sm flex items-center justify-center text-slate-700 transition hover:scale-105 border border-slate-200 cursor-pointer"
+                >
+                  <Heart className={`w-5 h-5 ${wishlist.includes(selectedTour.id) ? 'fill-rose-600 text-rose-600' : ''}`} />
+                </button>
+                <button
+                  type="button"
+                  aria-label={compareList.includes(selectedTour.id) ? t('customerHome.toursHomeView.compare.remove') : t('customerHome.toursHomeView.compare.add')}
+                  onClick={() => handleToggleCompare(selectedTour.id)}
+                  className={`w-10 h-10 rounded-full shadow-sm flex items-center justify-center transition hover:scale-105 border cursor-pointer ${compareList.includes(selectedTour.id) ? 'bg-amber-50 text-amber-600 border-amber-200' : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'}`}
+                >
+                  <Scale className="w-5 h-5" />
+                </button>
+                <ShareMenuButton
+                  tour={selectedTour}
+                  slots={slots}
+                  onShowNotification={onShowNotification}
+                  stopPropagationOnOpen
+                  iconClassName="w-5 h-5"
+                  buttonClassName="w-10 h-10 rounded-full bg-white hover:bg-slate-50 shadow-sm flex items-center justify-center text-slate-700 transition hover:scale-105 border border-slate-200 cursor-pointer"
+                />
+              </div>
+              <div className="bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-slate-200">
               <div className="p-5 sm:p-6 space-y-5 sm:space-y-6">
-                {/* Pricing Header */}
+                {/* Pricing */}
                 <div className="flex flex-col gap-1">
                   {slots.filter(s => s.tourId === selectedTour.id).length > 0 ? (
                     (() => {
@@ -1109,20 +1103,18 @@ export function TourDetailPage({
                 {/* Selectors */}
                 <div className="space-y-4">
                   <div className="flex flex-col border border-slate-300 rounded-xl shadow-xs hover:border-slate-400 transition-colors">
-                    {/* Participants Dropdown */}
+                    {/* Participants */}
                     <div className="relative">
                       <button
                         type="button"
                         onClick={() => setShowParticipantsDropdown(prev => !prev)}
-                        className="w-full flex items-center justify-between bg-white px-4 py-3.5 border-b border-slate-200 text-left cursor-pointer hover:bg-slate-50 hover:border-emerald-300 transition-colors rounded-t-xl"
+                        className="w-full flex items-center justify-between bg-white px-4 py-3 border-b border-slate-200 text-left cursor-pointer hover:bg-slate-50 transition-colors rounded-t-xl"
                       >
                         <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-full bg-emerald-50 flex items-center justify-center">
-                            <Users className="w-[18px] h-[18px] text-emerald-600" />
-                          </div>
-                          <span className="text-sm font-bold text-slate-800">{t('tourDetailPage.participantsDropdown.adultsCount', { count: bookingQty })}</span>
+                          <Users className="w-5 h-5 text-emerald-700" />
+                          <span className="text-sm font-extrabold text-slate-800">{t('tourDetailPage.participantsDropdown.adultsCount', { count: bookingQty })}</span>
                         </div>
-                        <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform ${showParticipantsDropdown ? 'rotate-180' : ''}`} />
+                        <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${showParticipantsDropdown ? 'rotate-180' : ''}`} />
                       </button>
                       {showParticipantsDropdown && (() => {
                         const maxParticipants = selectedSlot ? Math.max(1, selectedSlot.capacity - selectedSlot.bookedCount) : 20;
@@ -1173,20 +1165,18 @@ export function TourDetailPage({
                       })()}
                     </div>
 
-                    {/* Date Dropdown */}
+                    {/* Date */}
                     <div className="relative">
                       <button
                         type="button"
                         onClick={() => setShowDateDropdown(prev => !prev)}
-                        className="w-full flex items-center justify-between bg-white px-4 py-3.5 text-left cursor-pointer hover:bg-slate-50 hover:border-emerald-300 transition-colors rounded-b-xl"
+                        className="w-full flex items-center justify-between bg-white px-4 py-3 text-left cursor-pointer hover:bg-slate-50 transition-colors rounded-b-xl"
                       >
                         <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-full bg-emerald-50 flex items-center justify-center">
-                            <Calendar className="w-[18px] h-[18px] text-emerald-600" />
-                          </div>
-                          <span className="text-sm font-bold text-slate-800">{selectedSlot ? t('tourDetailPage.dateDropdown.selectedDate', { date: formatDisplayDate(selectedSlot.startDate) }) : t('tourDetailPage.dateDropdown.selectDate')}</span>
+                          <Calendar className="w-5 h-5 text-emerald-700" />
+                          <span className="text-sm font-extrabold text-slate-800">{selectedSlot ? formatDisplayDate(selectedSlot.startDate) : t('tourDetailPage.dateDropdown.selectDate')}</span>
                         </div>
-                        <ChevronDown className={`w-5 h-5 text-slate-400 transition-transform ${showDateDropdown ? 'rotate-180' : ''}`} />
+                        <ChevronDown className={`w-4 h-4 text-slate-400 transition-transform ${showDateDropdown ? 'rotate-180' : ''}`} />
                       </button>
                       {showDateDropdown && (
                         <MaybeBodyPortal>
@@ -1210,6 +1200,8 @@ export function TourDetailPage({
                                 today.setHours(0, 0, 0, 0);
                                 const isPast = slotDate ? slotDate < today : false;
                                 const isDisabled = remainingSpots <= 0 || isPast;
+                                const isSelected = selectedSlot?.id === slot.id;
+                                const urgentSpots = remainingSpots > 0 && remainingSpots <= 5;
                                 return (
                                   <button
                                     key={slot.id}
@@ -1219,18 +1211,28 @@ export function TourDetailPage({
                                       setSelectedSlot(slot);
                                       setShowDateDropdown(false);
                                     }}
-                                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-left transition ${
+                                    className={`w-full flex items-center justify-between gap-3 px-3 py-3.5 rounded-[10px] text-left transition border-b border-slate-100 last:border-b-0 ${
                                       isDisabled
                                         ? 'opacity-40 cursor-not-allowed'
-                                        : selectedSlot?.id === slot.id
-                                          ? 'bg-emerald-50 border border-emerald-300'
+                                        : isSelected
+                                          ? ''
                                           : 'hover:bg-slate-50 cursor-pointer'
                                     }`}
+                                    style={isSelected ? { background: '#F0F5F1' } : undefined}
                                   >
-                                    <span className="text-xs font-bold text-slate-700">📅 {formatDisplayDate(slot.startDate)}</span>
-                                    <span className={`text-[10px] font-bold ${isDisabled ? 'text-red-400' : 'text-slate-400'}`}>
-                                      {isPast ? t('tourDetailPage.dateDropdown.ended') : remainingSpots <= 0 ? t('tourDetailPage.dateDropdown.full') : t('tourDetailPage.dateDropdown.spotsLeft', { count: remainingSpots })}
+                                    <span className="min-w-0">
+                                      <span className="block font-semibold text-sm text-slate-900">{formatDisplayDate(slot.startDate)}</span>
+                                      <span className="block text-xs mt-0.5" style={{ color: isPast || remainingSpots <= 0 ? '#94A3B8' : urgentSpots ? '#DC2626' : '#16A34A' }}>
+                                        {isPast ? t('tourDetailPage.dateDropdown.ended') : remainingSpots <= 0 ? t('tourDetailPage.dateDropdown.full') : urgentSpots ? t('tourDetailPage.dateDropdown.spotsFew', { count: remainingSpots }) : t('tourDetailPage.dateDropdown.spotsAvailable')}
+                                      </span>
                                     </span>
+                                    {isSelected ? (
+                                      <span className="w-[22px] h-[22px] rounded-full flex items-center justify-center shrink-0 bg-primary-500">
+                                        <Check className="w-[13px] h-[13px] text-white" strokeWidth={3} />
+                                      </span>
+                                    ) : (
+                                      <ChevronRight className="w-4 h-4 shrink-0" style={{ color: '#CBD5E1' }} />
+                                    )}
                                   </button>
                                 );
                               })
@@ -1242,7 +1244,7 @@ export function TourDetailPage({
                   </div>
                 </div>
 
-                {/* Remaining-seats indicator */}
+                {/* Remaining seats */}
                 {(() => {
                   const todayStr = new Date().toISOString().slice(0, 10);
                   const displaySlot = selectedSlot
@@ -1271,14 +1273,14 @@ export function TourDetailPage({
                   );
                 })()}
 
-                {/* Primary CTA */}
+                {/* CTA - "Rezervasiya et" */}
                 <button
                   type="button"
                   disabled={!selectedSlot && !earliestAvailableSlot}
                   onClick={() => handleOpenInquiry()}
-                  className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-base md:text-lg font-black py-4 rounded-full shadow-lg hover:shadow-xl transition-all active:scale-95 cursor-pointer block text-center disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="w-full bg-primary-500 hover:bg-primary-600 text-white text-base md:text-lg font-black py-3.5 rounded-full shadow-md transition-all active:scale-95 cursor-pointer block text-center disabled:opacity-40 disabled:cursor-not-allowed"
                 >
-                  {t('tourDetailPage.sidebar.checkAvailability')}
+                  {t('tourDetailPage.sidebar.reserveButton') || 'Rezervasiya et'}
                 </button>
 
                 {/* Guarantees */}
@@ -1307,12 +1309,13 @@ export function TourDetailPage({
                   </div>
                 </div>
               </div>
+              </div>
             </div>
           </div>
-        </div> {/* Closes TWO COLUMN WRAPPER */}
+        </div>
 
-        {/* Bunlar da maraqlı ola bilər */}
-        <div className="mt-16 pt-16 border-t border-slate-200">
+        {/* Related Tours */}
+        <div className="mt-16 pt-16 border-t border-slate-100">
           <h2 className="text-2xl font-extrabold text-label-primary mb-8">{t('tourDetailPage.relatedTours.title')}</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 w-full">
               {relatedTours
@@ -1455,62 +1458,60 @@ export function TourDetailPage({
                     </div>
                   );
                 })}
-            </div>
           </div>
-      </div>
+        </div>
 
-      {/* Mobile fixed price bar */}
-      {(() => {
-        const tourSlots = slots.filter(s => s.tourId === selectedTour.id);
-        if (!tourSlots.length) return null;
-        const basePrice = selectedTour.price ?? tourSlots[0].price;
-        const hasDiscount = !!selectedTour.discountPrice && selectedTour.discountPrice > 0 && selectedTour.discountPrice < basePrice;
-        const shownPrice = hasDiscount ? selectedTour.discountPrice! : basePrice;
-        return (
-         <div
-  className={`lg:hidden fixed left-0 right-0 bottom-24 sm:bottom-0 z-[60] bg-white border-t border-slate-200 shadow-[0_-4px_16px_rgba(0,0,0,0.08)] px-4 py-2.5 transition-all duration-300 ${
-    isMobileBarHidden ? 'translate-y-[130%] opacity-0 pointer-events-none' : 'translate-y-0 opacity-100'
-  }`}
->
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex flex-col leading-tight">
-                {hasDiscount && (
-                  <span className="line-through text-slate-400 text-[12px]">
-                    {getConvertedPriceInfo(basePrice, selectedTour.priceCurrency).both}
-                  </span>
-                )}
-                <div className="flex items-baseline gap-1">
-                  <span className={`font-extrabold text-lg ${hasDiscount ? 'text-label-critical' : 'text-label-primary'}`}>
-                    {getConvertedPriceInfo(shownPrice, selectedTour.priceCurrency).both}
-                  </span>
-                  <span className="text-[12px] text-slate-500 font-medium">/ {t('tourDetailPage.pricingHeader.perPerson')}</span>
+        {/* Mobile fixed price bar - "Rezervasiya et" */}
+        {(() => {
+          const tourSlots = slots.filter(s => s.tourId === selectedTour.id);
+          if (!tourSlots.length) return null;
+          const basePrice = selectedTour.price ?? tourSlots[0].price;
+          const hasDiscount = !!selectedTour.discountPrice && selectedTour.discountPrice > 0 && selectedTour.discountPrice < basePrice;
+          const shownPrice = hasDiscount ? selectedTour.discountPrice! : basePrice;
+          return (
+            <div
+              className={`lg:hidden fixed left-0 right-0 bottom-24 sm:bottom-0 z-[60] bg-white border-t border-slate-200 shadow-[0_-4px_16px_rgba(0,0,0,0.08)] px-4 py-2.5 transition-all duration-300 ${isMobileBarHidden ? 'translate-y-[130%] opacity-0 pointer-events-none' : 'translate-y-0 opacity-100'}`}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex flex-col leading-tight">
+                  {hasDiscount && (
+                    <span className="line-through text-slate-400 text-[12px]">
+                      {getConvertedPriceInfo(basePrice, selectedTour.priceCurrency).both}
+                    </span>
+                  )}
+                  <div className="flex items-baseline gap-1">
+                    <span className={`font-extrabold text-[20px] ${hasDiscount ? 'text-label-critical' : 'text-label-primary'}`}>
+                      {getConvertedPriceInfo(shownPrice, selectedTour.priceCurrency).both}
+                    </span>
+                    <span className="text-[12px] text-slate-500 font-medium">/ {t('tourDetailPage.pricingHeader.perPerson')}</span>
+                  </div>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const panel = document.getElementById('booking-widget-container');
+                    if (panel) panel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  }}
+                  className="bg-primary-500 hover:bg-primary-600 text-white font-black text-[15px] px-6 py-3 rounded-full shadow-md active:scale-95 transition whitespace-nowrap cursor-pointer"
+                >
+                  {t('tourDetailPage.sidebar.reserveButton') || 'Rezervasiya et'}
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => {
-                  const panel = document.getElementById('booking-widget-container');
-                  if (panel) panel.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                }}
-                className="bg-primary-500 hover:bg-primary-600 text-white font-black text-sm px-5 py-2.5 rounded-full shadow-md active:scale-95 transition cursor-pointer"
-              >
-                {t('tourDetailPage.sidebar.checkAvailability')}
-              </button>
             </div>
-          </div>
-        );
-      })()}
+          );
+        })()}
 
-      {/* Booking-inquiry sheet/modal */}
-      <TourInquirySheet
-        tour={selectedTour}
-        slot={selectedSlot || earliestAvailableSlot}
-        qty={bookingQty}
-        open={showInquiry}
-        onClose={() => setShowInquiry(false)}
-        formatDisplayDate={formatDisplayDate}
-        onShowNotification={onShowNotification}
-      />
+        {/* Booking inquiry sheet */}
+        <TourInquirySheet
+          tour={selectedTour}
+          slot={selectedSlot || earliestAvailableSlot}
+          qty={bookingQty}
+          open={showInquiry}
+          onClose={() => setShowInquiry(false)}
+          formatDisplayDate={formatDisplayDate}
+          onShowNotification={onShowNotification}
+        />
+      </div>
     </div>
   );
 }

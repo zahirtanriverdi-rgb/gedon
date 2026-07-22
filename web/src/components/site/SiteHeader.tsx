@@ -118,6 +118,85 @@ export function SiteHeader({
     }
   };
 
+  // Tur detal səhifəsi: mockup-dakı kompakt 43px bar — solda geri düyməsi, ortada scroll
+  // zamanı görünən tur adı (səhifədəki #ggMainTitle bar-ın altına keçəndə), sağda nav ikonları.
+  const isTourDetail = pathname?.startsWith('/tours/');
+  const [stickyTitle, setStickyTitle] = useState('');
+  const [showStickyTitle, setShowStickyTitle] = useState(false);
+  React.useEffect(() => {
+    if (!isTourDetail) return;
+    const onScroll = () => {
+      const el = document.getElementById('ggMainTitle');
+      if (!el) { setShowStickyTitle(false); return; }
+      setStickyTitle(el.textContent || '');
+      const bar = document.getElementById('ggTopBar');
+      setShowStickyTitle(el.getBoundingClientRect().bottom < (bar?.offsetHeight ?? 52));
+    };
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, [isTourDetail, pathname]);
+
+  if (isTourDetail) {
+    return (
+      <header
+        id="ggTopBar"
+        className={`bg-white sticky top-0 z-40 border-b transition-shadow duration-200 ${
+          showStickyTitle ? 'border-slate-100 shadow-[0_1px_8px_rgba(0,0,0,0.06)]' : 'border-transparent'
+        }`}
+        style={{ minHeight: 43 }}
+      >
+        <div
+          className="relative max-w-[var(--global-max-width)] mx-auto px-4 sm:px-8 py-0 flex flex-nowrap items-center justify-between gap-4"
+          style={{ minHeight: 43 }}
+        >
+          <Link href="/" className="text-xl font-black tracking-tight text-[var(--color-primary)] shrink-0">
+            GedəkGörək
+          </Link>
+          <span
+            className="absolute left-1/2 top-1/2 pointer-events-none text-[15px] font-bold text-slate-900 whitespace-nowrap overflow-hidden text-ellipsis max-w-[65%] text-center transition-all duration-300 ease-out"
+            style={{
+              transform: showStickyTitle ? 'translate(-50%,-50%)' : 'translate(-50%,-50%) translateY(6px)',
+              opacity: showStickyTitle ? 1 : 0,
+            }}
+          >
+            {stickyTitle}
+          </span>
+          {/* Naviqasiya — ana səhifə header-i ilə eyni ölçülər (h-16, 40px dairə, w-6 ikon) */}
+          <nav className="hidden sm:flex items-center gap-[14px]">
+            {nav.map(({ href, label, Icon, count, badgeClass, activeFill }) => {
+              const active = count > 0;
+              return (
+                <Link
+                  key={href}
+                  href={href}
+                  className={`group flex h-16 min-w-10 flex-col items-center justify-center gap-1.5 transition-colors ${
+                    active ? 'text-[var(--color-primary)]' : 'text-[var(--color-text-muted)]'
+                  }`}
+                  title={active ? `${label} (${count})` : label}
+                  aria-label={active ? `${label} (${count})` : label}
+                >
+                  <span className="relative flex h-10 w-10 items-center justify-center rounded-full transition-all duration-200 group-hover:bg-[var(--background-secondary)] group-hover:text-[var(--color-primary)] group-hover:scale-110 group-active:scale-95">
+                    <Icon className="h-6 w-6" fill={active && activeFill ? 'currentColor' : 'none'} />
+                    {active && (
+                      <span className={`absolute -top-0.5 -right-0.5 min-w-[17px] h-[17px] px-1 ${badgeClass} text-white text-[10px] font-bold rounded-full flex items-center justify-center`}>
+                        {count}
+                      </span>
+                    )}
+                  </span>
+                  <span className="text-[11px] font-semibold leading-none whitespace-nowrap">{label}</span>
+                </Link>
+              );
+            })}
+            <UrgentDealsBell />
+            <LanguageSwitcher showLabel />
+            <CurrencySwitcher showLabel />
+          </nav>
+        </div>
+      </header>
+    );
+  }
+
   return (
     // Sticky only from sm up — on mobile the header scrolls away with the logo and the home
     // page's own search bar takes over the viewport top (its sticky top-0 pins flush there,
