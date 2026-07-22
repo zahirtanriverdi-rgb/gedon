@@ -191,11 +191,11 @@ export function TourDetailPage({
 
   return (
     <div className="animate-fadeIn bg-white min-h-screen pb-20">
-      <div className="max-w-[var(--global-max-width)] mx-auto px-4 sm:px-5 pt-2 pb-8">
+      <div className="max-w-[var(--global-max-width)] mx-auto px-4 sm:px-14 pt-2 pb-8">
         {/* TWO COLUMN WRAPPER */}
         <div className="flex flex-col lg:flex-row gap-10 relative items-stretch">
           {/* LEFT COLUMN */}
-          <div className="w-full lg:w-[65%] shrink-0">
+          <div className="w-full lg:w-[65%] shrink-0 mt-6">
             {/* Gallery - SAXLANILIR */}
             {(() => {
               const allMedia = [selectedTour.image, ...(selectedTour.images || []), ...(selectedTour.videos || [])].filter(Boolean);
@@ -209,8 +209,10 @@ export function TourDetailPage({
               const tiles = allMedia.slice(1, 5);
               const extraCount = allMedia.length - 5;
               const hasTiles = tiles.length > 0;
+              // Mobildə əsas şəklin, desktop/planşetdə isə bütün qalereya qutusunun (yəni ən
+              // sağdakı şəklin) sağ üst küncündə oturur — hər iki yerdə eyni düymə dəsti.
               const overlayActions = (
-                <div className="absolute top-3 right-3 flex gap-2 z-10 lg:hidden" onClick={(e) => e.stopPropagation()}>
+                <div className="absolute top-3 right-3 flex gap-2 z-10" onClick={(e) => e.stopPropagation()}>
                   <button
                     type="button"
                     aria-label={wishlist.includes(selectedTour.id) ? t('tourDetailPage.header.inWishlist') : t('tourDetailPage.header.addToWishlist')}
@@ -237,11 +239,12 @@ export function TourDetailPage({
                   />
                 </div>
               );
-              const categoryBadge = (
-                <div className="absolute top-4 left-16 bg-black/60 backdrop-blur-sm text-white px-3 py-1.5 rounded-full flex items-center gap-1.5 z-10 shadow-sm">
-                  <span className="text-[12px] font-medium tracking-wide">{categoryBadges[selectedTour.category] || categoryBadges.peak}</span>
-                </div>
-              );
+             const categoryBadge = (
+  <div className="absolute bottom-4 left-4 bg-black/60 backdrop-blur-sm text-white px-3 py-1.5 rounded-full flex items-center gap-1.5 z-10 shadow-sm">
+    <span className="text-[12px] font-medium tracking-wide">{categoryBadges[selectedTour.category] || categoryBadges.peak}</span>
+  </div>
+);
+
               const regionBadge = (
                 <div className="absolute bottom-4 left-4 bg-black/60 backdrop-blur-sm text-white px-3 py-1.5 rounded-full flex items-center gap-1.5 z-10 shadow-sm">
                   <MapPin className="w-3.5 h-3.5" />
@@ -281,15 +284,11 @@ export function TourDetailPage({
                       </div>
                       {backButton}
                       {overlayActions}
-                      <div className="absolute bottom-4 left-4 flex flex-col items-start gap-2 z-10">
-                        <span className="bg-black/60 backdrop-blur-sm text-white px-3 py-1.5 rounded-full shadow-sm text-[12px] font-medium tracking-wide">
-                          {categoryBadges[selectedTour.category] || categoryBadges.peak}
-                        </span>
-                        <span className="bg-black/60 backdrop-blur-sm text-white px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-sm">
-                          <MapPin className="w-3.5 h-3.5" />
-                          <span className="text-[12px] font-medium tracking-wide">{selectedTour.region}</span>
-                        </span>
-                      </div>
+                                 <div className="absolute bottom-4 left-4 z-10">
+              <span className="bg-black/60 backdrop-blur-sm text-white px-3 py-1.5 rounded-full shadow-sm text-[12px] font-medium tracking-wide">
+                {categoryBadges[selectedTour.category] || categoryBadges.peak}
+              </span>
+            </div>
                       <button
                         type="button"
                         onClick={(e) => { e.stopPropagation(); setLightboxIndex(0); }}
@@ -312,16 +311,15 @@ export function TourDetailPage({
                     </div>
                   </div>
                   {/* DESKTOP */}
-                  <div className="hidden sm:flex flex-row gap-2 h-[440px] rounded-2xl overflow-hidden">
+                  <div className="relative hidden sm:flex flex-row gap-2 h-[440px] rounded-2xl overflow-hidden">
                     <div
-                      className={`relative group cursor-pointer overflow-hidden bg-slate-100 ${hasTiles ? 'w-1/2' : 'w-full'}`}
-                      onClick={() => setLightboxIndex(0)}
+                       className={`relative group cursor-pointer overflow-hidden bg-slate-100 ${hasTiles ? 'w-1/2' : 'w-full'}`}
+  onClick={() => setLightboxIndex(0)}
                     >
                       {categoryBadge}
-                      {regionBadge}
-                      <img src={allMedia[0]} alt={getLocalizedTourName(selectedTour, language)} className="w-full h-full object-cover block transition duration-500 group-hover:scale-105" referrerPolicy="no-referrer" />
-                      {backButton}
-                      {overlayActions}
+  {/* {regionBadge} silindi */}
+  <img src={allMedia[0]} alt={getLocalizedTourName(selectedTour, language)} className="w-full h-full object-cover block transition duration-500 group-hover:scale-105" referrerPolicy="no-referrer" />
+  {backButton}
                     </div>
                     {hasTiles && (
                       <div className={`grid w-1/2 gap-2 ${
@@ -357,6 +355,9 @@ export function TourDetailPage({
                         })}
                       </div>
                     )}
+                    {/* İstəklər / müqayisə / paylaş — qalereya qutusunun sağ üst küncündə
+                        (ən sağdakı şəklin üstündə), desktop və planşetdə eyni yerdə. */}
+                    {overlayActions}
                   </div>
                 </>
               );
@@ -623,31 +624,39 @@ export function TourDetailPage({
                 <ChevronDown className={`w-[22px] h-[22px] text-slate-700 transition-transform ${isImportantInfoExpanded ? '' : '-rotate-90'}`} />
               </button>
               {isImportantInfoExpanded && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 mt-2 gap-x-6 gap-y-4">
-                  <div>
-                    <h3 className="text-sm font-extrabold text-slate-800 mb-3">{t('tourDetailPage.importantInfo.bringHeader')}</h3>
-                    <ul className="space-y-2.5">
+                // Mockup: alt-alta iki rəngli kart (yaşıl "Özünüzlə gətirin" / qırmızı "İcazə
+                // verilmir") — bütün ekran ölçülərində eyni yığılmış görünüş.
+                <div className="flex flex-col gap-4 mt-2">
+                  <div className="rounded-2xl bg-emerald-50/60 border border-emerald-100/70 px-5 py-5 sm:px-6">
+                    <h3 className="flex items-center gap-3 text-[16px] font-extrabold text-slate-900 mb-4">
+                      <Check className="w-5 h-5 shrink-0 text-slate-900" strokeWidth={2.6} />
+                      {t('tourDetailPage.importantInfo.bringHeader')}
+                    </h3>
+                    <ul className="space-y-3">
                       {(selectedTour.importantInfo?.bring && selectedTour.importantInfo.bring.length > 0
                         ? selectedTour.importantInfo.bring
                         : [selectedTour.requiredEquipment || t('tourDetailPage.importantInfo.defaultBring1'), t('tourDetailPage.importantInfo.defaultBring2'), t('tourDetailPage.importantInfo.defaultBring3')]
                       ).map((item, idx) => (
                         <li key={idx} className="flex items-start gap-2.5">
-                          <Check className="w-[18px] h-[18px] shrink-0 mt-0.5" style={{ color: '#16A34A' }} strokeWidth={2.4} />
+                          <Check className="w-[18px] h-[18px] shrink-0 mt-0.5 text-slate-800" strokeWidth={2.4} />
                           <span className="text-slate-700 text-[15px]">{item}</span>
                         </li>
                       ))}
                     </ul>
                   </div>
-                  <div>
-                    <h3 className="text-sm font-extrabold text-slate-800 mb-3">{t('tourDetailPage.importantInfo.notAllowedHeader')}</h3>
-                    <ul className="space-y-2.5">
+                  <div className="rounded-2xl bg-rose-50 border border-rose-100 px-5 py-5 sm:px-6">
+                    <h3 className="flex items-center gap-3 text-[16px] font-extrabold text-rose-900 mb-4">
+                      <X className="w-5 h-5 shrink-0" style={{ color: '#DC2626' }} strokeWidth={2.6} />
+                      {t('tourDetailPage.importantInfo.notAllowedHeader')}
+                    </h3>
+                    <ul className="space-y-3">
                       {(selectedTour.importantInfo?.notAllowed && selectedTour.importantInfo.notAllowed.length > 0
                         ? selectedTour.importantInfo.notAllowed
                         : [t('tourDetailPage.importantInfo.defaultNotAllowed1'), t('tourDetailPage.importantInfo.defaultNotAllowed2')]
                       ).map((item, idx) => (
                         <li key={idx} className="flex items-start gap-2.5">
                           <X className="w-[18px] h-[18px] shrink-0 mt-0.5" style={{ color: '#DC2626' }} strokeWidth={2.4} />
-                          <span className="text-slate-700 text-[15px]">{item}</span>
+                          <span className="text-slate-600 text-[15px]">{item}</span>
                         </li>
                       ))}
                     </ul>
@@ -1037,33 +1046,6 @@ export function TourDetailPage({
           {/* RIGHT COLUMN: Booking Widget - HTML ÜSLUBUNDA */}
           <div className="w-full lg:w-[35%] relative" id="booking-widget-container">
             <div className="sticky top-24">
-              {/* İstəklər / Müqayisə / Paylaş — boxdan ayrı, üstündə */}
-              <div className="hidden lg:flex items-center justify-end gap-2 mb-3" onClick={(e) => e.stopPropagation()}>
-                <button
-                  type="button"
-                  aria-label={wishlist.includes(selectedTour.id) ? t('tourDetailPage.header.inWishlist') : t('tourDetailPage.header.addToWishlist')}
-                  onClick={() => handleToggleWishlist(selectedTour.id)}
-                  className="w-10 h-10 rounded-full bg-white hover:bg-slate-50 shadow-sm flex items-center justify-center text-slate-700 transition hover:scale-105 border border-slate-200 cursor-pointer"
-                >
-                  <Heart className={`w-5 h-5 ${wishlist.includes(selectedTour.id) ? 'fill-rose-600 text-rose-600' : ''}`} />
-                </button>
-                <button
-                  type="button"
-                  aria-label={compareList.includes(selectedTour.id) ? t('customerHome.toursHomeView.compare.remove') : t('customerHome.toursHomeView.compare.add')}
-                  onClick={() => handleToggleCompare(selectedTour.id)}
-                  className={`w-10 h-10 rounded-full shadow-sm flex items-center justify-center transition hover:scale-105 border cursor-pointer ${compareList.includes(selectedTour.id) ? 'bg-amber-50 text-amber-600 border-amber-200' : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'}`}
-                >
-                  <Scale className="w-5 h-5" />
-                </button>
-                <ShareMenuButton
-                  tour={selectedTour}
-                  slots={slots}
-                  onShowNotification={onShowNotification}
-                  stopPropagationOnOpen
-                  iconClassName="w-5 h-5"
-                  buttonClassName="w-10 h-10 rounded-full bg-white hover:bg-slate-50 shadow-sm flex items-center justify-center text-slate-700 transition hover:scale-105 border border-slate-200 cursor-pointer"
-                />
-              </div>
               <div className="bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] border border-slate-200">
               <div className="p-5 sm:p-6 space-y-5 sm:space-y-6">
                 {/* Pricing */}

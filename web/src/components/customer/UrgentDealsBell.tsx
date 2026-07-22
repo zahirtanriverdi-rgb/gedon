@@ -266,7 +266,7 @@ export function UrgentDealsBell({ variant = 'header' }: UrgentDealsBellProps) {
               </span>
             )}
           </span>
-          <span className="text-[10px] font-bold">{s.title}</span>
+          <span className="text-[10px] font-bold">{s.navLabel}</span>
         </button>
 
         {sheetOpen &&

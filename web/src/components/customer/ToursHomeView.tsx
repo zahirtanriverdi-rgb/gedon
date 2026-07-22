@@ -152,8 +152,15 @@ export function ToursHomeView({
   {t('discoverTours')}
 </h2>
         <div ref={stickySentinelRef} aria-hidden="true" className="sm:hidden h-px w-full" />
-        <div className={`sticky top-0 sm:static z-30 sm:w-full -mx-4 px-4 sm:mx-0 sm:px-0 md:mx-0 md:px-0 lg:mx-0 lg:px-0 xl:mx-0 xl:px-0 sm:bg-transparent sm:backdrop-blur-none transition-colors duration-200 ${isSearchStuck ? 'bg-white/95 backdrop-blur-sm' : 'bg-transparent'}`}>
-          <div className="w-full max-w-[706px] mx-auto mt-2 sm:mt-8 pb-3 sm:pb-4 flex items-center justify-center relative">
+        {/* max-sm:pt-3 — mobildə bar yapışanda ekranın lap üstünə dirənməsin deyə yuxarıdan
+            nəfəslik; padding olduğu üçün ağ fon onu da örtür (margin örtməzdi). sm+ isə bar
+            burada static qalır — scroll zamanı axtarış header sətrinin içində (loqo ilə
+            ikonların arasında) görünür, SiteHeader-dəki inline search bunu edir. */}
+        {/* Keçid yalnız yapışan anda tətbiq olunur — geri qayıdanda ağ fon dərhal sönür,
+            yoxsa 200ms fade zamanı ağ düzbucaq hero qradiyentinin üstündə görünüb
+            künclərdə "kəsik" effekti yaradırdı. */}
+        <div className={`sticky top-0 sm:static z-30 max-sm:pt-3 sm:w-full -mx-4 px-4 sm:mx-0 sm:px-0 md:mx-0 md:px-0 lg:mx-0 lg:px-0 xl:mx-0 xl:px-0 sm:bg-transparent sm:backdrop-blur-none ${isSearchStuck ? 'bg-white/95 backdrop-blur-sm transition-colors duration-200' : 'bg-transparent'}`}>
+          <div className="w-full max-w-[706px] mx-auto mt-0 sm:mt-8 pb-3 sm:pb-4 flex items-center justify-center relative">
             <div ref={searchContainerRef} className="relative w-full h-12 sm:h-14 bg-white shadow-sm sm:shadow-md rounded-full px-5 border border-slate-200 flex items-center">
               <div className="flex items-center flex-1 min-w-0">
                 <Search className="text-brand-text-muted w-5 h-5 sm:w-[22px] sm:h-[22px] mr-3 flex-shrink-0" />

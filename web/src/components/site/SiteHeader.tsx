@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Heart, Scale, Calculator, Tent } from 'lucide-react';
+import { Heart, Scale, Calculator, Tent, Menu, X, BookOpen, Search } from 'lucide-react';
 import type { Tour } from '@/types';
 import { useLanguage } from '@/i18n/LanguageContext';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
@@ -14,6 +14,7 @@ import { getRecentSearches, addRecentSearch } from '@/utils/recentSearches';
 import { getWishlist, WISHLIST_CHANGED_EVENT } from '@/utils/wishlist';
 import { getCompareList, COMPARE_CHANGED_EVENT } from '@/utils/compare';
 import { useGlobalSearch } from './GlobalSearchContext';
+import { useCurrency } from '@/lib/currency';
 import { useSiteFeatureFlags } from './useSiteFeatureFlags';
 
 /**
@@ -22,10 +23,10 @@ import { useSiteFeatureFlags } from './useSiteFeatureFlags';
  * Next <Link>s (crawlable). Labels are localized inline (these nav strings lived in the old
  * CustomerPortal's local translations object, not the global i18n dictionary).
  */
-const NAV_LABELS: Record<'az' | 'en' | 'ru', { wishlist: string; compare: string; camp: string; calc: string }> = {
-  az: { wishlist: 'İstəklər', compare: 'Müqayisə', camp: 'Kamp yerləri', calc: 'Qrup hesabla' },
-  en: { wishlist: 'Wishlist', compare: 'Compare', camp: 'Camp sites', calc: 'Calculator' },
-  ru: { wishlist: 'Избранное', compare: 'Сравнить', camp: 'Кемпинги', calc: 'Калькулятор' },
+const NAV_LABELS: Record<'az' | 'en' | 'ru', { wishlist: string; compare: string; camp: string; calc: string; guide: string; menu: string; langHeading: string }> = {
+  az: { wishlist: 'İstəklər', compare: 'Müqayisə', camp: 'Kamp yerləri', calc: 'Qrup hesabla', guide: 'Bələdçi', menu: 'Menyu', langHeading: 'Dil / Valyuta' },
+  en: { wishlist: 'Wishlist', compare: 'Compare', camp: 'Camp sites', calc: 'Calculator', guide: 'Guide', menu: 'Menu', langHeading: 'Language / Currency' },
+  ru: { wishlist: 'Избранное', compare: 'Сравнить', camp: 'Кемпинги', calc: 'Калькулятор', guide: 'Гид', menu: 'Меню', langHeading: 'Язык / Валюта' },
 };
 
 // Scroll depth past which the home page's own search box is out of view — same 300px
@@ -39,7 +40,8 @@ export function SiteHeader({
   tours: Tour[];
   featureFlags?: { campSitesEnabled: boolean; groupCalculatorEnabled: boolean };
 }) {
-  const { language, t } = useLanguage();
+  const { language, setLanguage, t } = useLanguage();
+  const { displayCurrency, setDisplayCurrency } = useCurrency();
   const router = useRouter();
   const pathname = usePathname();
   const labels = NAV_LABELS[language] || NAV_LABELS.az;
@@ -118,52 +120,233 @@ export function SiteHeader({
     }
   };
 
-  // Tur detal səhifəsi: mockup-dakı kompakt 43px bar — solda geri düyməsi, ortada scroll
-  // zamanı görünən tur adı (səhifədəki #ggMainTitle bar-ın altına keçəndə), sağda nav ikonları.
+  // Tur detal səhifəsi: GYG-stil kompakt bar — solda loqo, sağda ikon-only nav (mobil+planşet)
+  // / tam nav (lg+), ortada isə tur adı deyil, scroll zamanı görünən axtarış çubuğu
+  // (səhifədəki #ggMainTitle bar-ın altına keçəndə — desktop ana səhifə davranışı kimi).
   const isTourDetail = pathname?.startsWith('/tours/');
-  const [stickyTitle, setStickyTitle] = useState('');
-  const [showStickyTitle, setShowStickyTitle] = useState(false);
+  const [showHeaderSearch, setShowHeaderSearch] = useState(false);
   React.useEffect(() => {
     if (!isTourDetail) return;
     const onScroll = () => {
       const el = document.getElementById('ggMainTitle');
-      if (!el) { setShowStickyTitle(false); return; }
-      setStickyTitle(el.textContent || '');
       const bar = document.getElementById('ggTopBar');
-      setShowStickyTitle(el.getBoundingClientRect().bottom < (bar?.offsetHeight ?? 52));
+      setShowHeaderSearch(
+        el
+          ? el.getBoundingClientRect().bottom < (bar?.offsetHeight ?? 52)
+          : window.scrollY > HEADER_SEARCH_SCROLL_Y,
+      );
     };
     onScroll();
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
   }, [isTourDetail, pathname]);
 
+  // GYG-stil burger menyu (mobil + planşet header ikonu) — kənara toxununca bağlanır.
+  const [burgerOpen, setBurgerOpen] = useState(false);
+  const burgerRef = React.useRef<HTMLDivElement>(null);
+  React.useEffect(() => {
+    if (!burgerOpen) return;
+    const handleClickOutside = (event: MouseEvent) => {
+      if (burgerRef.current && !burgerRef.current.contains(event.target as Node)) {
+        setBurgerOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [burgerOpen]);
+
+  const goBurger = (href: string) => {
+    setBurgerOpen(false);
+    router.push(href);
+  };
+
+  // Dil + valyuta cütü — MobileBottomNav-ın burger menyusundakı ilə eyni 4 seçim.
+  const burgerLangOption = (lang: 'az' | 'en' | 'ru', currency: 'AZN' | 'USD' | 'EUR', label: string) => (
+    <button
+      type="button"
+      onClick={() => {
+        setLanguage(lang);
+        setDisplayCurrency(currency);
+        setBurgerOpen(false);
+      }}
+      className={`w-full flex items-center gap-2 px-5 py-2.5 text-sm font-medium transition-colors ${
+        language === lang && displayCurrency === currency
+          ? 'text-brand-primary bg-emerald-50'
+          : 'text-brand-text-main hover:bg-slate-50'
+      }`}
+    >
+      {label}
+    </button>
+  );
+
+  // GYG-stil kompakt ikon nav — yalnız planşet (sm–lg): istəklər, müqayisə, burger.
+  // Mobildə göstərilmir (alt naviqasiyada var), lg+ isə tam etiketli nav işləyir.
+  // Həm tur detal, həm də ana səhifə header-ində eyni blok istifadə olunur.
+  const compactIconNav = (
+    <div className="hidden sm:flex lg:hidden items-center gap-1 shrink-0">
+      {[
+        { href: '/wishlist', label: labels.wishlist, Icon: Heart, count: wishlistCount, badgeClass: 'bg-rose-600', activeFill: true },
+        { href: '/compare', label: labels.compare, Icon: Scale, count: compareCount, badgeClass: 'bg-brand-cta', activeFill: false },
+      ].map(({ href, label, Icon, count, badgeClass, activeFill }) => {
+        const active = count > 0;
+        return (
+          <Link
+            key={href}
+            href={href}
+            aria-label={active ? `${label} (${count})` : label}
+            title={active ? `${label} (${count})` : label}
+            className={`relative flex h-10 w-10 items-center justify-center rounded-full transition-colors hover:bg-[var(--background-secondary)] ${
+              active ? 'text-[var(--color-primary)]' : 'text-[var(--color-text-muted)]'
+            }`}
+          >
+            <Icon className="h-6 w-6" fill={active && activeFill ? 'currentColor' : 'none'} />
+            {active && (
+              <span className={`absolute -top-0.5 -right-0.5 min-w-[17px] h-[17px] px-1 ${badgeClass} text-white text-[10px] font-bold rounded-full flex items-center justify-center`}>
+                {count}
+              </span>
+            )}
+          </Link>
+        );
+      })}
+      <div className="relative" ref={burgerRef}>
+        <button
+          type="button"
+          onClick={() => setBurgerOpen((v) => !v)}
+          aria-label={labels.menu}
+          aria-haspopup="true"
+          aria-expanded={burgerOpen}
+          className={`flex h-10 w-10 items-center justify-center rounded-full transition-colors hover:bg-[var(--background-secondary)] ${
+            burgerOpen ? 'text-[var(--color-primary)] bg-[var(--background-secondary)]' : 'text-[var(--color-text-muted)]'
+          }`}
+        >
+          {burgerOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+        </button>
+
+        {burgerOpen && (
+          <div className="absolute right-0 top-[calc(100%+8px)] w-56 bg-white rounded-2xl border border-slate-200 shadow-2xl overflow-hidden z-[110] animate-in fade-in slide-in-from-top-2 duration-200">
+            {campSitesEnabled && (
+              <button
+                type="button"
+                onClick={() => goBurger('/camp-sites')}
+                className="w-full flex items-center gap-3 px-5 py-4 text-sm font-medium text-brand-text-main hover:bg-slate-50 transition-colors border-b border-slate-100"
+              >
+                <Tent className="w-5 h-5 text-brand-text-muted" />
+                {labels.camp}
+              </button>
+            )}
+            {groupCalculatorEnabled && (
+              <button
+                type="button"
+                onClick={() => goBurger('/calculator')}
+                className="w-full flex items-center gap-3 px-5 py-4 text-sm font-medium text-brand-text-main hover:bg-slate-50 transition-colors border-b border-slate-100"
+              >
+                <Calculator className="w-5 h-5 text-brand-text-muted" />
+                {labels.calc}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => goBurger('/faq')}
+              className="w-full flex items-center gap-3 px-5 py-4 text-sm font-medium text-brand-text-main hover:bg-slate-50 transition-colors border-b border-slate-100"
+            >
+              <BookOpen className="w-5 h-5 text-brand-text-muted" />
+              {labels.guide}
+            </button>
+            <div className="px-5 pt-3 pb-1 text-[10px] uppercase tracking-wide font-bold text-slate-400">
+              {labels.langHeading}
+            </div>
+            {burgerLangOption('az', 'AZN', '🇦🇿 AZ (AZN)')}
+            {burgerLangOption('ru', 'AZN', '🇷🇺 RU (AZN)')}
+            {burgerLangOption('en', 'USD', '🇬🇧 EN (USD)')}
+            {burgerLangOption('en', 'EUR', '🇪🇺 EN (EUR)')}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
   if (isTourDetail) {
     return (
       <header
         id="ggTopBar"
         className={`bg-white sticky top-0 z-40 border-b transition-shadow duration-200 ${
-          showStickyTitle ? 'border-slate-100 shadow-[0_1px_8px_rgba(0,0,0,0.06)]' : 'border-transparent'
+          showHeaderSearch ? 'border-slate-100 shadow-[0_1px_8px_rgba(0,0,0,0.06)]' : 'border-transparent'
         }`}
-        style={{ minHeight: 43 }}
+        style={{ minHeight: 52 }}
       >
         <div
-          className="relative max-w-[var(--global-max-width)] mx-auto px-4 sm:px-8 py-0 flex flex-nowrap items-center justify-between gap-4"
-          style={{ minHeight: 43 }}
+          className="relative max-w-[var(--global-max-width)] mx-auto px-4 sm:px-8 py-0 flex flex-nowrap items-center justify-between gap-2 sm:gap-4"
+          style={{ minHeight: 52 }}
         >
-          <Link href="/" className="text-xl font-black tracking-tight text-[var(--color-primary)] shrink-0">
+          {/* Loqo — mobildə axtarış çubuğu görünəndə yer açmaq üçün gizlənir (sm+ yer var). */}
+          <Link
+            href="/"
+            className={`text-xl font-black tracking-tight text-[var(--color-primary)] shrink-0 transition-opacity duration-300 ${
+              showHeaderSearch ? 'max-sm:opacity-0 max-sm:pointer-events-none max-sm:w-0 max-sm:overflow-hidden' : ''
+            }`}
+          >
             GedəkGörək
           </Link>
-          <span
-            className="absolute left-1/2 top-1/2 pointer-events-none text-[15px] font-bold text-slate-900 whitespace-nowrap overflow-hidden text-ellipsis max-w-[65%] text-center transition-all duration-300 ease-out"
-            style={{
-              transform: showStickyTitle ? 'translate(-50%,-50%)' : 'translate(-50%,-50%) translateY(6px)',
-              opacity: showStickyTitle ? 1 : 0,
-            }}
-          >
-            {stickyTitle}
-          </span>
-          {/* Naviqasiya — ana səhifə header-i ilə eyni ölçülər (h-16, 40px dairə, w-6 ikon) */}
-          <nav className="hidden sm:flex items-center gap-[14px]">
+
+          {/* Orta zolaq: scroll zamanı tur adı deyil, desktop ana səhifədəki kimi axtarış çubuğu. */}
+          <div className="flex-1 min-w-0 flex justify-center">
+            {showHeaderSearch && (
+              <div ref={searchRef} className="relative w-full max-w-xl animate-header-search-in">
+                <div className="relative flex w-full items-center rounded-full border border-slate-200 bg-white p-1 shadow-sm">
+                  <div className="flex flex-1 min-w-0 items-center pl-3 sm:pl-4 pr-1">
+                    <input
+                      type="text"
+                      placeholder={t('app.search.placeholder')}
+                      value={query}
+                      onChange={(e) => setQuery(e.target.value)}
+                      onFocus={() => setIsSearchFocused(true)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') submitSearch(query);
+                      }}
+                      className="w-full bg-transparent py-1.5 text-base sm:text-sm font-medium text-brand-text-main placeholder-brand-text-muted focus:outline-none"
+                    />
+                  </div>
+                  {/* sm+: mətnli düymə; mobildə yer az olduğundan dairəvi ikon düyməsi. */}
+                  <button
+                    onClick={() => submitSearch(query)}
+                    className="hidden sm:block flex-shrink-0 cursor-pointer rounded-full bg-brand-primary px-4 py-1.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-brand-primary-hover"
+                  >
+                    {t('app.search.button')}
+                  </button>
+                  <button
+                    onClick={() => submitSearch(query)}
+                    aria-label={t('app.search.button')}
+                    className="sm:hidden flex-shrink-0 flex h-8 w-8 items-center justify-center rounded-full bg-brand-primary text-white"
+                  >
+                    <Search className="h-4 w-4" />
+                  </button>
+                </div>
+
+                {isSearchFocused && (
+                  <SearchDropdown
+                    query={query}
+                    tours={tours}
+                    recentSearches={recentSearches}
+                    onSelect={(val) => {
+                      setQuery(val);
+                      submitSearch(val);
+                    }}
+                    onSelectTour={(tour) => {
+                      if (query.trim()) setRecentSearches(addRecentSearch(query));
+                      setIsSearchFocused(false);
+                      router.push(`/tours/${tour.slug || tour.id}`);
+                    }}
+                    appLanguage={language}
+                  />
+                )}
+              </div>
+            )}
+          </div>
+
+          {compactIconNav}
+
+          {/* Tam naviqasiya — yalnız desktop (lg+); ana səhifə header-i ilə eyni ölçülər. */}
+          <nav className="hidden lg:flex items-center gap-[14px] shrink-0">
             {nav.map(({ href, label, Icon, count, badgeClass, activeFill }) => {
               const active = count > 0;
               return (
@@ -219,8 +402,8 @@ export function SiteHeader({
           GedəkGörək
         </Link>
 
-        {/* Inline Search Bar — desktop only, appears glued into the header (same row as the
-            logo and nav icons) once the page is scrolled past the home page's search box. */}
+        {/* Inline Search Bar — sm+ only: hero-nun axtarışı görüntüdən çıxandan sonra axtarış
+            header sətrinin içində (loqo ilə nav ikonlarının arasında) görünür. */}
         {isScrolled && (
           <div ref={searchRef} className="relative hidden sm:flex sm:max-w-xl sm:flex-1 sm:mx-6 animate-header-search-in">
             <div className="relative flex w-full items-center rounded-full border border-slate-200 bg-white p-1.5 shadow-sm">
@@ -266,9 +449,13 @@ export function SiteHeader({
           </div>
         )}
 
-        {/* Hidden below sm — on mobile these all live in the fixed bottom nav instead
-            (wishlist/compare/camp/bell as tabs, calculator + language in its burger menu). */}
-        <nav className="hidden sm:flex items-center gap-[14px]">
+        {/* Planşetdə (sm–lg) tur detal səhifəsindəki kompakt GYG-stil ikon nav. */}
+        {compactIconNav}
+
+        {/* Hidden below lg — on mobile these all live in the fixed bottom nav instead
+            (wishlist/compare/camp/bell as tabs, calculator + language in its burger menu),
+            planşetdə isə yuxarıdakı kompakt ikon nav işləyir. */}
+        <nav className="hidden lg:flex items-center gap-[14px]">
           {/* Icon (40px circle, matching the tour-card action buttons) with the label below it. */}
           {nav.map(({ href, label, Icon, count, badgeClass, activeFill }) => {
             const active = count > 0;
