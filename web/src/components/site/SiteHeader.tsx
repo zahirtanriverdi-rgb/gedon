@@ -133,7 +133,9 @@ export function SiteHeader({
       }`}
       style={{ height: 'var(--header-height)' }}
     >
-      <div className="mx-auto flex h-full max-w-[var(--global-max-width)] items-center justify-center sm:justify-between gap-4 px-4 sm:px-6">
+      {/* Side padding mirrors the tour-card section (ToursHomeView root) so the logo and nav
+          icons line up flush with the tour cards' outer edges at every breakpoint. */}
+      <div className="mx-auto flex h-full max-w-[var(--global-max-width)] items-center justify-center sm:justify-between gap-4 px-4 sm:px-5 md:px-8 lg:px-12 xl:px-14 min-[1440px]:px-[72px]">
         <Link href="/" className="text-xl font-black tracking-tight text-[var(--color-primary)]">
           GedəkGörək
         </Link>
@@ -187,26 +189,31 @@ export function SiteHeader({
 
         {/* Hidden below sm — on mobile these all live in the fixed bottom nav instead
             (wishlist/compare/camp/bell as tabs, calculator + language in its burger menu). */}
-        <nav className="hidden sm:flex items-center gap-1 sm:gap-3">
-          {/* Icon-only by request — each label survives as tooltip (title) + aria-label. */}
+        <nav className="hidden sm:flex items-center gap-[14px]">
+          {/* Icon (40px circle, matching the tour-card action buttons) with the label below it. */}
           {nav.map(({ href, label, Icon, count, badgeClass, activeFill }) => {
             const active = count > 0;
             return (
               <Link
                 key={href}
                 href={href}
-                className={`relative flex items-center rounded-full p-2.5 transition-colors hover:bg-[var(--background-secondary)] hover:text-[var(--color-primary)] ${
+                className={`group flex h-16 min-w-10 flex-col items-center justify-center gap-1.5 transition-colors ${
                   active ? 'text-[var(--color-primary)]' : 'text-[var(--color-text-muted)]'
                 }`}
                 title={active ? `${label} (${count})` : label}
                 aria-label={active ? `${label} (${count})` : label}
               >
-                <Icon className="h-5 w-5" fill={active && activeFill ? 'currentColor' : 'none'} />
-                {active && (
-                  <span className={`absolute -top-0.5 -right-0.5 min-w-[17px] h-[17px] px-1 ${badgeClass} text-white text-[10px] font-bold rounded-full flex items-center justify-center`}>
-                    {count}
-                  </span>
-                )}
+                <span className="relative flex h-10 w-10 items-center justify-center rounded-full transition-all duration-200 group-hover:bg-[var(--background-secondary)] group-hover:text-[var(--color-primary)] group-hover:scale-110 group-active:scale-95">
+                  <Icon className="h-6 w-6" fill={active && activeFill ? 'currentColor' : 'none'} />
+                  {active && (
+                    <span className={`absolute -top-0.5 -right-0.5 min-w-[17px] h-[17px] px-1 ${badgeClass} text-white text-[10px] font-bold rounded-full flex items-center justify-center`}>
+                      {count}
+                    </span>
+                  )}
+                </span>
+                {/* Label in flow so it drives the button width — with the nav's 14px flex gap this
+                    puts 14px between adjacent labels; icons spread out accordingly. */}
+                <span className="text-[11px] font-semibold leading-none whitespace-nowrap">{label}</span>
               </Link>
             );
           })}
@@ -214,8 +221,8 @@ export function SiteHeader({
               has an upcoming departure with fewer than 5 seats left; opens a popup listing
               them with direct "Bilet al" links. */}
           <UrgentDealsBell />
-          <LanguageSwitcher />
-          <CurrencySwitcher />
+          <LanguageSwitcher showLabel />
+          <CurrencySwitcher showLabel />
         </nav>
       </div>
     </header>

@@ -36,6 +36,7 @@ interface UrgentDeal {
 const STRINGS = {
   az: {
     title: 'Təcili fürsətlər',
+    navLabel: 'Fürsətlər',
     empty: 'Hazırda yeri azalan tur yoxdur.',
     emptyHint: 'Yenə də baxın — yerlər tez dolur!',
     headerCount: (n: number) => `${n} turda yerlər azalır`,
@@ -45,6 +46,7 @@ const STRINGS = {
   },
   en: {
     title: 'Urgent deals',
+    navLabel: 'Deals',
     empty: 'No tours are running low right now.',
     emptyHint: 'Check back soon — seats fill fast!',
     headerCount: (n: number) => `${n} tour${n === 1 ? '' : 's'} almost full`,
@@ -54,6 +56,7 @@ const STRINGS = {
   },
   ru: {
     title: 'Срочные предложения',
+    navLabel: 'Предложения',
     empty: 'Сейчас нет туров с малым числом мест.',
     emptyHint: 'Загляните позже — места разбирают быстро!',
     headerCount: (n: number) => `Мест мало в ${n} тур${n === 1 ? 'е' : 'ах'}`,
@@ -288,23 +291,25 @@ export function UrgentDealsBell({ variant = 'header' }: UrgentDealsBellProps) {
 
   return (
     <div className="relative">
-      {/* Icon-only to match the header nav — the title survives as tooltip + aria-label. */}
+      {/* Icon (40px circle) with the label below it, matching the rest of the header nav. */}
       <button
         ref={menu.buttonRef}
         onClick={() => menu.setOpen((v) => !v)}
-        className="relative flex items-center justify-center hover:text-emerald-600 transition group cursor-pointer bg-transparent border-none p-0"
+        className={`flex h-16 min-w-10 flex-col items-center justify-center gap-1.5 transition-colors group cursor-pointer bg-transparent border-none ${
+          hasUrgent ? 'text-amber-500' : 'text-brand-text-muted hover:text-emerald-600'
+        }`}
         title={s.title}
         aria-label={s.title}
         aria-haspopup="true"
         aria-expanded={menu.open}
       >
         <span
-          className={`relative w-10 h-10 flex items-center justify-center rounded-full transition-colors group-hover:bg-amber-50 ${
+          className={`relative w-10 h-10 flex items-center justify-center rounded-full transition-all duration-200 group-hover:bg-amber-50 group-hover:scale-110 group-active:scale-95 ${
             menu.open ? 'bg-amber-50 text-amber-600' : ''
           }`}
         >
           <Bell
-            className={`w-5 h-5 stroke-[2px] transition-colors ${
+            className={`w-6 h-6 stroke-[2px] transition-colors ${
               hasUrgent ? 'text-amber-500 animate-bell-ring' : 'group-hover:stroke-amber-500'
             }`}
           />
@@ -318,6 +323,7 @@ export function UrgentDealsBell({ variant = 'header' }: UrgentDealsBellProps) {
             </span>
           )}
         </span>
+        <span className="text-[11px] font-semibold leading-none whitespace-nowrap">{s.navLabel}</span>
       </button>
 
       {menu.hasOpenedOnce && menu.coords &&
