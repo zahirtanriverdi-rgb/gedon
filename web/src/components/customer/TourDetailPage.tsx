@@ -19,6 +19,7 @@ import {
   Gauge,
   Globe,
   Grid2X2,
+   Play,
   Heart,
   Images,
   MapPin,
@@ -105,6 +106,13 @@ export function TourDetailPage({
   autoOpenBooking
 }: TourDetailPageProps) {
   const { t, language } = useLanguage();
+  const isVideoUrl = (url: string): boolean => {
+    if (!url) return false;
+    const videoExtensions = ['.mp4', '.webm', '.ogg', '.mov', '.mkv'];
+    return videoExtensions.some(ext => url.toLowerCase().endsWith(ext)) || 
+           url.includes('video') ||
+           url.startsWith('blob:');
+  };
   const [isDescExpanded, setIsDescExpanded] = useState<boolean>(false);
   const [selectedSlot, setSelectedSlot] = useState<TourSlot | null>(null);
   const [bookingQty, setBookingQty] = useState<number>(1);
@@ -190,13 +198,13 @@ export function TourDetailPage({
   }, [selectedTour.id]);
 
   return (
-    <div className="animate-fadeIn bg-white min-h-screen pb-20">
-      <div className="max-w-[var(--global-max-width)] mx-auto px-4 sm:px-14 pt-2 pb-8">
-        {/* TWO COLUMN WRAPPER */}
-        <div className="flex flex-col lg:flex-row gap-10 relative items-stretch">
-          {/* LEFT COLUMN */}
-          <div className="w-full lg:w-[65%] shrink-0 mt-6">
-            {/* Gallery - SAXLANILIR */}
+  <div className="animate-fadeIn bg-white min-h-screen pb-20">
+    <div className="max-w-[var(--global-max-width)] mx-auto px-4 sm:px-14 pt-0 sm:pt-2 pb-8">
+      {/* TWO COLUMN WRAPPER */}
+      <div className="flex flex-col lg:flex-row gap-10 relative items-stretch">
+        {/* LEFT COLUMN */}
+        <div className="w-full lg:w-[65%] shrink-0 mt-2 lg:mt-6">
+          {/* Gallery - SAXLANILIR */}
             {(() => {
               const allMedia = [selectedTour.image, ...(selectedTour.images || []), ...(selectedTour.videos || [])].filter(Boolean);
               const categoryBadges: Record<string, string> = {
@@ -212,83 +220,86 @@ export function TourDetailPage({
               // Mobildə əsas şəklin, desktop/planşetdə isə bütün qalereya qutusunun (yəni ən
               // sağdakı şəklin) sağ üst küncündə oturur — hər iki yerdə eyni düymə dəsti.
               const overlayActions = (
-                <div className="absolute top-3 right-3 flex gap-2 z-10" onClick={(e) => e.stopPropagation()}>
-                  <button
-                    type="button"
-                    aria-label={wishlist.includes(selectedTour.id) ? t('tourDetailPage.header.inWishlist') : t('tourDetailPage.header.addToWishlist')}
-                    onClick={() => handleToggleWishlist(selectedTour.id)}
-                    className="w-10 h-10 rounded-full bg-white/95 hover:bg-white shadow-sm flex items-center justify-center text-slate-700 transition hover:scale-105 border border-slate-200/60 cursor-pointer"
-                  >
-                    <Heart className={`w-5 h-5 ${wishlist.includes(selectedTour.id) ? 'fill-rose-600 text-rose-600' : ''}`} />
-                  </button>
-                  <button
-                    type="button"
-                    aria-label={compareList.includes(selectedTour.id) ? t('customerHome.toursHomeView.compare.remove') : t('customerHome.toursHomeView.compare.add')}
-                    onClick={() => handleToggleCompare(selectedTour.id)}
-                    className={`w-10 h-10 rounded-full shadow-sm flex items-center justify-center transition hover:scale-105 border border-slate-200/60 cursor-pointer ${compareList.includes(selectedTour.id) ? 'bg-amber-50 text-amber-600' : 'bg-white/95 hover:bg-white text-slate-700'}`}
-                  >
-                    <Scale className="w-5 h-5" />
-                  </button>
-                  <ShareMenuButton
-                    tour={selectedTour}
-                    slots={slots}
-                    onShowNotification={onShowNotification}
-                    stopPropagationOnOpen
-                    iconClassName="w-5 h-5"
-                    buttonClassName="w-10 h-10 rounded-full bg-white/95 hover:bg-white shadow-sm flex items-center justify-center text-slate-700 transition hover:scale-105 border border-slate-200/60 cursor-pointer"
-                  />
-                </div>
-              );
-             const categoryBadge = (
-  <div className="absolute bottom-4 left-4 bg-black/60 backdrop-blur-sm text-white px-3 py-1.5 rounded-full flex items-center gap-1.5 z-10 shadow-sm">
-    <span className="text-[12px] font-medium tracking-wide">{categoryBadges[selectedTour.category] || categoryBadges.peak}</span>
+  <div className="absolute top-3 right-3 flex gap-2 z-10" onClick={(e) => e.stopPropagation()}>
+    <button
+      type="button"
+      aria-label={wishlist.includes(selectedTour.id) ? t('tourDetailPage.header.inWishlist') : t('tourDetailPage.header.addToWishlist')}
+      onClick={() => handleToggleWishlist(selectedTour.id)}
+      className="w-10 h-10 rounded-full bg-white/95 hover:bg-white shadow-sm flex items-center justify-center text-slate-700 transition hover:scale-105 border border-slate-200/60 cursor-pointer"
+    >
+      <Heart className={`w-5 h-5 ${wishlist.includes(selectedTour.id) ? 'fill-rose-600 text-rose-600' : ''}`} />
+    </button>
+    <button
+      type="button"
+      aria-label={compareList.includes(selectedTour.id) ? t('customerHome.toursHomeView.compare.remove') : t('customerHome.toursHomeView.compare.add')}
+      onClick={() => handleToggleCompare(selectedTour.id)}
+      className={`w-10 h-10 rounded-full shadow-sm flex items-center justify-center transition hover:scale-105 border border-slate-200/60 cursor-pointer ${compareList.includes(selectedTour.id) ? 'bg-amber-50 text-amber-600' : 'bg-white/95 hover:bg-white text-slate-700'}`}
+    >
+      <Scale className="w-5 h-5" />
+    </button>
+    <ShareMenuButton
+      tour={selectedTour}
+      slots={slots}
+      onShowNotification={onShowNotification}
+      stopPropagationOnOpen
+      iconClassName="w-5 h-5"
+      buttonClassName="w-10 h-10 rounded-full bg-white/95 hover:bg-white shadow-sm flex items-center justify-center text-slate-700 transition hover:scale-105 border border-slate-200/60 cursor-pointer"
+    />
   </div>
 );
 
-              const regionBadge = (
-                <div className="absolute bottom-4 left-4 bg-black/60 backdrop-blur-sm text-white px-3 py-1.5 rounded-full flex items-center gap-1.5 z-10 shadow-sm">
-                  <MapPin className="w-3.5 h-3.5" />
-                  <span className="text-[12px] font-medium tracking-wide">{selectedTour.region}</span>
-                </div>
-              );
-              const backButton = (
-                <button
-                  type="button"
-                  aria-label={t('tourDetailPage.header.homeCrumb')}
-                  onClick={(e) => { e.stopPropagation(); if (window.history.length > 1) window.history.back(); else window.location.href = '/'; }}
-                  className="absolute top-3 left-3 z-10 w-10 h-10 rounded-full bg-white/95 hover:bg-white shadow-sm flex items-center justify-center text-slate-700 transition border border-slate-200/60 cursor-pointer"
-                >
-                  <ArrowLeft className="w-5 h-5" />
-                </button>
-              );
+const categoryBadge = (
+  <div className="absolute top-4 left-4 sm:top-auto sm:bottom-4 bg-black/60 backdrop-blur-sm text-white px-3 py-1.5 rounded-full flex items-center gap-1.5 z-10 shadow-sm">
+    <span className="text-[12px] font-medium tracking-wide">{categoryBadges[selectedTour.category] || categoryBadges.peak}</span>
+  </div>
+);
+            
+              
               return (
                 <>
-                  {/* MOBİL */}
-                  <div className="sm:hidden">
-                    <div className="relative">
-                      <div
-                        ref={mobileGalleryRef}
-                        onScroll={handleMobileGalleryScroll}
-                        className="flex overflow-x-auto snap-x snap-mandatory scrollbar-none rounded-2xl bg-slate-100"
-                        style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}
-                      >
+                 {/* MOBİL */}
+<div className="sm:hidden">
+  <div className="relative">
+    <div
+      ref={mobileGalleryRef}
+      onScroll={handleMobileGalleryScroll}
+      className="flex overflow-x-auto snap-x snap-mandatory scrollbar-none rounded-xl bg-slate-100"
+      style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}
+    >
                         {allMedia.map((m, idx) => (
-                          <div
-                            key={idx}
-                            className="relative shrink-0 w-full snap-center h-[300px] cursor-pointer"
-                            onClick={() => setLightboxIndex(idx)}
-                          >
-                            <img src={m} alt="" className="w-full h-full object-cover block" referrerPolicy="no-referrer" />
-                          </div>
-                        ))}
+  <div
+    key={idx}
+    className="relative shrink-0 w-full snap-center h-[300px] cursor-pointer"
+    onClick={() => setLightboxIndex(idx)}
+  >
+    {isVideoUrl(m) ? (
+      <>
+        <video 
+          src={m} 
+          className="w-full h-full object-cover block"
+          muted
+          playsInline
+          preload="metadata"
+        />
+        <div className="absolute inset-0 flex items-center justify-center bg-black/20 pointer-events-none">
+          <div className="w-14 h-14 rounded-full bg-white/95 flex items-center justify-center shadow-lg">
+            <Play className="w-7 h-7 text-slate-800 ml-1" fill="currentColor" />
+          </div>
+        </div>
+      </>
+    ) : (
+      <img src={m} alt=" " className="w-full h-full object-cover block" referrerPolicy="no-referrer" />
+    )}
+  </div>
+))}
                       </div>
-                      {backButton}
-                      {overlayActions}
-                                 <div className="absolute bottom-4 left-4 z-10">
-              <span className="bg-black/60 backdrop-blur-sm text-white px-3 py-1.5 rounded-full shadow-sm text-[12px] font-medium tracking-wide">
-                {categoryBadges[selectedTour.category] || categoryBadges.peak}
-              </span>
-            </div>
+                    {overlayActions}
+               
+                                <div className="absolute top-4 left-4 z-10">
+  <span className="bg-black/60 backdrop-blur-sm text-white px-3 py-1.5 rounded-full shadow-sm text-[12px] font-medium tracking-wide">
+    {categoryBadges[selectedTour.category] || categoryBadges.peak}
+  </span>
+</div>
                       <button
                         type="button"
                         onClick={(e) => { e.stopPropagation(); setLightboxIndex(0); }}
@@ -316,10 +327,27 @@ export function TourDetailPage({
                        className={`relative group cursor-pointer overflow-hidden bg-slate-100 ${hasTiles ? 'w-1/2' : 'w-full'}`}
   onClick={() => setLightboxIndex(0)}
                     >
-                      {categoryBadge}
+                       {categoryBadge}
+                   
   {/* {regionBadge} silindi */}
+{isVideoUrl(allMedia[0]) ? (
+  <>
+    <video 
+      src={allMedia[0]} 
+      className="w-full h-full object-cover block transition duration-500 group-hover:scale-105"
+      muted
+      playsInline
+      preload="metadata"
+    />
+    <div className="absolute inset-0 flex items-center justify-center bg-black/20 pointer-events-none">
+      <div className="w-16 h-16 rounded-full bg-white/95 flex items-center justify-center shadow-lg">
+        <Play className="w-8 h-8 text-slate-800 ml-1" fill="currentColor" />
+      </div>
+    </div>
+  </>
+) : (
   <img src={allMedia[0]} alt={getLocalizedTourName(selectedTour, language)} className="w-full h-full object-cover block transition duration-500 group-hover:scale-105" referrerPolicy="no-referrer" />
-  {backButton}
+)}
                     </div>
                     {hasTiles && (
                       <div className={`grid w-1/2 gap-2 ${
@@ -335,8 +363,24 @@ export function TourDetailPage({
                               className={`relative group cursor-pointer overflow-hidden bg-slate-100 ${tiles.length === 3 && i === 2 ? 'col-span-2' : ''}`}
                               onClick={() => setLightboxIndex(idx)}
                             >
-                              <img src={m} alt="" className="w-full h-full object-cover block transition duration-500 group-hover:scale-105" referrerPolicy="no-referrer" />
-                              {isLast && extraCount > 0 ? (
+{isVideoUrl(m) ? (
+  <>
+    <video 
+      src={m} 
+      className="w-full h-full object-cover block transition duration-500 group-hover:scale-105"
+      muted
+      playsInline
+      preload="metadata"
+    />
+    <div className="absolute inset-0 flex items-center justify-center bg-black/20 pointer-events-none">
+      <div className="w-12 h-12 rounded-full bg-white/95 flex items-center justify-center shadow-lg">
+        <Play className="w-6 h-6 text-slate-800 ml-1" fill="currentColor" />
+      </div>
+    </div>
+  </>
+) : (
+  <img src={m} alt="" className="w-full h-full object-cover block transition duration-500 group-hover:scale-105" referrerPolicy="no-referrer" />
+)}                              {isLast && extraCount > 0 ? (
                                 <div className="absolute inset-0 bg-black/55 flex flex-col items-center justify-center text-white gap-1">
                                   <span className="text-2xl font-bold leading-none">+{extraCount}</span>
                                   <span className="text-[12px] font-semibold flex items-center gap-1"><Grid2X2 className="w-3.5 h-3.5" /> {t('tourDetailPage.gallery.viewAll')}</span>
@@ -364,7 +408,7 @@ export function TourDetailPage({
             })()}
 
             {/* Başlıq + region (mockup: ggMainTitle — sticky header bu id-ni izləyir) */}
-            <div className="mt-3.5">
+            <div className="mt-2 sm:mt-3.5">
               {isFeaturedThisMonth && (
                 <span className="inline-block bg-amber-500 text-white border border-amber-600 text-[10px] font-extrabold px-2 py-0.5 rounded shadow-sm mb-1.5">🔥 {t('tourDetailPage.header.bestSellerBadge')}</span>
               )}
@@ -1452,8 +1496,7 @@ export function TourDetailPage({
           const shownPrice = hasDiscount ? selectedTour.discountPrice! : basePrice;
           return (
             <div
-              className={`lg:hidden fixed left-0 right-0 bottom-24 sm:bottom-0 z-[60] bg-white border-t border-slate-200 shadow-[0_-4px_16px_rgba(0,0,0,0.08)] px-4 py-2.5 transition-all duration-300 ${isMobileBarHidden ? 'translate-y-[130%] opacity-0 pointer-events-none' : 'translate-y-0 opacity-100'}`}
-            >
+className={`lg:hidden fixed left-0 right-0 bottom-0 z-[60] bg-white border-t border-slate-200 shadow-[0_-4px_16px_rgba(0,0,0,0.08)] px-4 py-2.5 transition-all duration-300 ${isMobileBarHidden ? 'translate-y-[130%] opacity-0 pointer-events-none' : 'translate-y-0 opacity-100'}`}            >
               <div className="flex items-center justify-between gap-3">
                 <div className="flex flex-col leading-tight">
                   {hasDiscount && (

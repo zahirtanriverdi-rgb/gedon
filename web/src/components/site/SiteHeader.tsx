@@ -1,9 +1,8 @@
 'use client';
-
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Heart, Scale, Calculator, Tent, Menu, X, BookOpen, Search } from 'lucide-react';
+import { Heart, Scale, Calculator, Tent, Menu, X, BookOpen, Search, ArrowLeft } from 'lucide-react';
 import type { Tour } from '@/types';
 import { useLanguage } from '@/i18n/LanguageContext';
 import LanguageSwitcher from '@/components/LanguageSwitcher';
@@ -17,20 +16,12 @@ import { useGlobalSearch } from './GlobalSearchContext';
 import { useCurrency } from '@/lib/currency';
 import { useSiteFeatureFlags } from './useSiteFeatureFlags';
 
-/**
- * Site chrome header. Replaces the old App.tsx renderChrome header. Kept intentionally small and
- * modular — the incoming designer restyles this without touching data/logic. Nav links are real
- * Next <Link>s (crawlable). Labels are localized inline (these nav strings lived in the old
- * CustomerPortal's local translations object, not the global i18n dictionary).
- */
 const NAV_LABELS: Record<'az' | 'en' | 'ru', { wishlist: string; compare: string; camp: string; calc: string; guide: string; menu: string; langHeading: string }> = {
   az: { wishlist: 'İstəklər', compare: 'Müqayisə', camp: 'Kamp yerləri', calc: 'Qrup hesabla', guide: 'Bələdçi', menu: 'Menyu', langHeading: 'Dil / Valyuta' },
   en: { wishlist: 'Wishlist', compare: 'Compare', camp: 'Camp sites', calc: 'Calculator', guide: 'Guide', menu: 'Menu', langHeading: 'Language / Currency' },
   ru: { wishlist: 'Избранное', compare: 'Сравнить', camp: 'Кемпинги', calc: 'Калькулятор', guide: 'Гид', menu: 'Меню', langHeading: 'Язык / Валюта' },
 };
 
-// Scroll depth past which the home page's own search box is out of view — same 300px
-// threshold the old SPA used to decide when the header's inline copy takes over.
 const HEADER_SEARCH_SCROLL_Y = 300;
 
 export function SiteHeader({
@@ -45,17 +36,12 @@ export function SiteHeader({
   const router = useRouter();
   const pathname = usePathname();
   const labels = NAV_LABELS[language] || NAV_LABELS.az;
-  // Camp sites / group calculator are admin-toggled features — their nav icons must disappear
-  // when the admin turns them off (the mobile bottom nav already does this via the same flags).
-  // featureFlags is the SSR-resolved state, passed so the icons don't flash in/out on load.
+
   const { campSitesEnabled, groupCalculatorEnabled } = useSiteFeatureFlags(featureFlags);
 
-  // Wishlist/compare counts — both stores live in localStorage and fire a change event whenever
-  // the customer toggles a tour from a card, so the header icons must listen and re-render. Init
-  // to 0 to match SSR (localStorage isn't available server-side), then hydrate in the effect.
-  // Also listen to the native `storage` event so a change made in another tab reflects here too.
   const [wishlistCount, setWishlistCount] = useState(0);
   const [compareCount, setCompareCount] = useState(0);
+
   React.useEffect(() => {
     const sync = () => {
       setWishlistCount(getWishlist().length);
@@ -79,9 +65,6 @@ export function SiteHeader({
     ...(groupCalculatorEnabled ? [{ href: '/calculator', label: labels.calc, Icon: Calculator, count: 0, badgeClass: '', activeFill: false }] : []),
   ];
 
-  // Inline search bar state — desktop (sm+) only, revealed once scrolled past the home page's
-  // own search box. Bound to the same global query as that box, so they always stay in sync;
-  // this is effectively that same search reflected here once its own copy scrolled away.
   const { query, setQuery } = useGlobalSearch();
   const [isScrolled, setIsScrolled] = useState(false);
   const [isSearchFocused, setIsSearchFocused] = useState(false);
@@ -89,7 +72,6 @@ export function SiteHeader({
   const searchRef = React.useRef<HTMLDivElement>(null);
 
   React.useEffect(() => setRecentSearches(getRecentSearches()), []);
-
   React.useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > HEADER_SEARCH_SCROLL_Y);
     handleScroll();
@@ -107,9 +89,6 @@ export function SiteHeader({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Off the home page there's no tour grid to filter live, so submitting hops to the home
-  // page with ?q= (HomeClient's URL-driven filter effect picks it up). On the home page the
-  // grid already filtered as the user typed — just scroll back down to the results.
   const submitSearch = (term: string) => {
     if (term.trim()) setRecentSearches(addRecentSearch(term));
     setIsSearchFocused(false);
@@ -120,10 +99,12 @@ export function SiteHeader({
     }
   };
 
-  // Tur detal səhifəsi: GYG-stil kompakt bar — solda loqo, sağda ikon-only nav (mobil+planşet)
-  // / tam nav (lg+), ortada isə tur adı deyil, scroll zamanı görünən axtarış çubuğu
-  // (səhifədəki #ggMainTitle bar-ın altına keçəndə — desktop ana səhifə davranışı kimi).
   const isTourDetail = pathname?.startsWith('/tours/');
+  
+// Tur adını tap (header-də göstərmək üçün)
+const currentTour = tours.find(t => (t.slug || t.id) === pathname?.split('/tours/')[1]);
+const tourName = currentTour?.name || '';
+
   const [showHeaderSearch, setShowHeaderSearch] = useState(false);
   React.useEffect(() => {
     if (!isTourDetail) return;
@@ -141,7 +122,6 @@ export function SiteHeader({
     return () => window.removeEventListener('scroll', onScroll);
   }, [isTourDetail, pathname]);
 
-  // GYG-stil burger menyu (mobil + planşet header ikonu) — kənara toxununca bağlanır.
   const [burgerOpen, setBurgerOpen] = useState(false);
   const burgerRef = React.useRef<HTMLDivElement>(null);
   React.useEffect(() => {
@@ -160,7 +140,6 @@ export function SiteHeader({
     router.push(href);
   };
 
-  // Dil + valyuta cütü — MobileBottomNav-ın burger menyusundakı ilə eyni 4 seçim.
   const burgerLangOption = (lang: 'az' | 'en' | 'ru', currency: 'AZN' | 'USD' | 'EUR', label: string) => (
     <button
       type="button"
@@ -170,18 +149,13 @@ export function SiteHeader({
         setBurgerOpen(false);
       }}
       className={`w-full flex items-center gap-2 px-5 py-2.5 text-sm font-medium transition-colors ${
-        language === lang && displayCurrency === currency
-          ? 'text-brand-primary bg-emerald-50'
-          : 'text-brand-text-main hover:bg-slate-50'
+        language === lang && displayCurrency === currency ? 'text-brand-primary bg-emerald-50' : 'text-brand-text-main hover:bg-slate-50'
       }`}
     >
       {label}
     </button>
   );
 
-  // GYG-stil kompakt ikon nav — yalnız planşet (sm–lg): istəklər, müqayisə, burger.
-  // Mobildə göstərilmir (alt naviqasiyada var), lg+ isə tam etiketli nav işləyir.
-  // Həm tur detal, həm də ana səhifə header-ində eyni blok istifadə olunur.
   const compactIconNav = (
     <div className="hidden sm:flex lg:hidden items-center gap-1 shrink-0">
       {[
@@ -221,7 +195,6 @@ export function SiteHeader({
         >
           {burgerOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
         </button>
-
         {burgerOpen && (
           <div className="absolute right-0 top-[calc(100%+8px)] w-56 bg-white rounded-2xl border border-slate-200 shadow-2xl overflow-hidden z-[110] animate-in fade-in slide-in-from-top-2 duration-200">
             {campSitesEnabled && (
@@ -278,74 +251,85 @@ export function SiteHeader({
           className="relative max-w-[var(--global-max-width)] mx-auto px-4 sm:px-8 py-0 flex flex-nowrap items-center justify-between gap-2 sm:gap-4"
           style={{ minHeight: 52 }}
         >
-          {/* Loqo — mobildə axtarış çubuğu görünəndə yer açmaq üçün gizlənir (sm+ yer var). */}
+          {/* Geri buttonu — mobildə loqo əvəzinə */}
+          <button
+            type="button"
+            onClick={() => (window.history.length > 1 ? window.history.back() : (window.location.href = '/'))}
+            className="sm:hidden flex h-10 w-10 items-center justify-center rounded-full transition-colors hover:bg-[var(--background-secondary)] text-[var(--color-text-muted)] shrink-0"
+            aria-label="Geri qayıt"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </button>
+
+          {/* Desktop-da loqo */}
           <Link
             href="/"
-            className={`text-xl font-black tracking-tight text-[var(--color-primary)] shrink-0 transition-opacity duration-300 ${
+            className={`hidden sm:block text-xl font-black tracking-tight text-[var(--color-primary)] shrink-0 transition-opacity duration-300 ${
               showHeaderSearch ? 'max-sm:opacity-0 max-sm:pointer-events-none max-sm:w-0 max-sm:overflow-hidden' : ''
             }`}
           >
             GedəkGörək
           </Link>
 
-          {/* Orta zolaq: scroll zamanı tur adı deyil, desktop ana səhifədəki kimi axtarış çubuğu. */}
-          <div className="flex-1 min-w-0 flex justify-center">
-            {showHeaderSearch && (
-              <div ref={searchRef} className="relative w-full max-w-xl animate-header-search-in">
-                <div className="relative flex w-full items-center rounded-full border border-slate-200 bg-white p-1 shadow-sm">
-                  <div className="flex flex-1 min-w-0 items-center pl-3 sm:pl-4 pr-1">
-                    <input
-                      type="text"
-                      placeholder={t('app.search.placeholder')}
-                      value={query}
-                      onChange={(e) => setQuery(e.target.value)}
-                      onFocus={() => setIsSearchFocused(true)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') submitSearch(query);
-                      }}
-                      className="w-full bg-transparent py-1.5 text-base sm:text-sm font-medium text-brand-text-main placeholder-brand-text-muted focus:outline-none"
-                    />
-                  </div>
-                  {/* sm+: mətnli düymə; mobildə yer az olduğundan dairəvi ikon düyməsi. */}
-                  <button
-                    onClick={() => submitSearch(query)}
-                    className="hidden sm:block flex-shrink-0 cursor-pointer rounded-full bg-brand-primary px-4 py-1.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-brand-primary-hover"
-                  >
-                    {t('app.search.button')}
-                  </button>
-                  <button
-                    onClick={() => submitSearch(query)}
-                    aria-label={t('app.search.button')}
-                    className="sm:hidden flex-shrink-0 flex h-8 w-8 items-center justify-center rounded-full bg-brand-primary text-white"
-                  >
-                    <Search className="h-4 w-4" />
-                  </button>
-                </div>
-
-                {isSearchFocused && (
-                  <SearchDropdown
-                    query={query}
-                    tours={tours}
-                    recentSearches={recentSearches}
-                    onSelect={(val) => {
-                      setQuery(val);
-                      submitSearch(val);
-                    }}
-                    onSelectTour={(tour) => {
-                      if (query.trim()) setRecentSearches(addRecentSearch(query));
-                      setIsSearchFocused(false);
-                      router.push(`/tours/${tour.slug || tour.id}`);
-                    }}
-                    appLanguage={language}
-                  />
-                )}
-              </div>
-            )}
+          {/* Orta zolaq: mobil cihazlarda tur adı, planşet+desktop-da axtarış çubuğu */}
+<div className="flex-1 min-w-0 flex justify-center">
+  {showHeaderSearch && (
+    <>
+      {/* Mobil cihazlarda: tur adı */}
+      <div className="sm:hidden flex-1 min-w-0 truncate px-2">
+        <h2 className="text-sm font-bold text-slate-900 truncate">
+          {tourName}
+        </h2>
+      </div>
+      
+      {/* Planşet və desktop: axtarış çubuğu */}
+      <div ref={searchRef} className="hidden sm:block relative w-full max-w-xl animate-header-search-in">
+        <div className="relative flex w-full items-center rounded-full border border-slate-200 bg-white p-1 shadow-sm">
+          <div className="flex flex-1 min-w-0 items-center pl-3 sm:pl-4 pr-1">
+            <input
+              type="text"
+              placeholder={t('app.search.placeholder')}
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              onFocus={() => setIsSearchFocused(true)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') submitSearch(query);
+              }}
+              className="w-full bg-transparent py-1.5 text-base sm:text-sm font-medium text-brand-text-main placeholder-brand-text-muted focus:outline-none"
+            />
           </div>
+          <button
+            onClick={() => submitSearch(query)}
+            className="flex-shrink-0 cursor-pointer rounded-full bg-brand-primary px-4 py-1.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-brand-primary-hover"
+          >
+            {t('app.search.button')}
+          </button>
+        </div>
+        {isSearchFocused && (
+          <SearchDropdown
+            query={query}
+            tours={tours}
+            recentSearches={recentSearches}
+            onSelect={(val) => {
+              setQuery(val);
+              submitSearch(val);
+            }}
+            onSelectTour={(tour) => {
+              if (query.trim()) setRecentSearches(addRecentSearch(query));
+              setIsSearchFocused(false);
+              router.push(`/tours/${tour.slug || tour.id}`);
+            }}
+            appLanguage={language}
+          />
+        )}
+      </div>
+    </>
+  )}
+</div>
 
           {compactIconNav}
 
-          {/* Tam naviqasiya — yalnız desktop (lg+); ana səhifə header-i ilə eyni ölçülər. */}
+          {/* Tam naviqasiya — yalnız desktop (lg+) */}
           <nav className="hidden lg:flex items-center gap-[14px] shrink-0">
             {nav.map(({ href, label, Icon, count, badgeClass, activeFill }) => {
               const active = count > 0;
@@ -381,29 +365,17 @@ export function SiteHeader({
   }
 
   return (
-    // Sticky only from sm up — on mobile the header scrolls away with the logo and the home
-    // page's own search bar takes over the viewport top (its sticky top-0 pins flush there,
-    // exactly like the old SPA). Making this sticky on mobile would cover that search bar.
     <header
       className={`relative sm:sticky top-0 z-40 border-b transition-colors ${
-        // On the home page at the very top, the hero's green gradient extends up behind the
-        // header — so keep it transparent/borderless there to blend in. Once scrolled (or on
-        // any other page) it becomes the solid white bar with a divider.
-        pathname === '/' && !isScrolled
-          ? 'border-transparent bg-transparent'
-          : 'border-[var(--border-primary)] bg-white/90 backdrop-blur'
+        pathname === '/' && !isScrolled ? 'border-transparent bg-transparent' : 'border-[var(--border-primary)] bg-white/90 backdrop-blur'
       }`}
       style={{ height: 'var(--header-height)' }}
     >
-      {/* Side padding mirrors the tour-card section (ToursHomeView root) so the logo and nav
-          icons line up flush with the tour cards' outer edges at every breakpoint. */}
       <div className="mx-auto flex h-full max-w-[var(--global-max-width)] items-center justify-center sm:justify-between gap-4 px-4 sm:px-5 md:px-8 lg:px-12 xl:px-14 min-[1440px]:px-[72px]">
         <Link href="/" className="text-xl font-black tracking-tight text-[var(--color-primary)]">
           GedəkGörək
         </Link>
-
-        {/* Inline Search Bar — sm+ only: hero-nun axtarışı görüntüdən çıxandan sonra axtarış
-            header sətrinin içində (loqo ilə nav ikonlarının arasında) görünür. */}
+        
         {isScrolled && (
           <div ref={searchRef} className="relative hidden sm:flex sm:max-w-xl sm:flex-1 sm:mx-6 animate-header-search-in">
             <div className="relative flex w-full items-center rounded-full border border-slate-200 bg-white p-1.5 shadow-sm">
@@ -427,7 +399,6 @@ export function SiteHeader({
                 {t('app.search.button')}
               </button>
             </div>
-
             {isSearchFocused && (
               <SearchDropdown
                 query={query}
@@ -438,7 +409,6 @@ export function SiteHeader({
                   submitSearch(val);
                 }}
                 onSelectTour={(tour) => {
-                  // Header search — a tour pick jumps straight to that tour's page.
                   if (query.trim()) setRecentSearches(addRecentSearch(query));
                   setIsSearchFocused(false);
                   router.push(`/tours/${tour.slug || tour.id}`);
@@ -448,15 +418,10 @@ export function SiteHeader({
             )}
           </div>
         )}
-
-        {/* Planşetdə (sm–lg) tur detal səhifəsindəki kompakt GYG-stil ikon nav. */}
+        
         {compactIconNav}
-
-        {/* Hidden below lg — on mobile these all live in the fixed bottom nav instead
-            (wishlist/compare/camp/bell as tabs, calculator + language in its burger menu),
-            planşetdə isə yuxarıdakı kompakt ikon nav işləyir. */}
+        
         <nav className="hidden lg:flex items-center gap-[14px]">
-          {/* Icon (40px circle, matching the tour-card action buttons) with the label below it. */}
           {nav.map(({ href, label, Icon, count, badgeClass, activeFill }) => {
             const active = count > 0;
             return (
@@ -477,15 +442,10 @@ export function SiteHeader({
                     </span>
                   )}
                 </span>
-                {/* Label in flow so it drives the button width — with the nav's 14px flex gap this
-                    puts 14px between adjacent labels; icons spread out accordingly. */}
                 <span className="text-[11px] font-semibold leading-none whitespace-nowrap">{label}</span>
               </Link>
             );
           })}
-          {/* "Təcili fürsətlər" — rings + shows an amber badge whenever any approved tour
-              has an upcoming departure with fewer than 5 seats left; opens a popup listing
-              them with direct "Bilet al" links. */}
           <UrgentDealsBell />
           <LanguageSwitcher showLabel />
           <CurrencySwitcher showLabel />

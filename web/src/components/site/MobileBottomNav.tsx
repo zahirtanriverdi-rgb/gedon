@@ -67,6 +67,11 @@ export function MobileBottomNav({
   // SSR-resolved values arrive via props so the burger's calculator entry doesn't flicker.
   const { campSitesEnabled, groupCalculatorEnabled } = useSiteFeatureFlags(featureFlags);
 
+// Tur detal səhifəsində mobil navbar-ı gizlət (rezervasiya barı ilə toqquşmaması üçün)
+if (pathname.startsWith('/tours/')) {
+  return null;
+}
+
   const go = (href: string) => {
     setMenuOpen(false);
     router.push(href);
