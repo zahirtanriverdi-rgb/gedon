@@ -1,5 +1,6 @@
 'use client';
 import React, { useState } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { Heart, Scale, Calculator, Tent, Menu, X, BookOpen, Search, ArrowLeft } from 'lucide-react';
@@ -264,11 +265,17 @@ const tourName = currentTour?.name || '';
           {/* Desktop-da loqo */}
           <Link
             href="/"
-            className={`hidden sm:block text-xl font-black tracking-tight text-[var(--color-primary)] shrink-0 transition-opacity duration-300 ${
+            className={`hidden sm:block shrink-0 transition-opacity duration-300 ${
               showHeaderSearch ? 'max-sm:opacity-0 max-sm:pointer-events-none max-sm:w-0 max-sm:overflow-hidden' : ''
             }`}
           >
-            Gotabiat
+            <Image
+              src="/logo/gotabiat_logo.svg"
+              alt="Gotabiat"
+              width={180}
+              height={40}
+              className="h-9 w-auto"
+            />
           </Link>
 
           {/* Orta zolaq: mobil cihazlarda tur adı, planşet+desktop-da axtarış çubuğu */}

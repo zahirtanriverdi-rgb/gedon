@@ -13,6 +13,11 @@ export const metadata: Metadata = {
     template: '%s | Gotabiat',
   },
   description: 'Azərbaycanda turlar, kamp yerləri və təbiət səyahətləri.',
+  icons: {
+    icon: '/logo/gotabiat_icon.svg',
+    shortcut: '/logo/gotabiat_icon.svg',
+    apple: '/logo/gotabiat_icon.svg',
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
