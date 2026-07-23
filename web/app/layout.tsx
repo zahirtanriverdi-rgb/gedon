@@ -9,8 +9,8 @@ const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3001';
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: 'GedəkGörək',
-    template: '%s | GedəkGörək',
+    default: 'Gotabiat',
+    template: '%s | Gotabiat',
   },
   description: 'Azərbaycanda turlar, kamp yerləri və təbiət səyahətləri.',
 };

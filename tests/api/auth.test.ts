@@ -43,7 +43,7 @@ describe('POST /api/auth/operator/login', () => {
     const res = await fetch(`${BASE_URL}/api/auth/operator/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ identifier: 'gedekgorek', password: 'wrong-password' }),
+      body: JSON.stringify({ identifier: 'gotabiat', password: 'wrong-password' }),
     });
     expect(res.status).toBe(401);
   });
@@ -52,7 +52,7 @@ describe('POST /api/auth/operator/login', () => {
     const res = await fetch(`${BASE_URL}/api/auth/operator/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ identifier: 'gedekgorek', password: 'password123' }),
+      body: JSON.stringify({ identifier: 'gotabiat', password: 'password123' }),
     });
     expect(res.status).toBe(200);
     const data = await res.json();

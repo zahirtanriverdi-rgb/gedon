@@ -18,33 +18,33 @@ const CATEGORY_META: Record<
 > = {
   peak: {
     key: 'peak',
-    title: 'Zirvə Turları | GedəkGörək',
+    title: 'Zirvə Turları | Gotabiat',
     description:
       'Azərbaycanın ən yüksək zirvələrinə dırmanma turları — təcrübəli bələdçilər ilə Şahdağ, Bazardüzü və daha çox zirvəni kəşf edin.',
   },
   camp: {
     key: 'camp',
-    title: 'Kamp Turları | GedəkGörək',
+    title: 'Kamp Turları | Gotabiat',
     description:
       'Təbiətin qoynunda çadır kampları və gecələmə turları — ailə və dostlarla unudulmaz kamp təcrübəsi.',
   },
   hiking: {
     key: 'hiking',
-    title: 'Hiking Turları | GedəkGörək',
+    title: 'Hiking Turları | Gotabiat',
     description:
       'Azərbaycanın gözəl cığırları üzrə piyada gəzinti (hiking) turları — şəlalələr, meşələr və dağ mənzərələri.',
   },
   active: {
     key: 'active',
-    title: 'Aktiv Həyat Turları | GedəkGörək',
+    title: 'Aktiv Həyat Turları | Gotabiat',
     description:
       'Adrenalin dolu aktiv istirahət turları — rafting, zip-line, velosiped və digər açıq hava fəaliyyətləri.',
   },
   international: {
     key: 'international',
-    title: 'Xarici Turlar | GedəkGörək',
+    title: 'Xarici Turlar | Gotabiat',
     description:
-      'Xaricə səyahət turları — dünyanın müxtəlif ölkələrinə təşkilatlanmış qrup turları GedəkGörək ilə.',
+      'Xaricə səyahət turları — dünyanın müxtəlif ölkələrinə təşkilatlanmış qrup turları Gotabiat ilə.',
   },
 };
 

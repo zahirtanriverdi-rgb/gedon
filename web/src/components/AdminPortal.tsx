@@ -615,7 +615,7 @@ export default function AdminPortal({
 
   return (
     <DashboardSidebarLayout
-      wordmark="GedəkGörək"
+      wordmark="Gotabiat"
       subtitle={t('adminPortal.sidebar.subtitle')}
       navItems={navItems}
       activeId={activeSection}

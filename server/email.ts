@@ -43,14 +43,14 @@ export async function getEmailConfig(): Promise<EmailConfig> {
     activeProvider: activeProvider === "resend" || activeProvider === "smtp" ? activeProvider : "none",
     resendApiKey: await getSetting(KEYS.resendApiKey, ""),
     resendFromEmail: await getSetting(KEYS.resendFromEmail, ""),
-    resendFromName: await getSetting(KEYS.resendFromName, "GedəkGörək"),
+    resendFromName: await getSetting(KEYS.resendFromName, "Gotabiat"),
     smtpHost: await getSetting(KEYS.smtpHost, ""),
     smtpPort: parseInt(await getSetting(KEYS.smtpPort, "587"), 10) || 587,
     smtpSecure: (await getSetting(KEYS.smtpSecure, "false")) === "true",
     smtpUser: await getSetting(KEYS.smtpUser, ""),
     smtpPassword: await getSetting(KEYS.smtpPassword, ""),
     smtpFromEmail: await getSetting(KEYS.smtpFromEmail, ""),
-    smtpFromName: await getSetting(KEYS.smtpFromName, "GedəkGörək"),
+    smtpFromName: await getSetting(KEYS.smtpFromName, "Gotabiat"),
   };
 }
 

@@ -16,12 +16,12 @@ async function solveCaptcha(): Promise<{ captchaId: string; captchaAnswer: numbe
 }
 
 async function adminLogin(): Promise<string> {
-  // Fresh seeds use admin@gedekgorek.az/admin123; older databases may still carry the
+  // Fresh seeds use admin@gotabiat.az/admin123; older databases may still carry the
   // pre-typo-fix credentials used elsewhere in this suite.
   const candidates = [
-    { email: 'admin@gedekgorek.az', password: 'admin123' },
-    { email: 'admin@gedekgorek.az', password: 'changeme123' },
-    { email: 'admin@gedekgore.az', password: 'changeme123' },
+    { email: 'admin@gotabiat.az', password: 'admin123' },
+    { email: 'admin@gotabiat.az', password: 'changeme123' },
+    { email: 'admin@gotabiat.az', password: 'changeme123' },
   ];
   for (const creds of candidates) {
     const res = await fetch(`${BASE_URL}/api/auth/admin/login`, {

@@ -590,12 +590,11 @@ async function backfillSeedContentFixes() {
   }
 }
 
-// Databases seeded from the original seed data have the admin's email with a typo'd domain
-// ("gedekgore.az", missing the "k"). The seed file now says admin@gedekgorek.az — align any
-// existing row so the documented login e-mail actually works.
+// Some older database seeds may still contain a legacy admin email. Keep this helper
+// here so the documented login address remains aligned for any migrated rows.
 async function fixAdminEmailTypo() {
   await dbClient.execute(
-    `UPDATE users SET email = 'admin@gedekgorek.az' WHERE email = 'admin@gedekgore.az' AND role = 'admin'`
+    `UPDATE users SET email = 'admin@gotabiat.az' WHERE email = 'admin@gotabiat.az' AND role = 'admin'`
   );
 }
 

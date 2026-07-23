@@ -139,8 +139,8 @@ export function AuthProvider({
   );
 }
 
-export const VENDOR_SESSION_KEY = 'gedekgorek_vendor_session';
-export const ADMIN_SESSION_KEY = 'gedekgorek_admin_session';
+export const VENDOR_SESSION_KEY = 'gotabiat_vendor_session';
+export const ADMIN_SESSION_KEY = 'gotabiat_admin_session';
 
 export function useAuth(): AuthState {
   const ctx = useContext(AuthContext);

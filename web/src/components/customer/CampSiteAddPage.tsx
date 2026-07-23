@@ -31,9 +31,9 @@ export const CampSiteAddPage: React.FC<CampSiteAddPageProps> = ({ onBack }) => {
 
   const seo = useMemo(() => ({
     title:
-      language === 'en' ? 'Add a Camp Site | GedəkGörək'
-      : language === 'ru' ? 'Добавить кемпинг | GedəkGörək'
-      : 'Yeni Kamp Yeri Əlavə Et | GedəkGörək',
+      language === 'en' ? 'Add a Camp Site | Gotabiat'
+      : language === 'ru' ? 'Добавить кемпинг | Gotabiat'
+      : 'Yeni Kamp Yeri Əlavə Et | Gotabiat',
     description:
       language === 'en' ? 'Share a camping spot you know in Azerbaijan — every approved spot earns you points toward a free tour.'
       : language === 'ru' ? 'Поделитесь известным вам местом для кемпинга в Азербайджане — каждое одобренное место приносит баллы к бесплатному туру.'

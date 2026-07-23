@@ -71,7 +71,7 @@ export function SiteFooter({ tours }: SiteFooterProps) {
           {/* Brand */}
           <div className="col-span-2 md:col-span-4 lg:col-span-1">
             <div className="flex flex-col font-black text-white leading-tight text-xl tracking-tight">
-              <span>GedəkGörək</span>
+              <span>Gotabiat</span>
               <span className="text-[11px] uppercase tracking-widest text-primary-300 font-bold">Marketplace</span>
             </div>
             <p className="mt-3 text-[13px] text-primary-200/80 leading-relaxed max-w-xs">
@@ -143,7 +143,7 @@ export function SiteFooter({ tours }: SiteFooterProps) {
         </div>
 
         <div className="mt-10 pt-5 border-t border-primary-800 text-[12px] text-primary-300/80">
-          © {new Date().getFullYear()} GedəkGörək Marketplace. {t('customerMisc.siteFooter.rightsReserved')}
+          © {new Date().getFullYear()} Gotabiat Marketplace. {t('customerMisc.siteFooter.rightsReserved')}
         </div>
       </div>
     </footer>

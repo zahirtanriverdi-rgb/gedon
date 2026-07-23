@@ -111,7 +111,7 @@ async function fetchFromMirror(url: string, query: string): Promise<OsmPoi[]> {
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
         // Overpass fair-use etiquette: identify the application instead of a generic runtime UA.
-        "User-Agent": "GedekGorek-Marketplace/1.0 (camp-sites POI layer)",
+        "User-Agent": "Gotabiat-Marketplace/1.0 (camp-sites POI layer)",
       },
       body: `data=${encodeURIComponent(query)}`,
       signal: controller.signal,

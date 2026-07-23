@@ -39,7 +39,7 @@ export function loadGoogleMaps(): Promise<typeof google> {
       return;
     }
 
-    const callbackName = '__gedekgorek_gmaps_init__';
+    const callbackName = '__gotabiat_gmaps_init__';
     (window as any)[callbackName] = () => {
       if (window.google) resolve(window.google);
       else reject(new Error('Google Maps skripti yükləndi, amma window.google tapılmadı.'));

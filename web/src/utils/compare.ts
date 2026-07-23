@@ -1,5 +1,5 @@
 // Customer tour comparison ("Müqayisə"), persisted client-side only — mirrors wishlist.ts.
-const STORAGE_KEY = 'gedek_gorek_compare';
+const STORAGE_KEY = 'gotabiat_compare';
 
 // Dispatched whenever the compare list changes, so components that don't own the toggle
 // (e.g. the header badge) can stay in sync without prop drilling or a page reload.

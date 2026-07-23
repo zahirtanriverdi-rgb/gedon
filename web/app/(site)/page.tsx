@@ -11,9 +11,9 @@ export const dynamic = 'force-dynamic';
 
 // Ported from the old CustomerPortal's Helmet block (AZ default — the html lang is az).
 export const metadata: Metadata = {
-  title: 'GedəkGörək Marketplace | Azərbaycanda Turlar və Aktiv İstirahət',
+  title: 'Gotabiat Marketplace | Azərbaycanda Turlar və Aktiv İstirahət',
   description:
-    'Azərbaycanın ən yaxşı hiking, kamp, zirvə və xarici turlarını kəşf edin — GedəkGörək ilə asanlıqla rezerv edin.',
+    'Azərbaycanın ən yaxşı hiking, kamp, zirvə və xarici turlarını kəşf edin — Gotabiat ilə asanlıqla rezerv edin.',
 };
 
 export default async function HomePage() {

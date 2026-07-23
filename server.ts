@@ -70,7 +70,7 @@ const getBaseUrl = () => {
   if (process.env.NODE_ENV === "production") {
     return process.env.VITE_API_BASE_URL || 
            process.env.RENDER_EXTERNAL_URL || 
-           "https://gedekgorek.onrender.com";   // ← buranı öz Render linkinə dəyiş
+           "https://gotabiat.onrender.com";   // ← buranı öz Render linkinə dəyiş
   }
   return `http://localhost:${process.env.PORT || 3000}`;
 };
@@ -331,7 +331,7 @@ app.post("/api/admin/vendors", authenticateUser, async (req: any, res) => {
     // schema, so if the admin typed a plain username we derive a private placeholder email —
     // it's never shown to anyone and login still works via the username itself.
     const isEmailLogin = trimmedLogin.includes('@');
-    const email = isEmailLogin ? trimmedLogin : `${trimmedLogin.toLowerCase().replace(/[^a-z0-9._-]/g, '')}@vendor.gedekgorek.local`;
+    const email = isEmailLogin ? trimmedLogin : `${trimmedLogin.toLowerCase().replace(/[^a-z0-9._-]/g, '')}@vendor.gotabiat.local`;
     const username = isEmailLogin ? null : trimmedLogin;
 
     const existing = await dbClient.query(
@@ -569,7 +569,7 @@ app.post("/api/auth/send-email-verification", authenticateUser, async (req: any,
 
     await sendEmail({
       to: user.email,
-      subject: "E-poçt təsdiqləmə kodu - GedəkGörək",
+      subject: "E-poçt təsdiqləmə kodu - Gotabiat",
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; color: #1e293b;">
           <h2 style="color: #047857;">E-poçt ünvanınızı təsdiqləyin</h2>
@@ -671,7 +671,7 @@ app.post("/api/auth/forgot-password", async (req, res) => {
     try {
       await sendEmail({
         to: user.email,
-        subject: "Şifrənizi bərpa edin - GedəkGörək",
+        subject: "Şifrənizi bərpa edin - Gotabiat",
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; color: #1e293b;">
             <h2 style="color: #047857;">Şifrənizi bərpa edin</h2>
@@ -1416,11 +1416,11 @@ app.post("/api/admin/email-settings/test", authenticateUser, async (req: any, re
   try {
     await sendEmail({
       to: req.operator.email,
-      subject: "Test Email - GedəkGörək",
+      subject: "Test Email - Gotabiat",
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 480px; margin: 0 auto; color: #1e293b;">
           <h2 style="color: #047857;">Test uğurludur ✅</h2>
-          <p>Bu, GedəkGörək admin panelindən göndərilən test emailidir. Email tənzimləmələriniz düzgün işləyir.</p>
+          <p>Bu, Gotabiat admin panelindən göndərilən test emailidir. Email tənzimləmələriniz düzgün işləyir.</p>
         </div>
       `
     });
@@ -1577,7 +1577,7 @@ app.get("/api/tours", async (req, res) => {
 
 // SEO: robots.txt + a DB-generated sitemap.xml (not a static file — regenerated from the
 // live `tours` table on every request so newly-approved tours show up immediately).
-const SITE_URL = "https://gedekgorek.com";
+const SITE_URL = "https://gotabiat.com";
 
 app.get("/robots.txt", (req, res) => {
   res.type("text/plain").send(`User-agent: *\nAllow: /\nSitemap: ${SITE_URL}/sitemap.xml\n`);
@@ -3278,7 +3278,7 @@ app.post("/api/bookings/generate-ticket", async (req, res) => {
   try {
     // ===== 1. QR KODU SERVER-DƏ YARADIRIQ (xarici API-yə ehtiyac yoxdur) =====
     const bRef = reference || `TUR-${String(bookingId).slice(0, 5).toUpperCase()}`;
-    const qrData = `GEDƏKGÖRƏK|${bRef}|${customerName}|${tourName}`;
+    const qrData = `GOTABIAT|${bRef}|${customerName}|${tourName}`;
     let qrBase64: string | null = null;
     try {
       qrBase64 = await QRCode.toDataURL(qrData, {
@@ -3338,7 +3338,7 @@ app.post("/api/bookings/generate-ticket", async (req, res) => {
     doc.setTextColor(...TICKET_COLORS.white);
     doc.setFont(fontName, "bold");
     doc.setFontSize(22);
-    doc.text(displayText("GedəkGörək"), 24, 42);
+    doc.text(displayText("Gotabiat"), 24, 42);
 
     doc.setFont(fontName, "normal");
     doc.setFontSize(10);
@@ -3536,7 +3536,7 @@ app.post("/api/bookings/generate-ticket", async (req, res) => {
     doc.text(displayText("Xidmətdən istifadə etdiyiniz üçün təşəkkürlər!"), W / 2, H - 28, { align: "center" });
     doc.setFont(fontName, "bold");
     doc.setTextColor(...TICKET_COLORS.primary);
-    doc.text(displayText("gedekgorek.com"), W / 2, H - 18, { align: "center" });
+    doc.text(displayText("gotabiat.com"), W / 2, H - 18, { align: "center" });
 
     // ===== 14. FAYLI YADDAŞA VERİRİK VƏ QAYTARIRIQ =====
     const pdfBuffer = doc.output("arraybuffer");

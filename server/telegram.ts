@@ -186,7 +186,7 @@ export function startTelegramPolling(): void {
           await sendTelegramMessage(
             chatId,
             `Salam${name ? " <b>" + escapeHtml(name) + "</b>" : ""}! 👋\n\n` +
-              `Bu, <b>GedəkGörək</b> bildiriş botudur.\n\n` +
+              `Bu, <b>Gotabiat</b> bildiriş botudur.\n\n` +
               `Sizin chat ID: <code>${escapeHtml(chatId)}</code>\n\n` +
               `Bu ID panelə əlavə olunduqdan sonra yeni rezervasiya sorğuları bura bildiriş kimi gələcək.`
           );

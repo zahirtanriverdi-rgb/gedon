@@ -8,14 +8,14 @@ export interface AdminLoginResponse {
 }
 
 // Logs in as the seeded admin and returns the full login response.
-// Fresh seeds use admin@gedekgorek.az/admin123 (server/seedCredentials.ts); older databases
+// Fresh seeds use admin@gotabiat.az/admin123 (server/seedCredentials.ts); older databases
 // may still carry the pre-typo-fix email and/or the old fallback password, so try each
 // known pair until one works.
 export async function adminLogin(): Promise<AdminLoginResponse> {
   const candidates = [
-    { email: 'admin@gedekgorek.az', password: 'admin123' },
-    { email: 'admin@gedekgorek.az', password: 'changeme123' },
-    { email: 'admin@gedekgore.az', password: 'changeme123' },
+    { email: 'admin@gotabiat.az', password: 'admin123' },
+    { email: 'admin@gotabiat.az', password: 'changeme123' },
+    { email: 'admin@gotabiat.az', password: 'changeme123' },
   ];
   for (const creds of candidates) {
     const res = await fetch(`${BASE_URL}/api/auth/admin/login`, {

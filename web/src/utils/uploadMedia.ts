@@ -13,7 +13,7 @@
 // açarlarından oxunur (VENDOR_SESSION_KEY / ADMIN_SESSION_KEY ilə eyni format) —
 // upload edən komponentlərin heç biri tokeni prop kimi almır, ona görə buradan oxuyuruq.
 function getOperatorToken(): string | null {
-  for (const key of ['gedekgorek_vendor_session', 'gedekgorek_admin_session']) {
+  for (const key of ['gotabiat_vendor_session', 'gotabiat_admin_session']) {
     try {
       const raw = window.localStorage.getItem(key);
       if (!raw) continue;

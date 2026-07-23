@@ -347,7 +347,7 @@ export function CrmTab({ tours, slots, bookings, currentUser, operatorToken, onE
                           count++;
                         });
 
-                        text += `*${t('vendorBookings.crmTab.whatsappManifest.generatedOn')}:* ${new Date().toLocaleDateString('az-AZ')} | gedekgorek.az CRM 🌲`;
+                        text += `*${t('vendorBookings.crmTab.whatsappManifest.generatedOn')}:* ${new Date().toLocaleDateString('az-AZ')} | gotabiat.az CRM 🌲`;
 
                         navigator.clipboard.writeText(text).then(() => {
                           if (onShowNotification) {

@@ -334,7 +334,7 @@ export function TicketModal({ booking, tours, onApproveBooking, onShowNotificati
                   
                   <div class="boarding-pass">
                     <div class="brand-bar">
-                      <div class="brand-logo-text">🌲 GEDƏK<span>GÖRƏK</span></div>
+                      <div class="brand-logo-text">🌲 GOTABIAT</div>
                       <div class="badge \${tBooking.status === 'paid' ? 'paid' : 'unpaid'}">
                         \${tBooking.status === 'paid' ? '${t('vendorBookings.ticketModal.printDoc.paidConfirmedBadge')}' : '${t('vendorBookings.ticketModal.printDoc.pendingBadge')}'}
                       </div>
@@ -506,7 +506,7 @@ export function TicketModal({ booking, tours, onApproveBooking, onShowNotificati
                   {/* Brand Header */}
                   <div className="bg-emerald-900 px-6 py-4 flex justify-between items-center text-white select-none">
                     <div className="font-sans font-extrabold text-sm tracking-widest flex items-center gap-1">
-                      🌲 GEDƏK<span className="text-emerald-400">GÖRƏK</span>
+                     🌲 GOTABIAT
                     </div>
                     <span className={`px-2.5 py-1 text-[9px] font-black rounded-full uppercase tracking-wider ${
                       tBooking.status === 'paid' ? 'bg-emerald-450 bg-emerald-500 text-white' : 'bg-amber-100 text-amber-800'

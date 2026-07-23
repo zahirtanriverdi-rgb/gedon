@@ -13,7 +13,7 @@ export const MEETING_POINTS: MeetingPoint[] = [
     embedUrl: 'https://www.google.com/maps/embed?pb=!1m17!1m12!1m3!1d774.4312524450341!2d49.84955626962236!3d40.40039401951195!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m2!1m1!2zNDDCsDI0JzAxLjQiTiA0OcKwNTEnMDAuNyJF!5e1!3m2!1str!2slv!4v1783229526024!5m2!1str!2slv',
   },
   {
-    name: 'Gedək Görək - Toplanış yeri',
+    name: 'Gotabiat - Toplanış yeri',
     embedUrl: 'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3097.716914197266!2d49.84744097592123!3d40.40056995662286!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x40307d0008f3743b%3A0x8e152613424aac00!2zR2VkyZlrIEfDtnLJmWsgLSBUb3BsYW7EscWfIHllcmk!5e1!3m2!1str!2slv!4v1783230047257!5m2!1str!2slv',
   },
   {

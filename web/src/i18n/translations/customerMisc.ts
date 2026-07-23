@@ -20,8 +20,8 @@ export const customerMisc = {
           copiedNotification: 'Tur məlumatları panoya kopyalandı! 📋',
           whatsappCopiedNotification: 'Mesaj panoya kopyalandı — WhatsApp mətni özü doldurmasa, yapışdırın (Cmd/Ctrl+V). 📋',
         },
-        whatsappQuickMessage: "Salam! GedəkGörək saytından '{{tourName}}' turu haqqında məlumat və rezervasiya daxil etmək istəyirəm. Zəhmət olmasa köməklik edərdiniz.",
-        shareTourTemplate: '*GEDƏKGÖRƏK - TUR PAYLAŞIMI*\n\n- *Turun adi:* {{tourName}}\n- *Region:* {{region}}\n- *Muddet:* {{durationDays}} Gun\n- *Qiymet:* {{minPrice}} AZN-den\n- *Kateqoriya:* {{category}}\n- *Teskilatci:* {{vendorName}}\n\n*Tur haqqinda:* {{descriptionExcerpt}}...\n\n*Etrafli melumat ve bilet sifarisi ucun platformani ziyaret edin:* {{shareUrl}}\n\nTebietde unudulmaz anlar kecirmek ucun biletinizi derhal platforma uzerinden elde edin!',
+        whatsappQuickMessage: "Salam! Gotabiat saytından '{{tourName}}' turu haqqında məlumat və rezervasiya daxil etmək istəyirəm. Zəhmət olmasa köməklik edərdiniz.",
+        shareTourTemplate: '*GOTABIAT - TUR PAYLAŞIMI*\n\n- *Turun adi:* {{tourName}}\n- *Region:* {{region}}\n- *Muddet:* {{durationDays}} Gun\n- *Qiymet:* {{minPrice}} AZN-den\n- *Kateqoriya:* {{category}}\n- *Teskilatci:* {{vendorName}}\n\n*Tur haqqinda:* {{descriptionExcerpt}}...\n\n*Etrafli melumat ve bilet sifarisi ucun platformani ziyaret edin:* {{shareUrl}}\n\nTebietde unudulmaz anlar kecirmek ucun biletinizi derhal platforma uzerinden elde edin!',
       },
       searchDropdown: {
         activities: 'aktivite',
@@ -118,8 +118,8 @@ export const customerMisc = {
           copiedNotification: 'Tour details copied to clipboard! 📋',
           whatsappCopiedNotification: "Message copied to clipboard — paste it (Cmd/Ctrl+V) if WhatsApp doesn't fill it in automatically. 📋",
         },
-        whatsappQuickMessage: "Hello! I'd like information and to make a booking for the '{{tourName}}' tour from the GedəkGörək website. I'd appreciate your help.",
-        shareTourTemplate: '*GEDƏKGÖRƏK - TOUR SHARE*\n\n- *Tour name:* {{tourName}}\n- *Region:* {{region}}\n- *Duration:* {{durationDays}} days\n- *Price:* from {{minPrice}} AZN\n- *Category:* {{category}}\n- *Organizer:* {{vendorName}}\n\n*About the tour:* {{descriptionExcerpt}}...\n\n*For more details and to book your ticket, visit the platform:* {{shareUrl}}\n\nGet your ticket through the platform now and enjoy unforgettable moments in nature!',
+        whatsappQuickMessage: "Hello! I'd like information and to make a booking for the '{{tourName}}' tour from the Gotabiat website. I'd appreciate your help.",
+        shareTourTemplate: '*GOTABIAT - TOUR SHARE*\n\n- *Tour name:* {{tourName}}\n- *Region:* {{region}}\n- *Duration:* {{durationDays}} days\n- *Price:* from {{minPrice}} AZN\n- *Category:* {{category}}\n- *Organizer:* {{vendorName}}\n\n*About the tour:* {{descriptionExcerpt}}...\n\n*For more details and to book your ticket, visit the platform:* {{shareUrl}}\n\nGet your ticket through the platform now and enjoy unforgettable moments in nature!',
       },
       searchDropdown: {
         activities: 'activities',
@@ -216,8 +216,8 @@ export const customerMisc = {
           copiedNotification: 'Данные о туре скопированы в буфер обмена! 📋',
           whatsappCopiedNotification: 'Сообщение скопировано в буфер обмена — вставьте его (Cmd/Ctrl+V), если WhatsApp не заполнит его автоматически. 📋',
         },
-        whatsappQuickMessage: 'Здравствуйте! Хочу получить информацию и оформить бронирование на тур \'{{tourName}}\' с сайта GedəkGörək. Буду благодарен(на) за помощь.',
-        shareTourTemplate: '*GEDƏKGÖRƏK - ДЕЛИТЬСЯ ТУРОМ*\n\n- *Название тура:* {{tourName}}\n- *Регион:* {{region}}\n- *Продолжительность:* {{durationDays}} дн.\n- *Цена:* от {{minPrice}} AZN\n- *Категория:* {{category}}\n- *Организатор:* {{vendorName}}\n\n*О туре:* {{descriptionExcerpt}}...\n\n*Подробная информация и бронирование билета на платформе:* {{shareUrl}}\n\nОформите билет прямо сейчас через платформу и проведите незабываемые моменты на природе!',
+        whatsappQuickMessage: 'Здравствуйте! Хочу получить информацию и оформить бронирование на тур \'{{tourName}}\' с сайта Gotabiat. Буду благодарен(на) за помощь.',
+        shareTourTemplate: '*GOTABIAT - ДЕЛИТЬСЯ ТУРОМ*\n\n- *Название тура:* {{tourName}}\n- *Регион:* {{region}}\n- *Продолжительность:* {{durationDays}} дн.\n- *Цена:* от {{minPrice}} AZN\n- *Категория:* {{category}}\n- *Организатор:* {{vendorName}}\n\n*О туре:* {{descriptionExcerpt}}...\n\n*Подробная информация и бронирование билета на платформе:* {{shareUrl}}\n\nОформите билет прямо сейчас через платформу и проведите незабываемые моменты на природе!',
       },
       searchDropdown: {
         activities: 'активностей',

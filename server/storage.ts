@@ -9,7 +9,7 @@
 //   S3_ACCESS_KEY_ID     — açar ID
 //   S3_SECRET_ACCESS_KEY — gizli açar
 //   S3_PUBLIC_URL        — faylların oxunduğu public baza URL (CDN/custom domain,
-//                          məs. https://media.gedekgorek.az). Yoxdursa, path-style
+//                          məs. https://media.gotabiat.az). Yoxdursa, path-style
 //                          `${S3_ENDPOINT}/${S3_BUCKET}` istifadə olunur.
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { randomUUID } from "crypto";

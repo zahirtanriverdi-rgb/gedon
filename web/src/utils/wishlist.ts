@@ -1,6 +1,6 @@
 // Customer wishlist ("İstəklərim"), persisted client-side only — no login is required to
 // save favorites, so it lives in localStorage rather than the backend.
-const STORAGE_KEY = 'gedek_gorek_wishlist';
+const STORAGE_KEY = 'gotabiat_wishlist';
 
 // Dispatched whenever the wishlist changes, so components that don't own the toggle
 // (e.g. the header badge) can stay in sync without prop drilling or a page reload.

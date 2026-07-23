@@ -268,7 +268,7 @@ const tourName = currentTour?.name || '';
               showHeaderSearch ? 'max-sm:opacity-0 max-sm:pointer-events-none max-sm:w-0 max-sm:overflow-hidden' : ''
             }`}
           >
-            GedəkGörək
+            Gotabiat
           </Link>
 
           {/* Orta zolaq: mobil cihazlarda tur adı, planşet+desktop-da axtarış çubuğu */}
@@ -373,7 +373,7 @@ const tourName = currentTour?.name || '';
     >
       <div className="mx-auto flex h-full max-w-[var(--global-max-width)] items-center justify-center sm:justify-between gap-4 px-4 sm:px-5 md:px-8 lg:px-12 xl:px-14 min-[1440px]:px-[72px]">
         <Link href="/" className="text-xl font-black tracking-tight text-[var(--color-primary)]">
-          GedəkGörək
+          Gotabiat
         </Link>
         
         {isScrolled && (

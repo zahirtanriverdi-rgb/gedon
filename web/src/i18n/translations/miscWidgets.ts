@@ -161,7 +161,7 @@ export const miscWidgets = {
         loggingIn: 'Giriş edilir...',
         login: 'Daxil ol',
         contactAdminNote: 'Daxil olmaq üçün sistem adminindən login məlumatları tələb edin.',
-        testCredentials: 'Test məlumatı: gedekgorek / password123',
+        testCredentials: 'Test məlumatı: gotabiat / password123',
       },
       forgotPassword: {
         link: 'Şifrəni unutmusunuz?',
@@ -348,7 +348,7 @@ export const miscWidgets = {
         loggingIn: 'Logging in...',
         login: 'Log in',
         contactAdminNote: 'Contact the system admin for login credentials.',
-        testCredentials: 'Test credentials: gedekgorek / password123',
+        testCredentials: 'Test credentials: gotabiat / password123',
       },
       forgotPassword: {
         link: 'Forgot your password?',
@@ -535,7 +535,7 @@ export const miscWidgets = {
         loggingIn: 'Выполняется вход...',
         login: 'Войти',
         contactAdminNote: 'Для получения учётных данных обратитесь к системному администратору.',
-        testCredentials: 'Тестовые данные: gedekgorek / password123',
+        testCredentials: 'Тестовые данные: gotabiat / password123',
       },
       forgotPassword: {
         link: 'Забыли пароль?',

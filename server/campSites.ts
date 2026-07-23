@@ -210,7 +210,7 @@ export function validateCampSiteSubmission(body: any): CampSiteSubmission | { er
 
 // Admin-created camp sites skip captcha/rate-limit/dedupe and land directly as approved.
 // They carry no submitter phone (empty string), which keeps them out of the contributor
-// points system entirely, and are credited publicly to the GedəkGörək team.
+// points system entirely, and are credited publicly to the Gotabiat team.
 export type AdminCampSiteInput = {
   name: string;
   description: string;
@@ -259,7 +259,7 @@ export async function insertAdminCampSite(input: AdminCampSiteInput): Promise<st
   const id = `camp-${randomUUID()}`;
   await dbClient.execute(
     `INSERT INTO camp_sites (id, name, description, lat, lon, photos, submitter_name, submitter_surname, submitter_phone, submitter_phone_normalized, status, points_awarded, is_verified, is_paid, added_by_admin, approved_at)
-     VALUES (?, ?, ?, ?, ?, ?, 'GedəkGörək', '', '', '', 'approved', 0, ?, ?, 1, CURRENT_TIMESTAMP)`,
+     VALUES (?, ?, ?, ?, ?, ?, 'Gotabiat', '', '', '', 'approved', 0, ?, ?, 1, CURRENT_TIMESTAMP)`,
     [
       id, input.name, input.description || null, input.lat, input.lon,
       JSON.stringify(input.photos), toDbBool(input.isVerified), toDbBool(input.isPaid),

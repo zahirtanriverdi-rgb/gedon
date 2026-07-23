@@ -97,9 +97,9 @@ export const CampSitesPage: React.FC<CampSitesPageProps> = ({ onBack, onAddSite 
 
   const seo = useMemo(() => ({
     title:
-      language === 'en' ? 'Camp Sites in Azerbaijan | GedəkGörək'
-      : language === 'ru' ? 'Кемпинги Азербайджана | GedəkGörək'
-      : 'Azərbaycanda Kamp Yerləri | GedəkGörək',
+      language === 'en' ? 'Camp Sites in Azerbaijan | Gotabiat'
+      : language === 'ru' ? 'Кемпинги Азербайджана | Gotabiat'
+      : 'Azərbaycanda Kamp Yerləri | Gotabiat',
     description:
       language === 'en' ? 'Community-shared and verified camping spots across Azerbaijan — explore the map, get directions, and add your own favourite camp site.'
       : language === 'ru' ? 'Проверенные места для кемпинга по всему Азербайджану — изучайте карту, стройте маршруты и добавляйте свои любимые стоянки.'
@@ -148,7 +148,7 @@ export const CampSitesPage: React.FC<CampSitesPageProps> = ({ onBack, onAddSite 
               className="flex items-center gap-1.5 text-sm font-semibold text-brand-text-muted hover:text-brand-primary transition-colors mb-2 cursor-pointer"
             >
               <ArrowLeft className="w-4 h-4" />
-              GedəkGörək
+              Gotabiat
             </button>
             <h1 className="text-2xl sm:text-3xl font-black text-brand-text-main flex items-center gap-2.5">
               <Tent className="w-7 h-7 text-brand-accent" />

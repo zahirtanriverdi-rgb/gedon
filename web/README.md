@@ -1,4 +1,4 @@
-# GedəkGörək — Next.js frontend (`web/`)
+# Gotabiat — Next.js frontend (`web/`)
 
 Next.js (App Router) frontend, migrated from the old Vite SPA. It renders the SEO-critical
 public pages **server-side** and talks to the **unchanged** Express API (repo root `server.ts`).

@@ -8,8 +8,8 @@
 //
 // Env overrides let a production deploy start with non-default secrets without code edits.
 export const seedPasswords: Record<string, string> = {
-  'info@gedekgorek.az': process.env.SEED_VENDOR_PASSWORD || 'password123',
-  'admin@gedekgorek.az': process.env.SEED_ADMIN_PASSWORD || 'admin123',
+  'info@gotabiat.az': process.env.SEED_VENDOR_PASSWORD || 'password123',
+  'admin@gotabiat.az': process.env.SEED_ADMIN_PASSWORD || 'admin123',
 };
 
 // Accounts with no entry above (e.g. the demo customer, who never logs in) get this.

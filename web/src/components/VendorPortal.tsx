@@ -228,7 +228,7 @@ export default function VendorPortal({
 
   return (
     <DashboardSidebarLayout
-      wordmark="GedəkGörək"
+      wordmark="Gotabiat"
       subtitle={t('vendorMisc.vendorPortal.sidebarSubtitle')}
       navItems={navItems}
       activeId={activeNavId}
