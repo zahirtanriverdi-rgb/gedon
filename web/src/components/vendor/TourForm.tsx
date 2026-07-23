@@ -88,7 +88,8 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
 
   // Active Lifestyle specifics
   const [tourActivityType, setTourActivityType] = useState<string>('volleyball');
-  const [tourActiveDifficulty, setTourActiveDifficulty] = useState<string>('medium');
+const [tourCustomActivityType, setTourCustomActivityType] = useState<string>(''); // ← YENİ: "digər" üçün manual yazı
+const [tourActiveDifficulty, setTourActiveDifficulty] = useState<string>('medium');
   // Ümumi yaş limiti — bütün kateqoriyalar üçün (boş = detal səhifəsində göstərilmir)
   const [tourAgeLimit, setTourAgeLimit] = useState<string>('');
   // "Günün proqramı" timeline addımları (vaxt + başlıq + qeyd) — yerli turların detal səhifəsində göstərilir
@@ -106,7 +107,7 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
 
   const [isSavingForm, setIsSavingForm] = useState(false);
   const [formSubmitError, setFormSubmitError] = useState<string | null>(null);
-
+const STANDARD_ACTIVITY_TYPES = ['volleyball', 'running', 'ski', 'rafting', 'bike', 'canyon', 'other'];
   const { currentStep, goToNextStep, goToPrevStep } = useStepWizard();
 
   // Per-field invalid markers for fields HTML5 `required` can't cover (tag lists, media) or
@@ -257,8 +258,15 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
     setTourIsActive(tour.isActive !== false);
     setTourCategory(tour.category as any);
 
-    setTourActivityType(tour.activityType || 'volleyball');
-    setTourActiveDifficulty(tour.activeDifficulty || 'medium');
+    const savedActivity = tour.activityType || 'volleyball';
+if (STANDARD_ACTIVITY_TYPES.includes(savedActivity)) {
+  setTourActivityType(savedActivity);
+  setTourCustomActivityType('');
+} else {
+  setTourActivityType('other');
+  setTourCustomActivityType(savedActivity);
+}
+setTourActiveDifficulty(tour.activeDifficulty || 'medium');
     setTourAgeLimit(tour.ageLimit || '');
     setTourDayProgram(Array.isArray(tour.dayProgram) ? tour.dayProgram : []);
     setTourMeetingPoint(tour.meetingPoint || '');
@@ -346,8 +354,12 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
       rating: tourRating !== '' ? Math.min(5, Math.max(1, Number(tourRating))) : undefined,
       isActive: tourIsActive,
       isActiveLife: tourCategory === 'active',
-      activityType: tourCategory === 'active' ? tourActivityType : undefined,
-      activeDifficulty: tourCategory === 'active' ? (tourActiveDifficulty as 'beginner' | 'medium' | 'professional') : undefined,
+activityType: tourCategory === 'active'
+  ? (tourActivityType === 'other' || !STANDARD_ACTIVITY_TYPES.includes(tourActivityType)
+      ? (tourCustomActivityType.trim() || 'other')
+      : tourActivityType)
+  : undefined,
+        activeDifficulty: tourCategory === 'active' ? (tourActiveDifficulty as 'beginner' | 'medium' | 'professional') : undefined,
       ageLimit: tourAgeLimit.trim() || undefined,
       dayProgram: (() => {
         const cleaned = tourDayProgram
@@ -633,25 +645,48 @@ const handleMediaFilesChange = async (e: React.ChangeEvent<HTMLInputElement>) =>
                 <h4 className="text-xs font-bold text-amber-900 flex items-center gap-1.5 tracking-wider">{t('vendorTourForms.tourForm.activeSection.heading')}</h4>
               </div>
               <div>
-                <label className="block text-[11px] font-bold text-amber-700 tracking-wide mb-1">{t('vendorTourForms.tourForm.activeSection.activityType.label')}</label>
-                <select value={tourActivityType} onChange={(e) => setTourActivityType(e.target.value)} className="w-full px-3 py-2 bg-white border border-amber-200 rounded-lg text-xs font-semibold text-slate-700">
-                  <option value="volleyball">{t('vendorTourForms.tourForm.activeSection.activityType.volleyball')}</option>
-                  <option value="running">{t('vendorTourForms.tourForm.activeSection.activityType.running')}</option>
-                  <option value="ski">{t('vendorTourForms.tourForm.activeSection.activityType.ski')}</option>
-                  <option value="rafting">{t('vendorTourForms.tourForm.activeSection.activityType.rafting')}</option>
-                  <option value="bike">{t('vendorTourForms.tourForm.activeSection.activityType.bike')}</option>
-                  <option value="canyon">{t('vendorTourForms.tourForm.activeSection.activityType.canyon')}</option>
-                  <option value="other">{t('vendorTourForms.tourForm.activeSection.activityType.other')}</option>
-                </select>
-              </div>
+  <label className="block text-[11px] font-bold text-amber-700 tracking-wide mb-1">{t('vendorTourForms.tourForm.activeSection.activityType.label')}</label>
+  <select
+    value={STANDARD_ACTIVITY_TYPES.includes(tourActivityType) ? tourActivityType : 'other'}
+    onChange={(e) => {
+      const v = e.target.value;
+      setTourActivityType(v);
+      if (v !== 'other') setTourCustomActivityType('');
+    }}
+    className="w-full px-3 py-2 bg-white border border-amber-200 rounded-lg text-xs font-semibold text-slate-700"
+  >
+    <option value="volleyball">{t('vendorTourForms.tourForm.activeSection.activityType.volleyball')}</option>
+    <option value="running">{t('vendorTourForms.tourForm.activeSection.activityType.running')}</option>
+    <option value="ski">{t('vendorTourForms.tourForm.activeSection.activityType.ski')}</option>
+    <option value="rafting">{t('vendorTourForms.tourForm.activeSection.activityType.rafting')}</option>
+    <option value="bike">{t('vendorTourForms.tourForm.activeSection.activityType.bike')}</option>
+    <option value="canyon">{t('vendorTourForms.tourForm.activeSection.activityType.canyon')}</option>
+    <option value="other">{t('vendorTourForms.tourForm.activeSection.activityType.other')}</option>
+  </select>
+
+  {/* "Digər" seçildikdə manual yazı sahəsi */}
+  {(tourActivityType === 'other' || !STANDARD_ACTIVITY_TYPES.includes(tourActivityType)) && (
+    <input
+      type="text"
+      value={tourCustomActivityType}
+      onChange={(e) => setTourCustomActivityType(e.target.value)}
+      placeholder="İdman növünü yazın (məs: paragliding, yelkən...)"
+      className="w-full mt-2 px-3 py-2 bg-white border border-amber-300 ring-1 ring-amber-100 rounded-lg text-xs font-semibold text-slate-800 placeholder-amber-400"
+    />
+  )}
+</div>
               <div>
-                <label className="block text-[11px] font-bold text-amber-700 tracking-wide mb-1">{t('vendorTourForms.tourForm.activeSection.activeDifficulty.label')}</label>
-                <select value={tourActiveDifficulty} onChange={(e) => setTourActiveDifficulty(e.target.value)} className="w-full px-3 py-2 bg-white border border-amber-200 rounded-lg text-xs font-semibold text-slate-700">
-                  <option value="beginner">{t('vendorTourForms.tourForm.activeSection.activeDifficulty.beginner')}</option>
-                  <option value="medium">{t('vendorTourForms.tourForm.activeSection.activeDifficulty.medium')}</option>
-                  <option value="professional">{t('vendorTourForms.tourForm.activeSection.activeDifficulty.professional')}</option>
-                </select>
-              </div>
+  <label className="block text-[11px] font-bold text-amber-700 tracking-wide mb-1">{t('vendorTourForms.tourForm.activeSection.activityType.label')}</label>
+  <select value={tourActivityType} onChange={(e) => setTourActivityType(e.target.value)} className="w-full px-3 py-2 bg-white border border-amber-200 rounded-lg text-xs font-semibold text-slate-700">
+    <option value="volleyball">{t('vendorTourForms.tourForm.activeSection.activityType.volleyball')}</option>
+    <option value="running">{t('vendorTourForms.tourForm.activeSection.activityType.running')}</option>
+    <option value="ski">{t('vendorTourForms.tourForm.activeSection.activityType.ski')}</option>
+    <option value="rafting">{t('vendorTourForms.tourForm.activeSection.activityType.rafting')}</option>
+    <option value="bike">{t('vendorTourForms.tourForm.activeSection.activityType.bike')}</option>
+    <option value="canyon">{t('vendorTourForms.tourForm.activeSection.activityType.canyon')}</option>
+    <option value="other">{t('vendorTourForms.tourForm.activeSection.activityType.other')}</option>
+  </select>
+</div>
             </div>
           )}
 

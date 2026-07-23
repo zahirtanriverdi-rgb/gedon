@@ -109,6 +109,11 @@ export const vendorMisc = {
         perPerson: '{{price}} / nəfər',
         dateLabel: 'Tarix: {{date}}',
         seatsLabel: '{{booked}} / {{capacity}} Yer',
+        // YENİ ƏLAVƏLƏR:
+        showAllButton: 'Hamısını gör (daha {{count}} tur)',
+        showLessButton: 'Gizlət',
+        showAllSlotsButton: 'Hamısını gör (daha {{count}} slot)',
+        showLessSlotsButton: 'Bu həftəni göstər',
       },
       tourDangerZone: {
         title: 'Status və Təhlükəli Zona',
@@ -268,6 +273,11 @@ export const vendorMisc = {
         perPerson: '{{price}} / person',
         dateLabel: 'Date: {{date}}',
         seatsLabel: '{{booked}} / {{capacity}} Seats',
+        // NEW ADDITIONS:
+        showAllButton: 'See all ({{count}} more tours)',
+        showLessButton: 'Show less',
+        showAllSlotsButton: 'See all ({{count}} more slots)',
+showLessSlotsButton: 'Show this week',
       },
       tourDangerZone: {
         title: 'Status and Danger Zone',
@@ -427,6 +437,11 @@ export const vendorMisc = {
         perPerson: '{{price}} / чел.',
         dateLabel: 'Дата: {{date}}',
         seatsLabel: '{{booked}} / {{capacity}} мест',
+        // НОВЫЕ ДОБАВЛЕНИЯ:
+        showAllButton: 'Показать все (ещё {{count}} туров)',
+        showLessButton: 'Скрыть',
+        showAllSlotsButton: 'Показать все (ещё {{count}} слотов)',
+showLessSlotsButton: 'Показать эту неделю',
       },
       tourDangerZone: {
         title: 'Статус и опасная зона',

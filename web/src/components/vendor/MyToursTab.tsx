@@ -21,6 +21,56 @@ interface MyToursTabProps {
 
 export function MyToursTab({ tours, slots, myTours, myTourIds, tourSearchTerm, onTourSearchChange, exchangeRates, onUpdateExchangeRates, onShowNotification, onEditClick, onToggleFeatured }: MyToursTabProps) {
   const { t } = useLanguage();
+  
+  // Tur siyahısı üçün limit
+  const [showAllTours, setShowAllTours] = useState(false);
+  const INITIAL_TOUR_LIMIT = 3;
+  const displayedTours = showAllTours ? myTours : myTours.slice(0, INITIAL_TOUR_LIMIT);
+  const hasMoreTours = myTours.length > INITIAL_TOUR_LIMIT;
+  
+  // Slotlar üçün məntiq
+  const [showAllSlots, setShowAllSlots] = useState(false);
+  
+  // Bu həftənin başlanğıc və bitiş tarixlərini hesabla
+  const getWeekRange = () => {
+    const now = new Date();
+    const dayOfWeek = now.getDay(); // 0 = Bazar, 1 = Bazar ertəsi, ...
+    const diffToMonday = dayOfWeek === 0 ? -6 : 1; // Bazar günü üçün xüsusi hal
+    const monday = new Date(now);
+    monday.setDate(now.getDate() - (dayOfWeek - diffToMonday));
+    monday.setHours(0, 0, 0, 0);
+    
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    sunday.setHours(23, 59, 59, 999);
+    
+    return { monday, sunday };
+  };
+  
+  // Slotun bu həftəyə aid olub-olmadığını yoxla
+  const isSlotThisWeek = (slot: TourSlot) => {
+    const { monday, sunday } = getWeekRange();
+    const slotDate = new Date(slot.startDate);
+    return slotDate >= monday && slotDate <= sunday;
+  };
+  
+  // Bütün mənim slotlarım
+  const mySlots = slots.filter(s => myTourIds.includes(s.tourId));
+  
+  // Göstəriləcək slotlar: bu həftə VEYA qeydiyyat olanlar
+  const visibleSlots = mySlots.filter(slot => 
+    isSlotThisWeek(slot) || slot.bookedCount > 0
+  );
+  
+  // Gizli qalan slotlar (gələcək və boş olanlar)
+  const hiddenSlots = mySlots.filter(slot => 
+    !isSlotThisWeek(slot) && slot.bookedCount === 0
+  );
+  
+  // Hansı slotları göstərək?
+  const displayedSlots = showAllSlots ? mySlots : visibleSlots;
+  const hasMoreSlots = hiddenSlots.length > 0;
+
   const [cbarLoading, setCbarLoading] = useState<boolean>(false);
   const [togglingFeaturedId, setTogglingFeaturedId] = useState<string | null>(null);
   const featuredTourIds = React.useMemo(() => computeFeaturedTourIds(tours, slots), [tours, slots]);
@@ -35,11 +85,6 @@ export function MyToursTab({ tours, slots, myTours, myTourIds, tourSearchTerm, o
     }
   };
 
-  // exchangeRates is owned by the parent (plain numbers), so the input can't just bind
-  // straight to it — clearing the field would send Number('') === 0 straight back in and
-  // the box would look "stuck". These local string drafts let the field go empty while
-  // typing; a valid number is pushed up to the parent on every keystroke, and an empty
-  // field snaps back to the last known-good rate on blur instead of silently becoming 0.
   const [usdDraft, setUsdDraft] = useState<string>(String(exchangeRates.USD));
   const [eurDraft, setEurDraft] = useState<string>(String(exchangeRates.EUR));
   useEffect(() => { setUsdDraft(String(exchangeRates.USD)); }, [exchangeRates.USD]);
@@ -85,201 +130,227 @@ export function MyToursTab({ tours, slots, myTours, myTourIds, tourSearchTerm, o
   };
 
   return (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          
-          {/* List of current tours */}
-          <div className="lg:col-span-2 space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <h3 className="text-xs font-bold text-slate-400 tracking-widest">{t('vendorMisc.myToursTab.activeToursTitle')}</h3>
-              <div className="relative w-full sm:max-w-[240px]">
-                <input
-                  type="text"
-                  placeholder={t('vendorMisc.myToursTab.searchPlaceholder')}
-                  value={tourSearchTerm}
-                  onChange={(e) => onTourSearchChange(e.target.value)}
-                  className="w-full bg-white border border-slate-200 text-slate-700 p-2 pl-8 pr-3 text-xs rounded-xl focus:outline-none focus:border-emerald-700 focus:ring-1 focus:ring-emerald-700/50 transition shadow-xs placeholder-slate-400"
-                />
-                <Search className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-slate-400" />
-              </div>
-            </div>
-            
-            {myTours.length === 0 ? (
-              <div className="p-8 text-center bg-white border border-slate-200 rounded-xl text-slate-400 italic text-xs">
-                {t('vendorMisc.myToursTab.noToursYet')}
-              </div>
-            ) : (
-              myTours.map((tour) => {
-                const tourSlots = slots.filter(s => s.tourId === tour.id);
-                return (
-                  <div key={tour.id} className="bg-white border border-slate-200 rounded-lg p-4 flex flex-wrap sm:flex-nowrap gap-4 items-center justify-between shadow-xs">
-                    <img 
-                      src={tour.image || undefined} 
-                      alt="" 
-                      className="w-12 h-12 sm:w-14 sm:h-14 rounded object-cover border border-slate-150 flex-shrink-0"
-                      referrerPolicy="no-referrer"
-                    />
-                    <div className="flex-1 space-y-1 min-w-0">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <h4 className="font-bold text-slate-900 text-xs leading-tight truncate max-w-full">{tour.name}</h4>
-                        {featuredTourIds.has(tour.id) && (
-                          <span className="inline-flex items-center gap-1 text-[9px] bg-amber-100 text-amber-800 border border-amber-200 font-extrabold px-1.5 py-0.5 rounded-full">
-                            🔥 {t('vendorMisc.myToursTab.bestSeller')}{tour.isManuallyFeatured ? ` ${t('vendorMisc.myToursTab.bestSellerSelected')}` : ''}
+    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      
+      {/* List of current tours */}
+      <div className="lg:col-span-2 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <h3 className="text-xs font-bold text-slate-400 tracking-widest">{t('vendorMisc.myToursTab.activeToursTitle')}</h3>
+          <div className="relative w-full sm:max-w-[240px]">
+            <input
+              type="text"
+              placeholder={t('vendorMisc.myToursTab.searchPlaceholder')}
+              value={tourSearchTerm}
+              onChange={(e) => onTourSearchChange(e.target.value)}
+              className="w-full bg-white border border-slate-200 text-slate-700 p-2 pl-8 pr-3 text-xs rounded-xl focus:outline-none focus:border-emerald-700 focus:ring-1 focus:ring-emerald-700/50 transition shadow-xs placeholder-slate-400"
+            />
+            <Search className="absolute left-2.5 top-2.5 w-3.5 h-3.5 text-slate-400" />
+          </div>
+        </div>
+        
+        {myTours.length === 0 ? (
+          <div className="p-8 text-center bg-white border border-slate-200 rounded-xl text-slate-400 italic text-xs">
+            {t('vendorMisc.myToursTab.noToursYet')}
+          </div>
+        ) : (
+          <>
+            {displayedTours.map((tour) => {
+              const tourSlots = slots.filter(s => s.tourId === tour.id);
+              return (
+                <div key={tour.id} className="bg-white border border-slate-200 rounded-lg p-4 flex flex-wrap sm:flex-nowrap gap-4 items-center justify-between shadow-xs">
+                  <img 
+                    src={tour.image || undefined} 
+                    alt="" 
+                    className="w-12 h-12 sm:w-14 sm:h-14 rounded object-cover border border-slate-150 flex-shrink-0"
+                    referrerPolicy="no-referrer"
+                  />
+                  <div className="flex-1 space-y-1 min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <h4 className="font-bold text-slate-900 text-xs leading-tight truncate max-w-full">{tour.name}</h4>
+                      {featuredTourIds.has(tour.id) && (
+                        <span className="inline-flex items-center gap-1 text-[9px] bg-amber-100 text-amber-800 border border-amber-200 font-extrabold px-1.5 py-0.5 rounded-full">
+                          🔥 {t('vendorMisc.myToursTab.bestSeller')}{tour.isManuallyFeatured ? ` ${t('vendorMisc.myToursTab.bestSellerSelected')}` : ''}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 text-[10px] text-slate-400">
+                      <span>📍 {tour.region}</span>
+                      <span>•</span>
+                      <span className="font-bold text-emerald-700 tracking-wider">
+                        {tour.category.toUpperCase()} ({tour.difficulty.toUpperCase()})
+                      </span>
+                    </div>
+                    <div className="text-[10px] text-slate-500 font-semibold">
+                      {t('vendorMisc.myToursTab.activeSlotCount')} <strong className="text-slate-700 font-mono">{t('vendorMisc.myToursTab.activeSlotCountValue', { count: tourSlots.length })}</strong>
+                    </div>
+                    {tour.status === 'rejected' && (
+                      <div className="text-[10px] text-red-700 font-semibold bg-red-50 border border-red-100 rounded-lg px-2 py-1.5 max-w-md">
+                        <span className="block">⚠️ {t('vendorMisc.myToursTab.rejectedNotice')}</span>
+                        {tour.rejectionReason && (
+                          <span className="block mt-1 text-red-800">
+                            <strong>{t('vendorMisc.myToursTab.rejectionReasonLabel')}</strong> {tour.rejectionReason}
                           </span>
                         )}
                       </div>
-                      <div className="flex items-center gap-2 text-[10px] text-slate-400">
-                        <span>📍 {tour.region}</span>
-                        <span>•</span>
-                        <span className="font-bold text-emerald-700 tracking-wider">
-                          {tour.category.toUpperCase()} ({tour.difficulty.toUpperCase()})
-                        </span>
-                      </div>
-                      <div className="text-[10px] text-slate-500 font-semibold">
-                        {t('vendorMisc.myToursTab.activeSlotCount')} <strong className="text-slate-700 font-mono">{t('vendorMisc.myToursTab.activeSlotCountValue', { count: tourSlots.length })}</strong>
-                      </div>
-                      {tour.status === 'rejected' && (
-                        <div className="text-[10px] text-red-700 font-semibold bg-red-50 border border-red-100 rounded-lg px-2 py-1.5 max-w-md">
-                          <span className="block">⚠️ {t('vendorMisc.myToursTab.rejectedNotice')}</span>
-                          {tour.rejectionReason && (
-                            <span className="block mt-1 text-red-800">
-                              <strong>{t('vendorMisc.myToursTab.rejectionReasonLabel')}</strong> {tour.rejectionReason}
-                            </span>
-                          )}
-                        </div>
-                      )}
-                    </div>
+                    )}
+                  </div>
 
-                    <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
-                      {tour.isActive === false ? (
-                        <span className="text-[9px] bg-rose-50 text-rose-800 border border-rose-100 font-bold px-2 py-0.5 rounded-full">
-                          {t('vendorMisc.myToursTab.statusDeactivated')}
-                        </span>
-                      ) : tour.status === 'rejected' ? (
-                        <span className="text-[9px] bg-red-50 text-red-800 border border-red-200 font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
-                          ❌ {t('vendorMisc.myToursTab.statusRejected')}
-                        </span>
-                      ) : tour.status === 'pending_approval' ? (
-                        <span className="text-[9px] bg-amber-55/60 text-amber-800 border border-amber-200 font-bold px-2 py-0.5 rounded-full flex items-center gap-1 animate-pulse">
-                          ⏳ {t('vendorMisc.myToursTab.statusPending')}
-                        </span>
-                      ) : (
-                        <span className="text-[9px] bg-emerald-50 text-emerald-800 border border-emerald-100 font-bold px-2 py-0.5 rounded-full">
-                          {t('vendorMisc.myToursTab.statusActive')}
-                        </span>
-                      )}
+                  <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+                    {tour.isActive === false ? (
+                      <span className="text-[9px] bg-rose-50 text-rose-800 border border-rose-100 font-bold px-2 py-0.5 rounded-full">
+                        {t('vendorMisc.myToursTab.statusDeactivated')}
+                      </span>
+                    ) : tour.status === 'rejected' ? (
+                      <span className="text-[9px] bg-red-50 text-red-800 border border-red-200 font-bold px-2 py-0.5 rounded-full flex items-center gap-1">
+                        ❌ {t('vendorMisc.myToursTab.statusRejected')}
+                      </span>
+                    ) : tour.status === 'pending_approval' ? (
+                      <span className="text-[9px] bg-amber-55/60 text-amber-800 border border-amber-200 font-bold px-2 py-0.5 rounded-full flex items-center gap-1 animate-pulse">
+                         {t('vendorMisc.myToursTab.statusPending')}
+                      </span>
+                    ) : (
+                      <span className="text-[9px] bg-emerald-50 text-emerald-800 border border-emerald-100 font-bold px-2 py-0.5 rounded-full">
+                        {t('vendorMisc.myToursTab.statusActive')}
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => onEditClick(tour)}
+                      className="flex items-center gap-1 min-h-[44px] px-2.5 bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-[10px] rounded-md transition-all cursor-pointer shadow-xs"
+                    >
+                      <Edit className="w-2.5 h-2.5" />
+                      <span>{t('vendorMisc.myToursTab.editButton')}</span>
+                    </button>
+                    {onToggleFeatured && (
                       <button
                         type="button"
-                        onClick={() => onEditClick(tour)}
-                        className="flex items-center gap-1 min-h-[44px] px-2.5 bg-slate-900 hover:bg-slate-800 text-white font-extrabold text-[10px] rounded-md transition-all cursor-pointer shadow-xs"
+                        onClick={() => handleFeaturedClick(tour)}
+                        disabled={togglingFeaturedId === tour.id}
+                        className={`flex items-center gap-1 min-h-[44px] px-2.5 font-extrabold text-[10px] rounded-md transition-all cursor-pointer shadow-xs disabled:opacity-50 ${
+                          tour.isManuallyFeatured
+                            ? 'bg-amber-100 hover:bg-amber-200 text-amber-800 border border-amber-300'
+                            : 'bg-white hover:bg-amber-50 text-amber-700 border border-amber-200'
+                        }`}
                       >
-                        <Edit className="w-2.5 h-2.5" />
-                        <span>{t('vendorMisc.myToursTab.editButton')}</span>
+                        <Star className="w-2.5 h-2.5" />
+                        <span>{tour.isManuallyFeatured ? t('vendorMisc.myToursTab.unfeatureButton') : t('vendorMisc.myToursTab.featureButton')}</span>
                       </button>
-                      {onToggleFeatured && (
-                        <button
-                          type="button"
-                          onClick={() => handleFeaturedClick(tour)}
-                          disabled={togglingFeaturedId === tour.id}
-                          className={`flex items-center gap-1 min-h-[44px] px-2.5 font-extrabold text-[10px] rounded-md transition-all cursor-pointer shadow-xs disabled:opacity-50 ${
-                            tour.isManuallyFeatured
-                              ? 'bg-amber-100 hover:bg-amber-200 text-amber-800 border border-amber-300'
-                              : 'bg-white hover:bg-amber-50 text-amber-700 border border-amber-200'
-                          }`}
-                        >
-                          <Star className="w-2.5 h-2.5" />
-                          <span>{tour.isManuallyFeatured ? t('vendorMisc.myToursTab.unfeatureButton') : t('vendorMisc.myToursTab.featureButton')}</span>
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
-
-          {/* Valyuta Məzənnələri Manager Card */}
-          <div className="space-y-4">
-            <div className="bg-white p-5 rounded-xl border border-amber-250 bg-gradient-to-b from-amber-500/3 to-transparent space-y-4 h-fit shadow-xs">
-              <div className="flex items-center gap-2">
-                <span className="text-base">💱</span>
-                <div>
-                  <h4 className="text-xs font-black text-amber-950 tracking-wider">{t('vendorMisc.myToursTab.currencyRatesTitle')}</h4>
-                  <p className="text-[10px] text-slate-500 leading-normal">
-                    {t('vendorMisc.myToursTab.currencyRatesSubtitle')}
-                  </p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-150 space-y-1">
-                  <span className="text-[9px] text-slate-400 font-extrabold tracking-wider block">1 USD ($)</span>
-                  <div className="flex items-center gap-1.5">
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0.1"
-                      value={usdDraft}
-                      onChange={handleRateChange('USD')}
-                      onBlur={handleRateBlur('USD')}
-                      className="w-full bg-white border border-slate-200 text-slate-900 font-bold p-1 text-center text-xs rounded focus:outline-none focus:border-amber-500"
-                    />
-                    <span className="text-[10px] text-slate-500 font-bold">₼</span>
+                    )}
                   </div>
                 </div>
+              );
+            })}
 
-                <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-150 space-y-1">
-                  <span className="text-[9px] text-slate-400 font-extrabold tracking-wider block">1 EUR (€)</span>
-                  <div className="flex items-center gap-1.5">
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0.1"
-                      value={eurDraft}
-                      onChange={handleRateChange('EUR')}
-                      onBlur={handleRateBlur('EUR')}
-                      className="w-full bg-white border border-slate-200 text-slate-900 font-bold p-1 text-center text-xs rounded focus:outline-none focus:border-amber-500"
-                    />
-                    <span className="text-[10px] text-slate-500 font-bold">₼</span>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="text-[9px] text-amber-800 bg-amber-50/70 p-2 rounded border border-amber-200/50 flex gap-1 items-start leading-relaxed font-medium">
-                <span className="mt-0.5">ℹ️</span>
-                <p>{t('vendorMisc.myToursTab.currencyRatesInfo')}</p>
-              </div>
-
+            {/* Hamısını gör / Gizlət düymələri (Turlar üçün) */}
+            {hasMoreTours && !showAllTours && (
               <button
                 type="button"
-                disabled={cbarLoading}
-                onClick={fetchCbarRates}
-                className="w-full bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white font-bold py-2 rounded-lg text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                onClick={() => setShowAllTours(true)}
+                className="w-full py-2.5 bg-white border border-slate-200 hover:border-emerald-700 hover:bg-emerald-50/40 text-emerald-700 font-bold text-[11px] rounded-lg transition-all cursor-pointer shadow-xs flex items-center justify-center gap-1.5"
               >
-                {cbarLoading ? (
-                  <>
-                    <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    {t('vendorMisc.myToursTab.cbarLoading')}
-                  </>
-                ) : (
-                  <>
-                    🔄 {t('vendorMisc.myToursTab.cbarRefreshButton')}
-                  </>
-                )}
+                <span></span>
+                <span>
+                  {t('vendorMisc.myToursTab.showAllButton', { count: myTours.length - INITIAL_TOUR_LIMIT }) || `Hamısını gör (${myTours.length - INITIAL_TOUR_LIMIT} tur daha)`}
+                </span>
               </button>
+            )}
+            {showAllTours && hasMoreTours && (
+              <button
+                type="button"
+                onClick={() => setShowAllTours(false)}
+                className="w-full py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-500 font-semibold text-[10px] rounded-lg transition-all cursor-pointer"
+              >
+                ▲ {t('vendorMisc.myToursTab.showLessButton') || 'Gizlət'}
+              </button>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Valyuta Məzənnələri Manager Card */}
+      <div className="space-y-4">
+        <div className="bg-white p-5 rounded-xl border border-amber-250 bg-gradient-to-b from-amber-500/3 to-transparent space-y-4 h-fit shadow-xs">
+          <div className="flex items-center gap-2">
+            <span className="text-base">💱</span>
+            <div>
+              <h4 className="text-xs font-black text-amber-950 tracking-wider">{t('vendorMisc.myToursTab.currencyRatesTitle')}</h4>
+              <p className="text-[10px] text-slate-500 leading-normal">
+                {t('vendorMisc.myToursTab.currencyRatesSubtitle')}
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-150 space-y-1">
+              <span className="text-[9px] text-slate-400 font-extrabold tracking-wider block">1 USD ($)</span>
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0.1"
+                  value={usdDraft}
+                  onChange={handleRateChange('USD')}
+                  onBlur={handleRateBlur('USD')}
+                  className="w-full bg-white border border-slate-200 text-slate-900 font-bold p-1 text-center text-xs rounded focus:outline-none focus:border-amber-500"
+                />
+                <span className="text-[10px] text-slate-500 font-bold">₼</span>
+              </div>
             </div>
 
-            {/* Slots overview widget */}
-          <div className="bg-white p-5 rounded-xl border border-slate-200 space-y-4 h-fit shadow-xs">
-            <h4 className="text-xs font-bold text-slate-400 tracking-widest">{t('vendorMisc.myToursTab.calendarPlanTitle')}</h4>
-            <p className="text-[11px] text-slate-500 leading-normal">
-              {t('vendorMisc.myToursTab.calendarPlanSubtitle')}
-            </p>
+            <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-150 space-y-1">
+              <span className="text-[9px] text-slate-400 font-extrabold tracking-wider block">1 EUR (€)</span>
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0.1"
+                  value={eurDraft}
+                  onChange={handleRateChange('EUR')}
+                  onBlur={handleRateBlur('EUR')}
+                  className="w-full bg-white border border-slate-200 text-slate-900 font-bold p-1 text-center text-xs rounded focus:outline-none focus:border-amber-500"
+                />
+                <span className="text-[10px] text-slate-500 font-bold">₼</span>
+              </div>
+            </div>
+          </div>
+          
+          <div className="text-[9px] text-amber-800 bg-amber-50/70 p-2 rounded border border-amber-200/50 flex gap-1 items-start leading-relaxed font-medium">
+            <span className="mt-0.5">ℹ️</span>
+            <p>{t('vendorMisc.myToursTab.currencyRatesInfo')}</p>
+          </div>
 
-            <div className="space-y-2.5 max-h-96 overflow-y-auto pr-1">
-              {slots.filter(s => myTourIds.includes(s.tourId)).length === 0 ? (
-                <div className="text-center p-6 text-slate-400 italic text-[11px]">{t('vendorMisc.myToursTab.noSlotsPlanned')}</div>
-              ) : (
-                slots.filter(s => myTourIds.includes(s.tourId)).map((slot) => {
+          <button
+            type="button"
+            disabled={cbarLoading}
+            onClick={fetchCbarRates}
+            className="w-full bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white font-bold py-2 rounded-lg text-xs transition-all cursor-pointer flex items-center justify-center gap-1.5"
+          >
+            {cbarLoading ? (
+              <>
+                <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                {t('vendorMisc.myToursTab.cbarLoading')}
+              </>
+            ) : (
+              <>
+                🔄 {t('vendorMisc.myToursTab.cbarRefreshButton')}
+              </>
+            )}
+          </button>
+        </div>
+
+        {/* Slots overview widget */}
+        <div className="bg-white p-5 rounded-xl border border-slate-200 space-y-4 h-fit shadow-xs">
+          <h4 className="text-xs font-bold text-slate-400 tracking-widest">{t('vendorMisc.myToursTab.calendarPlanTitle')}</h4>
+          <p className="text-[11px] text-slate-500 leading-normal">
+            {t('vendorMisc.myToursTab.calendarPlanSubtitle')}
+          </p>
+
+          <div className="space-y-2.5 max-h-96 overflow-y-auto pr-1">
+            {displayedSlots.length === 0 ? (
+              <div className="text-center p-6 text-slate-400 italic text-[11px]">{t('vendorMisc.myToursTab.noSlotsPlanned')}</div>
+            ) : (
+              <>
+                {displayedSlots.map((slot) => {
                   const associatedTour = tours.find(t => t.id === slot.tourId);
                   const tourName = associatedTour?.name || '';
                   const isFull = slot.bookedCount >= slot.capacity;
@@ -318,12 +389,36 @@ export function MyToursTab({ tours, slots, myTours, myTourIds, tourSearchTerm, o
                       </div>
                     </div>
                   );
-                })
-              )}
-            </div>
-          </div>
-          </div>
+                })}
 
+                {/* Hamısını gör / Gizlət düymələri (Slotlar üçün) */}
+                {hasMoreSlots && !showAllSlots && (
+                  <button
+                    type="button"
+                    onClick={() => setShowAllSlots(true)}
+                    className="w-full py-2.5 bg-white border border-slate-200 hover:border-emerald-700 hover:bg-emerald-50/40 text-emerald-700 font-bold text-[11px] rounded-lg transition-all cursor-pointer shadow-xs flex items-center justify-center gap-1.5"
+                  >
+                    <span></span>
+                    <span>
+                      {t('vendorMisc.myToursTab.showAllSlotsButton', { count: hiddenSlots.length }) || `Hamısını gör (${hiddenSlots.length} slot daha)`}
+                    </span>
+                  </button>
+                )}
+                {showAllSlots && hasMoreSlots && (
+                  <button
+                    type="button"
+                    onClick={() => setShowAllSlots(false)}
+                    className="w-full py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-500 font-semibold text-[10px] rounded-lg transition-all cursor-pointer"
+                  >
+                    ▲ {t('vendorMisc.myToursTab.showLessSlotsButton') || 'Əsas slotları göstər'}
+                  </button>
+                )}
+              </>
+            )}
+          </div>
         </div>
+      </div>
+
+    </div>
   );
 }
