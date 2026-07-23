@@ -379,8 +379,14 @@ const tourName = currentTour?.name || '';
       style={{ height: 'var(--header-height)' }}
     >
       <div className="mx-auto flex h-full max-w-[var(--global-max-width)] items-center justify-center sm:justify-between gap-4 px-4 sm:px-5 md:px-8 lg:px-12 xl:px-14 min-[1440px]:px-[72px]">
-        <Link href="/" className="text-xl font-black tracking-tight text-[var(--color-primary)]">
-          Gotabiat
+        <Link href="/" className="shrink-0 transition-opacity duration-300">
+          <Image
+            src="/logo/gotabiat_logo.svg"
+            alt="Gotabiat"
+            width={120}
+            height={30}
+            className="h-8 w-auto"
+          />
         </Link>
         
         {isScrolled && (
