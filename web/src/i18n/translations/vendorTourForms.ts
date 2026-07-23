@@ -146,6 +146,7 @@ export const vendorTourForms = {
           fieldNotIncluded: 'Qiymətə daxil deyil',
           fieldHighlights: 'Önə çıxanlar',
           fieldWhatsappVerification: 'WhatsApp nömrəsinin doğrulanması',
+          fieldActivityCustom: 'Aktiv həyat - digər idman növünü yazın',
         },
         submitErrors: {
           generic: 'Tur yadda saxlanılarkən xəta baş verdi.',

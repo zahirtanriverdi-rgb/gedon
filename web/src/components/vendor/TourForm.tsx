@@ -124,6 +124,10 @@ const STANDARD_ACTIVITY_TYPES = ['volleyball', 'running', 'ski', 'rafting', 'bik
     if (step === 1) {
       if (!tourLanguages.trim()) missing.push({ key: 'languages', label: t('vendorTourForms.tourForm.validation.fieldLanguages') });
       if (tourBringItems.filter(Boolean).length === 0) missing.push({ key: 'bringItems', label: t('vendorTourForms.tourForm.validation.fieldBringItems') });
+      // If category is active and user chose "other", the manual activity name is required
+      if (tourCategory === 'active' && (tourActivityType === 'other' || !STANDARD_ACTIVITY_TYPES.includes(tourActivityType)) && !tourCustomActivityType.trim()) {
+        missing.push({ key: 'activityCustom', label: t('vendorTourForms.tourForm.validation.fieldActivityCustom') });
+      }
     } else if (step === 2) {
       if (tourImages.length === 0) missing.push({ key: 'media', label: t('vendorTourForms.tourForm.validation.fieldMedia') });
       if (!isWhatsAppVerified) missing.push({ key: 'whatsappVerification', label: t('vendorTourForms.tourForm.validation.fieldWhatsappVerification') });
@@ -140,7 +144,7 @@ const STANDARD_ACTIVITY_TYPES = ['volleyball', 'running', 'ski', 'rafting', 'bik
     if (missing.length === 0) {
       setFieldErrors((prev) => {
         const next = { ...prev };
-        for (const key of ['languages', 'bringItems', 'media', 'whatsappVerification', 'includes', 'notIncluded', 'highlights']) delete next[key];
+        for (const key of ['languages', 'bringItems', 'media', 'whatsappVerification', 'includes', 'notIncluded', 'highlights', 'activityCustom']) delete next[key];
         return next;
       });
       return true;
@@ -666,27 +670,17 @@ const handleMediaFilesChange = async (e: React.ChangeEvent<HTMLInputElement>) =>
 
   {/* "Digər" seçildikdə manual yazı sahəsi */}
   {(tourActivityType === 'other' || !STANDARD_ACTIVITY_TYPES.includes(tourActivityType)) && (
-    <input
-      type="text"
-      value={tourCustomActivityType}
-      onChange={(e) => setTourCustomActivityType(e.target.value)}
-      placeholder="İdman növünü yazın (məs: paragliding, yelkən...)"
-      className="w-full mt-2 px-3 py-2 bg-white border border-amber-300 ring-1 ring-amber-100 rounded-lg text-xs font-semibold text-slate-800 placeholder-amber-400"
-    />
+    <div>
+      <input
+        type="text"
+        value={tourCustomActivityType}
+        onChange={(e) => { setTourCustomActivityType(e.target.value); clearFieldError('activityCustom'); }}
+        placeholder="İdman növünü yazın (məs: paragliding, yelkən...)"
+        className={`w-full mt-2 px-3 py-2 bg-white rounded-lg text-xs font-semibold text-slate-800 placeholder-amber-400 ${fieldErrors.activityCustom ? 'border-red-500 ring-1 ring-red-300' : 'border-amber-300 ring-amber-100'}`}
+      />
+      {fieldErrors.activityCustom && <p className="text-[10px] font-semibold text-red-600 mt-1">⚠️ {t('vendorTourForms.tourForm.validation.fieldActivityCustom')}</p>}
+    </div>
   )}
-</div>
-              <div>
-  <label className="block text-[11px] font-bold text-amber-700 tracking-wide mb-1">{t('vendorTourForms.tourForm.activeSection.activityType.label')}</label>
-  <select value={tourActivityType} onChange={(e) => setTourActivityType(e.target.value)} className="w-full px-3 py-2 bg-white border border-amber-200 rounded-lg text-xs font-semibold text-slate-700">
-    <option value="volleyball">{t('vendorTourForms.tourForm.activeSection.activityType.volleyball')}</option>
-    <option value="running">{t('vendorTourForms.tourForm.activeSection.activityType.running')}</option>
-    <option value="ski">{t('vendorTourForms.tourForm.activeSection.activityType.ski')}</option>
-    <option value="rafting">{t('vendorTourForms.tourForm.activeSection.activityType.rafting')}</option>
-    <option value="bike">{t('vendorTourForms.tourForm.activeSection.activityType.bike')}</option>
-    <option value="canyon">{t('vendorTourForms.tourForm.activeSection.activityType.canyon')}</option>
-    <option value="other">{t('vendorTourForms.tourForm.activeSection.activityType.other')}</option>
-  </select>
-</div>
             </div>
           )}
 
