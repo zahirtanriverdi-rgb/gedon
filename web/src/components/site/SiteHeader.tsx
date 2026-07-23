@@ -262,19 +262,19 @@ const tourName = currentTour?.name || '';
             <ArrowLeft className="h-5 w-5" />
           </button>
 
-          {/* Desktop-da loqo */}
+          {/* Sayt başlığında logo */}
           <Link
             href="/"
-            className={`hidden sm:block shrink-0 transition-opacity duration-300 ${
-              showHeaderSearch ? 'max-sm:opacity-0 max-sm:pointer-events-none max-sm:w-0 max-sm:overflow-hidden' : ''
+            className={`shrink-0 transition-opacity duration-300 ${
+              showHeaderSearch ? 'opacity-0 pointer-events-none w-0 overflow-hidden' : ''
             }`}
           >
             <Image
               src="/logo/gotabiat_logo.svg"
               alt="Gotabiat"
-              width={180}
-              height={40}
-              className="h-9 w-auto"
+              width={120}
+              height={30}
+              className="h-8 w-auto"
             />
           </Link>
 
