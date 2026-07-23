@@ -2,7 +2,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Tour, TourSlot, User, Guide, InquiryQuestion, DayProgramStep } from '../../types';
 import { InquiryQuestionsEditor } from './InquiryQuestionsEditor';
-import { parseGpsFile } from '../../utils/gpxParser';
 import { Plus, X, Check } from 'lucide-react';
 import { DynamicStringListInput } from './DynamicStringListInput';
 import { MEETING_POINTS } from '../../data/meetingPoints';
@@ -82,8 +81,6 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
   const [tourDiscountPrice, setTourDiscountPrice] = useState<string>('');
   const [tourRating, setTourRating] = useState<number | ''>('');
   const [selectedDates, setSelectedDates] = useState<Date[]>([]);
-  const [tourGpxData, setTourGpxData] = useState<string>('');
-  const [tourGpxFileName, setTourGpxFileName] = useState<string>('');
   const [tourIsActive, setTourIsActive] = useState<boolean>(true);
 
   // Active Lifestyle specifics
@@ -257,8 +254,6 @@ const STANDARD_ACTIVITY_TYPES = ['volleyball', 'running', 'ski', 'rafting', 'bik
     setTourVideos(tour.videos || []);
     setTourWhatsApp(tour.whatsapp_number || currentUser.whatsapp_number || currentUser.phone || '');
     setIsWhatsAppVerified(true);
-    setTourGpxData(tour.gpxData || '');
-    setTourGpxFileName(tour.gpxFileName || '');
     setTourIsActive(tour.isActive !== false);
     setTourCategory(tour.category as any);
 
@@ -351,8 +346,6 @@ setTourActiveDifficulty(tour.activeDifficulty || 'medium');
       images: tourImages.length > 0 ? tourImages : (tourImage ? [tourImage] : [defaultImg]),
       videos: tourVideos,
       whatsapp_number: tourWhatsApp || currentUser.whatsapp_number || currentUser.phone || '',
-      gpxData: tourGpxData || undefined,
-      gpxFileName: tourGpxFileName || undefined,
       price: Number(tourPrice) || 0,
       discountPrice: tourDiscountPrice !== '' && Number(tourDiscountPrice) > 0 ? Number(tourDiscountPrice) : undefined,
       rating: tourRating !== '' ? Math.min(5, Math.max(1, Number(tourRating))) : undefined,
@@ -481,23 +474,6 @@ activityType: tourCategory === 'active'
     }
   };
 
-  const handleGpsFileUpload = (file: File) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const text = e.target?.result as string;
-        const parsed = parseGpsFile(file.name, text);
-        setTourGpxData(JSON.stringify(parsed));
-        setTourGpxFileName(file.name);
-        if (onShowNotification) {
-          onShowNotification(t('vendorTourForms.tourForm.notifications.gpxUploaded', { distanceKm: parsed.stats.distanceKm, elevationGainM: parsed.stats.elevationGainM }), 'success');
-        }
-      } catch (err: any) {
-        if (onShowNotification) onShowNotification(t('vendorTourForms.tourForm.notifications.gpxError', { error: err.message || t('vendorTourForms.tourForm.notifications.gpxErrorDefault') }), 'error');
-      }
-    };
-    reader.readAsText(file);
-  };
 
 // Unified media upload to server (S3-compatible storage və ya dev-də lokal disk;
 // bax src/utils/uploadMedia.ts) — DB-yə yalnız URL yazılır, base64 yox.
@@ -893,39 +869,6 @@ const handleMediaFilesChange = async (e: React.ChangeEvent<HTMLInputElement>) =>
             )}
           </div>
 
-          {/* GPX Track Uploader - hidden for Active category */}
-          {tourCategory !== 'active' && (
-            <div className="md:col-span-2 bg-slate-50 border border-slate-200 p-4 rounded-xl space-y-3">
-              <div className="flex items-center justify-between">
-                <label className="block text-[11px] font-extrabold text-slate-400 tracking-wide">{t('vendorTourForms.tourForm.fields.gpx.label')}</label>
-                <span className="text-[9px] font-extrabold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded">{t('vendorTourForms.tourForm.fields.gpx.badge')}</span>
-              </div>
-              {!tourGpxFileName ? (
-                <div className="border border-dashed border-slate-350 rounded-lg p-4 flex flex-col items-center justify-center bg-white hover:bg-slate-50 transition cursor-pointer relative group">
-                  <input
-                    type="file"
-                    accept=".gpx,.kml"
-                    onChange={(e) => { const file = e.target.files?.[0]; if (file) handleGpsFileUpload(file); }}
-                    className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                  />
-                  <div className="text-center space-y-1">
-                    <p className="text-xs font-bold text-slate-700 group-hover:text-indigo-600 transition">{t('vendorTourForms.tourForm.fields.gpx.dropHint')}</p>
-                    <p className="text-[10px] text-slate-400">{t('vendorTourForms.tourForm.fields.gpx.helpText')}</p>
-                  </div>
-                </div>
-              ) : (
-                <div className="bg-indigo-50 border border-indigo-100 p-3 rounded-lg flex flex-col space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <span className="p-1 px-1.5 text-[10px] font-bold text-white bg-indigo-600 rounded animate-pulse">GPS</span>
-                      <span className="text-xs font-bold text-indigo-950 truncate max-w-[200px]" title={tourGpxFileName}>{tourGpxFileName}</span>
-                    </div>
-                    <button type="button" onClick={() => { setTourGpxData(''); setTourGpxFileName(''); }} className="text-[10px] font-black text-red-600 hover:text-red-700 tracking-wide cursor-pointer transition">{t('vendorTourForms.tourForm.fields.gpx.remove')}</button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
 
           <div className="md:col-span-2">
             <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">{t('vendorTourForms.tourForm.fields.description.label')}</label>
