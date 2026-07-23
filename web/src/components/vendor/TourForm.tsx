@@ -124,6 +124,10 @@ const STANDARD_ACTIVITY_TYPES = ['volleyball', 'running', 'ski', 'rafting', 'bik
     if (step === 1) {
       if (!tourLanguages.trim()) missing.push({ key: 'languages', label: t('vendorTourForms.tourForm.validation.fieldLanguages') });
       if (tourBringItems.filter(Boolean).length === 0) missing.push({ key: 'bringItems', label: t('vendorTourForms.tourForm.validation.fieldBringItems') });
+      // If category is active and user chose "other", the manual activity name is required
+      if (tourCategory === 'active' && (tourActivityType === 'other' || !STANDARD_ACTIVITY_TYPES.includes(tourActivityType)) && !tourCustomActivityType.trim()) {
+        missing.push({ key: 'activityCustom', label: t('vendorTourForms.tourForm.validation.fieldActivityCustom') });
+      }
     } else if (step === 2) {
       if (tourImages.length === 0) missing.push({ key: 'media', label: t('vendorTourForms.tourForm.validation.fieldMedia') });
       if (!isWhatsAppVerified) missing.push({ key: 'whatsappVerification', label: t('vendorTourForms.tourForm.validation.fieldWhatsappVerification') });
@@ -140,7 +144,7 @@ const STANDARD_ACTIVITY_TYPES = ['volleyball', 'running', 'ski', 'rafting', 'bik
     if (missing.length === 0) {
       setFieldErrors((prev) => {
         const next = { ...prev };
-        for (const key of ['languages', 'bringItems', 'media', 'whatsappVerification', 'includes', 'notIncluded', 'highlights']) delete next[key];
+        for (const key of ['languages', 'bringItems', 'media', 'whatsappVerification', 'includes', 'notIncluded', 'highlights', 'activityCustom']) delete next[key];
         return next;
       });
       return true;
@@ -666,27 +670,17 @@ const handleMediaFilesChange = async (e: React.ChangeEvent<HTMLInputElement>) =>
 
   {/* "Digər" seçildikdə manual yazı sahəsi */}
   {(tourActivityType === 'other' || !STANDARD_ACTIVITY_TYPES.includes(tourActivityType)) && (
-    <input
-      type="text"
-      value={tourCustomActivityType}
-      onChange={(e) => setTourCustomActivityType(e.target.value)}
-      placeholder="İdman növünü yazın (məs: paragliding, yelkən...)"
-      className="w-full mt-2 px-3 py-2 bg-white border border-amber-300 ring-1 ring-amber-100 rounded-lg text-xs font-semibold text-slate-800 placeholder-amber-400"
-    />
+    <div>
+      <input
+        type="text"
+        value={tourCustomActivityType}
+        onChange={(e) => { setTourCustomActivityType(e.target.value); clearFieldError('activityCustom'); }}
+        placeholder="İdman növünü yazın (məs: paragliding, yelkən...)"
+        className={`w-full mt-2 px-3 py-2 bg-white rounded-lg text-xs font-semibold text-slate-800 placeholder-amber-400 ${fieldErrors.activityCustom ? 'border-red-500 ring-1 ring-red-300' : 'border-amber-300 ring-amber-100'}`}
+      />
+      {fieldErrors.activityCustom && <p className="text-[10px] font-semibold text-red-600 mt-1">⚠️ {t('vendorTourForms.tourForm.validation.fieldActivityCustom')}</p>}
+    </div>
   )}
-</div>
-              <div>
-  <label className="block text-[11px] font-bold text-amber-700 tracking-wide mb-1">{t('vendorTourForms.tourForm.activeSection.activityType.label')}</label>
-  <select value={tourActivityType} onChange={(e) => setTourActivityType(e.target.value)} className="w-full px-3 py-2 bg-white border border-amber-200 rounded-lg text-xs font-semibold text-slate-700">
-    <option value="volleyball">{t('vendorTourForms.tourForm.activeSection.activityType.volleyball')}</option>
-    <option value="running">{t('vendorTourForms.tourForm.activeSection.activityType.running')}</option>
-    <option value="ski">{t('vendorTourForms.tourForm.activeSection.activityType.ski')}</option>
-    <option value="rafting">{t('vendorTourForms.tourForm.activeSection.activityType.rafting')}</option>
-    <option value="bike">{t('vendorTourForms.tourForm.activeSection.activityType.bike')}</option>
-    <option value="canyon">{t('vendorTourForms.tourForm.activeSection.activityType.canyon')}</option>
-    <option value="other">{t('vendorTourForms.tourForm.activeSection.activityType.other')}</option>
-  </select>
-</div>
             </div>
           )}
 
@@ -899,37 +893,39 @@ const handleMediaFilesChange = async (e: React.ChangeEvent<HTMLInputElement>) =>
             )}
           </div>
 
-          {/* GPX Track Uploader */}
-          <div className="md:col-span-2 bg-slate-50 border border-slate-200 p-4 rounded-xl space-y-3">
-            <div className="flex items-center justify-between">
-              <label className="block text-[11px] font-extrabold text-slate-400 tracking-wide">{t('vendorTourForms.tourForm.fields.gpx.label')}</label>
-              <span className="text-[9px] font-extrabold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded">{t('vendorTourForms.tourForm.fields.gpx.badge')}</span>
-            </div>
-            {!tourGpxFileName ? (
-              <div className="border border-dashed border-slate-350 rounded-lg p-4 flex flex-col items-center justify-center bg-white hover:bg-slate-50 transition cursor-pointer relative group">
-                <input
-                  type="file"
-                  accept=".gpx,.kml"
-                  onChange={(e) => { const file = e.target.files?.[0]; if (file) handleGpsFileUpload(file); }}
-                  className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
-                />
-                <div className="text-center space-y-1">
-                  <p className="text-xs font-bold text-slate-700 group-hover:text-indigo-600 transition">{t('vendorTourForms.tourForm.fields.gpx.dropHint')}</p>
-                  <p className="text-[10px] text-slate-400">{t('vendorTourForms.tourForm.fields.gpx.helpText')}</p>
-                </div>
+          {/* GPX Track Uploader - hidden for Active category */}
+          {tourCategory !== 'active' && (
+            <div className="md:col-span-2 bg-slate-50 border border-slate-200 p-4 rounded-xl space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="block text-[11px] font-extrabold text-slate-400 tracking-wide">{t('vendorTourForms.tourForm.fields.gpx.label')}</label>
+                <span className="text-[9px] font-extrabold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded">{t('vendorTourForms.tourForm.fields.gpx.badge')}</span>
               </div>
-            ) : (
-              <div className="bg-indigo-50 border border-indigo-100 p-3 rounded-lg flex flex-col space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="p-1 px-1.5 text-[10px] font-bold text-white bg-indigo-600 rounded animate-pulse">GPS</span>
-                    <span className="text-xs font-bold text-indigo-950 truncate max-w-[200px]" title={tourGpxFileName}>{tourGpxFileName}</span>
+              {!tourGpxFileName ? (
+                <div className="border border-dashed border-slate-350 rounded-lg p-4 flex flex-col items-center justify-center bg-white hover:bg-slate-50 transition cursor-pointer relative group">
+                  <input
+                    type="file"
+                    accept=".gpx,.kml"
+                    onChange={(e) => { const file = e.target.files?.[0]; if (file) handleGpsFileUpload(file); }}
+                    className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                  />
+                  <div className="text-center space-y-1">
+                    <p className="text-xs font-bold text-slate-700 group-hover:text-indigo-600 transition">{t('vendorTourForms.tourForm.fields.gpx.dropHint')}</p>
+                    <p className="text-[10px] text-slate-400">{t('vendorTourForms.tourForm.fields.gpx.helpText')}</p>
                   </div>
-                  <button type="button" onClick={() => { setTourGpxData(''); setTourGpxFileName(''); }} className="text-[10px] font-black text-red-600 hover:text-red-700 tracking-wide cursor-pointer transition">{t('vendorTourForms.tourForm.fields.gpx.remove')}</button>
                 </div>
-              </div>
-            )}
-          </div>
+              ) : (
+                <div className="bg-indigo-50 border border-indigo-100 p-3 rounded-lg flex flex-col space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="p-1 px-1.5 text-[10px] font-bold text-white bg-indigo-600 rounded animate-pulse">GPS</span>
+                      <span className="text-xs font-bold text-indigo-950 truncate max-w-[200px]" title={tourGpxFileName}>{tourGpxFileName}</span>
+                    </div>
+                    <button type="button" onClick={() => { setTourGpxData(''); setTourGpxFileName(''); }} className="text-[10px] font-black text-red-600 hover:text-red-700 tracking-wide cursor-pointer transition">{t('vendorTourForms.tourForm.fields.gpx.remove')}</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="md:col-span-2">
             <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">{t('vendorTourForms.tourForm.fields.description.label')}</label>
