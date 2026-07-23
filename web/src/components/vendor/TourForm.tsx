@@ -1108,21 +1108,32 @@ const handleMediaFilesChange = async (e: React.ChangeEvent<HTMLInputElement>) =>
           <div className="bg-red-50 border border-red-200 text-red-700 text-xs font-semibold rounded-lg px-3 py-2">⚠️ {formSubmitError}</div>
         )}
 
-        <div className="flex flex-col-reverse sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3">
+        <div className="flex flex-col sm:flex-row items-center justify-end gap-2.5">
+          {/* optional previous/back button (left-most when present) */}
           {currentStep > 1 && (
             <button
               type="button"
               onClick={goToPrevStep}
-              className="w-full sm:w-auto px-5 py-3 sm:py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-lg transition-all cursor-pointer"
+              className="hidden sm:inline-block px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-lg transition-all cursor-pointer"
             >
               {t('vendorTourForms.tourForm.buttons.back')}
             </button>
           )}
 
+          {/* Cancel (Ləğv et) - red, appears before Next */}
+          <button
+            type="button"
+            onClick={onNavigateBack}
+            className="px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-lg transition-all cursor-pointer w-full sm:w-auto"
+          >
+            {t('vendorTourForms.tourForm.buttons.cancel')}
+          </button>
+
+          {/* Primary action - Next / Submit - green */}
           <button
             type="submit"
             disabled={isSavingForm}
-            className="w-full sm:w-auto px-5 py-3 sm:py-2.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-lg transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
+            className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg transition-all cursor-pointer disabled:opacity-50 w-full sm:w-auto flex items-center justify-center gap-1.5"
           >
             {currentStep < 3 ? (
               <>{t('vendorTourForms.tourForm.buttons.next')}</>
@@ -1133,12 +1144,6 @@ const handleMediaFilesChange = async (e: React.ChangeEvent<HTMLInputElement>) =>
               </>
             )}
           </button>
-
-          {currentStep === 1 && (
-            <button type="button" onClick={onNavigateBack} className="w-full sm:w-auto px-5 py-3 sm:py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-lg transition-all cursor-pointer">
-              {t('vendorTourForms.tourForm.buttons.cancel')}
-            </button>
-          )}
         </div>
       </form>
     </div>
