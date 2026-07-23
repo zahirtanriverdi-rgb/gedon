@@ -15,13 +15,21 @@ const FIXED_EXPERIENCE_OPTIONS = [
   { value: '0-2 dəfə (Yeni başlayan)', labelKey: 'expBeginner' },
   { value: '3+ dəfə (Təcrübəli)', labelKey: 'expExperienced' },
 ] as const;
+
 const FIXED_HEIGHT_OPTIONS = [
   { value: 'Xeyr, problem yoxdur', labelKey: 'heightNo' },
   { value: 'Bir az var', labelKey: 'heightSome' },
   { value: 'Bəli, hündürlükdən qorxuram', labelKey: 'heightYes' },
 ] as const;
+
+const FIXED_DISEASE_OPTIONS = [
+  { value: 'Xeyr, yoxdur', labelKey: 'diseaseNo' },
+  { value: 'Bəli, var', labelKey: 'diseaseYes' },
+] as const;
+
 const FIXED_EXPERIENCE_QUESTION_AZ = 'Bundan öncə neçə yürüşdə (hiking-də) olmusunuz?';
 const FIXED_HEIGHT_QUESTION_AZ = 'Hündürlükdən qorxunuz varmı?';
+const FIXED_DISEASE_QUESTION_AZ = 'Hər hansı xroniki xəstəliyiniz və ya səhhətinizdə problem varmı?';
 
 // <=639px (Tailwind sm breakpoint-dən aşağı) — mobil sheet təqdimatının şərti
 export function useIsMobileViewport(): boolean {
@@ -36,9 +44,6 @@ export function useIsMobileViewport(): boolean {
   return isMobile;
 }
 
-// Mobil görünüşdə uşaqları document.body-yə portal edir (bottom-sheet-lər səhifə içindəki
-// stacking-context-lərə ilişməsin deyə); desktop-da olduğu kimi yerində saxlayır ki,
-// anchored dropdown mövqelənməsi işləsin.
 export function MaybeBodyPortal({ children }: { children: React.ReactNode }) {
   const isMobile = useIsMobileViewport();
   const [isMounted, setIsMounted] = useState(false);
@@ -57,10 +62,6 @@ interface TourInquirySheetProps {
   onShowNotification?: (message: string, type?: 'success' | 'info' | 'error' | 'warning') => void;
 }
 
-// Booking-inquiry form. Mobile (<sm): bottom sheet with drag-to-dismiss, matching the approved
-// mockup; desktop: centered modal. Collects name + WhatsApp number + the two fixed questions +
-// any vendor-defined extra questions, then POSTs /api/inquiries (which fans out the vendor/admin
-// panel notifications and Telegram messages server-side).
 export function TourInquirySheet({ tour, slot, qty, open, onClose, formatDisplayDate, onShowNotification }: TourInquirySheetProps) {
   const { t, language } = useLanguage();
 
@@ -70,14 +71,15 @@ export function TourInquirySheet({ tour, slot, qty, open, onClose, formatDisplay
   const [expAnswer, setExpAnswer] = useState('');
   const [expOtherText, setExpOtherText] = useState('');
   const [heightAnswer, setHeightAnswer] = useState('');
-  // Extra (vendor-defined) answers keyed by question id; `__other:` prefix marks the free-text choice
+  const [diseaseAnswer, setDiseaseAnswer] = useState('');
+  const [diseaseText, setDiseaseText] = useState('');
+
   const [extraAnswers, setExtraAnswers] = useState<Record<string, string>>({});
   const [extraOtherTexts, setExtraOtherTexts] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  // Fresh form on every open
   useEffect(() => {
     if (open) {
       setSubmitted(false);
@@ -85,12 +87,13 @@ export function TourInquirySheet({ tour, slot, qty, open, onClose, formatDisplay
       setExpAnswer('');
       setExpOtherText('');
       setHeightAnswer('');
+      setDiseaseAnswer('');
+      setDiseaseText('');
       setExtraAnswers({});
       setExtraOtherTexts({});
     }
   }, [open]);
 
-  // Lock page scroll while the sheet is open
   useEffect(() => {
     if (!open) return;
     const prev = document.body.style.overflow;
@@ -98,7 +101,6 @@ export function TourInquirySheet({ tour, slot, qty, open, onClose, formatDisplay
     return () => { document.body.style.overflow = prev; };
   }, [open]);
 
-  // Drag-to-dismiss (mobile sheet handle)
   const panelRef = useRef<HTMLDivElement | null>(null);
   const dragState = useRef({ startY: 0, current: 0, dragging: false });
   const onTouchStart = (e: React.TouchEvent) => {
@@ -122,7 +124,6 @@ export function TourInquirySheet({ tour, slot, qty, open, onClose, formatDisplay
     dragState.current.current = 0;
   };
 
-  // SSR-də portal hədəfi yoxdur — yalnız mount-dan sonra render edirik
   const [isMounted, setIsMounted] = useState(false);
   useEffect(() => { setIsMounted(true); }, []);
 
@@ -136,6 +137,7 @@ export function TourInquirySheet({ tour, slot, qty, open, onClose, formatDisplay
   };
 
   const expOk = expAnswer && (expAnswer !== '__other' || expOtherText.trim().length > 0);
+  const diseaseOk = diseaseAnswer && (diseaseAnswer !== 'Bəli, var' || diseaseText.trim().length > 0);
   const extrasOk = extraQuestions.every(q => {
     const a = extraAnswers[q.id];
     if (!a) return false;
@@ -143,18 +145,24 @@ export function TourInquirySheet({ tour, slot, qty, open, onClose, formatDisplay
     return true;
   });
   const phoneDigitsOk = customerPhone.replace(/\D/g, '').replace(/^0+/, '').length >= 7;
-  const canSubmit = !isSubmitting && customerName.trim().length > 1 && phoneDigitsOk && expOk && !!heightAnswer && extrasOk;
+  const canSubmit = !isSubmitting && customerName.trim().length > 1 && phoneDigitsOk && expOk && !!heightAnswer && diseaseOk && extrasOk;
 
   const handleSubmit = async () => {
     if (!canSubmit) return;
     setIsSubmitting(true);
     setSubmitError(null);
+
+    const formattedDiseaseAnswer = diseaseAnswer === 'Bəli, var' 
+      ? `Bəli, var: ${diseaseText.trim()}` 
+      : diseaseAnswer;
+
     const answers: Array<{ question: string; answer: string }> = [
       {
         question: FIXED_EXPERIENCE_QUESTION_AZ,
         answer: expAnswer === '__other' ? `Başqa: ${expOtherText.trim()}` : expAnswer,
       },
       { question: FIXED_HEIGHT_QUESTION_AZ, answer: heightAnswer },
+      { question: FIXED_DISEASE_QUESTION_AZ, answer: formattedDiseaseAnswer },
       ...extraQuestions.map(q => ({
         question: q.question,
         answer: extraAnswers[q.id] === '__other' ? `Başqa: ${(extraOtherTexts[q.id] || '').trim()}` : extraAnswers[q.id],
@@ -203,8 +211,6 @@ export function TourInquirySheet({ tour, slot, qty, open, onClose, formatDisplay
     </label>
   );
 
-  // Body-yə portal: səhifə ağacındakı stacking-context-lər (bottom nav və s.) sheet-in
-  // üstünə çıxa bilmir — overlay həmişə ən üstdə olur.
   return createPortal(
     <div
       className="fixed inset-0 z-[150] bg-black/50 flex items-end sm:items-center sm:justify-center animate-sheet-backdrop-in"
@@ -214,7 +220,6 @@ export function TourInquirySheet({ tour, slot, qty, open, onClose, formatDisplay
         ref={panelRef}
         className="bg-white w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col max-h-[88vh] sm:max-h-[85vh] animate-sheet-slide-up"
       >
-        {/* Mobile drag handle */}
         <div
           className="sm:hidden pt-2.5 pb-1 flex justify-center cursor-grab touch-none"
           onTouchStart={onTouchStart}
@@ -225,7 +230,6 @@ export function TourInquirySheet({ tour, slot, qty, open, onClose, formatDisplay
         </div>
 
         {submitted ? (
-          /* Thank-you screen (mirrors the approved mockup) */
           <div className="px-6 py-8 text-center overflow-y-auto">
             <div className="w-16 h-16 rounded-full bg-emerald-50 flex items-center justify-center mx-auto mb-4">
               <Check className="w-8 h-8 text-emerald-600" strokeWidth={2.5} />
@@ -247,7 +251,6 @@ export function TourInquirySheet({ tour, slot, qty, open, onClose, formatDisplay
           </div>
         ) : (
           <>
-            {/* Header */}
             <div className="flex items-center justify-between px-5 pt-2 pb-1 sm:pt-4">
               <span className="font-extrabold text-slate-900 text-base">{t('tourDetailPage.inquiry.title')}</span>
               <button
@@ -260,13 +263,11 @@ export function TourInquirySheet({ tour, slot, qty, open, onClose, formatDisplay
               </button>
             </div>
 
-            {/* Scrollable body */}
             <div className="px-5 pb-4 overflow-y-auto">
               <p className="text-[13px] text-slate-500 leading-relaxed border-b border-slate-100 pb-3.5 mb-4">
                 {t('tourDetailPage.inquiry.intro')}
               </p>
 
-              {/* Summary chips */}
               <div className="flex gap-2 flex-wrap mb-4">
                 <span className="text-xs font-semibold bg-slate-100 text-slate-700 px-2.5 py-1 rounded-full">
                   👥 {t('tourDetailPage.inquiry.chipAdults', { count: qty })}
@@ -278,7 +279,6 @@ export function TourInquirySheet({ tour, slot, qty, open, onClose, formatDisplay
                 )}
               </div>
 
-              {/* Contact fields */}
               <div className="space-y-3 mb-5">
                 <div>
                   <label className="block text-sm font-medium text-slate-900 mb-1.5">
@@ -374,6 +374,32 @@ export function TourInquirySheet({ tour, slot, qty, open, onClose, formatDisplay
                 )}
               </div>
 
+              {/* Fixed question 3: health/disease */}
+              <div className="mt-4 pt-4 border-t border-slate-100">
+                <div className="font-medium text-[15px] text-slate-900 mb-2.5">{t('tourDetailPage.inquiry.diseaseQuestion')}</div>
+                {FIXED_DISEASE_OPTIONS.map(opt =>
+                  radioRow({
+                    name: 'inquiry-disease',
+                    value: opt.value,
+                    label: t(`tourDetailPage.inquiry.${opt.labelKey}`),
+                    checked: diseaseAnswer === opt.value,
+                    onSelect: () => setDiseaseAnswer(opt.value),
+                  })
+                )}
+                
+                {diseaseAnswer === 'Bəli, var' && (
+                  <div className="mt-2 animate-fadeIn">
+                    <textarea
+                      rows={2}
+                      value={diseaseText}
+                      onChange={(e) => setDiseaseText(e.target.value)}
+                      placeholder={t('tourDetailPage.inquiry.diseaseTextPlaceholder')}
+                      className="w-full px-3.5 py-2.5 text-sm border border-slate-300 rounded-xl text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-primary-500"
+                    />
+                  </div>
+                )}
+              </div>
+
               {/* Vendor-defined extra questions */}
               {extraQuestions.map(q => (
                 <div key={q.id} className="mt-4 pt-4 border-t border-slate-100">
@@ -425,7 +451,6 @@ export function TourInquirySheet({ tour, slot, qty, open, onClose, formatDisplay
               )}
             </div>
 
-            {/* Footer */}
             <div className="px-5 py-3 border-t border-slate-100 bg-white rounded-b-2xl pb-[calc(12px+env(safe-area-inset-bottom))] sm:pb-3">
               <button
                 type="button"

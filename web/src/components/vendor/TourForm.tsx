@@ -624,40 +624,41 @@ const handleMediaFilesChange = async (e: React.ChangeEvent<HTMLInputElement>) =>
               <div className="md:col-span-3 pb-2 mb-2 border-b border-amber-200">
                 <h4 className="text-xs font-bold text-amber-900 flex items-center gap-1.5 tracking-wider">{t('vendorTourForms.tourForm.activeSection.heading')}</h4>
               </div>
-              <div>
-  <label className="block text-[11px] font-bold text-amber-700 tracking-wide mb-1">{t('vendorTourForms.tourForm.activeSection.activityType.label')}</label>
-  <select
-    value={STANDARD_ACTIVITY_TYPES.includes(tourActivityType) ? tourActivityType : 'other'}
-    onChange={(e) => {
-      const v = e.target.value;
-      setTourActivityType(v);
-      if (v !== 'other') setTourCustomActivityType('');
-    }}
-    className="w-full px-3 py-2 bg-white border border-amber-200 rounded-lg text-xs font-semibold text-slate-700"
-  >
-    <option value="volleyball">{t('vendorTourForms.tourForm.activeSection.activityType.volleyball')}</option>
-    <option value="running">{t('vendorTourForms.tourForm.activeSection.activityType.running')}</option>
-    <option value="ski">{t('vendorTourForms.tourForm.activeSection.activityType.ski')}</option>
-    <option value="rafting">{t('vendorTourForms.tourForm.activeSection.activityType.rafting')}</option>
-    <option value="bike">{t('vendorTourForms.tourForm.activeSection.activityType.bike')}</option>
-    <option value="canyon">{t('vendorTourForms.tourForm.activeSection.activityType.canyon')}</option>
-    <option value="other">{t('vendorTourForms.tourForm.activeSection.activityType.other')}</option>
-  </select>
+                        <div>
+             <label className="block text-[11px] font-bold text-amber-700 tracking-wide mb-1">{t('vendorTourForms.tourForm.activeSection.activityType.label')}</label>
+             <select
+               value={STANDARD_ACTIVITY_TYPES.includes(tourActivityType) ? tourActivityType : 'other'}
+               onChange={(e) => {
+                 const v = e.target.value;
+                 setTourActivityType(v);
+                 if (v !== 'other') setTourCustomActivityType('');
+               }}
+               className="w-full px-3 py-2 bg-white border border-amber-200 rounded-lg text-xs font-semibold text-slate-700"
+             >
+               <option value="volleyball">{t('vendorTourForms.tourForm.activeSection.activityType.volleyball')}</option>
+               <option value="running">{t('vendorTourForms.tourForm.activeSection.activityType.running')}</option>
+               <option value="ski">{t('vendorTourForms.tourForm.activeSection.activityType.ski')}</option>
+               <option value="rafting">{t('vendorTourForms.tourForm.activeSection.activityType.rafting')}</option>
+               <option value="bike">{t('vendorTourForms.tourForm.activeSection.activityType.bike')}</option>
+               <option value="canyon">{t('vendorTourForms.tourForm.activeSection.activityType.canyon')}</option>
+               <option value="other">{t('vendorTourForms.tourForm.activeSection.activityType.other')}</option>
+             </select>
 
-  {/* "Digər" seçildikdə manual yazı sahəsi */}
-  {(tourActivityType === 'other' || !STANDARD_ACTIVITY_TYPES.includes(tourActivityType)) && (
-    <div>
-      <input
-        type="text"
-        value={tourCustomActivityType}
-        onChange={(e) => { setTourCustomActivityType(e.target.value); clearFieldError('activityCustom'); }}
-        placeholder="İdman növünü yazın (məs: paragliding, yelkən...)"
-        className={`w-full mt-2 px-3 py-2 bg-white rounded-lg text-xs font-semibold text-slate-800 placeholder-amber-400 ${fieldErrors.activityCustom ? 'border-red-500 ring-1 ring-red-300' : 'border-amber-300 ring-amber-100'}`}
-      />
-      {fieldErrors.activityCustom && <p className="text-[10px] font-semibold text-red-600 mt-1">⚠️ {t('vendorTourForms.tourForm.validation.fieldActivityCustom')}</p>}
-    </div>
-  )}
-            </div>
+             {/* "Digər" seçildikdə manual yazı sahəsi */}
+             {(tourActivityType === 'other' || !STANDARD_ACTIVITY_TYPES.includes(tourActivityType)) && (
+               <div>
+                 <input
+                   type="text"
+                   value={tourCustomActivityType}
+                   onChange={(e) => { setTourCustomActivityType(e.target.value); clearFieldError('activityCustom'); }}
+                   placeholder="İdman növünü yazın (məs: paragliding, yelkən...)"
+                   className={`w-full mt-2 px-3 py-2 bg-white rounded-lg text-xs font-semibold text-slate-800 placeholder-amber-400 ${fieldErrors.activityCustom ? 'border-red-500 ring-1 ring-red-300' : 'border-amber-300 ring-amber-100'}`}
+                 />
+                 {fieldErrors.activityCustom && <p className="text-[10px] font-semibold text-red-600 mt-1">⚠️ {t('vendorTourForms.tourForm.validation.fieldActivityCustom')}</p>}
+               </div>
+             )}
+           </div>
+          </div>
           )}
 
           <div>
