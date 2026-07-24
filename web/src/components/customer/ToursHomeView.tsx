@@ -476,10 +476,10 @@ export function ToursHomeView({
               </div>
               <div className="shrink-0 sticky bottom-0 bg-white border-t border-slate-100 px-6 sm:px-10 py-3 sm:py-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:pb-4 flex items-center justify-between gap-3">
                 <button type="button" onClick={() => { setSelectedDifficulty('all'); setSelectedRegion('all'); handleCalendarReset(); setSortBy('default'); setMaxPrice(maxPriceLimit); }} className="px-4 py-2.5 rounded-xl text-xs font-bold text-brand-text-muted hover:bg-slate-100 hover:text-brand-text-main transition-colors cursor-pointer">
-                  <span suppressHydrationWarning>{tt('customerHome.toursHomeView.filters.resetAll', 'Reset')}</span>
+                  <span suppressHydrationWarning>{tt('customerHome.toursHomeView.filters.resetAll')}</span>
                 </button>
                 <button type="button" onClick={() => setIsFiltersExpanded(false)} className="flex-1 sm:flex-none sm:px-8 py-2.5 rounded-xl bg-brand-primary hover:bg-brand-primary-hover text-white text-xs font-bold transition-colors cursor-pointer shadow-sm">
-                  <span suppressHydrationWarning>{tt('customerHome.toursHomeView.filters.showResults', 'Show Results')}</span>
+                  <span suppressHydrationWarning>{tt('customerHome.toursHomeView.filters.showResults')}</span>
                 </button>
               </div>
             </div>
@@ -709,14 +709,14 @@ export function ToursHomeView({
                       ) : (
                         <div className="flex items-center justify-between bg-[#fcfdfc] border border-slate-100 rounded-xl p-2.5 mb-4 shadow-sm h-[60px]">
                           <div className="flex flex-col gap-0.5 justify-center w-[30%]">
-                            <span className="text-[8px] font-bold text-gray-400 uppercase tracking-wider" suppressHydrationWarning>{tt('customerHome.toursHomeView.guideLabel', 'GUIDE')}</span>
+                            <span className="text-[8px] font-bold text-gray-400 uppercase tracking-wider" suppressHydrationWarning>{tt('customerHome.toursHomeView.guideLabel')}</span>
                             <span className="text-[11px] font-extrabold text-gray-800 line-clamp-1 truncate">
                               {tour.languages && tour.languages.length > 0 ? tour.languages.join(', ') : 'AZ, RU'}
                             </span>
                           </div>
                           <div className="w-[1px] h-8 bg-slate-100 mx-1.5 shrink-0"></div>
                           <div className="flex flex-col gap-0.5 items-center justify-center flex-1 overflow-hidden">
-                            <span className="text-[8px] font-bold text-gray-400 uppercase tracking-wider text-center" suppressHydrationWarning>{tt('customerHome.toursHomeView.equipmentLabel', 'EQUIPMENT')}</span>
+                            <span className="text-[8px] font-bold text-gray-400 uppercase tracking-wider text-center" suppressHydrationWarning>{tt('customerHome.toursHomeView.equipmentLabel')}</span>
                             <span className="text-[11px] font-extrabold text-gray-800 line-clamp-1 text-center w-full truncate">
                               {tour.importantInfo?.bring && tour.importantInfo.bring.length > 0
                                 ? tour.importantInfo.bring[0]
@@ -725,9 +725,9 @@ export function ToursHomeView({
                           </div>
                           <div className="w-[1px] h-8 bg-slate-100 mx-1.5 shrink-0"></div>
                           <div className="flex flex-col gap-0.5 text-right justify-center w-[30%]">
-                            <span className="text-[8px] font-bold text-gray-400 uppercase tracking-wider" suppressHydrationWarning>{tt('customerHome.toursHomeView.formatLabel', 'FORMAT')}</span>
+                            <span className="text-[8px] font-bold text-gray-400 uppercase tracking-wider" suppressHydrationWarning>{tt('customerHome.toursHomeView.formatLabel')}</span>
                             <span className="text-[11px] font-extrabold text-gray-800 line-clamp-1 truncate" suppressHydrationWarning>
-                              {isSportActive ? tt('customerHome.toursHomeView.activeTourLabel', 'Active Tour') : tour.isInternational ? tt('customerHome.toursHomeView.internationalTourLabel', 'International Tour') : tour.category === 'camp' ? tt('customerHome.toursHomeView.campLabel', 'Camp') : tt('customerHome.toursHomeView.natureTourLabel', 'Nature Tour')}
+                              {isSportActive ? tt('customerHome.toursHomeView.activeTourLabel') : tour.isInternational ? tt('customerHome.toursHomeView.internationalTourLabel') : tour.category === 'camp' ? tt('customerHome.toursHomeView.campLabel') : tt('customerHome.toursHomeView.natureTourLabel')}
                             </span>
                           </div>
                         </div>
