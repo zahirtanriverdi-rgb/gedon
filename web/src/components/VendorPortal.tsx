@@ -136,7 +136,16 @@ export default function VendorPortal({
           amount: booking.totalAmount,
           status: booking.status,
           attendanceStatus: booking.attendanceStatus || 'Təsdiqlənib',
-          paymentStatus: booking.paymentStatus || 'Ödənilib'
+          paymentStatus: booking.paymentStatus || 'Ödənilib',
+          vendorName: currentUser.companyName || currentUser.name || 'GoTabiat.com',
+          vendorPhone: currentUser.phone || '',
+          vendorEmail: currentUser.email || '',
+          meetingPoint: bTour?.meetingPoint || '',
+          meetingPointEmbedUrl: bTour?.meetingPointEmbedUrl || '',
+          category: bTour?.category || '',
+          difficulty: bTour?.difficulty || '',
+          importantInfo: bTour?.importantInfo || null,
+          safetyInstructions: bTour?.safetyInstructions || ''
         })
       });
       const data = await response.json();
