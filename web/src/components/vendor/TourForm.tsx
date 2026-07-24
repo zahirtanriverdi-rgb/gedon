@@ -79,6 +79,22 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
     clearFieldError('bringItems');
   };
   const [tourImage, setTourImage] = useState<string>('');
+
+  const BRING_ITEM_SUGGESTIONS = [
+    'Rahat Yürüş Ayaqqabısı',
+    'Dəyişən Havaya Qarşı Geyim',
+    'Kifayət Qədər Su',
+    'Enerji Verən Qəlyanaltılar',
+    'Powerbank',
+    'Şəxsi Tibbi Dəst',
+    'Günəşdən Qorunma Vasitələri',
+    'Yürüş çubuğu',
+  ];
+
+  const addBringItemSuggestion = (item: string) => {
+    setTourBringItems((prev) => (prev.includes(item) ? prev : [...prev, item]));
+    clearFieldError('bringItems');
+  };
   const [tourImages, setTourImages] = useState<string[]>([]);
   const [tourVideos, setTourVideos] = useState<string[]>([]);
   const [tourWhatsApp, setTourWhatsApp] = useState<string>('');
