@@ -3,11 +3,13 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Tour, TourSlot, User, Guide, InquiryQuestion, DayProgramStep } from '../../types';
 import { InquiryQuestionsEditor } from './InquiryQuestionsEditor';
 import { Plus, X, Check } from 'lucide-react';
-import { DynamicStringListInput } from './DynamicStringListInput';
+import { LanguageMultiSelect } from './LanguageMultiSelect';
+import { TagPillInput } from './TagPillInput';
 import { MEETING_POINTS } from '../../data/meetingPoints';
 import { MultiDateCalendar, toIsoDate } from './MultiDateCalendar';
 import { TourDangerZone } from './TourDangerZone';
-import { WhatsAppVerifyField } from '../shared/WhatsAppVerifyField';
+import { DateTimeField } from './DateTimeField';
+import { MeetingPointField } from './MeetingPointField';
 import { handleNumberInput, useStepWizard } from './useTourFormWizard';
 import { useLanguage } from '../../i18n/LanguageContext';
 import { uploadMediaFiles } from '../../utils/uploadMedia';
@@ -53,7 +55,8 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
   const [tourIncludes, setTourIncludes] = useState<string[]>(['Professional Bələdçi', 'Komfort Transit', 'Səhər yeməyi', 'Yol Sığortası']);
   const [tourNotIncluded, setTourNotIncluded] = useState<string[]>([]);
   const [tourHighlights, setTourHighlights] = useState<string>('');
-  const [tourLanguages, setTourLanguages] = useState<string>('Azərbaycanca');
+  // Bələdçinin danışdığı dillər — seçim kartları (LANGUAGE_SUGGESTIONS) + "özündən yaz" ilə idarə olunur.
+  const [tourLanguages, setTourLanguages] = useState<string[]>(['Azərbaycanca']);
   const [tourDurationHours, setTourDurationHours] = useState<number | ''>(8);
   const [tourDepartureDateTime, setTourDepartureDateTime] = useState<string>('');
   const [tourReturnDateTime, setTourReturnDateTime] = useState<string>('');
@@ -62,6 +65,17 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
   const [dateTimeError, setDateTimeError] = useState<string | null>(null);
   const [tourBringItems, setTourBringItems] = useState<string[]>([]);
   const [tourNotAllowedItems, setTourNotAllowedItems] = useState<string[]>([]);
+
+  const LANGUAGE_SUGGESTIONS = [
+    'Azərbaycanca',
+    'Rusca',
+    'İngiliscə',
+    'Türkcə',
+    'Ərəbcə',
+    'Fransızca',
+    'Almanca',
+    'Farsca',
+  ];
 
   const BRING_ITEM_SUGGESTIONS = [
     'Rahat Yürüş Ayaqqabısı',
@@ -74,18 +88,40 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
     'Yürüş çubuğu',
   ];
 
-  const addBringItemSuggestion = (item: string) => {
-    setTourBringItems((prev) => (prev.includes(item) ? prev : [...prev, item]));
-    clearFieldError('bringItems');
-  };
+  const NOT_ALLOWED_SUGGESTIONS = [
+    'Spirtli içki',
+    'Siqaret çəkmək',
+    'Narkotik maddələr',
+    'Odlu silah',
+    'Pirotexnika (fişəng və s.)',
+    'Ev heyvanları',
+    'Böyük çamadanlar',
+    'Dron istifadəsi',
+  ];
+
+  const INCLUDES_SUGGESTIONS = [
+    'Komfort Transit',
+    'Professional Bələdçi',
+    'Səhər Yeməyi',
+    'Yol Sığortası',
+    'Fotoçəkiliş',
+    'Muzey Biletləri',
+  ];
+
+  const NOT_INCLUDED_SUGGESTIONS = [
+    'Şəxsi Xərclər',
+    'Nahar/Şam yeməyi',
+    'Muzey daxili biletlər',
+    'Alkollu içkilər',
+  ];
+
+  // Kliklənən təklif kartlarının aktiv/deaktiv (toggle) idarəsi TagPillInput və
+  // LanguageMultiSelect komponentlərinin içində həyata keçirilir.
   const [tourImage, setTourImage] = useState<string>('');
 
   const [tourImages, setTourImages] = useState<string[]>([]);
   const [tourVideos, setTourVideos] = useState<string[]>([]);
   const [tourWhatsApp, setTourWhatsApp] = useState<string>('');
-  // New tours require a fresh live-WhatsApp check on the guide number; editing an existing tour
-  // starts pre-verified since that number was already checked when the tour was first created.
-  const [isWhatsAppVerified, setIsWhatsAppVerified] = useState<boolean>(!!tour);
   const [tourPrice, setTourPrice] = useState<number | ''>(35);
   const [tourCapacity, setTourCapacity] = useState<number | ''>(20);
   // Per-date seat overrides, keyed by ISO date — lets a vendor give each departure date its
@@ -96,6 +132,9 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
   const [slotCapacities, setSlotCapacities] = useState<Record<string, number | ''>>({});
   const [slotRemaining, setSlotRemaining] = useState<Record<string, number | ''>>({});
   const [tourDiscountPrice, setTourDiscountPrice] = useState<string>('');
+  // Toggle idarə edir: "Endirim tətbiq et" aktiv deyilsə input tamamilə gizlənir, ona görə
+  // istifadəçi boş sahəyə nə yazacağını qarışdırmır.
+  const [applyDiscount, setApplyDiscount] = useState<boolean>(false);
   const [tourRating, setTourRating] = useState<number | ''>('');
   const [selectedDates, setSelectedDates] = useState<Date[]>([]);
   const [tourIsActive, setTourIsActive] = useState<boolean>(true);
@@ -136,7 +175,7 @@ const STANDARD_ACTIVITY_TYPES = ['volleyball', 'running', 'ski', 'rafting', 'bik
   const getMissingFieldsForStep = (step: 1 | 2 | 3): { key: string; label: string }[] => {
     const missing: { key: string; label: string }[] = [];
     if (step === 1) {
-      if (!tourLanguages.trim()) missing.push({ key: 'languages', label: t('vendorTourForms.tourForm.validation.fieldLanguages') });
+      if (tourLanguages.filter(Boolean).length === 0) missing.push({ key: 'languages', label: t('vendorTourForms.tourForm.validation.fieldLanguages') });
       if (tourBringItems.filter(Boolean).length === 0) missing.push({ key: 'bringItems', label: t('vendorTourForms.tourForm.validation.fieldBringItems') });
       // If category is active and user chose "other", the manual activity name is required
       if (tourCategory === 'active' && (tourActivityType === 'other' || !STANDARD_ACTIVITY_TYPES.includes(tourActivityType)) && !tourCustomActivityType.trim()) {
@@ -144,7 +183,6 @@ const STANDARD_ACTIVITY_TYPES = ['volleyball', 'running', 'ski', 'rafting', 'bik
       }
     } else if (step === 2) {
       if (tourImages.length === 0) missing.push({ key: 'media', label: t('vendorTourForms.tourForm.validation.fieldMedia') });
-      if (!isWhatsAppVerified) missing.push({ key: 'whatsappVerification', label: t('vendorTourForms.tourForm.validation.fieldWhatsappVerification') });
     } else if (step === 3) {
       if (tourIncludes.filter(Boolean).length === 0) missing.push({ key: 'includes', label: t('vendorTourForms.tourForm.validation.fieldIncludes') });
       if (tourNotIncluded.filter(Boolean).length === 0) missing.push({ key: 'notIncluded', label: t('vendorTourForms.tourForm.validation.fieldNotIncluded') });
@@ -158,7 +196,7 @@ const STANDARD_ACTIVITY_TYPES = ['volleyball', 'running', 'ski', 'rafting', 'bik
     if (missing.length === 0) {
       setFieldErrors((prev) => {
         const next = { ...prev };
-        for (const key of ['languages', 'bringItems', 'media', 'whatsappVerification', 'includes', 'notIncluded', 'highlights', 'activityCustom']) delete next[key];
+        for (const key of ['languages', 'bringItems', 'media', 'includes', 'notIncluded', 'highlights', 'activityCustom']) delete next[key];
         return next;
       });
       return true;
@@ -256,7 +294,7 @@ const STANDARD_ACTIVITY_TYPES = ['volleyball', 'running', 'ski', 'rafting', 'bik
     setTourIncludes(Array.isArray(tour.includes) ? tour.includes : []);
     setTourNotIncluded(Array.isArray(tour.notIncluded) ? tour.notIncluded : []);
     setTourHighlights(Array.isArray(tour.highlights) ? tour.highlights.join(', ') : '');
-    setTourLanguages(Array.isArray(tour.languages) ? tour.languages.join(', ') : '');
+    setTourLanguages(Array.isArray(tour.languages) && tour.languages.length > 0 ? tour.languages : ['Azərbaycanca']);
     setTourDurationHours(tour.durationHours || (tour.durationDays ? tour.durationDays * 8 : 8));
     setTourDepartureDateTime(tour.departureDateTime || '');
     setTourReturnDateTime(tour.returnDateTime || '');
@@ -270,7 +308,6 @@ const STANDARD_ACTIVITY_TYPES = ['volleyball', 'running', 'ski', 'rafting', 'bik
     setTourImages(tour.image && !existingGallery.includes(tour.image) ? [tour.image, ...existingGallery] : existingGallery);
     setTourVideos(tour.videos || []);
     setTourWhatsApp(tour.whatsapp_number || currentUser.whatsapp_number || currentUser.phone || '');
-    setIsWhatsAppVerified(true);
     setTourIsActive(tour.isActive !== false);
     setTourCategory(tour.category as any);
 
@@ -302,6 +339,7 @@ setTourActiveDifficulty(tour.activeDifficulty || 'medium');
     setTourPrice(tour.price !== undefined ? tour.price : (tourSlots.length > 0 ? tourSlots[0].price : 35));
     setTourCapacity(tourSlots.length > 0 ? tourSlots[0].capacity : 20);
     setTourDiscountPrice(tour.discountPrice !== undefined ? String(tour.discountPrice) : '');
+    setApplyDiscount(tour.discountPrice !== undefined && Number(tour.discountPrice) > 0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tour]);
 
@@ -335,7 +373,7 @@ setTourActiveDifficulty(tour.activeDifficulty || 'medium');
       : 'https://images.unsplash.com/photo-1426604966848-d7adac402bff?w=800';
 
     const cleanHighlights = tourHighlights.split(',').map(s => s.trim()).filter(Boolean);
-    const cleanLanguages = tourLanguages.split(',').map(s => s.trim()).filter(Boolean);
+    const cleanLanguages = tourLanguages.map(s => s.trim()).filter(Boolean);
     const cleanBringItems = tourBringItems.filter(Boolean);
     const cleanNotAllowedItems = tourNotAllowedItems.filter(Boolean);
     const cleanIncludes = tourIncludes.filter(Boolean);
@@ -556,175 +594,172 @@ const handleMediaFilesChange = async (e: React.ChangeEvent<HTMLInputElement>) =>
         </div>
 
         {currentStep === 1 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">{t('vendorTourForms.tourForm.fields.name.label')}</label>
-            <input
-              type="text"
-              required
-              value={tourName}
-              onChange={(e) => setTourName(e.target.value)}
-              placeholder={t('vendorTourForms.tourForm.fields.name.placeholder')}
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
-            />
-          </div>
-
-          <div>
-            <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">{t('vendorTourForms.tourForm.fields.region.label')}</label>
-            <input
-              type="text"
-              required
-              value={tourRegion}
-              onChange={(e) => setTourRegion(e.target.value)}
-              placeholder={t('vendorTourForms.tourForm.fields.region.placeholder')}
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
-            />
-          </div>
-
-          <div>
-            <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">{t('vendorTourForms.tourForm.fields.category.label')}</label>
-            <select
-              value={tourCategory}
-              onChange={(e) => setTourCategory(e.target.value as any)}
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700"
-            >
-              <option value="hiking">{t('vendorTourForms.tourForm.fields.category.hiking')}</option>
-              <option value="peak">{t('vendorTourForms.tourForm.fields.category.peak')}</option>
-              <option value="camp">{t('vendorTourForms.tourForm.fields.category.camp')}</option>
-              <option value="active">{t('vendorTourForms.tourForm.fields.category.active')}</option>
-            </select>
-          </div>
-
-          {tourCategory !== 'active' && (
-            <div>
-              <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">{t('vendorTourForms.tourForm.fields.difficulty.label')}</label>
-              <select
-                value={tourDifficulty}
-                onChange={(e) => setTourDifficulty(e.target.value as any)}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700"
-              >
-                <option value="easy">{t('vendorTourForms.tourForm.fields.difficulty.easy')}</option>
-                <option value="medium">{t('vendorTourForms.tourForm.fields.difficulty.medium')}</option>
-                <option value="hard">{t('vendorTourForms.tourForm.fields.difficulty.hard')}</option>
-                <option value="extreme">{t('vendorTourForms.tourForm.fields.difficulty.extreme')}</option>
-              </select>
-            </div>
-          )}
-
-          <div>
-            <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">{t('vendorTourForms.tourForm.fields.days.label')}</label>
-            <input
-              type="number"
-              min="1"
-              max="14"
-              required
-              value={tourDays}
-              onChange={handleNumberInput(setTourDays)}
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800"
-            />
-          </div>
-
-          <div>
-            <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">{t('vendorTourForms.tourForm.fields.languages.label')}</label>
-            <input
-              type="text"
-              value={tourLanguages}
-              onChange={(e) => { setTourLanguages(e.target.value); clearFieldError('languages'); }}
-              placeholder={t('vendorTourForms.tourForm.fields.languages.placeholder')}
-              className={`w-full px-3 py-2 bg-slate-50 border rounded-lg text-xs text-slate-800 ${fieldErrors.languages ? 'border-red-500 ring-1 ring-red-300' : 'border-slate-200'}`}
-            />
-            {fieldErrors.languages && <p className="text-[10px] font-semibold text-red-600 mt-1">⚠️ {t('vendorTourForms.tourForm.fields.languages.error')}</p>}
-          </div>
-
-          {tourCategory === 'active' && (
-            <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4 bg-amber-50/50 p-4 rounded-xl border border-amber-200 shadow-xs">
-              <div className="md:col-span-3 pb-2 mb-2 border-b border-amber-200">
-                <h4 className="text-xs font-bold text-amber-900 flex items-center gap-1.5 tracking-wider">{t('vendorTourForms.tourForm.activeSection.heading')}</h4>
+        <div className="bg-gray-50 -mx-4 sm:-mx-6 px-4 sm:px-6 py-5 space-y-6">
+          {/* Card 1 — Əsas Tur Məlumatları */}
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+            <h4 className="text-sm font-bold text-gray-900 mb-4">Əsas Tur Məlumatları</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1.5">{t('vendorTourForms.tourForm.fields.name.label')}</label>
+                <input
+                  type="text"
+                  required
+                  value={tourName}
+                  onChange={(e) => setTourName(e.target.value)}
+                  placeholder={t('vendorTourForms.tourForm.fields.name.placeholder')}
+                  className="w-full px-3 py-2.5 bg-white border border-gray-200 rounded-lg text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-500 transition"
+                />
               </div>
-                        <div>
-             <label className="block text-[11px] font-bold text-amber-700 tracking-wide mb-1">{t('vendorTourForms.tourForm.activeSection.activityType.label')}</label>
-             <select
-               value={STANDARD_ACTIVITY_TYPES.includes(tourActivityType) ? tourActivityType : 'other'}
-               onChange={(e) => {
-                 const v = e.target.value;
-                 setTourActivityType(v);
-                 if (v !== 'other') setTourCustomActivityType('');
-               }}
-               className="w-full px-3 py-2 bg-white border border-amber-200 rounded-lg text-xs font-semibold text-slate-700"
-             >
-               <option value="volleyball">{t('vendorTourForms.tourForm.activeSection.activityType.volleyball')}</option>
-               <option value="running">{t('vendorTourForms.tourForm.activeSection.activityType.running')}</option>
-               <option value="ski">{t('vendorTourForms.tourForm.activeSection.activityType.ski')}</option>
-               <option value="rafting">{t('vendorTourForms.tourForm.activeSection.activityType.rafting')}</option>
-               <option value="bike">{t('vendorTourForms.tourForm.activeSection.activityType.bike')}</option>
-               <option value="canyon">{t('vendorTourForms.tourForm.activeSection.activityType.canyon')}</option>
-               <option value="other">{t('vendorTourForms.tourForm.activeSection.activityType.other')}</option>
-             </select>
 
-             {/* "Digər" seçildikdə manual yazı sahəsi */}
-             {(tourActivityType === 'other' || !STANDARD_ACTIVITY_TYPES.includes(tourActivityType)) && (
-               <div>
-                 <input
-                   type="text"
-                   value={tourCustomActivityType}
-                   onChange={(e) => { setTourCustomActivityType(e.target.value); clearFieldError('activityCustom'); }}
-                   placeholder="İdman növünü yazın (məs: paragliding, yelkən...)"
-                   className={`w-full mt-2 px-3 py-2 bg-white rounded-lg text-xs font-semibold text-slate-800 placeholder-amber-400 ${fieldErrors.activityCustom ? 'border-red-500 ring-1 ring-red-300' : 'border-amber-300 ring-amber-100'}`}
-                 />
-                 {fieldErrors.activityCustom && <p className="text-[10px] font-semibold text-red-600 mt-1">⚠️ {t('vendorTourForms.tourForm.validation.fieldActivityCustom')}</p>}
-               </div>
-             )}
-           </div>
-          </div>
-          )}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1.5">{t('vendorTourForms.tourForm.fields.region.label')}</label>
+                <input
+                  type="text"
+                  required
+                  value={tourRegion}
+                  onChange={(e) => setTourRegion(e.target.value)}
+                  placeholder={t('vendorTourForms.tourForm.fields.region.placeholder')}
+                  className="w-full px-3 py-2.5 bg-white border border-gray-200 rounded-lg text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-500 transition"
+                />
+              </div>
 
-          <div>
-            <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">{t('vendorTourForms.tourForm.fields.ageLimit.label')}</label>
-            <input
-              type="text"
-              value={tourAgeLimit}
-              onChange={(e) => setTourAgeLimit(e.target.value)}
-              placeholder={t('vendorTourForms.tourForm.fields.ageLimit.placeholder')}
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs"
-            />
-          </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1.5">{t('vendorTourForms.tourForm.fields.category.label')}</label>
+                <select
+                  value={tourCategory}
+                  onChange={(e) => setTourCategory(e.target.value as any)}
+                  className="w-full px-3 py-2.5 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-500 transition"
+                >
+                  <option value="hiking">{t('vendorTourForms.tourForm.fields.category.hiking')}</option>
+                  <option value="peak">{t('vendorTourForms.tourForm.fields.category.peak')}</option>
+                  <option value="camp">{t('vendorTourForms.tourForm.fields.category.camp')}</option>
+                  <option value="active">{t('vendorTourForms.tourForm.fields.category.active')}</option>
+                </select>
+              </div>
 
-          <div>
-            <div className="mb-2">
-              <div className="text-[11px] font-semibold text-slate-600 mb-1">Seçmək üçün təkliflər:</div>
-              <div className="flex flex-wrap gap-2">
-                {BRING_ITEM_SUGGESTIONS.map((item) => (
-                  <button
-                    key={item}
-                    type="button"
-                    onClick={() => addBringItemSuggestion(item)}
-                    className={`text-[11px] px-2.5 py-1 rounded-full border transition ${tourBringItems.includes(item) ? 'bg-emerald-600 border-emerald-600 text-white' : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'}`}
+              {tourCategory !== 'active' && (
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1.5">{t('vendorTourForms.tourForm.fields.difficulty.label')}</label>
+                  <select
+                    value={tourDifficulty}
+                    onChange={(e) => setTourDifficulty(e.target.value as any)}
+                    className="w-full px-3 py-2.5 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-500 transition"
                   >
-                    {item}
-                  </button>
-                ))}
+                    <option value="easy">{t('vendorTourForms.tourForm.fields.difficulty.easy')}</option>
+                    <option value="medium">{t('vendorTourForms.tourForm.fields.difficulty.medium')}</option>
+                    <option value="hard">{t('vendorTourForms.tourForm.fields.difficulty.hard')}</option>
+                    <option value="extreme">{t('vendorTourForms.tourForm.fields.difficulty.extreme')}</option>
+                  </select>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1.5">{t('vendorTourForms.tourForm.fields.days.label')}</label>
+                <input
+                  type="number"
+                  min="1"
+                  max="14"
+                  required
+                  value={tourDays}
+                  onChange={handleNumberInput(setTourDays)}
+                  className="w-full px-3 py-2.5 bg-white border border-gray-200 rounded-lg text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-500 transition"
+                />
               </div>
-              <p className="text-[10px] text-slate-500 mt-1">Və ya siyahıya özündən nəsə əlavə edə bilərsən.</p>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1.5">{t('vendorTourForms.tourForm.fields.ageLimit.label')}</label>
+                <input
+                  type="text"
+                  value={tourAgeLimit}
+                  onChange={(e) => setTourAgeLimit(e.target.value)}
+                  placeholder={t('vendorTourForms.tourForm.fields.ageLimit.placeholder')}
+                  className="w-full px-3 py-2.5 bg-white border border-gray-200 rounded-lg text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-emerald-100 focus:border-emerald-500 transition"
+                />
+              </div>
+
+              {tourCategory === 'active' && (
+                <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4 bg-amber-50/50 p-4 rounded-xl border border-amber-200">
+                  <div className="md:col-span-3 pb-2 mb-2 border-b border-amber-200">
+                    <h5 className="text-xs font-bold text-amber-900 flex items-center gap-1.5 tracking-wider">{t('vendorTourForms.tourForm.activeSection.heading')}</h5>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-amber-700 mb-1.5">{t('vendorTourForms.tourForm.activeSection.activityType.label')}</label>
+                    <select
+                      value={STANDARD_ACTIVITY_TYPES.includes(tourActivityType) ? tourActivityType : 'other'}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setTourActivityType(v);
+                        if (v !== 'other') setTourCustomActivityType('');
+                      }}
+                      className="w-full px-3 py-2.5 bg-white border border-amber-200 rounded-lg text-xs font-semibold text-slate-700"
+                    >
+                      <option value="volleyball">{t('vendorTourForms.tourForm.activeSection.activityType.volleyball')}</option>
+                      <option value="running">{t('vendorTourForms.tourForm.activeSection.activityType.running')}</option>
+                      <option value="ski">{t('vendorTourForms.tourForm.activeSection.activityType.ski')}</option>
+                      <option value="rafting">{t('vendorTourForms.tourForm.activeSection.activityType.rafting')}</option>
+                      <option value="bike">{t('vendorTourForms.tourForm.activeSection.activityType.bike')}</option>
+                      <option value="canyon">{t('vendorTourForms.tourForm.activeSection.activityType.canyon')}</option>
+                      <option value="other">{t('vendorTourForms.tourForm.activeSection.activityType.other')}</option>
+                    </select>
+
+                    {/* "Digər" seçildikdə manual yazı sahəsi */}
+                    {(tourActivityType === 'other' || !STANDARD_ACTIVITY_TYPES.includes(tourActivityType)) && (
+                      <div>
+                        <input
+                          type="text"
+                          value={tourCustomActivityType}
+                          onChange={(e) => { setTourCustomActivityType(e.target.value); clearFieldError('activityCustom'); }}
+                          placeholder="İdman növünü yazın (məs: paragliding, yelkən...)"
+                          className={`w-full mt-2 px-3 py-2 bg-white rounded-lg text-xs font-semibold text-slate-800 placeholder-amber-400 ${fieldErrors.activityCustom ? 'border-red-500 ring-1 ring-red-300' : 'border-amber-300 ring-amber-100'}`}
+                        />
+                        {fieldErrors.activityCustom && <p className="text-[10px] font-semibold text-red-600 mt-1">⚠️ {t('vendorTourForms.tourForm.validation.fieldActivityCustom')}</p>}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
-            <DynamicStringListInput
-              label={t('vendorTourForms.tourForm.fields.bringItems.label')}
-              items={tourBringItems}
-              onChange={(items) => { setTourBringItems(items); clearFieldError('bringItems'); }}
-              placeholder={t('vendorTourForms.tourForm.fields.bringItems.placeholder')}
-              error={fieldErrors.bringItems}
-            />
           </div>
-          <div>
-            <DynamicStringListInput
-              label={t('vendorTourForms.tourForm.fields.notAllowedItems.label')}
-              items={tourNotAllowedItems}
-              onChange={setTourNotAllowedItems}
-              placeholder={t('vendorTourForms.tourForm.fields.notAllowedItems.placeholder')}
-              accent="red"
-            />
+
+          {/* Card 2 — Bələdçi və Tələblər */}
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+            <h4 className="text-sm font-bold text-gray-900 mb-4">Bələdçi və Tələblər</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="md:col-span-2">
+                <label className="block text-xs font-medium text-gray-700 mb-1.5">{t('vendorTourForms.tourForm.fields.languages.label')}</label>
+                <LanguageMultiSelect
+                  value={tourLanguages}
+                  onChange={(items) => { setTourLanguages(items); clearFieldError('languages'); }}
+                  suggestions={LANGUAGE_SUGGESTIONS}
+                  placeholder={t('vendorTourForms.tourForm.fields.languages.placeholder')}
+                  error={fieldErrors.languages}
+                />
+                {fieldErrors.languages && <p className="text-[10px] font-semibold text-red-600 mt-1">⚠️ {t('vendorTourForms.tourForm.fields.languages.error')}</p>}
+              </div>
+
+              <TagPillInput
+                label={t('vendorTourForms.tourForm.fields.bringItems.label')}
+                items={tourBringItems}
+                onChange={(items) => { setTourBringItems(items); clearFieldError('bringItems'); }}
+                suggestions={BRING_ITEM_SUGGESTIONS}
+                placeholder={t('vendorTourForms.tourForm.fields.bringItems.placeholder')}
+                accent="emerald"
+                error={fieldErrors.bringItems}
+              />
+
+              <TagPillInput
+                label={t('vendorTourForms.tourForm.fields.notAllowedItems.label')}
+                items={tourNotAllowedItems}
+                onChange={setTourNotAllowedItems}
+                suggestions={NOT_ALLOWED_SUGGESTIONS}
+                placeholder={t('vendorTourForms.tourForm.fields.notAllowedItems.placeholder')}
+                accent="red"
+              />
+            </div>
           </div>
         </div>
         )}
+
 
         {currentStep === 2 && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -759,51 +794,37 @@ const handleMediaFilesChange = async (e: React.ChangeEvent<HTMLInputElement>) =>
           )}
           <div className="md:col-span-2">
             <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">{t('vendorTourForms.tourForm.fields.meetingPoint.label')}</label>
-            <select
+            <MeetingPointField
               value={tourMeetingPoint}
-              onChange={(e) => {
-                const selected = MEETING_POINTS.find((p) => p.name === e.target.value);
-                setTourMeetingPoint(selected?.name || '');
-                setTourMeetingPointEmbedUrl(selected?.embedUrl || '');
-              }}
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700"
-            >
-              <option value="">{t('vendorTourForms.tourForm.fields.meetingPoint.placeholderOption')}</option>
-              {MEETING_POINTS.map((point) => (
-                <option key={point.name} value={point.name}>{point.name}</option>
-              ))}
-            </select>
+              embedUrl={tourMeetingPointEmbedUrl}
+              onChange={(value, embed) => { setTourMeetingPoint(value); setTourMeetingPointEmbedUrl(embed); }}
+              suggestions={MEETING_POINTS}
+            />
           </div>
 
-          <div>
+          <div className="md:col-span-2">
             <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">{t('vendorTourForms.tourForm.fields.whatsapp.label')}</label>
-            <WhatsAppVerifyField
+            <input
+              type="tel"
               value={tourWhatsApp}
-              onChange={setTourWhatsApp}
-              isVerified={isWhatsAppVerified}
-              onVerifiedChange={setIsWhatsAppVerified}
-              onShowNotification={onShowNotification}
+              onChange={(e) => setTourWhatsApp(e.target.value)}
+              placeholder={t('vendorTourForms.tourForm.fields.whatsapp.placeholder')}
+              className="w-full sm:w-72 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800"
             />
           </div>
 
-          <div>
-            <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">{t('vendorTourForms.tourForm.fields.departureDateTime.label')}</label>
-            <input
-              type="datetime-local"
-              value={tourDepartureDateTime}
-              onChange={(e) => setTourDepartureDateTime(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800"
-            />
-          </div>
-          <div>
-            <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">{t('vendorTourForms.tourForm.fields.returnDateTime.label')}</label>
-            <input
-              type="datetime-local"
-              value={tourReturnDateTime}
-              onChange={(e) => setTourReturnDateTime(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800"
-            />
-          </div>
+          <DateTimeField
+            label={t('vendorTourForms.tourForm.fields.departureDateTime.label')}
+            value={tourDepartureDateTime}
+            onChange={setTourDepartureDateTime}
+            error={!!dateTimeError}
+          />
+          <DateTimeField
+            label={t('vendorTourForms.tourForm.fields.returnDateTime.label')}
+            value={tourReturnDateTime}
+            onChange={setTourReturnDateTime}
+            error={!!dateTimeError}
+          />
           {dateTimeError && (
             <div className="md:col-span-2 text-[11px] font-semibold text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2">⚠️ {dateTimeError}</div>
           )}
@@ -858,22 +879,6 @@ const handleMediaFilesChange = async (e: React.ChangeEvent<HTMLInputElement>) =>
             </button>
           </div>
 
-          <div>
-            <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">
-              {t('vendorTourForms.tourForm.fields.durationHours.label', { autoSuffix: tourDepartureDateTime && tourReturnDateTime ? t('vendorTourForms.tourForm.fields.durationHours.autoSuffix') : '' })}
-            </label>
-            <input
-              type="number"
-              min={1}
-              value={tourDurationHours}
-              onChange={handleNumberInput(setTourDurationHours)}
-              readOnly={!!(tourDepartureDateTime && tourReturnDateTime)}
-              className={`w-full px-3 py-2 border rounded-lg text-xs ${
-                tourDepartureDateTime && tourReturnDateTime ? 'bg-slate-100 border-slate-200 text-slate-500 cursor-not-allowed' : 'bg-slate-50 border-slate-200 text-slate-800'
-              }`}
-            />
-          </div>
-
           <div className="md:col-span-2">
             <label className="block text-[11px] font-bold text-slate-400 tracking-wide mb-1">{t('vendorTourForms.tourForm.fields.guides.label')}</label>
             {(currentUser.guides || []).length === 0 ? (
@@ -923,30 +928,32 @@ const handleMediaFilesChange = async (e: React.ChangeEvent<HTMLInputElement>) =>
             </div>
             <div className="relative">
               <input type="file" multiple accept="image/*,video/*" onChange={handleMediaFilesChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
-              <div className={`w-full px-4 py-3 bg-slate-50 hover:bg-slate-100 border border-dashed rounded-xl text-xs flex items-center justify-center gap-2 text-emerald-800 font-bold transition ${fieldErrors.media ? 'border-red-500 ring-1 ring-red-300' : 'border-emerald-300 hover:border-emerald-500'}`}>
-                <Plus className="w-4 h-4 text-emerald-600" />
-                <span>{t('vendorTourForms.tourForm.fields.media.selectButton')}</span>
+              <div className={`w-full px-4 py-6 bg-slate-50 hover:bg-emerald-50/60 border-2 border-dashed rounded-2xl text-xs flex flex-col items-center justify-center gap-2 transition ${fieldErrors.media ? 'border-red-500 ring-1 ring-red-300' : 'border-emerald-300 hover:border-emerald-500'}`}>
+                <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center">
+                  <Plus className="w-5 h-5 text-emerald-700" />
+                </div>
+                <span className="font-bold text-emerald-800">{t('vendorTourForms.tourForm.fields.media.selectButton')}</span>
               </div>
             </div>
             {fieldErrors.media && <p className="text-[10px] font-semibold text-red-600">⚠️ {t('vendorTourForms.tourForm.fields.media.error')}</p>}
 
             {(tourImages.length > 0 || tourVideos.length > 0) && (
-              <div className="flex flex-wrap gap-2 mt-2">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mt-2">
                 {tourImages.map((img, idx) => {
                   const isCover = img === tourImage;
                   return (
-                    <div key={`img-${idx}`} className={`relative rounded-xl overflow-hidden border shadow-xs h-24 w-32 flex-shrink-0 group ${isCover ? 'border-emerald-500 ring-2 ring-emerald-400' : 'border-slate-200'}`}>
+                    <div key={`img-${idx}`} className={`relative rounded-xl overflow-hidden border shadow-xs aspect-square group ${isCover ? 'border-emerald-500 ring-2 ring-emerald-400' : 'border-slate-200'}`}>
                       <img src={img || undefined} alt={`Gallery Preview ${idx}`} className="h-full w-full object-cover" />
                       {isCover ? (
-                        <div className="absolute bottom-1 left-1 right-1 bg-emerald-600 text-white text-[8px] font-extrabold px-1.5 py-0.5 rounded flex items-center justify-center gap-1">
-                          <Check className="w-2.5 h-2.5" />
+                        <div className="absolute bottom-1.5 left-1.5 right-1.5 bg-emerald-600 text-white text-[9px] font-extrabold px-1.5 py-1 rounded-lg flex items-center justify-center gap-1 shadow">
+                          <Check className="w-3 h-3" />
                           <span>{t('vendorTourForms.tourForm.fields.media.coverBadge')}</span>
                         </div>
                       ) : (
                         <button
                           type="button"
                           onClick={() => setTourImage(img)}
-                          className="absolute bottom-1 left-1 right-1 bg-slate-900/80 hover:bg-emerald-600 text-white text-[8px] font-bold px-1.5 py-0.5 rounded transition opacity-0 group-hover:opacity-100"
+                          className="absolute bottom-1.5 left-1.5 right-1.5 bg-slate-900/75 hover:bg-emerald-600 text-white text-[9px] font-bold px-1.5 py-1 rounded-lg transition opacity-0 group-hover:opacity-100"
                         >
                           {t('vendorTourForms.tourForm.fields.media.makeCover')}
                         </button>
@@ -957,22 +964,22 @@ const handleMediaFilesChange = async (e: React.ChangeEvent<HTMLInputElement>) =>
                           setTourImages(prev => prev.filter((_, i) => i !== idx));
                           if (isCover) setTourImage('');
                         }}
-                        className="absolute top-1 right-1 bg-red-600 hover:bg-red-700 text-white p-0.5 rounded-full shadow-xs transition cursor-pointer z-10"
+                        className="absolute top-1.5 right-1.5 bg-white/90 hover:bg-red-600 hover:text-white text-red-600 p-1 rounded-full shadow transition cursor-pointer z-10"
                       >
-                        <X className="w-2.5 h-2.5" />
+                        <X className="w-3 h-3" />
                       </button>
                     </div>
                   );
                 })}
                 {tourVideos.map((vid, idx) => (
-                  <div key={`vid-${idx}`} className="relative rounded-xl overflow-hidden border border-slate-200 shadow-xs h-24 w-32 flex-shrink-0 group bg-black">
+                  <div key={`vid-${idx}`} className="relative rounded-xl overflow-hidden border border-slate-200 shadow-xs aspect-square group bg-black">
                     <video src={vid || undefined} className="h-full w-full object-contain" muted playsInline />
-                    <div className="absolute bottom-1 left-1 bg-slate-900/80 text-white font-bold text-[8px] px-1.5 py-0.5 rounded flex items-center gap-1">
+                    <div className="absolute bottom-1.5 left-1.5 bg-slate-900/80 text-white font-bold text-[9px] px-1.5 py-1 rounded-lg flex items-center gap-1">
                       <span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-ping" />
                       <span>{t('vendorTourForms.tourForm.fields.media.videoBadge')}</span>
                     </div>
-                    <button type="button" onClick={() => setTourVideos(prev => prev.filter((_, i) => i !== idx))} className="absolute top-1 right-1 bg-red-600 hover:bg-red-700 text-white p-0.5 rounded-full shadow-xs transition cursor-pointer z-10">
-                      <X className="w-2.5 h-2.5" />
+                    <button type="button" onClick={() => setTourVideos(prev => prev.filter((_, i) => i !== idx))} className="absolute top-1.5 right-1.5 bg-white/90 hover:bg-red-600 hover:text-white text-red-600 p-1 rounded-full shadow transition cursor-pointer z-10">
+                      <X className="w-3 h-3" />
                     </button>
                   </div>
                 ))}
@@ -987,38 +994,78 @@ const handleMediaFilesChange = async (e: React.ChangeEvent<HTMLInputElement>) =>
 
         {currentStep === 3 && (
         <div className="space-y-5">
-          <div className="bg-primary-50/60 p-4 rounded-xl border border-emerald-100 space-y-3">
-            <h4 className="text-[10px] font-extrabold text-emerald-800 tracking-widest">{t('vendorTourForms.tourForm.pricingSection.heading')}</h4>
-            <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 sm:max-w-4xl">
-              <div>
-                <label className="flex items-end min-h-[30px] mb-1 text-[11px] font-bold text-slate-500 tracking-wide leading-tight">{t('vendorTourForms.tourForm.fields.price.label')}</label>
-                <input type="number" min="1" required value={tourPrice} onChange={handleNumberInput(setTourPrice)} className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-800" />
+          <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-xs space-y-4">
+            <h4 className="text-[10px] font-extrabold text-emerald-800 tracking-widest">{t('vendorTourForms.tourForm.pricingSection.cardHeading')}</h4>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Əsas Bilet Qiyməti — vurğulanmış, formanın ən görünən sahəsi */}
+              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3">
+                <label className="block text-[11px] font-extrabold text-emerald-800 tracking-wide mb-1">{t('vendorTourForms.tourForm.fields.price.label')}</label>
+                <div className="flex items-center gap-2">
+                  <input type="number" min="1" required value={tourPrice} onChange={handleNumberInput(setTourPrice)} className="w-full px-3 py-2.5 bg-white border border-emerald-300 rounded-lg text-base font-extrabold text-emerald-900" />
+                  <span className="text-xs font-bold text-emerald-700 shrink-0">AZN</span>
+                </div>
               </div>
+
+              {/* Endirimli qiymət — toggle aktiv olmadan input tamamilə gizli */}
+              <div className={`rounded-xl p-3 border transition ${applyDiscount ? 'bg-rose-50 border-rose-200' : 'bg-slate-50 border-slate-200'}`}>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-[11px] font-extrabold text-slate-600 tracking-wide">{t('vendorTourForms.tourForm.fields.discountPrice.label')}</label>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={applyDiscount}
+                    onClick={() => { setApplyDiscount((v) => !v); if (applyDiscount) setTourDiscountPrice(''); }}
+                    className={`relative w-9 h-5 rounded-full transition-colors cursor-pointer shrink-0 ${applyDiscount ? 'bg-rose-500' : 'bg-slate-300'}`}
+                  >
+                    <span className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${applyDiscount ? 'translate-x-4' : 'translate-x-0'}`} />
+                  </button>
+                </div>
+                {applyDiscount ? (
+                  <input
+                    type="number"
+                    min="0"
+                    autoFocus
+                    placeholder={t('vendorTourForms.tourForm.fields.discountPrice.placeholder')}
+                    value={tourDiscountPrice}
+                    onChange={(e) => setTourDiscountPrice(e.target.value)}
+                    className="w-full px-3 py-2.5 bg-white border border-rose-300 rounded-lg text-base font-extrabold text-rose-700 placeholder-rose-300"
+                  />
+                ) : (
+                  <p className="text-[10px] text-slate-400 font-semibold py-2">{t('vendorTourForms.tourForm.fields.discountToggle.label')}</p>
+                )}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
-                <label className="flex items-end min-h-[30px] mb-1 text-[11px] font-bold text-slate-500 tracking-wide leading-tight">{t('vendorTourForms.tourForm.fields.capacity.label')}</label>
-                <input type="number" min="1" max="200" required value={tourCapacity} onChange={handleNumberInput(setTourCapacity)} className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-800" />
+                <label className="block text-[11px] font-bold text-slate-500 tracking-wide mb-1">{t('vendorTourForms.tourForm.fields.capacity.label')}</label>
+                <input type="number" min="1" max="200" required value={tourCapacity} onChange={handleNumberInput(setTourCapacity)} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-800" />
                 <p className="text-[9px] text-slate-400 mt-1">{t('vendorTourForms.tourForm.fields.capacity.hint')}</p>
               </div>
               <div>
-                <label className="flex items-end min-h-[30px] mb-1 text-[11px] font-bold text-rose-600 tracking-wide leading-tight">{t('vendorTourForms.tourForm.fields.discountPrice.label')}</label>
-                <input type="number" min="0" placeholder={t('vendorTourForms.tourForm.fields.discountPrice.placeholder')} value={tourDiscountPrice} onChange={(e) => setTourDiscountPrice(e.target.value)} className="w-full px-3 py-2 bg-white border border-rose-200 rounded-lg text-xs font-bold text-rose-700 placeholder-rose-300" />
-              </div>
-              <div>
-                <label className="flex items-end min-h-[30px] mb-1 text-[11px] font-bold text-slate-500 tracking-wide leading-tight">{t('vendorTourForms.tourForm.fields.cancellationHours.label')}</label>
-                <select value={tourCancellationHours} onChange={(e) => setTourCancellationHours(Number(e.target.value))} className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-800">
+                <label className="block text-[11px] font-bold text-slate-500 tracking-wide mb-1">{t('vendorTourForms.tourForm.fields.cancellationHours.label')}</label>
+                <select value={tourCancellationHours} onChange={(e) => setTourCancellationHours(Number(e.target.value))} className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-800">
                   <option value={24}>{t('vendorTourForms.tourForm.fields.cancellationHours.option24')}</option>
                   <option value={48}>{t('vendorTourForms.tourForm.fields.cancellationHours.option48')}</option>
                   <option value={72}>{t('vendorTourForms.tourForm.fields.cancellationHours.option72')}</option>
                   <option value={0}>{t('vendorTourForms.tourForm.fields.cancellationHours.optionNone')}</option>
                 </select>
               </div>
-              <div>
-                <label className="flex items-end min-h-[30px] mb-1 text-[11px] font-bold text-amber-600 tracking-wide leading-tight">{t('vendorTourForms.tourForm.fields.rating.label')}</label>
-                <input type="number" min="1" max="5" step="0.1" placeholder={t('vendorTourForms.tourForm.fields.rating.placeholder')} value={tourRating} onChange={handleNumberInput(setTourRating)} className="w-full px-3 py-2 bg-white border border-amber-200 rounded-lg text-xs font-bold text-amber-800 placeholder-amber-300" />
-                <p className="text-[9px] text-slate-400 mt-1">{t('vendorTourForms.tourForm.fields.rating.hint')}</p>
-              </div>
+              {/* Reytinq əl ilə yazmaq vendor üçün UX xətasıdır — yalnız admin panelindən dəyişdirilə bilər */}
+              {currentUser.role === 'admin' && (
+                <div>
+                  <label className="block text-[11px] font-bold text-amber-600 tracking-wide mb-1">{t('vendorTourForms.tourForm.fields.rating.label')}</label>
+                  <input type="number" min="1" max="5" step="0.1" placeholder={t('vendorTourForms.tourForm.fields.rating.placeholder')} value={tourRating} onChange={handleNumberInput(setTourRating)} className="w-full px-3 py-2 bg-white border border-amber-200 rounded-lg text-xs font-bold text-amber-800 placeholder-amber-300" />
+                  <p className="text-[9px] text-slate-400 mt-1">{t('vendorTourForms.tourForm.fields.rating.hint')}</p>
+                </div>
+              )}
             </div>
-            <MultiDateCalendar selectedDates={selectedDates} onChange={setSelectedDates} />
+
+            <div>
+              <h5 className="text-[10px] font-extrabold text-slate-500 tracking-widest mb-2">{t('vendorTourForms.tourForm.pricingSection.heading')}</h5>
+              <MultiDateCalendar selectedDates={selectedDates} onChange={setSelectedDates} />
+            </div>
             {selectedDates.length > 0 && (
               <div className="space-y-1.5">
                 <label className="block text-[11px] font-bold text-slate-500 tracking-wide">{t('vendorTourForms.tourForm.fields.perDateCapacity.label')}</label>
@@ -1093,17 +1140,19 @@ const handleMediaFilesChange = async (e: React.ChangeEvent<HTMLInputElement>) =>
             )}
           </div>
 
-          <DynamicStringListInput
+          <TagPillInput
             label={t('vendorTourForms.tourForm.fields.includes.label')}
             items={tourIncludes}
             onChange={(items) => { setTourIncludes(items); clearFieldError('includes'); }}
+            suggestions={INCLUDES_SUGGESTIONS}
             placeholder={t('vendorTourForms.tourForm.fields.includes.placeholder')}
             error={fieldErrors.includes}
           />
-          <DynamicStringListInput
+          <TagPillInput
             label={t('vendorTourForms.tourForm.fields.notIncluded.label')}
             items={tourNotIncluded}
             onChange={(items) => { setTourNotIncluded(items); clearFieldError('notIncluded'); }}
+            suggestions={NOT_INCLUDED_SUGGESTIONS}
             placeholder={t('vendorTourForms.tourForm.fields.notIncluded.placeholder')}
             accent="red"
             error={fieldErrors.notIncluded}
@@ -1154,20 +1203,20 @@ const handleMediaFilesChange = async (e: React.ChangeEvent<HTMLInputElement>) =>
             </button>
           )}
 
-          {/* Cancel (Ləğv et) - red, appears before Next */}
+          {/* Cancel (Ləğv et) — neytral outline, qırmızı yalnız xəta/silmə üçün saxlanılır */}
           <button
             type="button"
             onClick={onNavigateBack}
-            className="px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white font-bold text-xs rounded-lg transition-all cursor-pointer w-full sm:w-auto"
+            className="px-4 py-2.5 bg-white hover:bg-gray-50 border border-gray-300 text-gray-700 font-bold text-xs rounded-lg transition-all cursor-pointer w-full sm:w-auto"
           >
             {t('vendorTourForms.tourForm.buttons.cancel')}
           </button>
 
-          {/* Primary action - Next / Submit - green */}
+          {/* Primary action - Next / Submit - dark emerald brand colour */}
           <button
             type="submit"
             disabled={isSavingForm}
-            className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg transition-all cursor-pointer disabled:opacity-50 w-full sm:w-auto flex items-center justify-center gap-1.5"
+            className="px-4 py-2.5 bg-emerald-800 hover:bg-emerald-900 text-white font-bold text-xs rounded-lg transition-all cursor-pointer disabled:opacity-50 w-full sm:w-auto flex items-center justify-center gap-1.5"
           >
             {currentStep < 3 ? (
               <>{t('vendorTourForms.tourForm.buttons.next')}</>
