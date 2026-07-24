@@ -46,7 +46,7 @@ export const vendorTourForms = {
             removeStep: 'Addımı sil',
           },
           languages: { label: 'Bələdçi hansı dillərdə danışa bilir aşağıdan seç:', placeholder: 'Azərbaycanca, Rusca, İngiliscə', error: 'Ən azı bir dil qeyd edin.' },
-          bringItems: { label: 'Özünüzlə gətirin:', placeholder: 'Məs: Rahat ayaqqabı, Pasport' },
+          bringItems: { label: 'Özünüzlə gətirin:', placeholder: 'Məs: Rahat Yürüş Ayaqqabısı, Pasport və ya özündən yazın' },
           notAllowedItems: { label: 'İcazə verilmir:', placeholder: 'Məs: Böyük çamadanlar' },
           meetingPoint: { label: 'Görüş Yeri:', placeholderOption: '— Görüş yeri seçin —' },
           whatsapp: { label: 'WhatsApp Bələdçi Nömrəsi:', placeholder: 'Məs: +994 XX XXX XX XX' },
@@ -248,7 +248,7 @@ export const vendorTourForms = {
           notIncludes: { label: 'Paketə Daxil DEYİL:', placeholder: 'Məs: Alış-veriş, Şəxsi xərclər' },
           highlights: { label: 'Önə çıxanlar (Vergüllə ayırın):', placeholder: 'Məs: Şəhər turu bələdçi ilə', error: 'Ən azı bir xüsusiyyət qeyd edin.' },
           languages: { label: 'Danışılan dillər (Vergüllə ayırın):', placeholder: 'Azərbaycanca, Rusca, İngiliscə', error: 'Ən azı bir dil qeyd edin.' },
-          bringItems: { label: 'Özünüzlə gətirin:', placeholder: 'Məs: Pasport, Hava şəraitinə uyğun geyim' },
+          bringItems: { label: 'Özünüzlə gətirin:', placeholder: 'Məs: Rahat Yürüş Ayaqqabısı, Pasport və ya özündən yazın' },
           notAllowedItems: { label: 'İcazə verilmir:', placeholder: 'Məs: Böyük çamadanlar' },
         },
         itinerary: {

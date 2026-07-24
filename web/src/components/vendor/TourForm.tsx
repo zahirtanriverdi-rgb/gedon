@@ -63,6 +63,22 @@ export function TourForm({ currentUser, tour, slots, category: tourCategory, onC
   const [dateTimeError, setDateTimeError] = useState<string | null>(null);
   const [tourBringItems, setTourBringItems] = useState<string[]>([]);
   const [tourNotAllowedItems, setTourNotAllowedItems] = useState<string[]>([]);
+
+  const BRING_ITEM_SUGGESTIONS = [
+    'Rahat Yürüş Ayaqqabısı',
+    'Dəyişən Havaya Qarşı Geyim',
+    'Kifayət Qədər Su',
+    'Enerji Verən Qəlyanaltılar',
+    'Powerbank',
+    'Şəxsi Tibbi Dəst',
+    'Günəşdən Qorunma Vasitələri',
+    'Yürüş çubuğu',
+  ];
+
+  const addBringItemSuggestion = (item: string) => {
+    setTourBringItems((prev) => (prev.includes(item) ? prev : [...prev, item]));
+    clearFieldError('bringItems');
+  };
   const [tourImage, setTourImage] = useState<string>('');
   const [tourImages, setTourImages] = useState<string[]>([]);
   const [tourVideos, setTourVideos] = useState<string[]>([]);
@@ -702,6 +718,22 @@ const handleMediaFilesChange = async (e: React.ChangeEvent<HTMLInputElement>) =>
           </div>
 
           <div>
+            <div className="mb-2">
+              <div className="text-[11px] font-semibold text-slate-600 mb-1">Seçmək üçün təkliflər:</div>
+              <div className="flex flex-wrap gap-2">
+                {BRING_ITEM_SUGGESTIONS.map((item) => (
+                  <button
+                    key={item}
+                    type="button"
+                    onClick={() => addBringItemSuggestion(item)}
+                    className={`text-[11px] px-2.5 py-1 rounded-full border transition ${tourBringItems.includes(item) ? 'bg-emerald-600 border-emerald-600 text-white' : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'}`}
+                  >
+                    {item}
+                  </button>
+                ))}
+              </div>
+              <p className="text-[10px] text-slate-500 mt-1">Və ya siyahıya özündən nəsə əlavə edə bilərsən.</p>
+            </div>
             <DynamicStringListInput
               label={t('vendorTourForms.tourForm.fields.bringItems.label')}
               items={tourBringItems}
