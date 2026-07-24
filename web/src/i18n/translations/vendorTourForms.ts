@@ -45,7 +45,7 @@ export const vendorTourForms = {
             addStep: 'Addım əlavə et',
             removeStep: 'Addımı sil',
           },
-          languages: { label: 'Danışılan dillər (Vergüllə ayırın):', placeholder: 'Azərbaycanca, Rusca, İngiliscə', error: 'Ən azı bir dil qeyd edin.' },
+          languages: { label: 'Bələdçi hansı dillərdə danışa bilir aşağıdan seç:', placeholder: 'Azərbaycanca, Rusca, İngiliscə', error: 'Ən azı bir dil qeyd edin.' },
           bringItems: { label: 'Özünüzlə gətirin:', placeholder: 'Məs: Rahat ayaqqabı, Pasport' },
           notAllowedItems: { label: 'İcazə verilmir:', placeholder: 'Məs: Böyük çamadanlar' },
           meetingPoint: { label: 'Görüş Yeri:', placeholderOption: '— Görüş yeri seçin —' },
