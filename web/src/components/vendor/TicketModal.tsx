@@ -1,7 +1,7 @@
 'use client';
 import React from 'react';
 import { Tour, Booking } from '../../types';
-import { CheckCircle, Clock, FileText, Printer, Send, ShieldCheck, X, MapPin, User } from 'lucide-react';
+import { CheckCircle, Clock, FileText, Printer, Send, ShieldCheck, X } from 'lucide-react';
 import { useLanguage } from '../../i18n/LanguageContext';
 
 interface TicketModalProps {
@@ -24,10 +24,12 @@ export function TicketModal({ booking, tours, onApproveBooking, onShowNotificati
         const tourRegion = linkedTour?.region || t('vendorBookings.ticketModal.defaultRegion');
         const bookingRef = tBooking.booking_reference || `TUR-${tBooking.id.slice(0, 5).toUpperCase()}`;
 
-        const ticketPdfUrl = `${window.location.protocol}//${window.location.host}/tickets/ticket_${tBooking.id}.pdf`;
+        // Onlayn bilet (mobil vaucher) səhifəsinin linki — bron nömrəsi ilə axtarılır, "#" işarəsi
+        // URL-də problem yaratmasın deyə çıxarılır (server tərəfi "TUR-" prefiksini də qəbul edir).
+        const onlineTicketUrl = `${window.location.protocol}//${window.location.host}/ticket/${bookingRef.replace(/^#/, '')}`;
 
         // Create the pre-filled Whatsapp text
-        const whatsappMsg = `*${t('vendorBookings.ticketModal.whatsappMsg.header')}*\n\n- *${t('vendorBookings.ticketModal.whatsappMsg.ticketIdLabel')}:* #${bookingRef}\n- *${t('vendorBookings.ticketModal.whatsappMsg.tourLabel')}:* ${tourName}\n- *${t('vendorBookings.ticketModal.whatsappMsg.dateLabel')}:* ${tBooking.bookingDate}\n- *${t('vendorBookings.ticketModal.whatsappMsg.participantsLabel')}:* ${t('vendorBookings.crmTab.metrics.peopleCount', { count: tBooking.participantsCount })}\n- *${t('vendorBookings.ticketModal.whatsappMsg.amountLabel')}:* ${tBooking.totalAmount} AZN (${tBooking.status === 'paid' ? t('vendorBookings.ticketModal.whatsappMsg.paidBadge') : t('vendorBookings.ticketModal.whatsappMsg.pendingBadge')})\n- *${t('vendorBookings.ticketModal.whatsappMsg.customerLabel')}:* ${tBooking.customerName} (${tBooking.customerPhone})\n\n📲 *${t('vendorBookings.ticketModal.whatsappMsg.pdfLabel')}:* ${ticketPdfUrl}\n\n*${t('vendorBookings.ticketModal.whatsappMsg.safetyTitle')}:*\n1. ${t('vendorBookings.ticketModal.whatsappMsg.safetyRule1')}\n2. ${t('vendorBookings.ticketModal.whatsappMsg.safetyRule2')}\n3. ${t('vendorBookings.ticketModal.whatsappMsg.safetyRule3')}\n4. ${t('vendorBookings.ticketModal.whatsappMsg.safetyRule4')}\n5. ${t('vendorBookings.ticketModal.whatsappMsg.safetyRule5')}\n\n${t('vendorBookings.ticketModal.whatsappMsg.footer')}`;
+        const whatsappMsg = `*${t('vendorBookings.ticketModal.whatsappMsg.header')}*\n\n- *${t('vendorBookings.ticketModal.whatsappMsg.ticketIdLabel')}:* #${bookingRef}\n- *${t('vendorBookings.ticketModal.whatsappMsg.tourLabel')}:* ${tourName}\n- *${t('vendorBookings.ticketModal.whatsappMsg.dateLabel')}:* ${tBooking.bookingDate}\n- *${t('vendorBookings.ticketModal.whatsappMsg.participantsLabel')}:* ${t('vendorBookings.crmTab.metrics.peopleCount', { count: tBooking.participantsCount })}\n- *${t('vendorBookings.ticketModal.whatsappMsg.amountLabel')}:* ${tBooking.totalAmount} AZN (${tBooking.status === 'paid' ? t('vendorBookings.ticketModal.whatsappMsg.paidBadge') : t('vendorBookings.ticketModal.whatsappMsg.pendingBadge')})\n- *${t('vendorBookings.ticketModal.whatsappMsg.customerLabel')}:* ${tBooking.customerName} (${tBooking.customerPhone})\n\n📲 *${t('vendorBookings.ticketModal.whatsappMsg.pdfLabel')}:* ${onlineTicketUrl}\n\n*${t('vendorBookings.ticketModal.whatsappMsg.safetyTitle')}:*\n1. ${t('vendorBookings.ticketModal.whatsappMsg.safetyRule1')}\n2. ${t('vendorBookings.ticketModal.whatsappMsg.safetyRule2')}\n3. ${t('vendorBookings.ticketModal.whatsappMsg.safetyRule3')}\n4. ${t('vendorBookings.ticketModal.whatsappMsg.safetyRule4')}\n5. ${t('vendorBookings.ticketModal.whatsappMsg.safetyRule5')}\n\n${t('vendorBookings.ticketModal.whatsappMsg.footer')}`;
 
         // Direct Clean Print Trigger function
         const handlePrintTicket = async () => {
@@ -499,174 +501,107 @@ export function TicketModal({ booking, tours, onApproveBooking, onShowNotificati
                     </button>
                   )}
                 </div>
+
                 {/* Ticket Mock Render */}
-                <div id="printable-voucher-area" className="max-w-2xl mx-auto bg-white border border-slate-200 rounded-2xl shadow-lg p-6 sm:p-8 space-y-6 text-slate-800 relative select-none">
+                <div id="printable-voucher-area" className="max-w-xl mx-auto bg-white border border-slate-200 rounded-2xl shadow-md overflow-hidden relative">
                   
-                  {/* Header Area */}
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-slate-200">
-                    <div className="space-y-1">
-                      <div className="text-emerald-700 font-sans font-black text-2xl tracking-tight flex items-center gap-1.5">
-                        🌲 GoTabiat.com
-                      </div>
-                      <span className="block text-[10px] font-black tracking-widest text-slate-400">
-                        BRON SƏNƏDİ / BOOKING VOUCHER
-                      </span>
+                  {/* Brand Header */}
+                  <div className="bg-emerald-900 px-6 py-4 flex justify-between items-center text-white select-none">
+                    <div className="font-sans font-extrabold text-sm tracking-widest flex items-center gap-1">
+                     🌲 GOTABIAT
                     </div>
-
-                    <div className="flex items-center gap-3">
-                      {/* Booking Code and details */}
-                      <div className="text-right">
-                        <span className="block text-[9px] font-black text-slate-400 uppercase tracking-wider">Bron Kodu / Ref</span>
-                        <strong className="text-slate-900 text-sm font-mono tracking-wide">#{bookingRef}</strong>
-                      </div>
-                      
-                      {/* QR Code Graphic wrapper */}
-                      <div className="bg-white p-1 rounded-lg border border-slate-200 shadow-sm flex-shrink-0">
-                        <img
-                          src={`https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${bookingRef}`}
-                          className="w-12 h-12 block"
-                          alt="Validation QR"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Tour Info Section */}
-                  <div className="space-y-2">
-                    <span className="inline-block bg-emerald-50 border border-emerald-100 text-emerald-800 text-[9px] font-extrabold px-2.5 py-0.5 rounded-full uppercase tracking-wider">
-                      {linkedTour?.category ? t(`vendorTours.categories.${linkedTour.category}`) : 'Tur'}
+                    <span className={`px-2.5 py-1 text-[9px] font-black rounded-full uppercase tracking-wider ${
+                      tBooking.status === 'paid' ? 'bg-emerald-450 bg-emerald-500 text-white' : 'bg-amber-100 text-amber-800'
+                    }`}>
+                      {tBooking.status === 'paid' ? `${t('vendorBookings.ticketModal.printDoc.paidConfirmedBadge')} 🎫` : `${t('vendorBookings.ticketModal.printDoc.pendingBadge')} ⏳`}
                     </span>
-                    <h3 className="text-xl sm:text-2xl font-black text-slate-900 leading-tight">
-                      {tourName}
-                    </h3>
-                    <p className="text-xs text-slate-500 font-semibold">
-                      {linkedTour?.difficulty ? `${t('vendorBookings.ticketModal.ticketRender.transportClassLabel')}: ${t(`vendorTours.difficulties.${linkedTour.difficulty}`)}` : 'Standart Variant'} · {tourRegion}
-                    </p>
                   </div>
 
-                  {/* Meeting Point Section */}
-                  <div className="border border-slate-150 rounded-2xl p-5 bg-slate-50/50 flex flex-col md:flex-row justify-between gap-6">
-                    <div className="flex-1 space-y-3">
-                      <div className="text-[10px] font-black tracking-wider text-emerald-700 flex items-center gap-1.5 uppercase">
-                        <MapPin className="w-3.5 h-3.5 text-emerald-600" />
-                        <span>Görüş və ya Pikap Nöqtəsi / Meeting Point</span>
-                      </div>
-                      
-                      <strong className="block text-slate-900 text-sm font-bold leading-snug">
-                        {linkedTour?.meetingPoint || t('vendorBookings.ticketModal.printDoc.departurePoint')}
-                      </strong>
-                      
-                      <p className="text-[10px] text-slate-400 font-medium leading-relaxed">
-                        Qeyd: Xəritədə göstərilən görüş nöqtəsində nəzərdə tutulan çıxış saatından 15 dəqiqə əvvəl hazır olmağınız xahiş olunur.
-                      </p>
-                    </div>
+                  {/* Body Wrapper with notched tickets effect */}
+                  <div className="flex flex-col md:flex-row relative bg-white border-b border-slate-100">
 
-                    {/* Google Map Section */}
-                    <div className="w-full md:w-[220px] h-[130px] rounded-xl overflow-hidden border border-slate-200 shadow-sm relative bg-slate-100 flex-shrink-0">
-                      {linkedTour?.meetingPointEmbedUrl ? (
-                        <iframe
-                          src={linkedTour.meetingPointEmbedUrl}
-                          className="w-full h-full border-none"
-                          loading="lazy"
-                          allowFullScreen
-                        />
-                      ) : (
-                        <div className="w-full h-full flex flex-col items-center justify-center p-3 text-center bg-blue-50 text-blue-900 gap-1.5">
-                          <MapPin className="w-6 h-6 text-blue-500" />
-                          <span className="text-[9px] font-black tracking-wider uppercase">Xəritə təyin olunmayıb</span>
-                          {linkedTour?.meetingPoint && (
-                            <a
-                              href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(linkedTour.meetingPoint)}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-[8px] font-bold text-blue-700 underline flex items-center gap-0.5"
-                            >
-                              Xəritədə axtar ↗
-                            </a>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
+                    {/* Circle punch-out notches */}
+                    <div className="hidden md:block w-4 h-4 rounded-full bg-slate-100/30 bg-slate-50 border border-slate-200/50 absolute -top-2 right-[152px] z-10" />
+                    <div className="hidden md:block w-4 h-4 rounded-full bg-slate-100/30 bg-slate-50 border border-slate-200/50 absolute -bottom-2 right-[152px] z-10" />
 
-                  {/* Two Column Grid for booking and supplier info */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    {/* Card 1: Voucher Details */}
-                    <div className="border border-slate-150 rounded-2xl p-5 bg-white space-y-4">
-                      <div className="text-[10px] font-black tracking-wider text-emerald-700 flex items-center gap-1.5 uppercase pb-2 border-b border-slate-100">
-                        <FileText className="w-3.5 h-3.5" />
-                        <span>Bron Məlumatları / Booking Info</span>
-                      </div>
-                      
-                      <div className="grid grid-cols-2 gap-y-3.5 gap-x-2 text-xs">
+                    {/* Main Part (Left) */}
+                    <div className="flex-1 p-6 md:border-r md:border-dashed md:border-slate-200 text-xs">
+                      {/* Vertical line route indicator */}
+                      <div className="flex items-center gap-3 pb-4 mb-4 border-b border-slate-100">
                         <div>
-                          <span className="block text-[8px] font-extrabold tracking-wider text-slate-400 uppercase">Bron Ref</span>
-                          <strong className="text-slate-900 font-mono">#{bookingRef}</strong>
+                          <span className="block text-[8px] font-extrabold tracking-wider text-slate-400">{t('vendorBookings.ticketModal.printDoc.departureLabel')}</span>
+                          <strong className="text-slate-800 text-xs">{t('vendorBookings.ticketModal.printDoc.departurePoint')}</strong>
                         </div>
+                        <div className="text-emerald-600 font-extrabold">➔</div>
                         <div>
-                          <span className="block text-[8px] font-extrabold tracking-wider text-slate-400 uppercase">Tarix / Date</span>
-                          <strong className="text-slate-950">{tBooking.bookingDate}</strong>
-                        </div>
-                        <div>
-                          <span className="block text-[8px] font-extrabold tracking-wider text-slate-400 uppercase">İştirakçı / Qty</span>
-                          <strong className="text-slate-900">{t('vendorBookings.crmTab.metrics.peopleCount', { count: tBooking.participantsCount })}</strong>
-                        </div>
-                        <div>
-                          <span className="block text-[8px] font-extrabold tracking-wider text-slate-400 uppercase">Status</span>
-                          <strong className={tBooking.status === 'paid' ? 'text-emerald-600' : 'text-amber-600'}>
-                            {tBooking.status === 'paid' ? 'Paid / Təsdiqlənib' : 'Pending / Gözləmədə'}
-                          </strong>
+                          <span className="block text-[8px] font-extrabold tracking-wider text-slate-400">{t('vendorBookings.ticketModal.ticketRender.routeLabel')}</span>
+                          <strong className="text-slate-800 text-xs">{tourName}</strong>
                         </div>
                       </div>
-                    </div>
 
-                    {/* Card 2: Local Partner Details */}
-                    <div className="border border-slate-150 rounded-2xl p-5 bg-white space-y-4">
-                      <div className="text-[10px] font-black tracking-wider text-emerald-700 flex items-center gap-1.5 uppercase pb-2 border-b border-slate-100">
-                        <User className="w-3.5 h-3.5 text-emerald-600" />
-                        <span>Yerli Tərəfdaş / Local Partner</span>
-                      </div>
-                      
-                      <div className="grid grid-cols-2 gap-y-3.5 gap-x-2 text-xs">
+                      {/* Details info grid */}
+                      <div className="grid grid-cols-2 gap-y-4 gap-x-3 text-[11px]">
                         <div>
-                          <span className="block text-[8px] font-extrabold tracking-wider text-slate-400 uppercase">Təşkilatçı</span>
-                          <strong className="text-slate-900 truncate block max-w-[120px]" title={linkedTour?.vendorName || 'GoTabiat'}>
-                            {linkedTour?.vendorName || 'GoTabiat'}
-                          </strong>
+                          <span className="block text-[8px] font-extrabold tracking-wider text-slate-400">{t('vendorBookings.ticketModal.ticketRender.passengerLabel')}</span>
+                          <strong className="text-slate-900 text-xs">{tBooking.customerName}</strong>
                         </div>
                         <div>
-                          <span className="block text-[8px] font-extrabold tracking-wider text-slate-400 uppercase">Ödənilən Məbləğ</span>
+                          <span className="block text-[8px] font-extrabold tracking-wider text-slate-400">{t('vendorBookings.ticketModal.ticketRender.contactLabel')}</span>
+                          <strong className="text-slate-900 text-xs font-mono font-semibold">{tBooking.customerPhone}</strong>
+                        </div>
+                        <div>
+                          <span className="block text-[8px] font-extrabold tracking-wider text-slate-400">{t('vendorBookings.ticketModal.ticketRender.tourDateLabel')}</span>
+                          <strong className="text-slate-905 text-slate-900 text-xs font-mono">{tBooking.bookingDate}</strong>
+                        </div>
+                        <div>
+                          <span className="block text-[8px] font-extrabold tracking-wider text-slate-400">{t('vendorBookings.ticketModal.ticketRender.seatsLabel')}</span>
+                          <strong className="text-slate-900 text-xs">{t('vendorBookings.crmTab.metrics.peopleCount', { count: tBooking.participantsCount })}</strong>
+                        </div>
+                        <div>
+                          <span className="block text-[8px] font-extrabold tracking-wider text-slate-400">{t('vendorBookings.ticketModal.printDoc.totalPaymentLabel')}</span>
                           <strong className="text-emerald-700 text-sm font-black font-mono">{tBooking.totalAmount} ₼</strong>
                         </div>
                         <div>
-                          <span className="block text-[8px] font-extrabold tracking-wider text-slate-400 uppercase">Müştəri</span>
-                          <strong className="text-slate-900 truncate block max-w-[120px]" title={tBooking.customerName}>
-                            {tBooking.customerName}
-                          </strong>
-                        </div>
-                        <div>
-                          <span className="block text-[8px] font-extrabold tracking-wider text-slate-400 uppercase">Əlaqə</span>
-                          <strong className="text-slate-900 font-mono text-[10px]">{tBooking.customerPhone}</strong>
+                          <span className="block text-[8px] font-extrabold tracking-wider text-slate-400">{t('vendorBookings.ticketModal.printDoc.transportClassLabel')}</span>
+                          <strong className="text-slate-800 text-[11px]">{t('vendorBookings.ticketModal.ticketRender.transportClassValue')}</strong>
                         </div>
                       </div>
                     </div>
+
+                    {/* Stub Area (Right) */}
+                    <div className="w-full md:w-[160px] p-6 bg-slate-50/50 flex flex-col items-center justify-between text-center shrink-0">
+                      <div>
+                        <span className="block text-[8px] font-extrabold tracking-wider text-slate-400">{t('vendorBookings.ticketModal.ticketRender.orderNoLabel')}</span>
+                        <strong className="text-slate-800 text-sm font-mono tracking-wide">#{bookingRef}</strong>
+                      </div>
+
+                      <div className="my-4 bg-white p-2 rounded-xl border border-slate-150 shadow-xs">
+                        <img
+                          src={`https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${bookingRef}`}
+                          className="w-20 h-20 block shrink-0"
+                          alt="Validation QR"
+                        />
+                      </div>
+
+                      <span className="text-[7.5px] font-bold text-slate-400 block tracking-wider">
+                        {t('vendorBookings.ticketModal.ticketRender.scanAtEntry')}
+                      </span>
+                    </div>
+
                   </div>
 
-                  {/* Safety Panel */}
-                  <div className="p-5 bg-amber-50/50 border border-amber-200/60 rounded-2xl flex items-start gap-3.5">
-                    <ShieldCheck className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-                    <div className="space-y-2">
-                      <h5 className="font-extrabold text-amber-950 text-xs tracking-wider uppercase">
-                        🛡️ Vacib Təlimatlar və Təhlükəsizlik Qaydaları
-                      </h5>
-                      <ul className="list-disc pl-4 space-y-1 text-[10px] text-slate-600 font-medium leading-relaxed">
-                        <li>Rahat yürüş ayaqqabısı, sukeçirməz geyim və fərdi su ehtiyatı mütləqdir.</li>
-                        <li>Şəxsiyyətinizi təsdiq edən sənədi (vəsiqə və ya pasport) özünüzlə götürün.</li>
-                        <li>Tur boyu bələdçinin və təşkilatçı heyətinin bütün təlimatlarına əməl edin.</li>
-                        <li>Xroniki xəstəliyiniz və ya allergiyanız varsa, çıxışdan əvvəl rəhbərliyə məlumat verin.</li>
-                        <li>Təbiəti qoruyun, heç bir halda zibil atmayın və ətraf mühitə zərər yetirməyin.</li>
-                      </ul>
-                    </div>
+                  {/* Safety instructions and notes */}
+                  <div className="p-5 bg-gradient-to-r from-amber-500/5 to-orange-500/5 border-t border-slate-100">
+                    <h5 className="font-extrabold text-amber-900 text-[10px] tracking-wider mb-2 flex items-center gap-1.5">
+                      <ShieldCheck className="w-4 h-4 text-amber-600" />
+                      <span>🛡️ {t('vendorBookings.ticketModal.printDoc.safetyTitle')}</span>
+                    </h5>
+                    <ol className="list-decimal pl-4 space-y-1 text-[10px] text-slate-600 font-medium">
+                      <li>{t('vendorBookings.ticketModal.ticketRender.safetyRule1')}</li>
+                      <li>{t('vendorBookings.ticketModal.ticketRender.safetyRule2')}</li>
+                      <li>{t('vendorBookings.ticketModal.ticketRender.safetyRule3')}</li>
+                      <li>{t('vendorBookings.ticketModal.ticketRender.safetyRule4')}</li>
+                    </ol>
                   </div>
 
                 </div>

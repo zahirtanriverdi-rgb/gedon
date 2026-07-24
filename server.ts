@@ -3231,6 +3231,62 @@ async function fetchQrCodeBase64(data: string): Promise<string | null> {
   }
 }
 
+// Bron ID-si və ya bron nömrəsi (#TUR-XXXX) ilə həm PDF generasiyası, həm də ictimai onlayn
+// bilet səhifəsi üçün lazım olan bütün konteksti (booking + tour + vendor) tək yerdən yığır.
+// Bu sayədə frontend-in görüş yeri koordinatları / vendor telefonu-email kimi sahələri əl ilə
+// ötürməsinə ehtiyac qalmır — server öz DB-sindən etibarlı mənbədən çəkir.
+async function fetchTicketContext(idOrRef: string): Promise<{ booking: any; tour: any; vendor: any; slot: any } | null> {
+  try {
+    const isRef = idOrRef.startsWith("#") || /^TUR-/i.test(idOrRef);
+    const rows = isRef
+      ? await dbClient.query('SELECT * FROM bookings WHERE booking_reference = ?', [idOrRef.startsWith("#") ? idOrRef : `#${idOrRef}`])
+      : await dbClient.query('SELECT * FROM bookings WHERE id = ?', [idOrRef]);
+    const bookingRow = rows[0];
+    if (!bookingRow) return null;
+    const booking = rowToBooking(bookingRow);
+
+    let tour: any = null;
+    if (bookingRow.tour_id) {
+      const tourRows = await dbClient.query('SELECT * FROM tours WHERE id = ?', [bookingRow.tour_id]);
+      if (tourRows[0]) tour = rowToTour(tourRows[0]);
+    }
+
+    let vendor: any = null;
+    if (bookingRow.vendor_id) {
+      const vendorRows = await dbClient.query('SELECT * FROM users WHERE id = ?', [bookingRow.vendor_id]);
+      if (vendorRows[0]) vendor = rowToUser(vendorRows[0]);
+    }
+
+    // Turun faktiki tarixi booking cədvəlində deyil, bağlı tour_slots sətrindədir (start_date/end_date).
+    let slot: any = null;
+    if (bookingRow.slot_id) {
+      const slotRows = await dbClient.query('SELECT * FROM tour_slots WHERE id = ?', [bookingRow.slot_id]);
+      if (slotRows[0]) slot = rowToSlot(slotRows[0]);
+    }
+
+    return { booking, tour, vendor, slot };
+  } catch (err) {
+    console.error("[Ticket] Booking konteksti tapılmadı:", err);
+    return null;
+  }
+}
+
+// Görüş nöqtəsinin OpenStreetMap əsaslı pulsuz statik xəritə şəklini çəkir (PDF-ə əlavə üçün —
+// Google Static Maps API açarı layihədə yoxdur, ona görə açar tələb etməyən staticmap.openstreetmap.de
+// istifadə olunur). Uğursuz olarsa null qaytarır, çağıran tərəf xəritəsiz davam edir.
+async function fetchStaticMapBase64(lat: number, lon: number): Promise<string | null> {
+  try {
+    const url = `https://staticmap.openstreetmap.de/staticmap.php?center=${lat},${lon}&zoom=15&size=440x220&maptype=mapnik&markers=${lat},${lon},red-pushpin`;
+    const res = await globalThis.fetch(url);
+    if (!res.ok) throw new Error(`staticmap status ${res.status}`);
+    const buf = await res.arrayBuffer();
+    return Buffer.from(buf).toString("base64");
+  } catch (err) {
+    console.error("[Ticket] OSM statik xəritə çəkilmədi:", err);
+    return null;
+  }
+}
+
 // Automated Landscape Ticket PDF Generation API (Redesigned as beautiful vertical A4 FlixBus format)
 
 function sanitizeForFallback(str: string): string {
@@ -3254,45 +3310,6 @@ const TICKET_COLORS: Record<string, [number, number, number]> = {
   bg: [248, 250, 252],        // #f8fafc (slate-50)
   divider: [226, 232, 240],   // #e2e8f0 (slate-200)
 };
-// Təhlükəsiz roundedRect helper — NaN/undefined/mənfi dəyərləri filtr edir
-function safeRoundedRect(
-  doc: any,
-  x: number,
-  y: number,
-  w: number,
-  h: number,
-  rx: number,
-  ry: number,
-  style: string
-) {
-  const safeNum = (v: any, fallback = 0) => {
-    const n = Number(v);
-    return Number.isFinite(n) && n >= 0 ? n : fallback;
-  };
-  const safeStyle = ["F", "S", "FD", "DF"].includes(style) ? style : "S";
-  const safeX = safeNum(x);
-  const safeY = safeNum(y);
-  const safeW = safeNum(w, 1);
-  const safeH = safeNum(h, 1);
-  const safeRx = safeNum(rx);
-  const safeRy = safeNum(ry);
-
-  try {
-    return doc.roundedRect(safeX, safeY, safeW, safeH, safeRx, safeRy, safeStyle);
-  } catch (error: any) {
-    console.error("[PDF] roundedRect failed, falling back to rect:", {
-      x: safeX,
-      y: safeY,
-      w: safeW,
-      h: safeH,
-      rx: safeRx,
-      ry: safeRy,
-      style: safeStyle,
-      error: error?.message || error,
-    });
-    return doc.rect(safeX, safeY, safeW, safeH, safeStyle);
-  }
-}
 
 app.post("/api/bookings/generate-ticket", async (req, res) => {
   const {
@@ -3308,13 +3325,6 @@ app.post("/api/bookings/generate-ticket", async (req, res) => {
     status,
     meetingPoint,
     vendorName,
-    vendorPhone,
-    vendorEmail,
-    meetingPointEmbedUrl,
-    category,
-    difficulty,
-    importantInfo,
-    safetyInstructions,
   } = req.body;
 
   if (!bookingId || !customerName || !tourName) {
@@ -3322,8 +3332,24 @@ app.post("/api/bookings/generate-ticket", async (req, res) => {
   }
 
   try {
+    // ===== 0. DB-DƏN ETİBARLI KONTEKST (görüş yeri koordinatları, vendor əlaqəsi) =====
+    // Frontend-dən gələn sahələr (yuxarıda) geriyə-uyğunluq üçün fallback olaraq saxlanılır,
+    // amma görüş yeri xəritəsi və vendor telefon/email kimi yeni sahələr üçün DB mənbəyi əsasdır.
+    const ctx = await fetchTicketContext(String(bookingId));
+    const tour = ctx?.tour || null;
+    const vendor = ctx?.vendor || null;
+    const resolvedDate = ctx?.slot?.startDate || date;
+
+    const resolvedMeetingPoint = meetingPoint || tour?.meetingPoint || "";
+    const meetingLat = tour?.meetingPointLat;
+    const meetingLng = tour?.meetingPointLng;
+    const hasMeetingCoords = typeof meetingLat === "number" && typeof meetingLng === "number";
+    const vendorPhone = vendor?.phone || "";
+    const vendorEmail = vendor?.email || "";
+    const vendorCompany = (vendor?.companyName && String(vendor.companyName).trim()) || vendorName || "";
+
     // ===== 1. QR KODU SERVER-DƏ YARADIRIQ (xarici API-yə ehtiyac yoxdur) =====
-    const bRef = reference || `TUR-${String(bookingId).slice(0, 5).toUpperCase()}`;
+    const bRef = reference || ctx?.booking?.booking_reference || `#TUR-${String(bookingId).slice(0, 5).toUpperCase()}`;
     const qrData = `GOTABIAT|${bRef}|${customerName}|${tourName}`;
     let qrBase64: string | null = null;
     try {
@@ -3331,29 +3357,28 @@ app.post("/api/bookings/generate-ticket", async (req, res) => {
         errorCorrectionLevel: "H",
         margin: 1,
         width: 300,
-        color: {
-          dark: "#0f172a",
-          light: "#FFFFFF",
-        },
+        color: { dark: "#047857", light: "#FFFFFF" },
       });
       qrBase64 = qrBase64.split(",")[1];
     } catch (qrErr) {
       console.error("[QR] Lokal QR yaratmaq alınmadı:", qrErr);
     }
 
-    // ===== 2. PDF SƏNƏDİNİ A4 FORMATINDA YARADIRIQ =====
-    const doc = new jsPDF({
-      orientation: "portrait",
-      unit: "pt",
-      format: "a4",
-    });
+    // ===== 2. GÖRÜŞ YERİ STATİK XƏRİTƏSİ (varsa) =====
+    let mapBase64: string | null = null;
+    if (hasMeetingCoords) {
+      mapBase64 = await fetchStaticMapBase64(meetingLat, meetingLng);
+    }
+    const mapsLink = hasMeetingCoords
+      ? `https://www.google.com/maps?q=${meetingLat},${meetingLng}`
+      : "";
 
-    const W = 595.27; // A4 Width in points
-    const H = 841.89; // A4 Height in points
-    const margin = 30;
-    const contentWidth = W - margin * 2;
+    // ===== 3. PDF SƏNƏDİNİ YARADIRIQ (A4-ə yaxın, "rəsmi sənəd" formatı) =====
+    const W = 480;
+    const H = 860;
+    const doc = new jsPDF({ orientation: "portrait", unit: "px", format: [W, H] });
 
-    // ===== 3. ŞRİFTLƏRİ YÜKLƏYİRİK =====
+    // ===== 4. ŞRİFTLƏRİ YÜKLƏYİRİK =====
     let hasCustomFonts = false;
     let fontName = "Helvetica";
     if (robotoRegularBase64 && robotoBoldBase64) {
@@ -3369,267 +3394,221 @@ app.post("/api/bookings/generate-ticket", async (req, res) => {
         console.error("[Fonts] Roboto yüklənmədi:", e);
       }
     }
+    // Qeyd: emoji glyph-ləri Roboto-da yoxdur (əvvəlki dizaynda "Ø=Ü..." zibilinə səbəb olan bug
+    // elə bu idi) — ona görə yeni dizaynda heç bir emoji istifadə olunmur, təmiz mətn etiketləri var.
     const displayText = (s: string) => (hasCustomFonts ? s || "" : sanitizeForFallback(s));
 
-    // ===== 4. ARXA FON VƏ KƏNAR BƏZƏK =====
     doc.setFillColor(...TICKET_COLORS.white);
     doc.rect(0, 0, W, H, "F");
 
-    // ===== 5. BAŞLIQ (HEADER): BREND + VOUCHER LOQO VƏ QR KOD =====
-    let currentY = 30;
+    // ===== 5. BAŞLIQ ZOLAĞI: VENDOR BRENDİ + BRON NÖMRƏSİ =====
+    doc.setFillColor(...TICKET_COLORS.primary);
+    doc.rect(0, 0, W, 72, "F");
+    doc.setFillColor(...TICKET_COLORS.secondary);
+    doc.rect(0, 68, W, 4, "F");
 
-    // Sol tərəf brend və loqo
-    doc.setTextColor(...TICKET_COLORS.primary);
+    const headerBrand = vendorCompany || "GoTabiat.com";
+    doc.setTextColor(...TICKET_COLORS.white);
     doc.setFont(fontName, "bold");
-    doc.setFontSize(22);
-    doc.text(displayText("🌲 GoTabiat.com"), margin, currentY + 22);
+    doc.setFontSize(headerBrand.length > 20 ? 15 : 19);
+    doc.text(displayText(headerBrand), 24, 32);
 
+    doc.setFont(fontName, "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(220, 252, 231);
+    doc.text(displayText("Elektron Bilet / Voucher"), 24, 48);
+
+    doc.setFillColor(...TICKET_COLORS.accent);
+    doc.roundedRect(W - 156, 20, 132, 30, 5, 5, "F");
+    doc.setTextColor(...TICKET_COLORS.white);
     doc.setFont(fontName, "bold");
     doc.setFontSize(11);
-    doc.setTextColor(...TICKET_COLORS.muted);
-    doc.text(displayText("BRON SƏNƏDİ / BOOKING VOUCHER"), margin, currentY + 38);
+    doc.text(displayText(`${bRef}`), W - 90, 39, { align: "center" });
 
-    // Sağ tərəf: QR Kod
-    const qrSize = 65;
-    const qrX = W - margin - qrSize;
-    const qrY = currentY;
+    let y = 92;
 
+    // ===== 6. TUR BAŞLIĞI + QR (GYG-in 1-2 saylı bölmələri) =====
+    const topCardH = 118;
     doc.setFillColor(...TICKET_COLORS.white);
-    safeRoundedRect(doc,qrX - 5, qrY - 5, qrSize + 10, qrSize + 10, 4, 4, "F");
+    doc.roundedRect(20, y, W - 40, topCardH, 8, 8, "F");
     doc.setDrawColor(...TICKET_COLORS.divider);
     doc.setLineWidth(0.5);
-    safeRoundedRect(doc,qrX - 5, qrY - 5, qrSize + 10, qrSize + 10, 4, 4, "S");
+    doc.roundedRect(20, y, W - 40, topCardH, 8, 8, "S");
 
+    const qrSize = 92;
+    const qrX = W - 32 - qrSize;
+    const qrY = y + 13;
     if (qrBase64) {
       try {
         doc.addImage(qrBase64, "PNG", qrX, qrY, qrSize, qrSize);
       } catch (err) {
-        console.error("[QR] PDF-ə QR əlavə olunmadı:", err);
+        console.error("[QR] PDF-ə əlavə etmək alınmadı:", err);
       }
     }
 
-    doc.setFont(fontName, "bold");
-    doc.setFontSize(8);
-    doc.setTextColor(...TICKET_COLORS.dark);
-    doc.text(displayText(bRef), qrX + qrSize / 2, qrY + qrSize + 11, { align: "center" });
-
-    currentY += 85;
-
-    // İncə ayırıcı xətt
-    doc.setDrawColor(...TICKET_COLORS.divider);
-    doc.setLineWidth(0.5);
-    doc.line(margin, currentY, W - margin, currentY);
-    currentY += 20;
-
-    // ===== 6. TUR ADI VƏ DETALLARI BLOKU =====
-    // Kateqoriya nişanı (Category Badge)
-    const catText = category ? String(category).toUpperCase() : "TUR";
-    doc.setFillColor(...TICKET_COLORS.bg);
-    safeRoundedRect(doc, margin, currentY, 80, 16, 2, 2, "F");
+    const textColW = qrX - 44;
     doc.setTextColor(...TICKET_COLORS.primary);
     doc.setFont(fontName, "bold");
     doc.setFontSize(8);
-    doc.text(displayText(catText), margin + 40, currentY + 11, { align: "center" });
-    currentY += 24;
+    doc.text(displayText("TUR ADI"), 32, y + 18);
 
-    // Tur Adı
     doc.setTextColor(...TICKET_COLORS.dark);
     doc.setFont(fontName, "bold");
-    doc.setFontSize(16);
-    const tourLines = doc.splitTextToSize(displayText(tourName), contentWidth);
-    doc.text(tourLines, margin, currentY);
-    currentY += tourLines.length * 18;
+    doc.setFontSize(14);
+    const tourLines = doc.splitTextToSize(displayText(tourName), textColW);
+    doc.text(tourLines.slice(0, 2), 32, y + 34);
 
-    // Seçilmiş Variant / Çətinlik
-    doc.setTextColor(...TICKET_COLORS.muted);
     doc.setFont(fontName, "normal");
-    doc.setFontSize(9.5);
-    const diffLabel = difficulty ? `Çətinlik: ${displayText(difficulty.charAt(0).toUpperCase() + difficulty.slice(1))}` : "Standart Variant";
-    const regLabel = region ? `Region: ${displayText(region)}` : "Azərbaycan";
-    doc.text(displayText(`${diffLabel} · ${regLabel}`), margin, currentY);
-    currentY += 20;
-
-    // ===== 7. GÖRÜŞ NÖQTƏSİ VƏ XƏRİTƏ BLOKU =====
-    const boxY = currentY;
-    const boxH = 135;
-    doc.setFillColor(...TICKET_COLORS.white);
-    doc.setDrawColor(...TICKET_COLORS.divider);
-    doc.setLineWidth(0.7);
-    safeRoundedRect(doc, margin, boxY, contentWidth, boxH, 6, 6, "FD");
-
-    // Sol tərəf: Ünvan və Təlimatlar
-    doc.setTextColor(...TICKET_COLORS.primary);
-    doc.setFont(fontName, "bold");
     doc.setFontSize(9);
-    doc.text(displayText("📍 GÖRÜŞ VƏ YA PİKAP NÖQTƏSİ / MEETING POINT"), margin + 15, boxY + 22);
-
-    doc.setTextColor(...TICKET_COLORS.dark);
-    doc.setFont(fontName, "bold");
-    doc.setFontSize(11);
-    const mpValue = meetingPoint || "Təyin olunmayıb. Zəhmət olmasa operatorla dəqiqləşdirin.";
-    const mpLines = doc.splitTextToSize(displayText(mpValue), contentWidth - 190);
-    doc.text(mpLines, margin + 15, boxY + 40);
-
     doc.setTextColor(...TICKET_COLORS.muted);
+    doc.text(displayText(region || tour?.region || "Azərbaycan"), 32, tourLines.length > 1 ? y + 76 : y + 62);
+
     doc.setFont(fontName, "normal");
     doc.setFontSize(8);
-    const mpInstruction = "Qeyd: Xəritədə göstərilən görüş nöqtəsində nəzərdə tutulan çıxış saatından 15 dəqiqə əvvəl hazır olmağınız xahiş olunur.";
-    doc.text(displayText(mpInstruction), margin + 15, boxY + 110, { maxWidth: contentWidth - 190 });
+    doc.text(displayText(`Sərnişin: ${customerName}`), 32, y + topCardH - 14);
 
-    // Sağ tərəf: Kliklənə bilən xəritə kartı (Clickable Map Box)
-    const mapX = W - margin - 15 - 140;
-    const mapY = boxY + 15;
-    const mapW = 140;
-    const mapH = 105;
+    y += topCardH + 16;
 
-    doc.setFillColor(219, 234, 254); // bg-blue-100
-    safeRoundedRect(doc, mapX, mapY, mapW, mapH, 4, 4, "F");
-
-    // Yol dizayn xətləri
-    doc.setDrawColor(255, 255, 255);
-    doc.setLineWidth(3);
-    doc.line(mapX + 10, mapY + 10, mapX + 130, mapY + 95);
-    doc.line(mapX + 130, mapY + 15, mapX + 10, mapY + 85);
-    doc.line(mapX + 70, mapY + 5, mapX + 70, mapY + 100);
-
-    // Google Maps Pin ikon effekti — üçbucaq yoxdur, əvəzinə sadə dairə marker
-    doc.setFillColor(239, 68, 68); // qırmızı marker
-    doc.circle(mapX + 70, mapY + 45, 7, "F");
-    doc.setFillColor(255, 255, 255);
-    doc.circle(mapX + 70, mapY + 45, 2.5, "F");
-
-    // Xəritə düyməsi/etiketi
-    doc.setFillColor(15, 23, 42); // Slate overlay
-    safeRoundedRect(doc, mapX + 10, mapY + mapH - 24, mapW - 20, 16, 2, 2, "F");
-    doc.setTextColor(255, 255, 255);
-    doc.setFont(fontName, "bold");
-    doc.setFontSize(7.5);
-    doc.text(displayText("XƏRİTƏNİ AÇ / OPEN MAP ↗"), mapX + mapW / 2, mapY + mapH - 14, { align: "center" });
-
-    // Keçid linki
-    if (meetingPointEmbedUrl) {
-      doc.link(mapX, mapY, mapW, mapH, { url: meetingPointEmbedUrl });
-    }
-
-    currentY += boxH + 20;
-
-    // ===== 8. İKİ SÜTUNLU MƏLUMAT VƏ SUPPLIER GRID =====
-    const colW = (contentWidth - 15) / 2;
-    const colH = 135;
-    const col1X = margin;
-    const col2X = margin + colW + 15;
-    const colY = currentY;
-
-    // Sütun 1: Bron məlumatları
-    doc.setFillColor(...TICKET_COLORS.white);
-    doc.setDrawColor(...TICKET_COLORS.divider);
-    safeRoundedRect(doc, col1X, colY, colW, colH, 6, 6, "FD");
-
-    doc.setTextColor(...TICKET_COLORS.primary);
-    doc.setFont(fontName, "bold");
-    doc.setFontSize(9);
-    doc.text(displayText("🎫 BRON MƏLUMATLARI / BOOKING INFO"), col1X + 15, colY + 20);
-
-    let fieldY = colY + 38;
-    const drawField = (label: string, value: string, isAccent: boolean = false) => {
-      doc.setTextColor(...TICKET_COLORS.muted);
-      doc.setFont(fontName, "normal");
-      doc.setFontSize(7.5);
-      doc.text(displayText(label), col1X + 15, fieldY);
-      if (isAccent) {
-        doc.setTextColor(21, 128, 61);
-      } else {
-        doc.setTextColor(...TICKET_COLORS.dark);
-      }
-      doc.setFont(fontName, "bold");
-      doc.setFontSize(9);
-      doc.text(displayText(value), col1X + 15, fieldY + 11);
-      fieldY += 23;
-    };
-
-    drawField("BRON KODU / BOOKING REF", bRef);
-    drawField("TARİX / DATE", date || "—");
-    drawField("İŞTİRAKÇI / PARTICIPANTS", `${participantsCount || 1} nəfər`);
-    drawField("STATUS", status === "paid" ? "TƏSDİQLƏNİB / PAID" : "GÖZLƏMƏDƏ / PENDING", status === "paid");
-
-    // Sütun 2: Tərəfdaş (Supplier) məlumatları
-    doc.setFillColor(...TICKET_COLORS.white);
-    doc.setDrawColor(...TICKET_COLORS.divider);
-    safeRoundedRect(doc, col2X, colY, colW, colH, 6, 6, "FD");
-
-    doc.setTextColor(...TICKET_COLORS.primary);
-    doc.setFont(fontName, "bold");
-    doc.setFontSize(9);
-    doc.text(displayText("🏢 YERLİ TƏRƏFDAŞ / SUPPLIER DETAILS"), col2X + 15, colY + 20);
-
-    let supFieldY = colY + 38;
-    const drawSupField = (label: string, value: string) => {
-      doc.setTextColor(...TICKET_COLORS.muted);
-      doc.setFont(fontName, "normal");
-      doc.setFontSize(7.5);
-      doc.text(displayText(label), col2X + 15, supFieldY);
+    // ===== 7. GÖRÜŞ NÖQTƏSİ + XƏRİTƏ (GYG-in 3 saylı bölməsi) =====
+    if (resolvedMeetingPoint || mapBase64) {
       doc.setTextColor(...TICKET_COLORS.dark);
       doc.setFont(fontName, "bold");
+      doc.setFontSize(11);
+      doc.text(displayText("Görüş nöqtəsi"), 24, y);
+      y += 6;
+
+      doc.setFillColor(...TICKET_COLORS.bg);
+      doc.roundedRect(20, y, W - 40, 30, 5, 5, "F");
+      doc.setFont(fontName, "normal");
       doc.setFontSize(9);
-      doc.text(displayText(value), col2X + 15, supFieldY + 11);
-      supFieldY += 23;
+      doc.setTextColor(...TICKET_COLORS.dark);
+      const mpLines = doc.splitTextToSize(displayText(resolvedMeetingPoint || "Görüş yeri bələdçi ilə razılaşdırılacaq"), W - 60);
+      doc.text(mpLines.slice(0, 2), 30, y + 18);
+      y += 38;
+
+      if (mapBase64) {
+        const mapH = 150;
+        try {
+          doc.addImage(`data:image/png;base64,${mapBase64}`, "PNG", 20, y, W - 40, mapH);
+        } catch (err) {
+          console.error("[Map] PDF-ə əlavə etmək alınmadı:", err);
+        }
+        doc.setDrawColor(...TICKET_COLORS.divider);
+        doc.setLineWidth(0.5);
+        doc.rect(20, y, W - 40, mapH, "S");
+        y += mapH + 8;
+
+        doc.setFont(fontName, "normal");
+        doc.setFontSize(8);
+        doc.setTextColor(...TICKET_COLORS.primary);
+        doc.text(displayText(`Xəritədə aç: ${mapsLink}`), 24, y);
+        y += 20;
+      } else {
+        y += 6;
+      }
+    }
+
+    // ===== 8. BİLET MƏLUMATLARI (2x2 grid — GYG-in 4 saylı bölməsi) =====
+    doc.setFont(fontName, "bold");
+    doc.setFontSize(11);
+    doc.setTextColor(...TICKET_COLORS.dark);
+    doc.text(displayText("Bilet məlumatları"), 24, y);
+    y += 10;
+
+    const cardW = (W - 60) / 2;
+    const cardH = 54;
+    const drawInfoCard = (x: number, cy: number, label: string, value: string, valueColor: [number, number, number] = TICKET_COLORS.dark) => {
+      doc.setFillColor(...TICKET_COLORS.bg);
+      doc.roundedRect(x, cy, cardW, cardH, 5, 5, "F");
+      doc.setDrawColor(...TICKET_COLORS.divider);
+      doc.setLineWidth(0.5);
+      doc.roundedRect(x, cy, cardW, cardH, 5, 5, "S");
+
+      doc.setTextColor(...TICKET_COLORS.muted);
+      doc.setFont(fontName, "normal");
+      doc.setFontSize(8);
+      doc.text(displayText(label), x + 10, cy + 15);
+
+      doc.setTextColor(...valueColor);
+      doc.setFont(fontName, "bold");
+      doc.setFontSize(11);
+      const valLines = doc.splitTextToSize(displayText(value), cardW - 20);
+      doc.text(valLines.slice(0, 2), x + 10, cy + 33);
     };
 
-    drawSupField("ŞİRKƏT ADI / COMPANY NAME", vendorName || "GoTabiat");
-    drawSupField("ƏLAQƏ / CONTACT PHONE", vendorPhone || "—");
-    drawSupField("E-POÇT / EMAIL", vendorEmail || "—");
-    drawSupField("MƏBLƏĞ / TOTAL PAID", `${amount || 0} AZN`);
+    drawInfoCard(20, y, "SƏFƏR TARİXİ", resolvedDate || "—", TICKET_COLORS.primary);
+    drawInfoCard(20 + cardW + 20, y, "İŞTİRAKÇI SAYI", `${participantsCount || 1} nəfər`);
+    y += cardH + 10;
+    drawInfoCard(20, y, "ÜMUMİ MƏBLƏĞ", `${amount || 0} AZN`, TICKET_COLORS.primary);
+    drawInfoCard(20 + cardW + 20, y, "STATUS", status === "cancelled" ? "LƏĞV EDİLDİ" : "TƏSDİQLƏNİB", [21, 128, 61]);
+    y += cardH + 24;
 
-    currentY += colH + 20;
+    // ===== 9. AŞAĞI 2 SÜTUN: QAYDALAR (sol) + VENDOR ƏLAQƏ (sağ) — GYG-in 5-6 saylı bölmələri =====
+    const colW = (W - 60) / 2;
+    const colX2 = 20 + colW + 20;
+    const colTop = y;
 
-    // ===== 9. TƏHLÜKƏSİZLİK VƏ VACİB QAYDALAR PANELİ =====
-    const rulesY = currentY;
-    const rulesH = 110;
-    doc.setFillColor(...TICKET_COLORS.bg);
-    safeRoundedRect(doc, margin, rulesY, contentWidth, rulesH, 6, 6, "F");
-    doc.setDrawColor(...TICKET_COLORS.divider);
-    safeRoundedRect(doc, margin, rulesY, contentWidth, rulesH, 6, 6, "S");
-
-    // Accent sol xətt
-    doc.setFillColor(...TICKET_COLORS.accent);
-    doc.rect(margin, rulesY, 3, rulesH, "F");
-
-    doc.setTextColor(...TICKET_COLORS.dark);
     doc.setFont(fontName, "bold");
-    doc.setFontSize(9);
-    doc.text(displayText("⚠️ VACİB TƏLİMATLAR / IMPORTANT RULES"), margin + 15, rulesY + 16);
-
-    let ruleTextY = rulesY + 30;
-    doc.setFont(fontName, "normal");
-    doc.setFontSize(8);
-    doc.setTextColor(...TICKET_COLORS.muted);
+    doc.setFontSize(10);
+    doc.setTextColor(...TICKET_COLORS.dark);
+    doc.text(displayText("Nəyi xatırlamaq lazımdır"), 20, colTop);
 
     const rules = [
-      "• Rahat yürüş ayaqqabısı, sukeçirməz geyim və fərdi su ehtiyatı mütləqdir.",
-      "• Şəxsiyyətinizi təsdiq edən sənədi (vəsiqə və ya pasport) özünüzlə götürün.",
-      "• Tur boyu bələdçinin və təşkilatçı heyətinin bütün təlimatlarına əməl edin.",
-      "• Xroniki xəstəliyiniz və ya allergiyanız varsa, çıxışdan əvvəl rəhbərliyə məlumat verin.",
-      "• Təbiəti qoruyun, heç bir halda zibil atmayın və ətraf mühitə zərər yetirməyin."
+      "Bələdçinin təlimatlarına əməl edin",
+      "Rahat yürüş ayaqqabısı və su mütləqdir",
+      "Təbiəti qoruyun, zibil atmayın",
+      "Xroniki xəstəlik barədə əvvəlcədən xəbərdar edin",
     ];
-
-    rules.forEach((r) => {
-      doc.text(displayText(r), margin + 15, ruleTextY);
-      ruleTextY += 14;
-    });
-
-    // ===== 10. ALT HİSSƏ (FOOTER) =====
-    doc.setDrawColor(...TICKET_COLORS.divider);
-    doc.setLineWidth(0.5);
-    doc.line(margin, H - 45, W - margin, H - 45);
-
-    doc.setFont(fontName, "bold");
+    doc.setFont(fontName, "normal");
     doc.setFontSize(8);
     doc.setTextColor(...TICKET_COLORS.muted);
-    doc.text(displayText("Bu sənəd GoTabiat.com platformasında rezervasiya əsasında generasiya edilmişdir."), W / 2, H - 30, { align: "center" });
+    let ruleY = colTop + 16;
+    rules.forEach((r) => {
+      const lines = doc.splitTextToSize(displayText(`• ${r}`), colW);
+      doc.text(lines, 20, ruleY);
+      ruleY += 11 * lines.length + 2;
+    });
+
+    doc.setFont(fontName, "bold");
+    doc.setFontSize(10);
+    doc.setTextColor(...TICKET_COLORS.dark);
+    doc.text(displayText("Köməyə ehtiyacınız var?"), colX2, colTop);
 
     doc.setFont(fontName, "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(...TICKET_COLORS.muted);
+    let helpY = colTop + 16;
+    doc.text(displayText(`Yerli tərəfdaş: ${vendorCompany || "GoTabiat.com"}`), colX2, helpY);
+    helpY += 13;
+    if (vendorPhone) {
+      doc.text(displayText(`Telefon: ${vendorPhone}`), colX2, helpY);
+      helpY += 13;
+    }
+    if (vendorEmail) {
+      doc.text(displayText(`E-poçt: ${vendorEmail}`), colX2, helpY);
+      helpY += 13;
+    }
+    helpY += 4;
+    doc.setFont(fontName, "bold");
+    doc.setFontSize(8);
+    doc.setTextColor(...TICKET_COLORS.dark);
+    doc.text(displayText(`Bron nömrəsi: ${bRef}`), colX2, helpY);
+
+    y = Math.max(ruleY, helpY) + 20;
+
+    // ===== 10. FOOTER =====
+    doc.setDrawColor(...TICKET_COLORS.divider);
+    doc.setLineWidth(0.5);
+    doc.line(20, H - 34, W - 20, H - 34);
+    doc.setFont(fontName, "normal");
     doc.setFontSize(7);
-    doc.text(displayText("Səhifə 1 / 1"), W / 2, H - 18, { align: "center" });
+    doc.setTextColor(...TICKET_COLORS.muted);
+    doc.text(
+      displayText("Bu, GoTabiat.com üzərindən rəsmi bron sənədidir. Bileti girişdə bələdçiyə göstərin."),
+      W / 2,
+      H - 18,
+      { align: "center" }
+    );
 
     // ===== 11. FAYLI YADDAŞA VERİRİK VƏ QAYTARIRIQ =====
     const pdfBuffer = doc.output("arraybuffer");
@@ -3637,11 +3616,54 @@ app.post("/api/bookings/generate-ticket", async (req, res) => {
     const filepath = path.join(ticketsDir, filename);
     fs.writeFileSync(filepath, Buffer.from(pdfBuffer));
 
-    console.log(`[Ticket] ✅ Yeni bilet yaradıldı (A4 GYG formatı): ${filename}`);
+    console.log(`[Ticket] ✅ Yeni bilet yaradıldı: ${filename}`);
     return res.json({ success: true, ticketUrl: `/tickets/${filename}` });
   } catch (error: any) {
     console.error("[Ticket] ❌ PDF yaratmaq alınmadı:", error);
     return res.status(500).json({ error: "Bilet yaradılarkən xəta: " + error.message });
+  }
+});
+
+// GET /api/bookings/ticket/:ref — İCTİMAİ endpoint (auth tələb etmir). Bron nömrəsi (#TUR-XXXX)
+// və ya bookingId ilə çağırıla bilər. Onlayn/mobil bilet səhifəsi (web/app/(site)/ticket/[ref])
+// bu endpoint-dən bron + tur (görüş yeri, embed xəritə) + vendor (ad, telefon, email) məlumatlarını
+// çəkir. Yalnız müştəriyə göstərilməli sahələr qaytarılır — vendor balansı, şifrə hash-i və s. yoxdur.
+app.get("/api/bookings/ticket/:ref", async (req, res) => {
+  try {
+    const ctx = await fetchTicketContext(decodeURIComponent(req.params.ref));
+    if (!ctx) return res.status(404).json({ error: "Bilet tapılmadı." });
+    const { booking, tour, vendor, slot } = ctx;
+
+    return res.json({
+      booking: {
+        id: booking.id,
+        reference: booking.booking_reference,
+        customerName: booking.customerName,
+        customerPhone: booking.customerPhone,
+        travelDate: slot?.startDate || null,
+        participantsCount: booking.participantsCount,
+        totalAmount: booking.totalAmount,
+        status: booking.status,
+      },
+      tour: tour ? {
+        name: tour.name,
+        region: tour.region,
+        slug: tour.slug,
+        meetingPoint: tour.meetingPoint,
+        meetingPointLat: tour.meetingPointLat,
+        meetingPointLng: tour.meetingPointLng,
+        meetingPointEmbedUrl: tour.meetingPointEmbedUrl,
+      } : null,
+      vendor: vendor ? {
+        companyName: vendor.companyName || vendor.name,
+        phone: vendor.phone,
+        email: vendor.email,
+      } : null,
+      ticketPdfUrl: `/tickets/ticket_${booking.id}.pdf`,
+    });
+  } catch (error: any) {
+    console.error("[Ticket] Onlayn bilet məlumatı çəkilmədi:", error);
+    return res.status(500).json({ error: "Bilet məlumatı yüklənərkən xəta baş verdi." });
   }
 });
 
