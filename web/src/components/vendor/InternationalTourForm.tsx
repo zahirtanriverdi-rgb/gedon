@@ -80,6 +80,22 @@ export function InternationalTourForm({ currentUser, tour, slots, onAddTour, onE
   const [intlBringItems, setIntlBringItems] = useState<string[]>([]);
   const [intlNotAllowedItems, setIntlNotAllowedItems] = useState<string[]>([]);
 
+  const BRING_ITEM_SUGGESTIONS = [
+    'Rahat Yürüş Ayaqqabısı',
+    'Dəyişən Havaya Qarşı Geyim',
+    'Kifayət Qədər Su',
+    'Enerji Verən Qəlyanaltılar',
+    'Powerbank',
+    'Şəxsi Tibbi Dəst',
+    'Günəşdən Qorunma Vasitələri',
+    'Yürüş çubuğu',
+  ];
+
+  const addIntlBringItemSuggestion = (item: string) => {
+    setIntlBringItems((prev) => (prev.includes(item) ? prev : [...prev, item]));
+    clearFieldError('bringItems');
+  };
+
   const [intlItinerary, setIntlItinerary] = useState<Array<{ day: number; title: string; description: string; image?: string }>>([
     { day: 1, title: 'Bakıdan Uçuş və Qarşılanma', description: 'Göstərilən saatda hava limanında toplaşırıq. Təyyarə ilə təyinat nöqtəsinə uçuş. Qarşılanma və otelə transfer.' }
   ]);
@@ -456,6 +472,22 @@ export function InternationalTourForm({ currentUser, tour, slots, onAddTour, onE
               {fieldErrors.languages && <p className="text-[10px] font-semibold text-red-600 mt-1">⚠️ {t('vendorTourForms.internationalTourForm.fields.languages.error')}</p>}
             </div>
             <div>
+              <div className="mb-2">
+                <div className="text-[11px] font-semibold text-slate-600 mb-1">Seçmək üçün təkliflər:</div>
+                <div className="flex flex-wrap gap-2">
+                  {BRING_ITEM_SUGGESTIONS.map((item) => (
+                    <button
+                      key={item}
+                      type="button"
+                      onClick={() => addIntlBringItemSuggestion(item)}
+                      className={`text-[11px] px-2.5 py-1 rounded-full border transition ${intlBringItems.includes(item) ? 'bg-emerald-600 border-emerald-600 text-white' : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'}`}
+                    >
+                      {item}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[10px] text-slate-500 mt-1">Və ya siyahıya özündən nəsə əlavə edə bilərsən.</p>
+              </div>
               <DynamicStringListInput
                 label={t('vendorTourForms.internationalTourForm.fields.bringItems.label')}
                 items={intlBringItems}
